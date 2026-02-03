@@ -127,17 +127,21 @@ saveAnswer(questionId, selected, question.correct)
     setSaving(false)
   }
 const saveAnswer = async (questionId, selected, correct) => {
+  console.log('Saving answer:', questionId, selected, correct)
   try {
     const { data: { user } } = await supabase.auth.getUser()
+    console.log('User:', user?.id)
     
     const { data: exercise } = await supabase
       .from('exercises')
       .select('id')
       .eq('title', 'Prepositions Practice')
       .single()
+    
+    console.log('Exercise:', exercise?.id)
 
     if (exercise) {
-      await supabase
+      const { data, error } = await supabase
         .from('student_answers')
         .insert({
           student_id: user.id,
@@ -148,6 +152,7 @@ const saveAnswer = async (questionId, selected, correct) => {
           is_correct: selected === correct,
           answered_at: new Date().toISOString()
         })
+      console.log('Insert result:', data, 'Error:', error)
     }
   } catch (error) {
     console.error('Error saving answer:', error)
