@@ -89,7 +89,7 @@ function Prepositions({ onComplete, onBack }) {
 
     const question = questions.find(q => q.id === questionId)
     const isCorrect = selected === question.correct
-
+saveAnswer(questionId, selected, question.correct)
     setAnswered(prev => ({ ...prev, [questionId]: selected }))
     if (isCorrect) setScore(prev => prev + 1)
 
@@ -126,7 +126,33 @@ function Prepositions({ onComplete, onBack }) {
     }
     setSaving(false)
   }
+const saveAnswer = async (questionId, selected, correct) => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    const { data: exercise } = await supabase
+      .from('exercises')
+      .select('id')
+      .eq('title', 'Prepositions Practice')
+      .single()
 
+    if (exercise) {
+      await supabase
+        .from('student_answers')
+        .insert({
+          student_id: user.id,
+          exercise_id: exercise.id,
+          question_id: questionId,
+          student_answer: selected,
+          correct_answer: correct,
+          is_correct: selected === correct,
+          answered_at: new Date().toISOString()
+        })
+    }
+  } catch (error) {
+    console.error('Error saving answer:', error)
+  }
+}
   const percentage = Math.round((score / questions.length) * 100)
 
   const getResultMessage = () => {
