@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 
 const questions = [
@@ -78,6 +78,9 @@ const questions = [
 function Prepositions({ onComplete, onBack }) {
   const [answered, setAnswered] = useState({})
   const [score, setScore] = useState(0)
+  useEffect(() => {
+  window.scrollTo(0, 0)
+}, [])
   const [finished, setFinished] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -137,7 +140,7 @@ function Prepositions({ onComplete, onBack }) {
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       {/* Header */}
 <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px 12px 0 0', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', position: 'relative' }}>        
-<button onClick={onBack} style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid white', color: 'white', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', position: 'absolute', left: '1rem', top: '1.5rem', fontSize: '0.9rem', fontWeight: 500 }}>← Back</button>        <span style={{ display: 'inline-block', background: '#4299e1', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>Level: B1 Intermediate</span>
+<button onClick={onBack} style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid white', color: 'white', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', position: 'absolute', left: '1rem', top: '1rem', fontSize: '0.9rem', fontWeight: 500 }}>← Back</button>        <span style={{ display: 'inline-block', background: '#4299e1', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>Level: B1 Intermediate</span>
       </div>
 
       {/* White card body */}
