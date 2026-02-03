@@ -27,7 +27,9 @@ setLoading(false)
   }
   return (
     <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px' }}>
-      <h1>Login to Perfect English</h1>
+     <h1 style={{ fontSize: '2rem', marginBottom: '2rem', color: '#2C3E50' }}>
+  Login to Perfect <span style={{ color: '#3498DB' }}>English</span>
+</h1>
       
       <form onSubmit={handleLogin}>
         <div style={{ marginBottom: '15px' }}>

@@ -109,7 +109,9 @@ function Dashboard({ session }) {
   // Approved user - show dashboard
   return (
     <div style={{ maxWidth: '800px', margin: '50px auto', padding: '20px' }}>
-      <h1>Perfect English Student Portal</h1>
+      <h1 style={{ fontSize: '2.5rem', marginBottom: '2rem', color: '#2C3E50' }}>
+  Perfect <span style={{ color: '#3498DB' }}>English</span> Student App
+</h1>
       <p>Welcome, {profile.full_name}!</p>
       <p>Email: {session.user.email}</p>
       <p>Your Level: {profile.level || 'Not assigned yet'}</p>

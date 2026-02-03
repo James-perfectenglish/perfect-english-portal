@@ -33,7 +33,7 @@ function Signup() {
 
   return (
     <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px' }}>
-      <h1>Sign Up for Perfect English</h1>
+      <h1>Sign Up for Perfect <span style={{ color: '#3498DB' }}>English</span></h1>
       
       <form onSubmit={handleSignup}>
         <div style={{ marginBottom: '15px' }}>
