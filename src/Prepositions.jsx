@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 
 const questions = [
-
   {
     id: 1,
     sentence: "The meeting starts ___________ 9 o'clock.",
@@ -78,65 +77,64 @@ const questions = [
 function Prepositions({ onComplete, onBack }) {
   const [answered, setAnswered] = useState({})
   const [score, setScore] = useState(0)
-  useEffect(() => {
-  window.scrollTo(0, 0)
-}, [])
   const [finished, setFinished] = useState(false)
   const [saving, setSaving] = useState(false)
-   } catch (error) {
-      console.error('Error saving result:', error)
-    }
-    setSaving(false)
-  }
-const saveAnswer = async (questionId, selected, correct) => {
-  console.log('Saving answer:', questionId, selected, correct)
-  try {
-    const { data: { user } } = await supabase.auth.getUser()
-    console.log('User:', user?.id)
-    
-    const { data: exercise } = await supabase
-      .from('exercises')
-      .select('id')
-      .eq('title', 'Prepositions Practice')
-      .single()
-    
-    console.log('Exercise:', exercise?.id)
 
-    if (exercise) {
-      const { data, error } = await supabase
-        .from('student_answers')
-        .insert({
-          student_id: user.id,
-          exercise_id: exercise.id,
-          question_id: questionId,
-          student_answer: selected,
-          correct_answer: correct,
-          is_correct: selected === correct,
-          answered_at: new Date().toISOString()
-        })
-      console.log('Insert result:', data, 'Error:', error)
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
+
+  const saveAnswer = async (questionId, selected, correct) => {
+    console.log('Saving answer:', questionId, selected, correct)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      console.log('User:', user?.id)
+      
+      const { data: exercise } = await supabase
+        .from('exercises')
+        .select('id')
+        .eq('title', 'Prepositions Practice')
+        .single()
+      
+      console.log('Exercise:', exercise?.id)
+
+      if (exercise) {
+        const { data, error } = await supabase
+          .from('student_answers')
+          .insert({
+            student_id: user.id,
+            exercise_id: exercise.id,
+            question_id: questionId,
+            student_answer: selected,
+            correct_answer: correct,
+            is_correct: selected === correct,
+            answered_at: new Date().toISOString()
+          })
+        console.log('Insert result:', data, 'Error:', error)
+      }
+    } catch (error) {
+      console.error('Error saving answer:', error)
     }
-  } catch (error) {
-    console.error('Error saving answer:', error)
   }
-}
+
   const handleAnswer = (questionId, selected) => {
     if (answered[questionId]) return
 
     const question = questions.find(q => q.id === questionId)
     const isCorrect = selected === question.correct
-saveAnswer(questionId, selected, question.correct)
+    
+    saveAnswer(questionId, selected, question.correct)
+    
     setAnswered(prev => ({ ...prev, [questionId]: selected }))
     if (isCorrect) setScore(prev => prev + 1)
 
-    // Check if all answered
     if (Object.keys(answered).length + 1 === questions.length) {
       setFinished(true)
       saveResult(isCorrect ? score + 1 : score)
     }
   }
 
- const saveResult = async (finalScore) => {
+  const saveResult = async (finalScore) => {
     setSaving(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -157,7 +155,12 @@ saveAnswer(questionId, selected, question.correct)
             completed_at: new Date().toISOString()
           })
       }
- 
+    } catch (error) {
+      console.error('Error saving result:', error)
+    }
+    setSaving(false)
+  }
+
   const percentage = Math.round((score / questions.length) * 100)
 
   const getResultMessage = () => {
@@ -169,20 +172,19 @@ saveAnswer(questionId, selected, question.correct)
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-      {/* Header */}
-<div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px 12px 0 0', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', position: 'relative' }}>        
-<button onClick={onBack} style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid white', color: 'white', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', position: 'absolute', left: '1rem', top: '1rem', fontSize: '0.9rem', fontWeight: 500 }}>← Back</button>        <span style={{ display: 'inline-block', background: '#4299e1', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>Level: B1 Intermediate</span>
+      <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px 12px 0 0', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', position: 'relative' }}>
+        <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid white', color: 'white', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', position: 'absolute', left: '1rem', top: '1rem', fontSize: '0.9rem', fontWeight: 500 }}>← Back</button>
+        <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Prepositions Practice</h1>
+        <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Choose the correct preposition for each sentence</p>
+        <span style={{ display: 'inline-block', background: '#4299e1', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>Level: B1 Intermediate</span>
       </div>
 
-      {/* White card body */}
       <div style={{ background: 'white', padding: '2rem', borderRadius: '0 0 12px 12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
-        {/* Progress */}
         <div style={{ display: 'flex', justifyContent: 'space-between', background: '#f7fafc', padding: '12px 16px', borderRadius: '8px', marginBottom: '24px', fontSize: '0.9rem', color: '#4a5568', fontWeight: 500 }}>
           <span>Progress: {Object.keys(answered).length}/{questions.length}</span>
           <span>Score: {score}/{questions.length}</span>
         </div>
 
-        {/* Questions */}
         {questions.map(q => {
           const userAnswer = answered[q.id]
           const isAnswered = userAnswer !== undefined
@@ -219,7 +221,6 @@ saveAnswer(questionId, selected, question.correct)
                   )
                 })}
               </div>
-              {/* Feedback */}
               {isAnswered && (
                 <div style={{
                   marginTop: '12px', padding: '12px', borderRadius: '6px',
@@ -235,7 +236,6 @@ saveAnswer(questionId, selected, question.correct)
           )
         })}
 
-        {/* Results */}
         {finished && (
           <div style={{ background: '#f7fafc', border: '2px solid #e2e8f0', borderRadius: '8px', padding: '2rem', textAlign: 'center', marginTop: '1rem' }}>
             <h2 style={{ color: '#2d3748', margin: '0 0 12px' }}>Exercise Complete!</h2>
