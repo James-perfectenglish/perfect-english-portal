@@ -118,13 +118,15 @@ function Dashboard({ session }) {
       <ExerciseList userLevel={profile.level} />
       <button 
         onClick={handleLogout}
-        style={{ 
-          padding: '10px 20px', 
-          backgroundColor: '#f44336',
-          color: 'white',
-          border: 'none',
-          cursor: 'pointer'
-        }}
+      style={{ 
+  marginTop: '3rem',
+  padding: '10px 20px', 
+  backgroundColor: '#f44336',
+  color: 'white',
+  border: 'none',
+  cursor: 'pointer',
+  borderRadius: '6px'
+}}
       >
         Logout
       </button>
