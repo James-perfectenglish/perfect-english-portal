@@ -83,7 +83,43 @@ function Prepositions({ onComplete, onBack }) {
 }, [])
   const [finished, setFinished] = useState(false)
   const [saving, setSaving] = useState(false)
+   } catch (error) {
+      console.error('Error saving result:', error)
+    }
+    setSaving(false)
+  }
+const saveAnswer = async (questionId, selected, correct) => {
+  console.log('Saving answer:', questionId, selected, correct)
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    console.log('User:', user?.id)
+    
+    const { data: exercise } = await supabase
+      .from('exercises')
+      .select('id')
+      .eq('title', 'Prepositions Practice')
+      .single()
+    
+    console.log('Exercise:', exercise?.id)
 
+    if (exercise) {
+      const { data, error } = await supabase
+        .from('student_answers')
+        .insert({
+          student_id: user.id,
+          exercise_id: exercise.id,
+          question_id: questionId,
+          student_answer: selected,
+          correct_answer: correct,
+          is_correct: selected === correct,
+          answered_at: new Date().toISOString()
+        })
+      console.log('Insert result:', data, 'Error:', error)
+    }
+  } catch (error) {
+    console.error('Error saving answer:', error)
+  }
+}
   const handleAnswer = (questionId, selected) => {
     if (answered[questionId]) return
 
@@ -121,43 +157,7 @@ saveAnswer(questionId, selected, question.correct)
             completed_at: new Date().toISOString()
           })
       }
-    } catch (error) {
-      console.error('Error saving result:', error)
-    }
-    setSaving(false)
-  }
-const saveAnswer = async (questionId, selected, correct) => {
-  console.log('Saving answer:', questionId, selected, correct)
-  try {
-    const { data: { user } } = await supabase.auth.getUser()
-    console.log('User:', user?.id)
-    
-    const { data: exercise } = await supabase
-      .from('exercises')
-      .select('id')
-      .eq('title', 'Prepositions Practice')
-      .single()
-    
-    console.log('Exercise:', exercise?.id)
-
-    if (exercise) {
-      const { data, error } = await supabase
-        .from('student_answers')
-        .insert({
-          student_id: user.id,
-          exercise_id: exercise.id,
-          question_id: questionId,
-          student_answer: selected,
-          correct_answer: correct,
-          is_correct: selected === correct,
-          answered_at: new Date().toISOString()
-        })
-      console.log('Insert result:', data, 'Error:', error)
-    }
-  } catch (error) {
-    console.error('Error saving answer:', error)
-  }
-}
+ 
   const percentage = Math.round((score / questions.length) * 100)
 
   const getResultMessage = () => {
