@@ -121,7 +121,7 @@ function SpanishVocabulary({ onComplete, onBack }) {
         <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid white', color: 'white', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', position: 'absolute', left: '1rem', top: '1rem', fontSize: '0.9rem', fontWeight: 500 }}>← Back</button>
         <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Spanish Vocabulary</h1>
         <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Essential Spanish vocabulary with bilingual practice</p>
-        <span style={{ display: 'inline-block', background: '#4299e1', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>Level: A2 Elementary</span>
+        <span style={{ display: 'inline-block', background: '#48bb78', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>Level: A1 Beginner</span>
       </div>
 
       <div style={{ background: 'white', padding: '2rem', borderRadius: '0 0 12px 12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
