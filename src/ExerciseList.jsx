@@ -45,7 +45,9 @@ if (activeExercise) {
     return <OfficeVocabulary onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
   }
 }
-
+if (loading) {
+  return <div>Loading exercises...</div>
+}
   if (exercises.length === 0) {
     return (
       <div style={{ padding: '20px', textAlign: 'center' }}>
