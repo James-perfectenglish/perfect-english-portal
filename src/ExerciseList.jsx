@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient'
 import Prepositions from './Prepositions'
 import PhrasalVerbs from './PhrasalVerbs'
 import OfficeVocabulary from './OfficeVocabulary'
+import SpanishVocabulary from './SpanishVocabulary'
 function ExerciseList({ userLevel }) {
   const [exercises, setExercises] = useState([])
   const [loading, setLoading] = useState(true)
@@ -29,7 +30,7 @@ function ExerciseList({ userLevel }) {
   }
 
 const startExercise = (exercise) => {
-  if (exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs' || exercise.title === 'Office Vocabulary') {
+  if (exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs' || exercise.title === 'Office Vocabulary' || exercise.title === 'Spanish Vocabulary') {
     setActiveExercise(exercise)
   }
 }
@@ -45,6 +46,9 @@ if (activeExercise) {
   if (activeExercise.title === 'Office Vocabulary') {
     return <OfficeVocabulary onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
   }
+  if (activeExercise.title === 'Spanish Vocabulary') {
+  return <SpanishVocabulary onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
+}
 }
 if (loading) {
   return <div>Loading exercises...</div>
@@ -92,15 +96,15 @@ if (loading) {
   style={{
     marginTop: '15px',
     padding: '10px 20px',
-    backgroundColor: (exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs'|| exercise.title === 'Office Vocabulary') ? '#667eea' : '#cbd5e0',
+    backgroundColor: (exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs'|| exercise.title === 'Office Vocabulary'|| exercise.title === 'Spanish Vocabulary') ? '#667eea' : '#cbd5e0',
     color: 'white',
     border: 'none',
     borderRadius: '6px',
-    cursor: (exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs'|| exercise.title === 'Office Vocabulary') ? 'pointer' : 'not-allowed',
+    cursor: (exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs'|| exercise.title === 'Office Vocabulary'|| exercise.title === 'Spanish Vocabulary') ? 'pointer' : 'not-allowed',
     fontWeight: 600
   }}
 >
-  {(exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs'|| exercise.title === 'Office Vocabulary'|| exercise.title === 'Office Vocabulary') ? 'Start Exercise' : 'Coming Soon'}
+  {(exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs'|| exercise.title === 'Office Vocabulary'|| exercise.title === 'Office Vocabulary'|| exercise.title === 'Spanish Vocabulary') ? 'Start Exercise' : 'Coming Soon'}
 </button>
           </div>
         ))}
