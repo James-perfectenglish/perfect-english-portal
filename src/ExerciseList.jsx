@@ -34,19 +34,17 @@ const startExercise = (exercise) => {
 }
 
   // Show the active exercise if one is selected
- if (activeExercise) {
+if (activeExercise) {
   if (activeExercise.title === 'Prepositions Practice') {
     return <Prepositions onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
   }
   if (activeExercise.title === 'Business Phrasal Verbs') {
     return <PhrasalVerbs onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
   }
-}if (activeExercise.title === 'Office Vocabulary') {
-  return <OfficeVocabulary onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
-}
-  if (loading) {
-    return <div>Loading exercises...</div>
+  if (activeExercise.title === 'Office Vocabulary') {
+    return <OfficeVocabulary onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
   }
+}
 
   if (exercises.length === 0) {
     return (
