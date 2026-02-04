@@ -19,7 +19,7 @@ function ExerciseList({ userLevel }) {
       .order('recommended_order', { ascending: true })
 
    if (data) {
-  console.log('Exercises from Supabase:', data.map(e => e.title))
+ 
   // Sort so user's level comes first
       const recommended = data.filter(e => e.level === userLevel)
       const others = data.filter(e => e.level !== userLevel)
