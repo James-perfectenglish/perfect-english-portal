@@ -84,16 +84,20 @@ const startExercise = (exercise) => {
               <span style={{ marginLeft: '15px' }}>✅ Pass: {exercise.passing_score}%</span>
             </div>
             <button
-              onClick={() => startExercise(exercise)}
-              style={{
-                marginTop: '15px',
-                padding: '10px 20px',
-                backgroundColor: (exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs') ? '#667eea' : '#cbd5e0',
-...
-cursor: (exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs') ? 'pointer' : 'not-allowed',
-...
-{(exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs') ? 'Start Exercise' : 'Coming Soon'}
-            </button>
+  onClick={() => startExercise(exercise)}
+  style={{
+    marginTop: '15px',
+    padding: '10px 20px',
+    backgroundColor: (exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs') ? '#667eea' : '#cbd5e0',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: (exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs') ? 'pointer' : 'not-allowed',
+    fontWeight: 600
+  }}
+>
+  {(exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs') ? 'Start Exercise' : 'Coming Soon'}
+</button>
           </div>
         ))}
       </div>
