@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import Prepositions from './Prepositions'
-
+import PhrasalVerbs from './PhrasalVerbs'
 function ExerciseList({ userLevel }) {
   const [exercises, setExercises] = useState([])
   const [loading, setLoading] = useState(true)
@@ -26,19 +26,21 @@ function ExerciseList({ userLevel }) {
     setLoading(false)
   }
 
-  const startExercise = (exercise) => {
-    if (exercise.title === 'Prepositions Practice') {
-      setActiveExercise(exercise)
-    }
+const startExercise = (exercise) => {
+  if (exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs') {
+    setActiveExercise(exercise)
   }
+}
 
   // Show the active exercise if one is selected
-  if (activeExercise) {
-    if (activeExercise.title === 'Prepositions Practice') {
-      return <Prepositions onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
-    }
+ if (activeExercise) {
+  if (activeExercise.title === 'Prepositions Practice') {
+    return <Prepositions onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
   }
-
+  if (activeExercise.title === 'Business Phrasal Verbs') {
+    return <PhrasalVerbs onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
+  }
+}
   if (loading) {
     return <div>Loading exercises...</div>
   }
@@ -86,15 +88,11 @@ function ExerciseList({ userLevel }) {
               style={{
                 marginTop: '15px',
                 padding: '10px 20px',
-                backgroundColor: exercise.title === 'Prepositions Practice' ? '#667eea' : '#cbd5e0',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: exercise.title === 'Prepositions Practice' ? 'pointer' : 'not-allowed',
-                fontWeight: 600
-              }}
-            >
-              {exercise.title === 'Prepositions Practice' ? 'Start Exercise' : 'Coming Soon'}
+                backgroundColor: (exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs') ? '#667eea' : '#cbd5e0',
+...
+cursor: (exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs') ? 'pointer' : 'not-allowed',
+...
+{(exercise.title === 'Prepositions Practice' || exercise.title === 'Business Phrasal Verbs') ? 'Start Exercise' : 'Coming Soon'}
             </button>
           </div>
         ))}
