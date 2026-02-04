@@ -19,7 +19,7 @@ const questions = [
   {
     id: 3,
     sentence: "Could you ___________ this report before we send it to the client?",
-    options: ["look into", "look over", "look after", "look up"],
+    options: ["look into", "look up", "look after", "look over"],
     correct: "look over",
     explanation: "'Look over' means to examine or review something quickly but carefully."
   },
@@ -33,7 +33,7 @@ const questions = [
   {
     id: 5,
     sentence: "We should ___________ a meeting to discuss the budget issues.",
-    options: ["set out", "set up", "set off", "set down"],
+    options: ["set out", "set off", "set up", "set down"],
     correct: "set up",
     explanation: "'Set up' means to arrange or organise something, like a meeting, appointment, or system."
   },
@@ -47,7 +47,7 @@ const questions = [
   {
     id: 7,
     sentence: "Let's ___________ from where we left off yesterday.",
-    options: ["carry out", "carry on", "carry over", "carry through"],
+    options: ["carry out", "carry through", "carry over", "carry on"],
     correct: "carry on",
     explanation: "'Carry on' means to continue doing something, especially after a pause or interruption."
   },
@@ -68,7 +68,7 @@ const questions = [
   {
     id: 10,
     sentence: "We need to ___________ the new software before we can use it company-wide.",
-    options: ["roll back", "roll out", "roll over", "roll up"],
+    options: ["roll back", "roll up", "roll over", "roll out"],
     correct: "roll out",
     explanation: "'Roll out' means to introduce or launch something gradually, especially a product or plan."
   }
@@ -171,7 +171,7 @@ function PhrasalVerbs({ onComplete, onBack }) {
         <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid white', color: 'white', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', position: 'absolute', left: '1rem', top: '1rem', fontSize: '0.9rem', fontWeight: 500 }}>← Back</button>
         <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Business Phrasal Verbs</h1>
         <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Master essential phrasal verbs for business communication</p>
-        <span style={{ display: 'inline-block', background: '#4299e1', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>Level: B2 Upper-Intermediate</span>
+        <span style={{ display: 'inline-block', background: '#ed8936', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>Level: C1 Advanced</span>
       </div>
 
       <div style={{ background: 'white', padding: '2rem', borderRadius: '0 0 12px 12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>

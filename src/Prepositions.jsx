@@ -19,7 +19,7 @@ const questions = [
   {
     id: 3,
     sentence: "She's very good ___________ playing tennis.",
-    options: ["at", "on", "in", "for"],
+    options: ["on", "at", "in", "for"],
     correct: "at",
     explanation: "We use 'good at' when talking about skills and abilities. It's a fixed expression."
   },
@@ -33,7 +33,7 @@ const questions = [
   {
     id: 5,
     sentence: "We travelled ___________ train from London to Edinburgh.",
-    options: ["by", "with", "in", "on"],
+    options: ["on", "with", "in", "by"],
     correct: "by",
     explanation: "We use 'by' with most forms of transport (by train, by car, by plane). Exception: on foot!"
   },
@@ -47,21 +47,21 @@ const questions = [
   {
     id: 7,
     sentence: "She lives ___________ London.",
-    options: ["in", "at", "on", "by"],
+    options: ["on", "at", "in", "by"],
     correct: "in",
     explanation: "We use 'in' with cities, countries, and enclosed spaces (in London, in Spain, in a room)."
   },
   {
     id: 8,
     sentence: "The report must be finished ___________ Friday.",
-    options: ["by", "until", "at", "in"],
+    options: ["at", "until", "by", "in"],
     correct: "by",
     explanation: "We use 'by' to mean 'not later than' or 'before' a specific time or date (by Friday = before Friday ends)."
   },
   {
     id: 9,
     sentence: "I've been waiting ___________ twenty minutes!",
-    options: ["for", "since", "during", "while"],
+    options: ["while", "since", "during", "for"],
     correct: "for",
     explanation: "We use 'for' with a period of time (for 20 minutes, for 3 hours, for 5 years)."
   },
