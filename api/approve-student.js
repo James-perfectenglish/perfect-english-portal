@@ -39,7 +39,7 @@ export default async function handler(req, res) {
       // Send confirmation email to student
       try {
         await resend.emails.send({
-          from: 'James at Perfect English <onboarding@resend.dev>',
+          from: 'James at Perfect English <james@perfect-english.org>',
           to: data.email,
           subject: 'Welcome to Perfect English! Your account is ready',
           html: `

@@ -28,7 +28,7 @@ export default async function handler(req, res) {
 
     // Send approval email to you
     await resend.emails.send({
-      from: 'Perfect English <onboarding@resend.dev>',
+      from: 'Perfect English <james@perfect-english.org>',
       to: 'james@perfect-english.org',
       subject: `New Student Signup: ${full_name}`,
       html: `
