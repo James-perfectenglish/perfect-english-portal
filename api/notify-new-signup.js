@@ -75,4 +75,4 @@ export default async function handler(req, res) {
     console.error('Error processing signup:', error);
     return res.status(500).json({ error: error.message });
   }
-}
+}// Force rebuild
