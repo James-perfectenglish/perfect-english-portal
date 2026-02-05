@@ -37,17 +37,12 @@ export default async function handler(req, res) {
       if (error) throw error;
 
       // Send confirmation email to student
-      // Note: This will work once Resend domain is verified
       try {
         await resend.emails.send({
-          from: 'James at Perfect English <james@perfect-english.org>',
+          from: 'James at Perfect English <onboarding@resend.dev>',
           to: data.email,
           subject: 'Welcome to Perfect English! Your account is ready',
-          html: await resend.emails.send({
-  from: 'James at Perfect English <james@perfect-english.org>',
-  to: data.email,
-  subject: 'Welcome to Perfect English! Your account is ready',
-  html: `
+          html: `
 <!DOCTYPE html>
 <html>
   <head>
@@ -66,7 +61,7 @@ export default async function handler(req, res) {
   </head>
   <body>
     <div class="header">
-      <h1>Welcome to Perfect English! 🎓</h1>
+      <h1>Welcome to Perfect English!</h1>
     </div>
     
     <div class="content">
@@ -116,12 +111,10 @@ export default async function handler(req, res) {
     </div>
   </body>
 </html>
-  `
-});
+          `
         });
       } catch (emailError) {
-        console.error('Email send failed (domain might not be verified yet):', emailError);
-        // Continue anyway - approval still worked
+        console.error('Email send failed:', emailError);
       }
 
       return res.status(200).send(`

@@ -28,7 +28,7 @@ export default async function handler(req, res) {
 
     // Send approval email to you
     await resend.emails.send({
-      from: 'Perfect English <james@perfect-english.org>',
+      from: 'Perfect English <onboarding@resend.dev>',
       to: 'james@perfect-english.org',
       subject: `New Student Signup: ${full_name}`,
       html: `
@@ -75,4 +75,5 @@ export default async function handler(req, res) {
     console.error('Error processing signup:', error);
     return res.status(500).json({ error: error.message });
   }
-}// Force rebuild
+}
+// Force rebuild
