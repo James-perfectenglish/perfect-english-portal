@@ -15,13 +15,27 @@ export default function RandomPracticeExercise() {
   const [difficultyRating, setDifficultyRating] = useState(0);
 
   const startExercise = async () => {
-    setLoading(true);
-    try {
-      const { data: gapFill, error: gapError } = await supabase
-        .from('question_bank')
-        .select('*')
-        .eq('type', 'gap_fill')
-        .limit(10);
+  setLoading(true);
+  try {
+    // Get ALL questions, then randomly select
+    const { data: allGapFill, error: gapError } = await supabase
+      .from('question_bank')
+      .select('*')
+      .eq('type', 'gap_fill');
+
+    const { data: allMultipleChoice, error: mcError } = await supabase
+      .from('question_bank')
+      .select('*')
+      .eq('type', 'multiple_choice');
+
+    if (gapError || mcError) throw gapError || mcError;
+
+    // Shuffle and take 10 of each
+    const shuffledGapFill = allGapFill.sort(() => Math.random() - 0.5).slice(0, 10);
+    const shuffledMultipleChoice = allMultipleChoice.sort(() => Math.random() - 0.5).slice(0, 10);
+
+    // Combine and shuffle again
+    const allQuestions = [...shuffledGapFill, ...shuffledMultipleChoice].sort(() => Math.random() - 0.5);
 
       const { data: multipleChoice, error: mcError } = await supabase
         .from('question_bank')
@@ -199,15 +213,32 @@ export default function RandomPracticeExercise() {
               color: '#666', 
               marginBottom: '0.5rem' 
             }}>
-              {currentQuestion.level} | {currentQuestion.topic.replace(/_/g, ' ')}
-            </div>
-            <h2 style={{ 
-              fontSize: 'clamp(1.1rem, 4vw, 1.5rem)', 
-              marginBottom: '1.5rem',
-              lineHeight: '1.4'
-            }}>
-              {currentQuestion.question}
-            </h2>
+          {/* Question Card */}
+<div style={{ 
+  backgroundColor: 'white', 
+  padding: 'clamp(1rem, 3vw, 2rem)', 
+  borderRadius: '12px',
+  marginBottom: '1rem',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  width: '100%',
+  boxSizing: 'border-box'
+}}>
+  <div style={{ 
+    fontSize: 'clamp(0.75rem, 2vw, 0.9rem)', 
+    color: '#666', 
+    marginBottom: '0.5rem' 
+  }}>
+    {currentQuestion.level} | {currentQuestion.topic.replace(/_/g, ' ')}
+  </div>
+  <h2 style={{ 
+    fontSize: 'clamp(1.1rem, 4vw, 1.5rem)', 
+    marginBottom: '1.5rem',
+    lineHeight: '1.4',
+    color: '#2C3E50',  /* This makes the question text dark */
+    fontWeight: '600'
+  }}>
+    {currentQuestion.question}
+  </h2>
 
             {/* Hint */}
             {showHint && currentQuestion.hint && (
