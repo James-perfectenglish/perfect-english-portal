@@ -14,10 +14,15 @@ export default function RandomPracticeExercise() {
   const [loading, setLoading] = useState(false);
   const [difficultyRating, setDifficultyRating] = useState(0);
 
+  // Scroll to top on mount
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const startExercise = async () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setLoading(true);
     try {
-      // Get ALL questions, then randomly select
       const { data: allGapFill, error: gapError } = await supabase
         .from('question_bank')
         .select('*')
@@ -30,11 +35,8 @@ export default function RandomPracticeExercise() {
 
       if (gapError || mcError) throw gapError || mcError;
 
-      // Shuffle and take 10 of each
       const shuffledGapFill = allGapFill.sort(() => Math.random() - 0.5).slice(0, 10);
       const shuffledMultipleChoice = allMultipleChoice.sort(() => Math.random() - 0.5).slice(0, 10);
-
-      // Combine and shuffle again
       const allQuestions = [...shuffledGapFill, ...shuffledMultipleChoice].sort(() => Math.random() - 0.5);
       
       setQuestions(allQuestions);
@@ -55,87 +57,81 @@ export default function RandomPracticeExercise() {
     }
   };
 
-const checkAnswer = () => {
-  const currentQuestion = questions[currentQuestionIndex];
-  let isCorrect = false;
-  let feedbackMessage = '';
-  let feedbackType = 'incorrect';
+  const checkAnswer = () => {
+    const currentQuestion = questions[currentQuestionIndex];
+    let isCorrect = false;
+    let feedbackMessage = '';
+    let feedbackType = 'incorrect';
 
-  if (currentQuestion.type === 'gap_fill') {
-    const answer = userAnswer.toLowerCase().trim();
-    
-    // Ensure correct_answers is an array and normalize all answers
-    const correctAnswers = Array.isArray(currentQuestion.correct_answers) 
-      ? currentQuestion.correct_answers.map(a => a.toLowerCase().trim())
-      : [];
-    
-    console.log('Student answer:', answer);
-    console.log('Correct answers:', correctAnswers);
-    console.log('Match found:', correctAnswers.includes(answer));
-    
-    if (correctAnswers.includes(answer)) {
-      isCorrect = true;
-      feedbackMessage = `✅ Correct! ${currentQuestion.explanation}`;
-      feedbackType = 'correct';
+    if (currentQuestion.type === 'gap_fill') {
+      const answer = userAnswer.toLowerCase().trim();
+      
+      const correctAnswers = Array.isArray(currentQuestion.correct_answers) 
+        ? currentQuestion.correct_answers.map(a => a.toLowerCase().trim())
+        : [];
+      
+      if (correctAnswers.includes(answer)) {
+        isCorrect = true;
+        feedbackMessage = `✅ Correct! ${currentQuestion.explanation}`;
+        feedbackType = 'correct';
+      } 
+      else if (currentQuestion.informal_accepted && Array.isArray(currentQuestion.informal_accepted)) {
+        const informalAnswers = currentQuestion.informal_accepted.map(a => a.toLowerCase().trim());
+        if (informalAnswers.includes(answer)) {
+          isCorrect = true;
+          feedbackMessage = `✅ Correct! ${currentQuestion.informal_feedback} ${currentQuestion.explanation}`;
+          feedbackType = 'informal';
+        }
+      }
+      if (!isCorrect && currentQuestion.acceptable_alternatives && Array.isArray(currentQuestion.acceptable_alternatives)) {
+        const alternative = currentQuestion.acceptable_alternatives.find(
+          alt => alt.answer && alt.answer.toLowerCase().trim() === answer
+        );
+        if (alternative) {
+          isCorrect = true;
+          feedbackMessage = `✅ ${alternative.feedback} ${currentQuestion.explanation}`;
+          feedbackType = 'alternative';
+        }
+      }
+      
+      if (!isCorrect) {
+        const correctAnswer = correctAnswers[0] || 'N/A';
+        feedbackMessage = `❌ Incorrect. The correct answer is: "${correctAnswer}". ${currentQuestion.explanation}`;
+      }
     } 
-    // Check informal accepted
-    else if (currentQuestion.informal_accepted && Array.isArray(currentQuestion.informal_accepted)) {
-      const informalAnswers = currentQuestion.informal_accepted.map(a => a.toLowerCase().trim());
-      if (informalAnswers.includes(answer)) {
+    else if (currentQuestion.type === 'multiple_choice') {
+      if (selectedOption === currentQuestion.correct_answer) {
         isCorrect = true;
-        feedbackMessage = `✅ Correct! ${currentQuestion.informal_feedback} ${currentQuestion.explanation}`;
-        feedbackType = 'informal';
+        feedbackMessage = `✅ Correct! ${currentQuestion.explanation}`;
+        feedbackType = 'correct';
+      } else {
+        feedbackMessage = `❌ Incorrect. The correct answer is: "${currentQuestion.correct_answer}". ${currentQuestion.explanation}`;
       }
     }
-    // Check acceptable alternatives
-    if (!isCorrect && currentQuestion.acceptable_alternatives && Array.isArray(currentQuestion.acceptable_alternatives)) {
-      const alternative = currentQuestion.acceptable_alternatives.find(
-        alt => alt.answer && alt.answer.toLowerCase().trim() === answer
-      );
-      if (alternative) {
-        isCorrect = true;
-        feedbackMessage = `✅ ${alternative.feedback} ${currentQuestion.explanation}`;
-        feedbackType = 'alternative';
-      }
-    }
-    
-    if (!isCorrect) {
-      const correctAnswer = correctAnswers[0] || 'N/A';
-      feedbackMessage = `❌ Incorrect. The correct answer is: "${correctAnswer}". ${currentQuestion.explanation}`;
-    }
-  } 
-  else if (currentQuestion.type === 'multiple_choice') {
-    if (selectedOption === currentQuestion.correct_answer) {
-      isCorrect = true;
-      feedbackMessage = `✅ Correct! ${currentQuestion.explanation}`;
-      feedbackType = 'correct';
+
+    setFeedback({ message: feedbackMessage, type: feedbackType, isCorrect });
+
+    if (isCorrect) {
+      setScore(score + 1);
     } else {
-      feedbackMessage = `❌ Incorrect. The correct answer is: "${currentQuestion.correct_answer}". ${currentQuestion.explanation}`;
+      const newLives = lives - 1;
+      setLives(newLives);
+      
+      if (newLives === 0) {
+        setTimeout(() => {
+          setStage('finished');
+        }, 2000);
+        return;
+      }
+      
+      if (newLives === 1 && !showHint && currentQuestion.hint) {
+        setShowHint(true);
+      }
     }
-  }
-
-  setFeedback({ message: feedbackMessage, type: feedbackType, isCorrect });
-
-  if (isCorrect) {
-    setScore(score + 1);
-  } else {
-    const newLives = lives - 1;
-    setLives(newLives);
-    
-    if (newLives === 0) {
-      setTimeout(() => {
-        setStage('finished');
-      }, 2000);
-      return;
-    }
-    
-    if (newLives === 1 && !showHint && currentQuestion.hint) {
-      setShowHint(true);
-    }
-  }
-};
+  };
 
   const nextQuestion = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setUserAnswer('');
@@ -158,8 +154,10 @@ const checkAnswer = () => {
       maxWidth: '800px', 
       margin: '0 auto', 
       padding: '1rem',
+      paddingTop: '0.5rem',
       width: '100%',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box',
+      minHeight: '100vh'
     }}>
       {/* START SCREEN */}
       {stage === 'start' && (
@@ -210,7 +208,7 @@ const checkAnswer = () => {
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
-            marginBottom: '1.5rem',
+            marginBottom: '1rem',
             fontSize: 'clamp(0.85rem, 2.5vw, 1rem)',
             gap: '0.5rem',
             flexWrap: 'wrap',
@@ -226,12 +224,15 @@ const checkAnswer = () => {
           {/* Question Card */}
           <div style={{ 
             backgroundColor: 'white', 
-            padding: 'clamp(1rem, 3vw, 2rem)', 
+            padding: 'clamp(1rem, 4vw, 2rem)', 
             borderRadius: '12px',
             marginBottom: '1rem',
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
             width: '100%',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            minHeight: 'auto',
+            display: 'flex',
+            flexDirection: 'column'
           }}>
             <div style={{ 
               fontSize: 'clamp(0.75rem, 2vw, 0.9rem)', 
