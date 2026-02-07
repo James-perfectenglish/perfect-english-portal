@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import RandomPracticeExercise from './RandomPracticeExercise';
-
+import RandomPracticeExercise from './RandomPracticeExercise.jsx';
 export default function PracticePage() {
   const [showExercise, setShowExercise] = useState(false);
 
