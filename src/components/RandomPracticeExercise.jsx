@@ -55,70 +55,85 @@ export default function RandomPracticeExercise() {
     }
   };
 
-  const checkAnswer = () => {
-    const currentQuestion = questions[currentQuestionIndex];
-    let isCorrect = false;
-    let feedbackMessage = '';
-    let feedbackType = 'incorrect';
+const checkAnswer = () => {
+  const currentQuestion = questions[currentQuestionIndex];
+  let isCorrect = false;
+  let feedbackMessage = '';
+  let feedbackType = 'incorrect';
 
-    if (currentQuestion.type === 'gap_fill') {
-      const answer = userAnswer.trim();
-      
-      const correctAnswers = currentQuestion.correct_answers || [];
-      if (correctAnswers.includes(answer)) {
-        isCorrect = true;
-        feedbackMessage = `✅ Correct! ${currentQuestion.explanation}`;
-        feedbackType = 'correct';
-      } 
-      else if (currentQuestion.informal_accepted && currentQuestion.informal_accepted.includes(answer)) {
+  if (currentQuestion.type === 'gap_fill') {
+    const answer = userAnswer.toLowerCase().trim();
+    
+    // Ensure correct_answers is an array and normalize all answers
+    const correctAnswers = Array.isArray(currentQuestion.correct_answers) 
+      ? currentQuestion.correct_answers.map(a => a.toLowerCase().trim())
+      : [];
+    
+    console.log('Student answer:', answer);
+    console.log('Correct answers:', correctAnswers);
+    console.log('Match found:', correctAnswers.includes(answer));
+    
+    if (correctAnswers.includes(answer)) {
+      isCorrect = true;
+      feedbackMessage = `✅ Correct! ${currentQuestion.explanation}`;
+      feedbackType = 'correct';
+    } 
+    // Check informal accepted
+    else if (currentQuestion.informal_accepted && Array.isArray(currentQuestion.informal_accepted)) {
+      const informalAnswers = currentQuestion.informal_accepted.map(a => a.toLowerCase().trim());
+      if (informalAnswers.includes(answer)) {
         isCorrect = true;
         feedbackMessage = `✅ Correct! ${currentQuestion.informal_feedback} ${currentQuestion.explanation}`;
         feedbackType = 'informal';
       }
-      else if (currentQuestion.acceptable_alternatives) {
-        const alternative = currentQuestion.acceptable_alternatives.find(alt => alt.answer === answer);
-        if (alternative) {
-          isCorrect = true;
-          feedbackMessage = `✅ ${alternative.feedback} ${currentQuestion.explanation}`;
-          feedbackType = 'alternative';
-        }
-      }
-      
-      if (!isCorrect) {
-        const correctAnswer = correctAnswers[0] || 'N/A';
-        feedbackMessage = `❌ Incorrect. The correct answer is: "${correctAnswer}". ${currentQuestion.explanation}`;
-      }
-    } 
-    else if (currentQuestion.type === 'multiple_choice') {
-      if (selectedOption === currentQuestion.correct_answer) {
+    }
+    // Check acceptable alternatives
+    if (!isCorrect && currentQuestion.acceptable_alternatives && Array.isArray(currentQuestion.acceptable_alternatives)) {
+      const alternative = currentQuestion.acceptable_alternatives.find(
+        alt => alt.answer && alt.answer.toLowerCase().trim() === answer
+      );
+      if (alternative) {
         isCorrect = true;
-        feedbackMessage = `✅ Correct! ${currentQuestion.explanation}`;
-        feedbackType = 'correct';
-      } else {
-        feedbackMessage = `❌ Incorrect. The correct answer is: "${currentQuestion.correct_answer}". ${currentQuestion.explanation}`;
+        feedbackMessage = `✅ ${alternative.feedback} ${currentQuestion.explanation}`;
+        feedbackType = 'alternative';
       }
     }
-
-    setFeedback({ message: feedbackMessage, type: feedbackType, isCorrect });
-
-    if (isCorrect) {
-      setScore(score + 1);
+    
+    if (!isCorrect) {
+      const correctAnswer = correctAnswers[0] || 'N/A';
+      feedbackMessage = `❌ Incorrect. The correct answer is: "${correctAnswer}". ${currentQuestion.explanation}`;
+    }
+  } 
+  else if (currentQuestion.type === 'multiple_choice') {
+    if (selectedOption === currentQuestion.correct_answer) {
+      isCorrect = true;
+      feedbackMessage = `✅ Correct! ${currentQuestion.explanation}`;
+      feedbackType = 'correct';
     } else {
-      const newLives = lives - 1;
-      setLives(newLives);
-      
-      if (newLives === 0) {
-        setTimeout(() => {
-          setStage('finished');
-        }, 2000);
-        return;
-      }
-      
-      if (newLives === 1 && !showHint && currentQuestion.hint) {
-        setShowHint(true);
-      }
+      feedbackMessage = `❌ Incorrect. The correct answer is: "${currentQuestion.correct_answer}". ${currentQuestion.explanation}`;
     }
-  };
+  }
+
+  setFeedback({ message: feedbackMessage, type: feedbackType, isCorrect });
+
+  if (isCorrect) {
+    setScore(score + 1);
+  } else {
+    const newLives = lives - 1;
+    setLives(newLives);
+    
+    if (newLives === 0) {
+      setTimeout(() => {
+        setStage('finished');
+      }, 2000);
+      return;
+    }
+    
+    if (newLives === 1 && !showHint && currentQuestion.hint) {
+      setShowHint(true);
+    }
+  }
+};
 
   const nextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
