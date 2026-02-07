@@ -15,37 +15,27 @@ export default function RandomPracticeExercise() {
   const [difficultyRating, setDifficultyRating] = useState(0);
 
   const startExercise = async () => {
-  setLoading(true);
-  try {
-    // Get ALL questions, then randomly select
-    const { data: allGapFill, error: gapError } = await supabase
-      .from('question_bank')
-      .select('*')
-      .eq('type', 'gap_fill');
-
-    const { data: allMultipleChoice, error: mcError } = await supabase
-      .from('question_bank')
-      .select('*')
-      .eq('type', 'multiple_choice');
-
-    if (gapError || mcError) throw gapError || mcError;
-
-    // Shuffle and take 10 of each
-    const shuffledGapFill = allGapFill.sort(() => Math.random() - 0.5).slice(0, 10);
-    const shuffledMultipleChoice = allMultipleChoice.sort(() => Math.random() - 0.5).slice(0, 10);
-
-    // Combine and shuffle again
-    const allQuestions = [...shuffledGapFill, ...shuffledMultipleChoice].sort(() => Math.random() - 0.5);
-
-      const { data: multipleChoice, error: mcError } = await supabase
+    setLoading(true);
+    try {
+      // Get ALL questions, then randomly select
+      const { data: allGapFill, error: gapError } = await supabase
         .from('question_bank')
         .select('*')
-        .eq('type', 'multiple_choice')
-        .limit(10);
+        .eq('type', 'gap_fill');
+
+      const { data: allMultipleChoice, error: mcError } = await supabase
+        .from('question_bank')
+        .select('*')
+        .eq('type', 'multiple_choice');
 
       if (gapError || mcError) throw gapError || mcError;
 
-      const allQuestions = [...gapFill, ...multipleChoice].sort(() => Math.random() - 0.5);
+      // Shuffle and take 10 of each
+      const shuffledGapFill = allGapFill.sort(() => Math.random() - 0.5).slice(0, 10);
+      const shuffledMultipleChoice = allMultipleChoice.sort(() => Math.random() - 0.5).slice(0, 10);
+
+      // Combine and shuffle again
+      const allQuestions = [...shuffledGapFill, ...shuffledMultipleChoice].sort(() => Math.random() - 0.5);
       
       setQuestions(allQuestions);
       setStage('playing');
@@ -56,6 +46,7 @@ export default function RandomPracticeExercise() {
       setUserAnswer('');
       setSelectedOption(null);
       setDifficultyRating(0);
+      setShowHint(false);
     } catch (error) {
       console.error('Error fetching questions:', error);
       alert('Failed to load questions. Please try again.');
@@ -116,15 +107,13 @@ export default function RandomPracticeExercise() {
       const newLives = lives - 1;
       setLives(newLives);
       
-      // STOP EXERCISE IF NO LIVES LEFT
       if (newLives === 0) {
         setTimeout(() => {
           setStage('finished');
-        }, 2000); // Give them 2 seconds to see the feedback
+        }, 2000);
         return;
       }
       
-      // Show hint on last life
       if (newLives === 1 && !showHint && currentQuestion.hint) {
         setShowHint(true);
       }
@@ -150,16 +139,33 @@ export default function RandomPracticeExercise() {
   const currentQuestion = questions[currentQuestionIndex];
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
+    <div style={{ 
+      maxWidth: '800px', 
+      margin: '0 auto', 
+      padding: '1rem',
+      width: '100%',
+      boxSizing: 'border-box'
+    }}>
       {/* START SCREEN */}
       {stage === 'start' && (
         <div style={{ textAlign: 'center', padding: '1rem' }}>
-          <h1 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)' }}>Random Practice</h1>
-          <p style={{ fontSize: 'clamp(0.9rem, 3vw, 1.1rem)' }}>
+          <h1 style={{ 
+            fontSize: 'clamp(1.5rem, 5vw, 2rem)',
+            color: '#2C3E50'
+          }}>
+            Random Practice
+          </h1>
+          <p style={{ 
+            fontSize: 'clamp(0.9rem, 3vw, 1.1rem)',
+            color: '#2C3E50'
+          }}>
             Test your English with 20 random questions!
           </p>
-          <p style={{ fontSize: 'clamp(0.9rem, 3vw, 1.1rem)' }}>
-            You have 3 lives. Good luck!
+          <p style={{ 
+            fontSize: 'clamp(0.9rem, 3vw, 1.1rem)',
+            color: '#2C3E50'
+          }}>
+            You have <strong>3 lives</strong>. Good luck!
           </p>
           <button 
             onClick={startExercise}
@@ -184,7 +190,7 @@ export default function RandomPracticeExercise() {
 
       {/* PLAYING SCREEN */}
       {stage === 'playing' && currentQuestion && (
-        <div>
+        <div style={{ width: '100%', boxSizing: 'border-box' }}>
           {/* Header */}
           <div style={{ 
             display: 'flex', 
@@ -192,53 +198,42 @@ export default function RandomPracticeExercise() {
             marginBottom: '1.5rem',
             fontSize: 'clamp(0.85rem, 2.5vw, 1rem)',
             gap: '0.5rem',
-            flexWrap: 'wrap'
+            flexWrap: 'wrap',
+            color: '#2C3E50'
           }}>
-            <div>Question {currentQuestionIndex + 1} / {questions.length}</div>
+            <div>Question {currentQuestionIndex + 1}/{questions.length}</div>
             <div>
               Lives: {Array(lives).fill('❤️').join(' ')} {Array(3 - lives).fill('🖤').join(' ')}
             </div>
             <div>Score: {score}</div>
           </div>
 
-          {/* Question */}
+          {/* Question Card */}
           <div style={{ 
-            backgroundColor: '#f5f7fa', 
+            backgroundColor: 'white', 
             padding: 'clamp(1rem, 3vw, 2rem)', 
             borderRadius: '12px',
-            marginBottom: '1rem'
+            marginBottom: '1rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            width: '100%',
+            boxSizing: 'border-box'
           }}>
             <div style={{ 
               fontSize: 'clamp(0.75rem, 2vw, 0.9rem)', 
               color: '#666', 
               marginBottom: '0.5rem' 
             }}>
-          {/* Question Card */}
-<div style={{ 
-  backgroundColor: 'white', 
-  padding: 'clamp(1rem, 3vw, 2rem)', 
-  borderRadius: '12px',
-  marginBottom: '1rem',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-  width: '100%',
-  boxSizing: 'border-box'
-}}>
-  <div style={{ 
-    fontSize: 'clamp(0.75rem, 2vw, 0.9rem)', 
-    color: '#666', 
-    marginBottom: '0.5rem' 
-  }}>
-    {currentQuestion.level} | {currentQuestion.topic.replace(/_/g, ' ')}
-  </div>
-  <h2 style={{ 
-    fontSize: 'clamp(1.1rem, 4vw, 1.5rem)', 
-    marginBottom: '1.5rem',
-    lineHeight: '1.4',
-    color: '#2C3E50',  /* This makes the question text dark */
-    fontWeight: '600'
-  }}>
-    {currentQuestion.question}
-  </h2>
+              {currentQuestion.level} | {currentQuestion.topic.replace(/_/g, ' ')}
+            </div>
+            <h2 style={{ 
+              fontSize: 'clamp(1.1rem, 4vw, 1.5rem)', 
+              marginBottom: '1.5rem',
+              lineHeight: '1.4',
+              color: '#2C3E50',
+              fontWeight: '600'
+            }}>
+              {currentQuestion.question}
+            </h2>
 
             {/* Hint */}
             {showHint && currentQuestion.hint && (
@@ -248,13 +243,14 @@ export default function RandomPracticeExercise() {
                 borderRadius: '8px',
                 marginBottom: '1rem',
                 border: '1px solid #ffc107',
-                fontSize: 'clamp(0.85rem, 2.5vw, 1rem)'
+                fontSize: 'clamp(0.85rem, 2.5vw, 1rem)',
+                color: '#2C3E50'
               }}>
                 💡 <strong>Hint:</strong> {currentQuestion.hint}
               </div>
             )}
 
-            {/* GAP FILL INPUT */}
+            {/* GAP FILL */}
             {currentQuestion.type === 'gap_fill' && !feedback && (
               <div>
                 <input
@@ -270,7 +266,8 @@ export default function RandomPracticeExercise() {
                     borderRadius: '8px',
                     border: '2px solid #ddd',
                     marginBottom: '1rem',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    color: '#2C3E50'
                   }}
                   autoFocus
                 />
@@ -294,7 +291,9 @@ export default function RandomPracticeExercise() {
                       borderRadius: '8px',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
-                      wordWrap: 'break-word'
+                      wordWrap: 'break-word',
+                      width: '100%',
+                      boxSizing: 'border-box'
                     }}
                   >
                     {option}
@@ -303,7 +302,7 @@ export default function RandomPracticeExercise() {
               </div>
             )}
 
-            {/* CHECK ANSWER BUTTON */}
+            {/* CHECK ANSWER */}
             {!feedback && (
               <button
                 onClick={checkAnswer}
@@ -371,11 +370,24 @@ export default function RandomPracticeExercise() {
       {/* FINISHED SCREEN */}
       {stage === 'finished' && (
         <div style={{ textAlign: 'center', padding: '1rem' }}>
-          <h1 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)' }}>Exercise Complete!</h1>
-          <div style={{ fontSize: 'clamp(2rem, 8vw, 3rem)', margin: '1.5rem 0' }}>
+          <h1 style={{ 
+            fontSize: 'clamp(1.5rem, 5vw, 2rem)',
+            color: '#2C3E50'
+          }}>
+            Exercise Complete!
+          </h1>
+          <div style={{ 
+            fontSize: 'clamp(2rem, 8vw, 3rem)', 
+            margin: '1.5rem 0',
+            color: '#2C3E50'
+          }}>
             {score} / {questions.length}
           </div>
-          <div style={{ fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', marginBottom: '1.5rem' }}>
+          <div style={{ 
+            fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', 
+            marginBottom: '1.5rem',
+            color: '#2C3E50'
+          }}>
             {score >= 18 ? '🌟 Excellent!' : score >= 15 ? '👍 Great job!' : score >= 10 ? '👌 Good effort!' : '💪 Keep practicing!'}
           </div>
 
@@ -385,19 +397,26 @@ export default function RandomPracticeExercise() {
               padding: '1rem',
               borderRadius: '8px',
               marginBottom: '1.5rem',
-              fontSize: 'clamp(0.9rem, 3vw, 1rem)'
+              fontSize: 'clamp(0.9rem, 3vw, 1rem)',
+              color: '#2C3E50'
             }}>
               You ran out of lives! Don't worry - practice makes perfect. Try again!
             </div>
           )}
 
           <div style={{
-            backgroundColor: '#f5f7fa',
+            backgroundColor: 'white',
             padding: '1.5rem',
             borderRadius: '12px',
-            marginBottom: '1.5rem'
+            marginBottom: '1.5rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
           }}>
-            <h3 style={{ fontSize: 'clamp(1rem, 3vw, 1.2rem)' }}>How difficult was this exercise?</h3>
+            <h3 style={{ 
+              fontSize: 'clamp(1rem, 3vw, 1.2rem)',
+              color: '#2C3E50'
+            }}>
+              How difficult was this exercise?
+            </h3>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '1rem' }}>
               {[1, 2, 3, 4, 5].map((rating) => (
                 <button
@@ -415,7 +434,11 @@ export default function RandomPracticeExercise() {
                 </button>
               ))}
             </div>
-            <div style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)', color: '#666', marginTop: '0.5rem' }}>
+            <div style={{ 
+              fontSize: 'clamp(0.75rem, 2vw, 0.9rem)', 
+              color: '#666', 
+              marginTop: '0.5rem' 
+            }}>
               1 = Too easy, 5 = Very hard
             </div>
           </div>
