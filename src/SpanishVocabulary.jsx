@@ -118,7 +118,6 @@ function SpanishVocabulary({ onComplete, onBack }) {
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px 12px 0 0', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', position: 'relative' }}>
-        <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid white', color: 'white', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', position: 'absolute', left: '1rem', top: '1rem', fontSize: '0.9rem', fontWeight: 500 }}>← Back</button>
         <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Spanish Vocabulary</h1>
         <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Essential Spanish vocabulary with bilingual practice</p>
         <span style={{ display: 'inline-block', background: '#48bb78', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>Level: A1 Beginner</span>
