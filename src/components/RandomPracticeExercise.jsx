@@ -157,8 +157,6 @@ export default function RandomPracticeExercise() {
     }}>
       <div style={{
         padding: '1rem',
-        maxWidth: '800px',
-        margin: '0 auto',
         width: '100%',
         boxSizing: 'border-box'
       }}>
@@ -170,7 +168,11 @@ export default function RandomPracticeExercise() {
             minHeight: '60vh',
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            width: '100%',
+            boxSizing: 'border-box',
+            maxWidth: '600px',
+            margin: '0 auto'
           }}>
             <h1 style={{ 
               fontSize: 'clamp(2rem, 8vw, 2.5rem)',
@@ -221,7 +223,11 @@ export default function RandomPracticeExercise() {
 
         {/* PLAYING SCREEN */}
         {stage === 'playing' && currentQuestion && (
-          <div style={{ width: '100%' }}>
+          <div style={{ 
+            width: '100%',
+            maxWidth: '700px',
+            margin: '0 auto'
+          }}>
             {/* Info Bar */}
             <div style={{ 
               display: 'flex', 
