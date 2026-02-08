@@ -328,106 +328,110 @@ function VerbsFlashcards({ flashcardSetId, onBack }) {
                 </div>
 
                 {/* Back of card */}
-<div style={{
-  position: 'absolute',
-  width: '100%',
-  height: '100%',
-  backfaceVisibility: 'hidden',
-  transform: 'rotateY(180deg)',
-  backgroundColor: 'white',
-  borderRadius: '16px',
-  padding: 'clamp(3rem, 10vw, 5rem) clamp(2rem, 5vw, 3rem)',
-  minHeight: '350px',
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'center',
-  alignItems: 'center',
-  textAlign: 'center',
-  color: '#667eea',
-  boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-  border: '3px solid #667eea',
-  boxSizing: 'border-box'
-}}>
-                 {currentCard.back.past_simple && (
-  <>
-    <div style={{ 
-      fontSize: 'clamp(0.9rem, 3vw, 1rem)', 
-      fontWeight: '600', 
-      opacity: 0.7,
-      marginBottom: '0.5rem',
-      textTransform: 'uppercase',
-      letterSpacing: '2px'
-    }}>
-      PAST SIMPLE
-    </div>
-    <div style={{ 
-      fontSize: 'clamp(2rem, 6vw, 2.5rem)', 
-      fontWeight: '700',
-      marginBottom: '1rem',
-      color: '#764ba2'
-    }}>
-      {currentCard.back.past_simple}
-    </div>
-    {currentCard.back.example_past_simple && (
-      <div style={{ 
-        fontSize: 'clamp(0.95rem, 3vw, 1.1rem)', 
-        color: '#4a5568',
-        fontStyle: 'italic',
-        marginBottom: '2rem'
-      }}>
-        "{currentCard.back.example_past_simple}"
-      </div>
-    )}
-    
-    <div style={{ 
-      fontSize: 'clamp(0.9rem, 3vw, 1rem)', 
-      fontWeight: '600', 
-      opacity: 0.7,
-      marginBottom: '0.5rem',
-      textTransform: 'uppercase',
-      letterSpacing: '2px'
-    }}>
-      PAST PARTICIPLE
-    </div>
-    <div style={{ 
-      fontSize: 'clamp(2rem, 6vw, 2.5rem)', 
-      fontWeight: '700',
-      marginBottom: '1rem',
-      color: '#764ba2'
-    }}>
-      {currentCard.back.past_participle}
-    </div>
-    {currentCard.back.example_past_participle && (
-      <div style={{ 
-        fontSize: 'clamp(0.95rem, 3vw, 1.1rem)', 
-        color: '#4a5568',
-        fontStyle: 'italic'
-      }}>
-        "{currentCard.back.example_past_participle}"
-      </div>
-    )}
-  </>
-)}
-{currentCard.back.translation && (
-  <div style={{ 
-    fontSize: 'clamp(1.5rem, 5vw, 2rem)', 
-    fontWeight: '600',
-    marginBottom: '1rem',
-    color: '#764ba2'
-  }}>
-    {currentCard.back.translation}
-  </div>
-)}
-{currentCard.back.explanation && (
-  <div style={{ 
-    fontSize: 'clamp(0.9rem, 3vw, 1rem)', 
-    color: '#718096',
-    marginTop: '1rem',
-    maxWidth: '90%'
-  }}>
-    {currentCard.back.explanation}
-  </div>
-)}
+                <div style={{
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  backfaceVisibility: 'hidden',
+                  transform: 'rotateY(180deg)',
+                  backgroundColor: 'white',
+                  borderRadius: '16px',
+                  padding: 'clamp(3rem, 10vw, 5rem) clamp(2rem, 5vw, 3rem)',
+                  minHeight: '350px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                  color: '#667eea',
+                  boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                  border: '3px solid #667eea',
+                  boxSizing: 'border-box'
+                }}>
+                  {currentCard.back.past_simple && (
+                    <>
+                      <div style={{ 
+                        fontSize: 'clamp(0.9rem, 3vw, 1rem)', 
+                        fontWeight: '600', 
+                        opacity: 0.7,
+                        marginBottom: '0.5rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '2px'
+                      }}>
+                        PAST SIMPLE
+                      </div>
+                      <div style={{ 
+                        fontSize: 'clamp(2rem, 6vw, 2.5rem)', 
+                        fontWeight: '700',
+                        marginBottom: '1rem',
+                        color: '#764ba2'
+                      }}>
+                        {currentCard.back.past_simple}
+                      </div>
+                      {currentCard.back.example_past_simple && (
+                        <div style={{ 
+                          fontSize: 'clamp(0.95rem, 3vw, 1.1rem)', 
+                          color: '#4a5568',
+                          fontStyle: 'italic',
+                          marginBottom: '2rem'
+                        }}>
+                          "{currentCard.back.example_past_simple}"
+                        </div>
+                      )}
+                      
+                      <div style={{ 
+                        fontSize: 'clamp(0.9rem, 3vw, 1rem)', 
+                        fontWeight: '600', 
+                        opacity: 0.7,
+                        marginBottom: '0.5rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '2px'
+                      }}>
+                        PAST PARTICIPLE
+                      </div>
+                      <div style={{ 
+                        fontSize: 'clamp(2rem, 6vw, 2.5rem)', 
+                        fontWeight: '700',
+                        marginBottom: '1rem',
+                        color: '#764ba2'
+                      }}>
+                        {currentCard.back.past_participle}
+                      </div>
+                      {currentCard.back.example_past_participle && (
+                        <div style={{ 
+                          fontSize: 'clamp(0.95rem, 3vw, 1.1rem)', 
+                          color: '#4a5568',
+                          fontStyle: 'italic'
+                        }}>
+                          "{currentCard.back.example_past_participle}"
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {currentCard.back.translation && (
+                    <div style={{ 
+                      fontSize: 'clamp(1.5rem, 5vw, 2rem)', 
+                      fontWeight: '600',
+                      marginBottom: '1rem',
+                      color: '#764ba2'
+                    }}>
+                      {currentCard.back.translation}
+                    </div>
+                  )}
+                  {currentCard.back.explanation && (
+                    <div style={{ 
+                      fontSize: 'clamp(0.9rem, 3vw, 1rem)', 
+                      color: '#718096',
+                      marginTop: '1rem',
+                      maxWidth: '90%'
+                    }}>
+                      {currentCard.back.explanation}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div style={{ 
               textAlign: 'center', 
               fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)', 
