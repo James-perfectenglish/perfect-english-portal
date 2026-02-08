@@ -202,7 +202,7 @@ function HomePage({ profile, handleLogout }) {
       <h1 style={{ 
         fontSize: 'clamp(1.5rem, 5vw, 2.5rem)', 
         marginBottom: '1rem', 
-        color: '#e2e8f0' 
+        color: '#3498db' 
       }}>
         Welcome back, {profile.full_name}!
       </h1>
