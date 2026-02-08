@@ -117,13 +117,13 @@ function Dashboard({ session }) {
         margin: 0,
         padding: 0
      }}>
-      <div style={{
-  maxWidth: '1400px',
-  margin: '0 auto',
+   <div style={{
+  width: '100%',
   padding: '1rem',
   display: 'flex',
   justifyContent: 'space-between',
-  alignItems: 'center'
+  alignItems: 'center',
+  boxSizing: 'border-box'
 }}>
           {/* Perfect English - links to main website */}
           <a 
