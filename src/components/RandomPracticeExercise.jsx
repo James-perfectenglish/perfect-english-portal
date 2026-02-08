@@ -153,13 +153,14 @@ export default function RandomPracticeExercise() {
       width: '100%',
       minHeight: '100vh',
       backgroundColor: '#f8f9fa',
-      padding: '1rem',
       boxSizing: 'border-box'
     }}>
       <div style={{
+        padding: '1rem',
         maxWidth: '800px',
         margin: '0 auto',
-        width: '100%'
+        width: '100%',
+        boxSizing: 'border-box'
       }}>
         {/* START SCREEN */}
         {stage === 'start' && (
