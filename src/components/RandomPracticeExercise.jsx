@@ -148,27 +148,28 @@ export default function RandomPracticeExercise() {
 
   const currentQuestion = questions[currentQuestionIndex];
 
-  rreturn (
-  <div style={{ 
-    width: '100%',
-    backgroundColor: '#f8f9fa',
-    minHeight: '100vh',
-    boxSizing: 'border-box'
-  }}>
+  return (
+    <div style={{ 
+      width: '100%',
+      minHeight: '100vh',
+      backgroundColor: '#f8f9fa',
+      padding: '1rem',
+      boxSizing: 'border-box'
+    }}>
       <div style={{
-        minHeight: '100%',
-        display: 'flex',
-        alignItems: stage === 'start' ? 'center' : 'flex-start',
-        padding: stage === 'start' ? '2rem 1rem' : '1rem',
-        boxSizing: 'border-box'
+        maxWidth: '800px',
+        margin: '0 auto',
+        width: '100%'
       }}>
         {/* START SCREEN */}
         {stage === 'start' && (
           <div style={{ 
             textAlign: 'center',
-            width: '100%',
-            maxWidth: '500px',
-            margin: '0 auto'
+            padding: '2rem 0',
+            minHeight: '60vh',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center'
           }}>
             <h1 style={{ 
               fontSize: 'clamp(2rem, 8vw, 2.5rem)',
@@ -207,6 +208,7 @@ export default function RandomPracticeExercise() {
                 cursor: 'pointer',
                 width: '100%',
                 maxWidth: '350px',
+                margin: '0 auto',
                 fontWeight: '600',
                 boxShadow: '0 4px 12px rgba(52, 152, 219, 0.3)'
               }}
@@ -218,11 +220,7 @@ export default function RandomPracticeExercise() {
 
         {/* PLAYING SCREEN */}
         {stage === 'playing' && currentQuestion && (
-          <div style={{ 
-            width: '100%',
-            maxWidth: '700px',
-            margin: '0 auto'
-          }}>
+          <div style={{ width: '100%' }}>
             {/* Info Bar */}
             <div style={{ 
               display: 'flex', 
@@ -237,15 +235,17 @@ export default function RandomPracticeExercise() {
               <div>Score: {score}</div>
             </div>
 
-            {/* Question Card - FIXED WIDTH */}
+            {/* Question Card */}
             <div style={{ 
               backgroundColor: 'white', 
               padding: 'clamp(1.5rem, 5vw, 2rem)', 
               borderRadius: '16px',
               boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-              minHeight: '65vh',
+              minHeight: '60vh',
               display: 'flex',
-              flexDirection: 'column'
+              flexDirection: 'column',
+              width: '100%',
+              boxSizing: 'border-box'
             }}>
               <div style={{ 
                 fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)', 
