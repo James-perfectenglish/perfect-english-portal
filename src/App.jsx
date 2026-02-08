@@ -118,13 +118,13 @@ function Dashboard({ session }) {
         padding: 0
      }}>
       <div style={{
-        width: '100%',
-        padding: '1rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        boxSizing: 'border-box'
-      }}>
+  maxWidth: '1400px',
+  margin: '0 auto',
+  padding: '1rem',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center'
+}}>
           {/* Perfect English - links to main website */}
           <a 
             href="https://perfect-english.org" 
