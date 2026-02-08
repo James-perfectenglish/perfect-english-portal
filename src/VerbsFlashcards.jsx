@@ -328,26 +328,26 @@ function VerbsFlashcards({ flashcardSetId, onBack }) {
                 </div>
 
                 {/* Back of card */}
-                <div style={{
-                  position: 'absolute',
-                  width: '100%',
-                  height: '100%',
-                  backfaceVisibility: 'hidden',
-                  transform: 'rotateY(180deg)',
-                  backgroundColor: 'white',
-                  borderRadius: '16px',
-                  padding: 'clamp(3rem, 10vw, 5rem) clamp(2rem, 5vw, 3rem)',
-                  minHeight: '350px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  textAlign: 'center',
-                  color: '#667eea',
-                  boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-                  border: '3px solid #667eea',
-                  boxSizing: 'border-box'
-                }}>
+<div style={{
+  position: 'absolute',
+  width: '100%',
+  height: '100%',
+  backfaceVisibility: 'hidden',
+  transform: 'rotateY(180deg)',
+  backgroundColor: 'white',
+  borderRadius: '16px',
+  padding: 'clamp(3rem, 10vw, 5rem) clamp(2rem, 5vw, 3rem)',
+  minHeight: '350px',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  alignItems: 'center',
+  textAlign: 'center',
+  color: '#667eea',
+  boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+  border: '3px solid #667eea',
+  boxSizing: 'border-box'
+}}>
                   {currentCard.back.past_simple && (
                     <>
                       <div style={{ 
