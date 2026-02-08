@@ -150,46 +150,50 @@ export default function RandomPracticeExercise() {
 
   return (
     <div style={{ 
-      width: '100%',
-      minHeight: 'calc(100vh - 70px)',
-      display: 'flex',
-      alignItems: stage === 'start' ? 'center' : 'flex-start',
-      padding: '1rem',
-      boxSizing: 'border-box'
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      overflow: 'auto',
+      backgroundColor: '#f8f9fa'
     }}>
       <div style={{
-        maxWidth: '800px',
-        margin: '0 auto',
-        width: '100%'
+        minHeight: '100%',
+        display: 'flex',
+        alignItems: stage === 'start' ? 'center' : 'flex-start',
+        padding: stage === 'start' ? '2rem 1rem' : '1rem',
+        boxSizing: 'border-box'
       }}>
         {/* START SCREEN */}
         {stage === 'start' && (
           <div style={{ 
-            textAlign: 'center', 
-            padding: '2rem 1rem',
-            minHeight: '50vh',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center'
+            textAlign: 'center',
+            width: '100%',
+            maxWidth: '500px',
+            margin: '0 auto'
           }}>
             <h1 style={{ 
-              fontSize: 'clamp(1.8rem, 6vw, 2.5rem)',
+              fontSize: 'clamp(2rem, 8vw, 2.5rem)',
               color: '#2C3E50',
-              marginBottom: '1.5rem'
+              marginBottom: '1.5rem',
+              fontWeight: '700'
             }}>
               Random Practice
             </h1>
             <p style={{ 
-              fontSize: 'clamp(1rem, 3.5vw, 1.2rem)',
+              fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
               color: '#2C3E50',
-              marginBottom: '1rem'
+              marginBottom: '1rem',
+              lineHeight: '1.5'
             }}>
               Test your English with 20 random questions!
             </p>
             <p style={{ 
-              fontSize: 'clamp(1rem, 3.5vw, 1.2rem)',
+              fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
               color: '#2C3E50',
-              marginBottom: '2.5rem'
+              marginBottom: '3rem',
+              lineHeight: '1.5'
             }}>
               You have <strong>3 lives</strong>. Good luck!
             </p>
@@ -197,17 +201,17 @@ export default function RandomPracticeExercise() {
               onClick={startExercise}
               disabled={loading}
               style={{
-                padding: '1.25rem 2.5rem',
-                fontSize: 'clamp(1.1rem, 3.5vw, 1.3rem)',
+                padding: '1.25rem',
+                fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
                 backgroundColor: '#3498DB',
                 color: 'white',
                 border: 'none',
                 borderRadius: '12px',
                 cursor: 'pointer',
-                margin: '0 auto',
                 width: '100%',
                 maxWidth: '350px',
-                fontWeight: '600'
+                fontWeight: '600',
+                boxShadow: '0 4px 12px rgba(52, 152, 219, 0.3)'
               }}
             >
               {loading ? 'Loading...' : 'Start Practice'}
@@ -217,114 +221,113 @@ export default function RandomPracticeExercise() {
 
         {/* PLAYING SCREEN */}
         {stage === 'playing' && currentQuestion && (
-          <div style={{ width: '100%', paddingTop: '1rem' }}>
-            {/* Header Info */}
+          <div style={{ 
+            width: '100%',
+            maxWidth: '700px',
+            margin: '0 auto'
+          }}>
+            {/* Info Bar */}
             <div style={{ 
               display: 'flex', 
               justifyContent: 'space-between', 
               marginBottom: '1rem',
-              fontSize: 'clamp(0.85rem, 2.5vw, 1rem)',
-              gap: '0.5rem',
-              flexWrap: 'wrap',
+              fontSize: 'clamp(0.9rem, 3vw, 1rem)',
               color: '#2C3E50',
-              padding: '0 0.5rem'
+              fontWeight: '500'
             }}>
-              <div>Question {currentQuestionIndex + 1}/{questions.length}</div>
+              <div>Q {currentQuestionIndex + 1}/{questions.length}</div>
               <div>Lives: {Array(lives).fill('❤️').join(' ')} {Array(3 - lives).fill('🖤').join(' ')}</div>
               <div>Score: {score}</div>
             </div>
 
-            {/* Question Card */}
+            {/* Question Card - FIXED WIDTH */}
             <div style={{ 
               backgroundColor: 'white', 
-              padding: 'clamp(1.5rem, 5vw, 2.5rem)', 
-              borderRadius: '12px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              width: '100%',
-              minHeight: '450px',
-              boxSizing: 'border-box',
+              padding: 'clamp(1.5rem, 5vw, 2rem)', 
+              borderRadius: '16px',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+              minHeight: '65vh',
               display: 'flex',
               flexDirection: 'column'
             }}>
               <div style={{ 
-                fontSize: 'clamp(0.75rem, 2vw, 0.9rem)', 
+                fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)', 
                 color: '#666', 
-                marginBottom: '0.75rem' 
+                marginBottom: '1rem',
+                fontWeight: '500'
               }}>
                 {currentQuestion.level} | {currentQuestion.topic.replace(/_/g, ' ')}
               </div>
               
               <h2 style={{ 
-                fontSize: 'clamp(1.2rem, 4.5vw, 1.6rem)', 
-                marginBottom: '1.5rem',
+                fontSize: 'clamp(1.3rem, 5vw, 1.6rem)', 
+                marginBottom: '2rem',
                 lineHeight: '1.4',
                 color: '#2C3E50',
-                fontWeight: '600'
+                fontWeight: '600',
+                wordWrap: 'break-word',
+                overflowWrap: 'break-word'
               }}>
                 {currentQuestion.question}
               </h2>
 
-              {/* Hint */}
               {showHint && currentQuestion.hint && (
                 <div style={{
                   backgroundColor: '#fff3cd',
                   padding: '1rem',
                   borderRadius: '8px',
-                  marginBottom: '1rem',
+                  marginBottom: '1.5rem',
                   border: '1px solid #ffc107',
-                  fontSize: 'clamp(0.9rem, 2.5vw, 1rem)',
-                  color: '#2C3E50'
+                  fontSize: 'clamp(0.9rem, 3vw, 1rem)',
+                  color: '#856404'
                 }}>
                   💡 <strong>Hint:</strong> {currentQuestion.hint}
                 </div>
               )}
 
-              {/* Content Area */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%' }}>
+              <div style={{ flex: 1 }}>
                 {/* GAP FILL */}
                 {currentQuestion.type === 'gap_fill' && !feedback && (
-                  <div style={{ width: '100%' }}>
-                    <input
-                      type="text"
-                      value={userAnswer}
-                      onChange={(e) => setUserAnswer(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && checkAnswer()}
-                      placeholder="Type your answer here..."
-                      style={{
-                        width: '100%',
-                        padding: '1.1rem',
-                        fontSize: 'clamp(1rem, 3.5vw, 1.2rem)',
-                        borderRadius: '8px',
-                        border: '2px solid #ddd',
-                        marginBottom: '1rem',
-                        boxSizing: 'border-box',
-                        color: '#2C3E50'
-                      }}
-                      autoFocus
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={userAnswer}
+                    onChange={(e) => setUserAnswer(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && checkAnswer()}
+                    placeholder="Type your answer..."
+                    style={{
+                      width: '100%',
+                      padding: '1.2rem',
+                      fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
+                      borderRadius: '10px',
+                      border: '2px solid #e0e0e0',
+                      boxSizing: 'border-box',
+                      color: '#2C3E50'
+                    }}
+                    autoFocus
+                  />
                 )}
 
                 {/* MULTIPLE CHOICE */}
                 {currentQuestion.type === 'multiple_choice' && !feedback && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', width: '100%' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     {currentQuestion.options.map((option, index) => (
                       <button
                         key={index}
                         onClick={() => setSelectedOption(option)}
                         style={{
-                          padding: '1.1rem',
-                          fontSize: 'clamp(1rem, 3.5vw, 1.15rem)',
+                          padding: '1.2rem',
+                          fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)',
                           textAlign: 'left',
                           backgroundColor: selectedOption === option ? '#3498DB' : 'white',
                           color: selectedOption === option ? 'white' : '#2C3E50',
-                          border: '2px solid #ddd',
-                          borderRadius: '8px',
+                          border: `2px solid ${selectedOption === option ? '#3498DB' : '#e0e0e0'}`,
+                          borderRadius: '10px',
                           cursor: 'pointer',
                           transition: 'all 0.2s',
                           wordWrap: 'break-word',
                           width: '100%',
-                          boxSizing: 'border-box'
+                          boxSizing: 'border-box',
+                          fontWeight: '500'
                         }}
                       >
                         {option}
@@ -338,21 +341,20 @@ export default function RandomPracticeExercise() {
                   <div style={{
                     backgroundColor: feedback.isCorrect ? '#d4edda' : '#f8d7da',
                     color: feedback.isCorrect ? '#155724' : '#721c24',
-                    padding: '1.1rem',
-                    borderRadius: '8px',
-                    fontSize: 'clamp(0.95rem, 2.8vw, 1.05rem)',
+                    padding: '1.2rem',
+                    borderRadius: '10px',
+                    fontSize: 'clamp(1rem, 3vw, 1.1rem)',
                     lineHeight: '1.6',
-                    marginBottom: '1rem',
-                    width: '100%',
-                    boxSizing: 'border-box'
+                    wordWrap: 'break-word',
+                    overflowWrap: 'break-word'
                   }}>
                     {feedback.message}
                   </div>
                 )}
               </div>
 
-              {/* Action Buttons */}
-              <div style={{ marginTop: 'auto', paddingTop: '1rem', width: '100%' }}>
+              {/* Buttons */}
+              <div style={{ marginTop: '1.5rem' }}>
                 {!feedback && (
                   <button
                     onClick={checkAnswer}
@@ -361,12 +363,12 @@ export default function RandomPracticeExercise() {
                       (currentQuestion.type === 'multiple_choice' && !selectedOption)
                     }
                     style={{
-                      padding: '1.1rem',
-                      fontSize: 'clamp(1rem, 3.5vw, 1.2rem)',
+                      padding: '1.2rem',
+                      fontSize: 'clamp(1.1rem, 4vw, 1.25rem)',
                       backgroundColor: '#2C3E50',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '8px',
+                      borderRadius: '10px',
                       cursor: 'pointer',
                       width: '100%',
                       fontWeight: '600',
@@ -382,12 +384,12 @@ export default function RandomPracticeExercise() {
                   <button
                     onClick={nextQuestion}
                     style={{
-                      padding: '1.1rem',
-                      fontSize: 'clamp(1rem, 3.5vw, 1.2rem)',
+                      padding: '1.2rem',
+                      fontSize: 'clamp(1.1rem, 4vw, 1.25rem)',
                       backgroundColor: '#3498DB',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '8px',
+                      borderRadius: '10px',
                       cursor: 'pointer',
                       width: '100%',
                       fontWeight: '600'
@@ -406,25 +408,25 @@ export default function RandomPracticeExercise() {
           <div style={{ 
             width: '100%',
             maxWidth: '600px',
-            margin: '2rem auto',
-            padding: '0 1rem'
+            margin: '2rem auto 0'
           }}>
             <div style={{
               backgroundColor: 'white',
               padding: 'clamp(2rem, 6vw, 3rem)',
-              borderRadius: '12px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              borderRadius: '16px',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
               textAlign: 'center'
             }}>
               <h1 style={{ 
-                fontSize: 'clamp(1.6rem, 5vw, 2.2rem)',
+                fontSize: 'clamp(1.8rem, 6vw, 2.2rem)',
                 color: '#2C3E50',
-                marginBottom: '1rem'
+                marginBottom: '1.5rem',
+                fontWeight: '700'
               }}>
                 Exercise Complete!
               </h1>
               <div style={{ 
-                fontSize: 'clamp(2.5rem, 10vw, 3.5rem)', 
+                fontSize: 'clamp(3rem, 12vw, 4rem)', 
                 margin: '1.5rem 0',
                 color: '#2C3E50',
                 fontWeight: 'bold'
@@ -432,7 +434,7 @@ export default function RandomPracticeExercise() {
                 {score} / {questions.length}
               </div>
               <div style={{ 
-                fontSize: 'clamp(1.3rem, 4.5vw, 1.7rem)', 
+                fontSize: 'clamp(1.4rem, 5vw, 1.7rem)', 
                 marginBottom: '2rem',
                 color: '#2C3E50'
               }}>
@@ -443,10 +445,10 @@ export default function RandomPracticeExercise() {
                 <div style={{
                   backgroundColor: '#fff3cd',
                   padding: '1.2rem',
-                  borderRadius: '8px',
+                  borderRadius: '10px',
                   marginBottom: '2rem',
-                  fontSize: 'clamp(0.95rem, 3vw, 1.05rem)',
-                  color: '#2C3E50',
+                  fontSize: 'clamp(1rem, 3.5vw, 1.1rem)',
+                  color: '#856404',
                   lineHeight: '1.5'
                 }}>
                   You ran out of lives! Don't worry - practice makes perfect. Try again!
@@ -460,24 +462,25 @@ export default function RandomPracticeExercise() {
                 marginBottom: '2rem'
               }}>
                 <h3 style={{ 
-                  fontSize: 'clamp(1.1rem, 3.5vw, 1.3rem)',
+                  fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
                   color: '#2C3E50',
-                  marginBottom: '1rem'
+                  marginBottom: '1rem',
+                  fontWeight: '600'
                 }}>
-                  How difficult was this exercise?
+                  How difficult was this?
                 </h3>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: 'clamp(0.5rem, 2vw, 0.8rem)', marginTop: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 'clamp(0.5rem, 2vw, 1rem)', marginTop: '1rem' }}>
                   {[1, 2, 3, 4, 5].map((rating) => (
                     <button
                       key={rating}
                       onClick={() => setDifficultyRating(rating)}
                       style={{
-                        fontSize: 'clamp(1.8rem, 6vw, 2.5rem)',
+                        fontSize: 'clamp(2rem, 7vw, 2.8rem)',
                         background: 'none',
                         border: 'none',
                         cursor: 'pointer',
                         opacity: difficultyRating >= rating ? 1 : 0.3,
-                        padding: '0.5rem'
+                        padding: '0.3rem'
                       }}
                     >
                       ⭐
@@ -485,7 +488,7 @@ export default function RandomPracticeExercise() {
                   ))}
                 </div>
                 <div style={{ 
-                  fontSize: 'clamp(0.8rem, 2.2vw, 0.95rem)', 
+                  fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)', 
                   color: '#666', 
                   marginTop: '0.75rem' 
                 }}>
@@ -496,8 +499,8 @@ export default function RandomPracticeExercise() {
               <button
                 onClick={retry}
                 style={{
-                  padding: '1.25rem 2.5rem',
-                  fontSize: 'clamp(1.1rem, 3.5vw, 1.3rem)',
+                  padding: '1.25rem',
+                  fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
                   backgroundColor: '#3498DB',
                   color: 'white',
                   border: 'none',
@@ -505,7 +508,8 @@ export default function RandomPracticeExercise() {
                   cursor: 'pointer',
                   width: '100%',
                   maxWidth: '300px',
-                  fontWeight: '600'
+                  fontWeight: '600',
+                  boxShadow: '0 4px 12px rgba(52, 152, 219, 0.3)'
                 }}
               >
                 Try Again
