@@ -148,16 +148,13 @@ export default function RandomPracticeExercise() {
 
   const currentQuestion = questions[currentQuestionIndex];
 
-  return (
-    <div style={{ 
-      position: 'fixed',
-      top: '70px',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      overflow: 'auto',
-      backgroundColor: '#f8f9fa'
-    }}>
+  rreturn (
+  <div style={{ 
+    width: '100%',
+    backgroundColor: '#f8f9fa',
+    minHeight: '100vh',
+    boxSizing: 'border-box'
+  }}>
       <div style={{
         minHeight: '100%',
         display: 'flex',
