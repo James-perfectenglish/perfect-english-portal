@@ -106,14 +106,16 @@ function Dashboard({ session }) {
 
   return (
     <div>
-      {/* Header - NO LOGOUT BUTTON */}
+      {/* FULL-WIDTH HEADER */}
       <header style={{
         background: 'white',
         boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
         position: 'sticky',
         top: 0,
         zIndex: 1000,
-        marginBottom: '1rem'
+        width: '100%',
+        margin: 0,
+        padding: 0
       }}>
         <div style={{
           maxWidth: '1400px',
@@ -123,7 +125,13 @@ function Dashboard({ session }) {
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
+          {/* Perfect English - links to main website */}
+          <a 
+            href="https://perfect-english.org" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}
+          >
             <h1 style={{ 
               fontSize: 'clamp(1.2rem, 4vw, 1.8rem)', 
               fontWeight: '700', 
@@ -132,8 +140,9 @@ function Dashboard({ session }) {
               <span style={{ color: '#2C3E50' }}>Perfect</span>
               <span style={{ color: '#3498DB' }}> English</span>
             </h1>
-          </Link>
+          </a>
           
+          {/* Navigation */}
           <nav>
             <ul style={{ 
               listStyle: 'none', 
@@ -149,7 +158,7 @@ function Dashboard({ session }) {
                   fontWeight: '500',
                   fontSize: 'clamp(0.875rem, 2vw, 1rem)'
                 }}>
-                  Home
+                  App
                 </Link>
               </li>
               <li>
@@ -177,6 +186,7 @@ function Dashboard({ session }) {
         </div>
       </header>
 
+      {/* MAIN CONTENT */}
       <Routes>
         <Route path="/" element={<HomePage profile={profile} handleLogout={handleLogout} />} />
         <Route path="/practice" element={<PracticePage />} />
@@ -276,7 +286,7 @@ function HomePage({ profile, handleLogout }) {
         </p>
       </div>
 
-      {/* LOGOUT BUTTON - ONLY ON HOME PAGE */}
+      {/* LOGOUT BUTTON */}
       <div style={{ marginTop: '3rem', textAlign: 'center', paddingBottom: '2rem' }}>
         <button 
           onClick={handleLogout}
