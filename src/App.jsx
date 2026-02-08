@@ -116,15 +116,15 @@ function Dashboard({ session }) {
         width: '100%',
         margin: 0,
         padding: 0
+     }}>
+      <div style={{
+        width: '100%',
+        padding: '1rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        boxSizing: 'border-box'
       }}>
-        <div style={{
-          maxWidth: '1400px',
-          margin: '0 auto',
-          padding: '1rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
           {/* Perfect English - links to main website */}
           <a 
             href="https://perfect-english.org" 
