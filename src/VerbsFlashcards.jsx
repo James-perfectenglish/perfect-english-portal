@@ -10,6 +10,8 @@ function VerbsFlashcards({ flashcardSetId, onBack }) {
   const [learningCards, setLearningCards] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [finished, setFinished] = useState(false);
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
 
   useEffect(() => {
     fetchFlashcards();
@@ -42,22 +44,56 @@ function VerbsFlashcards({ flashcardSetId, onBack }) {
     const cardId = cards[currentIndex].id;
     setKnownCards(prev => new Set([...prev, cardId]));
     learningCards.delete(cardId);
-    moveToNext();
+    setIsFlipped(false);
   };
 
   const handleStillLearning = () => {
     const cardId = cards[currentIndex].id;
     setLearningCards(prev => new Set([...prev, cardId]));
-    moveToNext();
+    setIsFlipped(false);
   };
 
-  const moveToNext = () => {
-    setIsFlipped(false);
+  const handleNext = () => {
     if (currentIndex < cards.length - 1) {
       setCurrentIndex(currentIndex + 1);
+      setIsFlipped(false);
     } else {
       setFinished(true);
       saveProgress();
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+      setIsFlipped(false);
+    }
+  };
+
+  // Swipe handling
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isRightSwipe) {
+      handlePrevious();
+    }
+    if (isLeftSwipe) {
+      handleNext();
     }
   };
 
@@ -202,28 +238,58 @@ function VerbsFlashcards({ flashcardSetId, onBack }) {
               </div>
             </div>
 
-            {/* Flashcard */}
-            <div 
-              onClick={handleFlip}
+            {/* Card Counter */}
+            <div style={{ 
+              textAlign: 'center', 
+              fontSize: 'clamp(1rem, 3vw, 1.2rem)', 
+              color: '#4a5568',
+              fontWeight: '600',
+              marginBottom: '1rem'
+            }}>
+              {currentIndex + 1} / {totalCards}
+            </div>
+
+            {/* Flashcard with 3D flip */}
+            <div
               style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                borderRadius: '16px',
-                padding: 'clamp(3rem, 10vw, 5rem) clamp(2rem, 5vw, 3rem)',
-                minHeight: '300px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
-                textAlign: 'center',
-                color: 'white',
-                cursor: 'pointer',
-                boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-                transition: 'transform 0.2s',
+                perspective: '1000px',
                 marginBottom: '1.5rem'
               }}
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
             >
-              {!isFlipped ? (
-                <>
+              <div
+                onClick={handleFlip}
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  minHeight: '350px',
+                  transformStyle: 'preserve-3d',
+                  transition: 'transform 0.6s',
+                  transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                  cursor: 'pointer'
+                }}
+              >
+                {/* Front of card */}
+                <div style={{
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  backfaceVisibility: 'hidden',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: '16px',
+                  padding: 'clamp(3rem, 10vw, 5rem) clamp(2rem, 5vw, 3rem)',
+                  minHeight: '350px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                  color: 'white',
+                  boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                  boxSizing: 'border-box'
+                }}>
                   <div style={{ 
                     fontSize: 'clamp(0.9rem, 3vw, 1rem)', 
                     fontWeight: '600', 
@@ -259,38 +325,64 @@ function VerbsFlashcards({ flashcardSetId, onBack }) {
                       {currentCard.front.example}
                     </div>
                   )}
-                </>
-              ) : (
-                <>
+                </div>
+
+                {/* Back of card */}
+                <div style={{
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  backfaceVisibility: 'hidden',
+                  transform: 'rotateY(180deg)',
+                  backgroundColor: 'white',
+                  borderRadius: '16px',
+                  padding: 'clamp(3rem, 10vw, 5rem) clamp(2rem, 5vw, 3rem)',
+                  minHeight: '350px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                  color: '#667eea',
+                  boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                  border: '3px solid #667eea',
+                  boxSizing: 'border-box'
+                }}>
                   {currentCard.back.past_simple && (
                     <>
                       <div style={{ 
                         fontSize: 'clamp(0.9rem, 3vw, 1rem)', 
                         fontWeight: '600', 
-                        opacity: 0.9,
-                        marginBottom: '0.5rem'
+                        opacity: 0.7,
+                        marginBottom: '0.5rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '2px'
                       }}>
                         PAST SIMPLE
                       </div>
                       <div style={{ 
                         fontSize: 'clamp(2rem, 6vw, 3rem)', 
                         fontWeight: '700',
-                        marginBottom: '2rem'
+                        marginBottom: '2rem',
+                        color: '#764ba2'
                       }}>
                         {currentCard.back.past_simple}
                       </div>
                       <div style={{ 
                         fontSize: 'clamp(0.9rem, 3vw, 1rem)', 
                         fontWeight: '600', 
-                        opacity: 0.9,
-                        marginBottom: '0.5rem'
+                        opacity: 0.7,
+                        marginBottom: '0.5rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '2px'
                       }}>
                         PAST PARTICIPLE
                       </div>
                       <div style={{ 
                         fontSize: 'clamp(2rem, 6vw, 3rem)', 
                         fontWeight: '700',
-                        marginBottom: '2rem'
+                        marginBottom: '2rem',
+                        color: '#764ba2'
                       }}>
                         {currentCard.back.past_participle}
                       </div>
@@ -300,7 +392,8 @@ function VerbsFlashcards({ flashcardSetId, onBack }) {
                     <div style={{ 
                       fontSize: 'clamp(1.5rem, 5vw, 2rem)', 
                       fontWeight: '600',
-                      marginBottom: '1rem'
+                      marginBottom: '1rem',
+                      color: '#764ba2'
                     }}>
                       {currentCard.back.translation}
                     </div>
@@ -308,59 +401,87 @@ function VerbsFlashcards({ flashcardSetId, onBack }) {
                   {currentCard.back.example && (
                     <div style={{ 
                       fontSize: 'clamp(1rem, 3vw, 1.2rem)', 
-                      opacity: 0.9,
+                      color: '#4a5568',
                       fontStyle: 'italic'
                     }}>
-                      {currentCard.back.example}
+                      "{currentCard.back.example}"
                     </div>
                   )}
                   {currentCard.back.explanation && (
                     <div style={{ 
                       fontSize: 'clamp(0.9rem, 3vw, 1rem)', 
-                      opacity: 0.8,
+                      color: '#718096',
                       marginTop: '1rem',
                       maxWidth: '90%'
                     }}>
                       {currentCard.back.explanation}
                     </div>
                   )}
-                </>
-              )}
+                </div>
+              </div>
             </div>
 
             <div style={{ 
               textAlign: 'center', 
               fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)', 
               color: '#718096',
-              marginBottom: '1rem'
-            }}>
-              💡 Click the card to flip it
-            </div>
-
-            <div style={{ 
-              textAlign: 'center', 
-              fontSize: 'clamp(1rem, 3vw, 1.2rem)', 
-              color: '#4a5568',
-              fontWeight: '600',
               marginBottom: '1.5rem'
             }}>
-              {currentIndex + 1} / {totalCards}
+              💡 Click/tap card to flip • Swipe to navigate
             </div>
 
-            {/* Action Buttons */}
+            {/* Navigation Buttons */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between',
+              marginBottom: '1rem',
+              gap: '1rem'
+            }}>
+              <button
+                onClick={handlePrevious}
+                disabled={currentIndex === 0}
+                style={{
+                  padding: '1rem 1.5rem',
+                  fontSize: 'clamp(1rem, 3vw, 1.1rem)',
+                  backgroundColor: currentIndex === 0 ? '#cbd5e0' : '#4a5568',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  cursor: currentIndex === 0 ? 'not-allowed' : 'pointer',
+                  fontWeight: '600',
+                  flex: 1
+                }}
+              >
+                ← Previous
+              </button>
+              <button
+                onClick={handleNext}
+                style={{
+                  padding: '1rem 1.5rem',
+                  fontSize: 'clamp(1rem, 3vw, 1.1rem)',
+                  backgroundColor: '#667eea',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  flex: 1
+                }}
+              >
+                {currentIndex === totalCards - 1 ? 'Finish' : 'Next →'}
+              </button>
+            </div>
+
+            {/* Know It / Still Learning Buttons */}
             {isFlipped && (
               <div style={{ 
                 display: 'grid', 
                 gridTemplateColumns: '1fr 1fr', 
                 gap: '1rem',
-                maxWidth: '500px',
-                margin: '0 auto'
+                marginTop: '1rem'
               }}>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleStillLearning();
-                  }}
+                  onClick={handleStillLearning}
                   style={{
                     padding: '1.2rem',
                     fontSize: 'clamp(1rem, 4vw, 1.2rem)',
@@ -376,10 +497,7 @@ function VerbsFlashcards({ flashcardSetId, onBack }) {
                   📚 Still Learning
                 </button>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleKnowIt();
-                  }}
+                  onClick={handleKnowIt}
                   style={{
                     padding: '1.2rem',
                     fontSize: 'clamp(1rem, 4vw, 1.2rem)',
