@@ -35,7 +35,8 @@ function ExerciseList({ userLevel }) {
       'Business Phrasal Verbs',
       'Office Vocabulary',
       'Spanish Vocabulary',
-      'Irregular Verbs Flashcards'
+      'Irregular Verbs Flashcards',
+      'Essential Phrasal Verbs'
     ]
     
     if (activeExercises.includes(exercise.title)) {
@@ -60,6 +61,9 @@ function ExerciseList({ userLevel }) {
     if (activeExercise.title === 'Irregular Verbs Flashcards') {
       return <VerbsFlashcards flashcardSetId={1} onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
     }
+    if (activeExercise.title === 'Essential Phrasal Verbs') {
+      return <VerbsFlashcards flashcardSetId={2} onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
+    }
   }
 
   if (loading) {
@@ -80,7 +84,8 @@ function ExerciseList({ userLevel }) {
     'Business Phrasal Verbs',
     'Office Vocabulary',
     'Spanish Vocabulary',
-    'Irregular Verbs Flashcards'
+    'Irregular Verbs Flashcards',
+    'Essential Phrasal Verbs'
   ]
 
   return (
