@@ -144,6 +144,9 @@ function VerbsFlashcards({ flashcardSetId, onBack }) {
   const totalCards = cards.length;
   const learnedCount = knownCards.size;
 
+  // Determine card type (verbs have past_simple, phrasal verbs have translation)
+  const isVerbCard = currentCard.back.past_simple !== undefined;
+
   return (
     <div style={{ 
       width: '100vw',
@@ -348,7 +351,8 @@ function VerbsFlashcards({ flashcardSetId, onBack }) {
                   border: '3px solid #667eea',
                   boxSizing: 'border-box'
                 }}>
-                  {currentCard.back.past_simple && (
+                  {/* Verb cards (past_simple & past_participle) */}
+                  {isVerbCard && (
                     <>
                       <div style={{ 
                         fontSize: 'clamp(0.9rem, 3vw, 1rem)', 
@@ -408,16 +412,33 @@ function VerbsFlashcards({ flashcardSetId, onBack }) {
                       )}
                     </>
                   )}
-                  {currentCard.back.translation && (
-                    <div style={{ 
-                      fontSize: 'clamp(1.5rem, 5vw, 2rem)', 
-                      fontWeight: '600',
-                      marginBottom: '1rem',
-                      color: '#764ba2'
-                    }}>
-                      {currentCard.back.translation}
-                    </div>
+
+                  {/* Phrasal verb/vocabulary cards (translation & example) */}
+                  {!isVerbCard && (
+                    <>
+                      {currentCard.back.translation && (
+                        <div style={{ 
+                          fontSize: 'clamp(1.5rem, 5vw, 2rem)', 
+                          fontWeight: '600',
+                          marginBottom: '1.5rem',
+                          color: '#764ba2'
+                        }}>
+                          {currentCard.back.translation}
+                        </div>
+                      )}
+                      {currentCard.back.example && (
+                        <div style={{ 
+                          fontSize: 'clamp(1rem, 3vw, 1.2rem)', 
+                          color: '#4a5568',
+                          fontStyle: 'italic'
+                        }}>
+                          "{currentCard.back.example}"
+                        </div>
+                      )}
+                    </>
                   )}
+
+                  {/* Explanation (optional, for any card type) */}
                   {currentCard.back.explanation && (
                     <div style={{ 
                       fontSize: 'clamp(0.9rem, 3vw, 1rem)', 
