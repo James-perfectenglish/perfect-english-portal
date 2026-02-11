@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Prepositions from './Prepositions'
 import PhrasalVerbs from './PhrasalVerbs'
@@ -10,6 +11,8 @@ function ExerciseList({ userLevel }) {
   const [exercises, setExercises] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeExercise, setActiveExercise] = useState(null)
+  const location = useLocation()
+useEffect(() => { setActiveExercise(null) }, [location.key])
 
   useEffect(() => {
     fetchExercises()
@@ -125,8 +128,11 @@ function ExerciseList({ userLevel }) {
               <div style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
                 <span>📚 {exercise.topic}</span>
                 <span style={{ marginLeft: '15px' }}>🎯 Level: {exercise.level}</span>
-                <span style={{ marginLeft: '15px' }}>✅ Pass: {exercise.passing_score}%</span>
-              </div>
+{exercise.passing_score ? (
+  <span style={{ marginLeft: '15px' }}>✅ Pass: {exercise.passing_score}%</span>
+) : (
+  <span style={{ marginLeft: '15px' }}>✅ Self-paced</span>
+)}              </div>
               <button
                 onClick={() => startExercise(exercise)}
                 style={{
