@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import RandomPracticeExercise from './RandomPracticeExercise.jsx';
+import SurvivalMode from './SurvivalMode.jsx';
 
 const LEVEL_CONFIG = [
   {
@@ -36,6 +37,11 @@ const LEVEL_CONFIG = [
 
 export default function PracticePage() {
   const [selectedLevel, setSelectedLevel] = useState(null);
+  const [survivalMode, setSurvivalMode] = useState(false);
+
+  if (survivalMode) {
+    return <SurvivalMode onBack={() => setSurvivalMode(false)} />;
+  }
 
   if (selectedLevel) {
     return (
@@ -175,6 +181,110 @@ export default function PracticePage() {
               </div>
             </button>
           ))}
+
+          {/* Divider */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            margin: '0.5rem 0'
+          }}>
+            <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+            <span style={{ fontSize: '0.85rem', color: '#aaa', fontWeight: '500' }}>or</span>
+            <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+          </div>
+
+          {/* Survival Mode Card */}
+          <button
+            onClick={() => setSurvivalMode(true)}
+            style={{
+              background: 'linear-gradient(135deg, #1a1a2e, #16213e)',
+              border: '2px solid #e74c3c',
+              borderRadius: '16px',
+              padding: 'clamp(1.25rem, 4vw, 1.75rem)',
+              cursor: 'pointer',
+              textAlign: 'left',
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1.25rem',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#ff6b6b';
+              e.currentTarget.style.boxShadow = '0 4px 20px rgba(231, 76, 60, 0.4)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#e74c3c';
+              e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            {/* Survival badge */}
+            <div style={{
+              background: 'linear-gradient(135deg, #e74c3c, #8e44ad)',
+              borderRadius: '12px',
+              width: 'clamp(55px, 15vw, 70px)',
+              height: 'clamp(55px, 15vw, 70px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 'clamp(1.5rem, 5vw, 2rem)',
+              flexShrink: 0
+            }}>
+              ⚔️
+            </div>
+
+            {/* Text content */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: '0.5rem',
+                flexWrap: 'wrap',
+                marginBottom: '0.3rem'
+              }}>
+                <span style={{
+                  fontSize: 'clamp(1.15rem, 4vw, 1.35rem)',
+                  fontWeight: '700',
+                  color: 'white'
+                }}>
+                  Survival Mode
+                </span>
+                <span style={{
+                  fontSize: 'clamp(0.75rem, 2vw, 0.8rem)',
+                  fontWeight: '600',
+                  color: '#e74c3c',
+                  backgroundColor: 'rgba(231, 76, 60, 0.15)',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Challenge
+                </span>
+              </div>
+              <p style={{
+                fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)',
+                color: '#adb5bd',
+                margin: 0,
+                lineHeight: '1.4'
+              }}>
+                5 lives. Start at Beginner, level up through Intermediate to Advanced. How far can you go?
+              </p>
+            </div>
+
+            {/* Arrow */}
+            <div style={{
+              fontSize: '1.5rem',
+              color: '#e74c3c',
+              flexShrink: 0
+            }}>
+              →
+            </div>
+          </button>
         </div>
       </div>
     </div>
