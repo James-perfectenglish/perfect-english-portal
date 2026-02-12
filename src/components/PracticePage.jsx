@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import RandomPracticeExercise from './RandomPracticeExercise.jsx';
 import SurvivalMode from './SurvivalMode.jsx';
 import { useLocation } from 'react-router-dom'
