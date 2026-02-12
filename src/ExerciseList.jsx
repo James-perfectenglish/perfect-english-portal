@@ -6,13 +6,15 @@ import PhrasalVerbs from './PhrasalVerbs'
 import OfficeVocabulary from './OfficeVocabulary'
 import SpanishVocabulary from './SpanishVocabulary'
 import VerbsFlashcards from './VerbsFlashcards'
+import SentenceBuilding from './SentenceBuilding'
 
 function ExerciseList({ userLevel }) {
   const [exercises, setExercises] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeExercise, setActiveExercise] = useState(null)
+
   const location = useLocation()
-useEffect(() => { setActiveExercise(null) }, [location.key])
+  useEffect(() => { setActiveExercise(null) }, [location.key])
 
   useEffect(() => {
     fetchExercises()
@@ -39,9 +41,10 @@ useEffect(() => { setActiveExercise(null) }, [location.key])
       'Office Vocabulary',
       'Spanish Vocabulary',
       'Irregular Verbs Flashcards',
-      'Essential Phrasal Verbs'
+      'Essential Phrasal Verbs',
+      'Sentence Building'
     ]
-    
+
     if (activeExercises.includes(exercise.title)) {
       setActiveExercise(exercise)
     }
@@ -67,6 +70,9 @@ useEffect(() => { setActiveExercise(null) }, [location.key])
     if (activeExercise.title === 'Essential Phrasal Verbs') {
       return <VerbsFlashcards flashcardSetId={2} onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
     }
+    if (activeExercise.title === 'Sentence Building') {
+      return <SentenceBuilding onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
+    }
   }
 
   if (loading) {
@@ -88,17 +94,19 @@ useEffect(() => { setActiveExercise(null) }, [location.key])
     'Office Vocabulary',
     'Spanish Vocabulary',
     'Irregular Verbs Flashcards',
-    'Essential Phrasal Verbs'
+    'Essential Phrasal Verbs',
+    'Sentence Building'
   ]
 
   return (
     <div style={{ marginTop: '30px' }}>
       <h2 style={{ color: '#2d3748', marginBottom: '5px' }}>Recommended Exercises</h2>
       <p style={{ color: '#718096', fontSize: '0.9rem', marginBottom: '20px' }}>Exercises matched to your level appear first</p>
+
       <div style={{ display: 'grid', gap: '20px' }}>
         {exercises.map((exercise) => {
           const isActive = activeExercises.includes(exercise.title)
-          
+
           return (
             <div
               key={exercise.id}
@@ -112,13 +120,13 @@ useEffect(() => { setActiveExercise(null) }, [location.key])
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <h3 style={{ color: '#2d3748', margin: 0 }}>{exercise.title}</h3>
                 {exercise.level === userLevel && (
-                  <span style={{ 
-                    background: '#667eea', 
-                    color: 'white', 
-                    padding: '2px 10px', 
-                    borderRadius: '20px', 
-                    fontSize: '0.8rem', 
-                    fontWeight: 600 
+                  <span style={{
+                    background: '#667eea',
+                    color: 'white',
+                    padding: '2px 10px',
+                    borderRadius: '20px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600
                   }}>
                     Recommended
                   </span>
@@ -128,11 +136,12 @@ useEffect(() => { setActiveExercise(null) }, [location.key])
               <div style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
                 <span>📚 {exercise.topic}</span>
                 <span style={{ marginLeft: '15px' }}>🎯 Level: {exercise.level}</span>
-{exercise.passing_score ? (
-  <span style={{ marginLeft: '15px' }}>✅ Pass: {exercise.passing_score}%</span>
-) : (
-  <span style={{ marginLeft: '15px' }}>✅ Self-paced</span>
-)}              </div>
+                {exercise.passing_score ? (
+                  <span style={{ marginLeft: '15px' }}>✅ Pass: {exercise.passing_score}%</span>
+                ) : (
+                  <span style={{ marginLeft: '15px' }}>✅ Self-paced</span>
+                )}
+              </div>
               <button
                 onClick={() => startExercise(exercise)}
                 style={{
