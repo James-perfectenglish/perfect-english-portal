@@ -146,7 +146,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
           fontSize: '0.85rem',
           fontWeight: 600,
           marginTop: '8px'
-        }}>📊 Level: B2</span>
+        }}> Level: B2</span>
       </div>
 
       {/* CONTENT AREA */}
