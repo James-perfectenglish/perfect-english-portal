@@ -140,13 +140,13 @@ export default function SentenceBuilding({ onBack, onComplete }) {
         </p>
         <span style={{
           display: 'inline-block',
-          background: '#ed8936',
+          background: '#4299e1',
           padding: '4px 12px',
           borderRadius: '20px',
           fontSize: '0.85rem',
           fontWeight: 600,
           marginTop: '8px'
-        }}>📊 Level: B1-B2</span>
+        }}>📊 Level: B2</span>
       </div>
 
       {/* CONTENT AREA */}
