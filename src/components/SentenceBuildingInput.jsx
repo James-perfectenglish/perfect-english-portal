@@ -53,7 +53,8 @@ export default function SentenceBuildingInput({
   const dragStartPos = useRef(null);
   const answerRefs = useRef([]);
   const answerZoneRef = useRef(null);
-  const DRAG_THRESHOLD = 8;
+  const tapCooldown = useRef(false);
+  const DRAG_THRESHOLD = 12;
 
   // Initialize words when they change
   useEffect(() => {
@@ -100,7 +101,10 @@ export default function SentenceBuildingInput({
   // =============================================
   const handlePointerDown = useCallback((word, zone, e) => {
     if (disabled) return;
+    if (isDragging.current) return;
+    if (tapCooldown.current) return; // prevent rapid multi-taps
     e.preventDefault();
+    e.stopPropagation();
     const touch = e.touches ? e.touches[0] : e;
     dragStartPos.current = { x: touch.clientX, y: touch.clientY };
     isDragging.current = false;
@@ -145,7 +149,9 @@ export default function SentenceBuildingInput({
       document.removeEventListener('touchend', handleUp);
 
       if (!isDragging.current) {
-        // TAP
+        // TAP — with cooldown to prevent multi-selection
+        tapCooldown.current = true;
+        setTimeout(() => { tapCooldown.current = false; }, 200);
         if (zone === 'bank') {
           setBankWords(prev => prev.filter(w => w.id !== word.id));
           setAnswerWords(prev => [...prev, word]);
@@ -202,19 +208,19 @@ export default function SentenceBuildingInput({
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '10px 16px',
-    margin: '4px',
+    padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)',
+    margin: 'clamp(4px, 1.5vw, 6px)',
     backgroundColor: isDragSource ? '#e2e8f0' : 'white',
     border: isDragSource ? '2px dashed #cbd5e0' : '2px solid #e2e8f0',
     borderRadius: '8px',
-    fontSize: 'clamp(1rem, 3.5vw, 1.15rem)',
+    fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)',
     fontWeight: '500',
     color: isDragSource ? 'transparent' : '#2C3E50',
     cursor: disabled ? 'default' : 'grab',
     userSelect: 'none',
     WebkitUserSelect: 'none',
     touchAction: 'none',
-    minWidth: '36px',
+    minWidth: '32px',
     textAlign: 'center',
     boxSizing: 'border-box'
   });
