@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import RandomPracticeExercise from './RandomPracticeExercise.jsx';
 import SurvivalMode from './SurvivalMode.jsx';
-
+import { useLocation } from 'react-router-dom'
 const LEVEL_CONFIG = [
   {
     id: 'beginner',
@@ -38,7 +38,8 @@ const LEVEL_CONFIG = [
 export default function PracticePage() {
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [survivalMode, setSurvivalMode] = useState(false);
-
+const location = useLocation()
+useEffect(() => { setSelectedLevel(null); setSurvivalMode(false); }, [location.key])
   if (survivalMode) {
     return <SurvivalMode onBack={() => setSurvivalMode(false)} />;
   }

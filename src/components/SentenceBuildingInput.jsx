@@ -83,8 +83,26 @@ export default function SentenceBuildingInput({
     const isCorrect = correctSentences.some(
       correct => correct.trim().toLowerCase() === userAnswer
     );
-    if (onResult) onResult(isCorrect);
-    return isCorrect;
+
+    if (isCorrect) {
+      if (onResult) onResult(true, false); // correct, not soft
+      return true;
+    }
+
+    // Soft fail check: words correct but punctuation missing/wrong
+    const stripPunctuation = (str) => str.replace(/[.,?!;:]/g, '').replace(/\s+/g, ' ').trim();
+    const userStripped = stripPunctuation(userAnswer);
+    const isSoftCorrect = correctSentences.some(
+      correct => stripPunctuation(correct.trim().toLowerCase()) === userStripped
+    );
+
+    if (isSoftCorrect) {
+      if (onResult) onResult(true, true); // correct but soft (punctuation issue)
+      return true;
+    }
+
+    if (onResult) onResult(false, false); // incorrect
+    return false;
   };
 
   const resetWords = () => {

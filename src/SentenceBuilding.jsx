@@ -54,13 +54,19 @@ export default function SentenceBuilding({ onBack, onComplete }) {
     setStage('playing');
   };
 
-  const handleResult = (isCorrect) => {
+  const handleResult = (isCorrect, isSoft = false) => {
     const q = questions[currentQ];
-    if (isCorrect) {
+    if (isCorrect && !isSoft) {
       setScore(s => s + 1);
       setFeedback({
         correct: true,
         message: `✅ Correct! ${q.explanation || ''}`
+      });
+    } else if (isCorrect && isSoft) {
+      setScore(s => s + 1); // still counts as correct
+      setFeedback({
+        correct: true,
+        message: `✅ You got the words right — but don't forget your punctuation! Score counted. ${q.explanation || ''}`
       });
     } else {
       const correctSentences = Array.isArray(q.correct_answers) ? q.correct_answers : JSON.parse(q.correct_answers || '[]');
@@ -125,28 +131,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
         padding: 'clamp(1.5rem, 5vw, 2.5rem) 1rem clamp(1.25rem, 4vw, 2rem)',
         textAlign: 'center',
         color: 'white',
-        position: 'relative'
       }}>
-        {onBack && (
-          <button
-            onClick={onBack}
-            style={{
-              position: 'absolute',
-              top: '1rem',
-              left: '1rem',
-              background: 'rgba(255,255,255,0.2)',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '6px 14px',
-              color: 'white',
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              fontWeight: '500'
-            }}
-          >
-            ← Back
-          </button>
-        )}
         <h1 style={{
           fontSize: 'clamp(1.5rem, 5vw, 2rem)',
           fontWeight: '700',
