@@ -34,14 +34,11 @@ const LEVELS = [
   }
 ];
 
-// Playback speed by level
-const getPlaybackSpeed = (level) => {
-  if (!level) return 1;
-  if (level.startsWith('A')) return 0.85;
-  if (level.startsWith('B')) return 0.95;
-  if (level.startsWith('C')) return 1.05;
-  return 1;
-};
+const SPEED_OPTIONS = [
+  { label: 'Slower', value: 0.9 },
+  { label: 'Normal', value: 1.0 },
+  { label: 'Faster', value: 1.1 }
+];
 
 export default function ListeningExercise({ onBack }) {
   // Navigation
@@ -74,6 +71,7 @@ export default function ListeningExercise({ onBack }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
 
   // Fetch counts on mount
   useEffect(() => { fetchCounts(); }, []);
@@ -136,6 +134,7 @@ export default function ListeningExercise({ onBack }) {
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
+    setPlaybackSpeed(1.0);
     setExerciseStage('intro');
     setStage('exercise');
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -148,7 +147,7 @@ export default function ListeningExercise({ onBack }) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.playbackRate = getPlaybackSpeed(currentExercise?.level);
+      audioRef.current.playbackRate = playbackSpeed;
       audioRef.current.play();
       setIsPlaying(true);
     }
@@ -157,9 +156,16 @@ export default function ListeningExercise({ onBack }) {
   const replayFromStart = () => {
     if (!audioRef.current) return;
     audioRef.current.currentTime = 0;
-    audioRef.current.playbackRate = getPlaybackSpeed(currentExercise?.level);
+    audioRef.current.playbackRate = playbackSpeed;
     audioRef.current.play();
     setIsPlaying(true);
+  };
+
+  const changeSpeed = (newSpeed) => {
+    setPlaybackSpeed(newSpeed);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = newSpeed;
+    }
   };
 
   const handleAudioEnded = () => { setIsPlaying(false); };
@@ -262,7 +268,6 @@ export default function ListeningExercise({ onBack }) {
   // ── Shared: Audio player bar ──
   const renderAudioPlayer = (stageLabel) => {
     const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
-    const speed = getPlaybackSpeed(currentExercise?.level);
 
     return (
       <div style={{
@@ -302,20 +307,44 @@ export default function ListeningExercise({ onBack }) {
               fontSize: '0.78rem', color: '#718096'
             }}>
               <span>{formatTime(currentTime)}</span>
-              <span>{speed !== 1 ? `Speed: ${speed}x` : ''}</span>
               <span>{duration > 0 ? formatTime(duration) : '--:--'}</span>
             </div>
           </div>
         </div>
-        {!isPlaying && currentTime > 0 && (
-          <button onClick={replayFromStart} style={{
-            marginTop: '0.75rem', padding: '6px 14px', background: '#667eea',
-            color: 'white', border: 'none', borderRadius: '6px',
-            fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer'
-          }}>
-            Replay from Start
-          </button>
-        )}
+
+        {/* Speed toggle + replay */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          marginTop: '0.75rem', flexWrap: 'wrap', gap: '0.5rem'
+        }}>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {SPEED_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => changeSpeed(opt.value)}
+                style={{
+                  padding: '5px 12px', fontSize: '0.8rem', fontWeight: 600,
+                  borderRadius: '6px', cursor: 'pointer', transition: 'all 0.15s',
+                  border: playbackSpeed === opt.value ? '2px solid #667eea' : '1px solid #d1d5db',
+                  background: playbackSpeed === opt.value ? '#667eea' : 'white',
+                  color: playbackSpeed === opt.value ? 'white' : '#4a5568'
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {!isPlaying && currentTime > 0 && (
+            <button onClick={replayFromStart} style={{
+              padding: '5px 14px', background: '#667eea', color: 'white',
+              border: 'none', borderRadius: '6px', fontSize: '0.8rem',
+              fontWeight: 600, cursor: 'pointer'
+            }}>
+              Replay
+            </button>
+          )}
+        </div>
       </div>
     );
   };
