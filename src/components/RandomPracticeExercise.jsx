@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import SentenceBuildingInput from './SentenceBuildingInput';
 
 export default function RandomPracticeExercise({ levels, levelTitle, levelSubtitle, gradient, onBack }) {
   const [stage, setStage] = useState('start');
@@ -13,6 +14,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const [showHint, setShowHint] = useState(false);
   const [loading, setLoading] = useState(false);
   const [difficultyRating, setDifficultyRating] = useState(0);
+  const [sbFeedback, setSbFeedback] = useState(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -33,22 +35,31 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         .select('*')
         .eq('type', 'multiple_choice');
 
+      let sbQuery = supabase
+        .from('question_bank')
+        .select('*')
+        .eq('type', 'sentence_building');
+
       // Apply level filter if levels are provided
       if (levels && levels.length > 0) {
         gapFillQuery = gapFillQuery.in('level', levels);
         mcQuery = mcQuery.in('level', levels);
+        sbQuery = sbQuery.in('level', levels);
       }
 
       const { data: allGapFill, error: gapError } = await gapFillQuery;
       const { data: allMultipleChoice, error: mcError } = await mcQuery;
+      const { data: allSentenceBuilding, error: sbError } = await sbQuery;
 
-      if (gapError || mcError) throw gapError || mcError;
+      if (gapError || mcError || sbError) throw gapError || mcError || sbError;
 
-      // Shuffle and take up to 10 of each type
-      const shuffledGapFill = (allGapFill || []).sort(() => Math.random() - 0.5).slice(0, 10);
-      const shuffledMultipleChoice = (allMultipleChoice || []).sort(() => Math.random() - 0.5).slice(0, 10);
+      // Shuffle and take up to 8 gap_fill, 8 multiple_choice, 4 sentence_building
+      const shuffledGapFill = (allGapFill || []).sort(() => Math.random() - 0.5).slice(0, 8);
+      const shuffledMultipleChoice = (allMultipleChoice || []).sort(() => Math.random() - 0.5).slice(0, 8);
+      const shuffledSentenceBuilding = (allSentenceBuilding || []).sort(() => Math.random() - 0.5).slice(0, 4);
 
-      const allQuestions = [...shuffledGapFill, ...shuffledMultipleChoice].sort(() => Math.random() - 0.5);
+      const allQuestions = [...shuffledGapFill, ...shuffledMultipleChoice, ...shuffledSentenceBuilding]
+        .sort(() => Math.random() - 0.5);
 
       if (allQuestions.length === 0) {
         alert('No questions available for this level yet. Check back soon!');
@@ -62,6 +73,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setLives(3);
       setScore(0);
       setFeedback(null);
+      setSbFeedback(null);
       setUserAnswer('');
       setSelectedOption(null);
       setDifficultyRating(0);
@@ -114,6 +126,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         const correctAnswer = correctAnswers[0] || 'N/A';
         feedbackMessage = `❌ Incorrect. The correct answer is: "${correctAnswer}". ${currentQuestion.explanation}`;
       }
+
     } else if (currentQuestion.type === 'multiple_choice') {
       if (selectedOption === currentQuestion.correct_answer) {
         isCorrect = true;
@@ -143,6 +156,63 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     }
   };
 
+  // Handler for sentence_building questions — called by SentenceBuildingInput
+  const handleSentenceBuildingResult = (isCorrect, isSoft = false) => {
+    const currentQuestion = questions[currentQuestionIndex];
+    let feedbackMessage = '';
+
+    if (isCorrect && !isSoft) {
+      feedbackMessage = `✅ Correct! ${currentQuestion.explanation || ''}`;
+      setSbFeedback({ correct: true, message: feedbackMessage });
+      setFeedback({ message: feedbackMessage, type: 'correct', isCorrect: true });
+      setScore(s => s + 1);
+    } else if (isCorrect && isSoft) {
+      feedbackMessage = `✅ You got the words right — but don't forget your punctuation! Score counted. ${currentQuestion.explanation || ''}`;
+      setSbFeedback({ correct: true, message: feedbackMessage });
+      setFeedback({ message: feedbackMessage, type: 'correct', isCorrect: true });
+      setScore(s => s + 1);
+    } else {
+      const correctSentences = Array.isArray(currentQuestion.correct_answers)
+        ? currentQuestion.correct_answers
+        : JSON.parse(currentQuestion.correct_answers || '[]');
+      const displaySentence = (correctSentences[0] || '')
+        .replace(/ ([.,?!;:])/g, '$1')
+        .replace(/^(\w)/, m => m.toUpperCase());
+      feedbackMessage = `❌ Not quite. The correct answer is: "${displaySentence}" — ${currentQuestion.explanation || ''}`;
+      setSbFeedback({ correct: false, message: feedbackMessage });
+      setFeedback({ message: feedbackMessage, type: 'incorrect', isCorrect: false });
+
+      const newLives = lives - 1;
+      setLives(newLives);
+      if (newLives === 0) {
+        setTimeout(() => {
+          setStage('finished');
+        }, 2000);
+        return;
+      }
+    }
+  };
+
+  // Get props for SentenceBuildingInput from a question_bank row
+  const getSbProps = (question) => {
+    if (!question) return {};
+    const options = Array.isArray(question.options)
+      ? question.options
+      : JSON.parse(question.options || '[]');
+    const correctSentences = Array.isArray(question.correct_answers)
+      ? question.correct_answers
+      : JSON.parse(question.correct_answers || '[]');
+    const hasPrompt = question.question && question.question.trim() !== '';
+
+    return {
+      words: options,
+      questionType: hasPrompt ? 'translation' : 'build',
+      prompt: hasPrompt ? question.question : null,
+      correctSentences,
+      explanation: question.explanation || ''
+    };
+  };
+
   const nextQuestion = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     if (currentQuestionIndex < questions.length - 1) {
@@ -150,6 +220,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setUserAnswer('');
       setSelectedOption(null);
       setFeedback(null);
+      setSbFeedback(null);
       setShowHint(false);
     } else {
       setStage('finished');
@@ -162,13 +233,18 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
   const currentQuestion = questions[currentQuestionIndex];
 
-  // Display title - use level info if provided, otherwise generic
+  // Display title
   const displayTitle = levelTitle ? `${levelTitle} Practice` : 'Random Practice';
   const displaySubtitle = levelSubtitle || '';
   const displayGradient = gradient || 'linear-gradient(135deg, #3498DB, #667eea)';
 
   return (
-    <div style={{ width: '100%', minHeight: '100vh', backgroundColor: '#f8f9fa', boxSizing: 'border-box' }}>
+    <div style={{
+      width: '100%',
+      minHeight: '100vh',
+      backgroundColor: '#f8f9fa',
+      boxSizing: 'border-box'
+    }}>
       <div style={{ padding: '1rem', width: '100%', boxSizing: 'border-box' }}>
 
         {/* START SCREEN */}
@@ -185,7 +261,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
             maxWidth: '600px',
             margin: '0 auto'
           }}>
-            {/* Level badge */}
             {levelSubtitle && (
               <div style={{
                 display: 'inline-block',
@@ -201,7 +276,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 {levelSubtitle}
               </div>
             )}
-
             <h1 style={{
               fontSize: 'clamp(2rem, 8vw, 2.5rem)',
               color: '#2C3E50',
@@ -210,7 +284,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
             }}>
               {displayTitle}
             </h1>
-
             <p style={{
               fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
               color: '#2C3E50',
@@ -227,7 +300,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
             }}>
               You have <strong>3 lives</strong>. Good luck!
             </p>
-
             <button
               onClick={startExercise}
               disabled={loading}
@@ -248,8 +320,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
             >
               {loading ? 'Loading...' : 'Start Practice'}
             </button>
-
-            {/* Back to level selection */}
             {onBack && (
               <button
                 onClick={onBack}
@@ -307,19 +377,23 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 fontWeight: '500'
               }}>
                 {currentQuestion.level} | {currentQuestion.topic.replace(/_/g, ' ')}
+                {currentQuestion.type === 'sentence_building' && ' | Sentence Building'}
               </div>
 
-              <h2 style={{
-                fontSize: 'clamp(1.3rem, 5vw, 1.6rem)',
-                marginBottom: '2rem',
-                lineHeight: '1.4',
-                color: '#2C3E50',
-                fontWeight: '600',
-                wordWrap: 'break-word',
-                overflowWrap: 'break-word'
-              }}>
-                {currentQuestion.question}
-              </h2>
+              {/* Show question text for gap_fill and multiple_choice */}
+              {currentQuestion.type !== 'sentence_building' && (
+                <h2 style={{
+                  fontSize: 'clamp(1.3rem, 5vw, 1.6rem)',
+                  marginBottom: '2rem',
+                  lineHeight: '1.4',
+                  color: '#2C3E50',
+                  fontWeight: '600',
+                  wordWrap: 'break-word',
+                  overflowWrap: 'break-word'
+                }}>
+                  {currentQuestion.question}
+                </h2>
+              )}
 
               {showHint && currentQuestion.hint && (
                 <div style={{
@@ -386,8 +460,21 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   </div>
                 )}
 
-                {/* FEEDBACK */}
-                {feedback && (
+                {/* SENTENCE BUILDING */}
+                {currentQuestion.type === 'sentence_building' && (
+                  <SentenceBuildingInput
+                    key={currentQuestionIndex}
+                    {...getSbProps(currentQuestion)}
+                    disabled={!!feedback}
+                    onResult={handleSentenceBuildingResult}
+                    feedback={sbFeedback}
+                    showCheckButton={true}
+                    onAnswerReady={() => {}}
+                  />
+                )}
+
+                {/* FEEDBACK for gap_fill and multiple_choice */}
+                {feedback && currentQuestion.type !== 'sentence_building' && (
                   <div style={{
                     backgroundColor: feedback.isCorrect ? '#d4edda' : '#f8d7da',
                     color: feedback.isCorrect ? '#155724' : '#721c24',
@@ -405,7 +492,8 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
               {/* Buttons */}
               <div style={{ marginTop: '1.5rem' }}>
-                {!feedback && (
+                {/* Check Answer — only for gap_fill and multiple_choice */}
+                {!feedback && currentQuestion.type !== 'sentence_building' && (
                   <button
                     onClick={checkAnswer}
                     disabled={
@@ -425,14 +513,14 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                       opacity:
                         (currentQuestion.type === 'gap_fill' && !userAnswer.trim()) ||
                         (currentQuestion.type === 'multiple_choice' && !selectedOption)
-                          ? 0.5
-                          : 1
+                          ? 0.5 : 1
                     }}
                   >
                     Check Answer
                   </button>
                 )}
 
+                {/* Next Question — shown after feedback for all types */}
                 {feedback && lives > 0 && (
                   <button
                     onClick={nextQuestion}
@@ -474,7 +562,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
               }}>
                 Exercise Complete!
               </h1>
-
               <div style={{
                 fontSize: 'clamp(3rem, 12vw, 4rem)',
                 margin: '1.5rem 0',
@@ -483,16 +570,12 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
               }}>
                 {score} / {questions.length}
               </div>
-
               <div style={{
                 fontSize: 'clamp(1.4rem, 5vw, 1.7rem)',
                 marginBottom: '2rem',
                 color: '#2C3E50'
               }}>
-                {score >= 18 ? '🌟 Excellent!' :
-                 score >= 15 ? '👍 Great job!' :
-                 score >= 10 ? '👌 Good effort!' :
-                 '💪 Keep practicing!'}
+                {score >= 18 ? '🌟 Excellent!' : score >= 15 ? '👍 Great job!' : score >= 10 ? '👌 Good effort!' : '💪 Keep practicing!'}
               </div>
 
               {lives === 0 && (
@@ -579,7 +662,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 >
                   Try Again
                 </button>
-
                 {onBack && (
                   <button
                     onClick={onBack}

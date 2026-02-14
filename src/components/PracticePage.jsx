@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import RandomPracticeExercise from './RandomPracticeExercise.jsx';
 import SurvivalMode from './SurvivalMode.jsx';
 import { useLocation } from 'react-router-dom'
+
 const LEVEL_CONFIG = [
   {
     id: 'beginner',
@@ -30,16 +31,21 @@ const LEVEL_CONFIG = [
     description: 'Complex structures, nuance, and precision. Perfect your English at the highest level.',
     levels: ['C1', 'C2'],
     emoji: '🎯',
-    gradient: 'linear-gradient(135deg, #8e44ad, #e74c3c)',
-    shadow: 'rgba(142, 68, 173, 0.3)'
+    gradient: 'linear-gradient(135deg, #ed8936, #f6ad55)',
+    shadow: 'rgba(237, 137, 54, 0.3)'
   }
 ];
 
 export default function PracticePage() {
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [survivalMode, setSurvivalMode] = useState(false);
-const location = useLocation()
-useEffect(() => { setSelectedLevel(null); setSurvivalMode(false); }, [location.key])
+  const location = useLocation()
+
+  useEffect(() => {
+    setSelectedLevel(null);
+    setSurvivalMode(false);
+  }, [location.key])
+
   if (survivalMode) {
     return <SurvivalMode onBack={() => setSurvivalMode(false)} />;
   }
@@ -64,11 +70,7 @@ useEffect(() => { setSelectedLevel(null); setSurvivalMode(false); }, [location.k
       padding: '1rem',
       boxSizing: 'border-box'
     }}>
-      <div style={{
-        maxWidth: '700px',
-        margin: '0 auto',
-        textAlign: 'center'
-      }}>
+      <div style={{ maxWidth: '700px', margin: '0 auto', textAlign: 'center' }}>
         <h1 style={{
           fontSize: 'clamp(1.8rem, 6vw, 2.5rem)',
           color: '#2C3E50',
@@ -86,11 +88,7 @@ useEffect(() => { setSelectedLevel(null); setSurvivalMode(false); }, [location.k
           Choose your level. 20 random questions, 3 lives. Let's go!
         </p>
 
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.25rem'
-        }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {LEVEL_CONFIG.map((level) => (
             <button
               key={level.id}
@@ -173,11 +171,7 @@ useEffect(() => { setSelectedLevel(null); setSurvivalMode(false); }, [location.k
               </div>
 
               {/* Arrow */}
-              <div style={{
-                fontSize: '1.5rem',
-                color: '#cbd5e0',
-                flexShrink: 0
-              }}>
+              <div style={{ fontSize: '1.5rem', color: '#cbd5e0', flexShrink: 0 }}>
                 →
               </div>
             </button>
@@ -278,11 +272,7 @@ useEffect(() => { setSelectedLevel(null); setSurvivalMode(false); }, [location.k
             </div>
 
             {/* Arrow */}
-            <div style={{
-              fontSize: '1.5rem',
-              color: '#e74c3c',
-              flexShrink: 0
-            }}>
+            <div style={{ fontSize: '1.5rem', color: '#e74c3c', flexShrink: 0 }}>
               →
             </div>
           </button>
