@@ -53,7 +53,6 @@ function ExerciseList({ userLevel }) {
     }
   }
 
-  // Show the active exercise if one is selected
   if (activeExercise) {
     if (activeExercise.title === 'Prepositions Practice') {
       return <Prepositions onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
@@ -123,12 +122,8 @@ function ExerciseList({ userLevel }) {
                 <h3 style={{ color: '#2d3748', margin: 0 }}>{exercise.title}</h3>
                 {exercise.level === userLevel && (
                   <span style={{
-                    background: '#667eea',
-                    color: 'white',
-                    padding: '2px 10px',
-                    borderRadius: '20px',
-                    fontSize: '0.8rem',
-                    fontWeight: 600
+                    background: '#667eea', color: 'white', padding: '2px 10px',
+                    borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600
                   }}>Recommended</span>
                 )}
               </div>
@@ -145,14 +140,10 @@ function ExerciseList({ userLevel }) {
               <button
                 onClick={() => startExercise(exercise)}
                 style={{
-                  marginTop: '15px',
-                  padding: '10px 20px',
+                  marginTop: '15px', padding: '10px 20px',
                   backgroundColor: isActive ? '#667eea' : '#cbd5e0',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: isActive ? 'pointer' : 'not-allowed',
-                  fontWeight: 600
+                  color: 'white', border: 'none', borderRadius: '6px',
+                  cursor: isActive ? 'pointer' : 'not-allowed', fontWeight: 600
                 }}
               >
                 {isActive ? 'Start Exercise' : 'Coming Soon'}
