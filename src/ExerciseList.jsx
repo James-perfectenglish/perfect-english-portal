@@ -7,6 +7,7 @@ import OfficeVocabulary from './OfficeVocabulary'
 import SpanishVocabulary from './SpanishVocabulary'
 import VerbsFlashcards from './VerbsFlashcards'
 import SentenceBuilding from './SentenceBuilding'
+import ListeningExercise from './ListeningExercise'
 
 function ExerciseList({ userLevel }) {
   const [exercises, setExercises] = useState([])
@@ -14,7 +15,9 @@ function ExerciseList({ userLevel }) {
   const [activeExercise, setActiveExercise] = useState(null)
 
   const location = useLocation()
-  useEffect(() => { setActiveExercise(null) }, [location.key])
+  useEffect(() => {
+    setActiveExercise(null)
+  }, [location.key])
 
   useEffect(() => {
     fetchExercises()
@@ -42,9 +45,9 @@ function ExerciseList({ userLevel }) {
       'Spanish Vocabulary',
       'Irregular Verbs Flashcards',
       'Essential Phrasal Verbs',
-      'Sentence Building'
+      'Sentence Building',
+      'Listening Exercises'
     ]
-
     if (activeExercises.includes(exercise.title)) {
       setActiveExercise(exercise)
     }
@@ -73,6 +76,9 @@ function ExerciseList({ userLevel }) {
     if (activeExercise.title === 'Sentence Building') {
       return <SentenceBuilding onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
     }
+    if (activeExercise.title === 'Listening Exercises') {
+      return <ListeningExercise onBack={() => setActiveExercise(null)} />
+    }
   }
 
   if (loading) {
@@ -95,28 +101,24 @@ function ExerciseList({ userLevel }) {
     'Spanish Vocabulary',
     'Irregular Verbs Flashcards',
     'Essential Phrasal Verbs',
-    'Sentence Building'
+    'Sentence Building',
+    'Listening Exercises'
   ]
 
   return (
     <div style={{ marginTop: '30px' }}>
       <h2 style={{ color: '#2d3748', marginBottom: '5px' }}>Recommended Exercises</h2>
       <p style={{ color: '#718096', fontSize: '0.9rem', marginBottom: '20px' }}>Exercises matched to your level appear first</p>
-
       <div style={{ display: 'grid', gap: '20px' }}>
         {exercises.map((exercise) => {
           const isActive = activeExercises.includes(exercise.title)
-
           return (
-            <div
-              key={exercise.id}
-              style={{
-                border: exercise.level === userLevel ? '2px solid #667eea' : '1px solid #e2e8f0',
-                borderRadius: '8px',
-                padding: '20px',
-                backgroundColor: exercise.level === userLevel ? '#f7f8ff' : '#f9f9f9'
-              }}
-            >
+            <div key={exercise.id} style={{
+              border: exercise.level === userLevel ? '2px solid #667eea' : '1px solid #e2e8f0',
+              borderRadius: '8px',
+              padding: '20px',
+              backgroundColor: exercise.level === userLevel ? '#f7f8ff' : '#f9f9f9'
+            }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <h3 style={{ color: '#2d3748', margin: 0 }}>{exercise.title}</h3>
                 {exercise.level === userLevel && (
@@ -127,9 +129,7 @@ function ExerciseList({ userLevel }) {
                     borderRadius: '20px',
                     fontSize: '0.8rem',
                     fontWeight: 600
-                  }}>
-                    Recommended
-                  </span>
+                  }}>Recommended</span>
                 )}
               </div>
               <p style={{ color: '#4a5568', marginTop: '8px' }}>{exercise.description}</p>
