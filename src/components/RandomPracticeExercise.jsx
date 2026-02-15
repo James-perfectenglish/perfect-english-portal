@@ -37,7 +37,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         .from('student_answers')
         .insert({
           student_id: user.id,
-          question_id: question.id,
+          question_id: question.question_number,
           student_answer: studentAnswer,
           correct_answer: correctAnswer,
           is_correct: isCorrect,
