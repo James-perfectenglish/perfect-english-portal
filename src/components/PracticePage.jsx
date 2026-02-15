@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import RandomPracticeExercise from './RandomPracticeExercise.jsx';
 import SurvivalMode from './SurvivalMode.jsx';
-import { useLocation } from 'react-router-dom'
 
 const LEVEL_CONFIG = [
   {
@@ -39,12 +39,12 @@ const LEVEL_CONFIG = [
 export default function PracticePage() {
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [survivalMode, setSurvivalMode] = useState(false);
-  const location = useLocation()
+  const location = useLocation();
 
   useEffect(() => {
     setSelectedLevel(null);
     setSurvivalMode(false);
-  }, [location.key])
+  }, [location.key]);
 
   if (survivalMode) {
     return <SurvivalMode onBack={() => setSurvivalMode(false)} />;
@@ -88,37 +88,34 @@ export default function PracticePage() {
           Choose your level. 20 random questions, 3 lives. Let's go!
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {LEVEL_CONFIG.map((level) => (
+        {/* Level Cards */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+          marginBottom: '1.5rem'
+        }}>
+          {LEVEL_CONFIG.map(level => (
             <button
               key={level.id}
               onClick={() => setSelectedLevel(level)}
               style={{
-                background: 'white',
-                border: '2px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'clamp(0.75rem, 3vw, 1.25rem)',
+                padding: 'clamp(1rem, 3vw, 1.5rem)',
+                backgroundColor: 'white',
+                border: '1px solid #e2e8f0',
                 borderRadius: '16px',
-                padding: 'clamp(1.25rem, 4vw, 1.75rem)',
                 cursor: 'pointer',
                 textAlign: 'left',
                 transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '1.25rem',
+                boxShadow: `0 4px 12px ${level.shadow}`,
                 width: '100%',
                 boxSizing: 'border-box'
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#667eea';
-                e.currentTarget.style.boxShadow = `0 4px 16px ${level.shadow}`;
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = '#e2e8f0';
-                e.currentTarget.style.boxShadow = 'none';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
             >
-              {/* Level badge */}
+              {/* Icon */}
               <div style={{
                 background: level.gradient,
                 borderRadius: '12px',
@@ -150,12 +147,9 @@ export default function PracticePage() {
                     {level.title}
                   </span>
                   <span style={{
-                    fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)',
-                    fontWeight: '600',
-                    color: '#667eea',
-                    backgroundColor: '#f0f0ff',
-                    padding: '2px 8px',
-                    borderRadius: '6px'
+                    fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)',
+                    color: '#888',
+                    fontWeight: '500'
                   }}>
                     {level.subtitle}
                   </span>
@@ -171,55 +165,40 @@ export default function PracticePage() {
               </div>
 
               {/* Arrow */}
-              <div style={{ fontSize: '1.5rem', color: '#cbd5e0', flexShrink: 0 }}>
+              <div style={{
+                fontSize: '1.5rem',
+                color: '#ccc',
+                flexShrink: 0
+              }}>
                 →
               </div>
             </button>
           ))}
+        </div>
 
-          {/* Divider */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-            margin: '0.5rem 0'
-          }}>
-            <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
-            <span style={{ fontSize: '0.85rem', color: '#aaa', fontWeight: '500' }}>or</span>
-            <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
-          </div>
-
-          {/* Survival Mode Card */}
+        {/* Survival Mode Card — dark themed with orange accents */}
+        <div style={{ marginTop: '0.5rem' }}>
           <button
             onClick={() => setSurvivalMode(true)}
             style={{
-              background: 'linear-gradient(135deg, #1a1a2e, #16213e)',
-              border: '2px solid #e74c3c',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'clamp(0.75rem, 3vw, 1.25rem)',
+              padding: 'clamp(1rem, 3vw, 1.5rem)',
+              backgroundColor: '#1a1a2e',
+              border: '1px solid #333',
               borderRadius: '16px',
-              padding: 'clamp(1.25rem, 4vw, 1.75rem)',
               cursor: 'pointer',
               textAlign: 'left',
               transition: 'all 0.2s',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '1.25rem',
+              boxShadow: '0 4px 12px rgba(237, 137, 54, 0.3)',
               width: '100%',
               boxSizing: 'border-box'
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#ff6b6b';
-              e.currentTarget.style.boxShadow = '0 4px 20px rgba(231, 76, 60, 0.4)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#e74c3c';
-              e.currentTarget.style.boxShadow = 'none';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
           >
-            {/* Survival badge */}
+            {/* Icon */}
             <div style={{
-              background: 'linear-gradient(135deg, #e74c3c, #8e44ad)',
+              background: 'linear-gradient(135deg, #ed8936, #e74c3c)',
               borderRadius: '12px',
               width: 'clamp(55px, 15vw, 70px)',
               height: 'clamp(55px, 15vw, 70px)',
@@ -251,8 +230,8 @@ export default function PracticePage() {
                 <span style={{
                   fontSize: 'clamp(0.75rem, 2vw, 0.8rem)',
                   fontWeight: '600',
-                  color: '#e74c3c',
-                  backgroundColor: 'rgba(231, 76, 60, 0.15)',
+                  color: '#ed8936',
+                  backgroundColor: 'rgba(237, 137, 54, 0.15)',
                   padding: '2px 8px',
                   borderRadius: '6px',
                   textTransform: 'uppercase',
@@ -272,7 +251,11 @@ export default function PracticePage() {
             </div>
 
             {/* Arrow */}
-            <div style={{ fontSize: '1.5rem', color: '#e74c3c', flexShrink: 0 }}>
+            <div style={{
+              fontSize: '1.5rem',
+              color: '#ed8936',
+              flexShrink: 0
+            }}>
               →
             </div>
           </button>

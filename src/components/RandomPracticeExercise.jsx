@@ -20,6 +20,34 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     window.scrollTo(0, 0);
   }, [stage]);
 
+  // Save individual answer to student_answers table
+  const saveAnswer = async (question, studentAnswer, isCorrect) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const correctAnswers = Array.isArray(question.correct_answers)
+        ? question.correct_answers
+        : JSON.parse(question.correct_answers || '[]');
+      const correctAnswer = question.type === 'multiple_choice'
+        ? (question.correct_answer || correctAnswers[0] || '')
+        : (correctAnswers[0] || '');
+
+      await supabase
+        .from('student_answers')
+        .insert({
+          student_id: user.id,
+          question_id: question.id,
+          student_answer: studentAnswer,
+          correct_answer: correctAnswer,
+          is_correct: isCorrect,
+          answered_at: new Date().toISOString()
+        });
+    } catch (error) {
+      console.error('Error saving answer:', error);
+    }
+  };
+
   const startExercise = async () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     setLoading(true);
@@ -53,9 +81,9 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
       if (gapError || mcError || sbError) throw gapError || mcError || sbError;
 
-      // Shuffle and take up to 8 gap_fill, 8 multiple_choice, 4 sentence_building
-      const shuffledGapFill = (allGapFill || []).sort(() => Math.random() - 0.5).slice(0, 8);
-      const shuffledMultipleChoice = (allMultipleChoice || []).sort(() => Math.random() - 0.5).slice(0, 8);
+      // Shuffle and take up to 3 gap_fill (reduced), 13 multiple_choice, 4 sentence_building
+      const shuffledGapFill = (allGapFill || []).sort(() => Math.random() - 0.5).slice(0, 3);
+      const shuffledMultipleChoice = (allMultipleChoice || []).sort(() => Math.random() - 0.5).slice(0, 13);
       const shuffledSentenceBuilding = (allSentenceBuilding || []).sort(() => Math.random() - 0.5).slice(0, 4);
 
       const allQuestions = [...shuffledGapFill, ...shuffledMultipleChoice, ...shuffledSentenceBuilding]
@@ -106,7 +134,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         const informalAnswers = currentQuestion.informal_accepted.map(a => a.toLowerCase().trim());
         if (informalAnswers.includes(answer)) {
           isCorrect = true;
-          feedbackMessage = `✅ Correct! ${currentQuestion.informal_feedback} ${currentQuestion.explanation}`;
+          feedbackMessage = `✅ Correct! ${currentQuestion.informal_feedback || ''} ${currentQuestion.explanation}`;
           feedbackType = 'informal';
         }
       }
@@ -127,6 +155,9 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         feedbackMessage = `❌ Incorrect. The correct answer is: "${correctAnswer}". ${currentQuestion.explanation}`;
       }
 
+      // Track the answer
+      saveAnswer(currentQuestion, userAnswer.trim(), isCorrect);
+
     } else if (currentQuestion.type === 'multiple_choice') {
       if (selectedOption === currentQuestion.correct_answer) {
         isCorrect = true;
@@ -135,6 +166,9 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       } else {
         feedbackMessage = `❌ Incorrect. The correct answer is: "${currentQuestion.correct_answer}". ${currentQuestion.explanation}`;
       }
+
+      // Track the answer
+      saveAnswer(currentQuestion, selectedOption || '', isCorrect);
     }
 
     setFeedback({ message: feedbackMessage, type: feedbackType, isCorrect });
@@ -166,11 +200,13 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setSbFeedback({ correct: true, message: feedbackMessage });
       setFeedback({ message: feedbackMessage, type: 'correct', isCorrect: true });
       setScore(s => s + 1);
+      saveAnswer(currentQuestion, '(sentence built correctly)', true);
     } else if (isCorrect && isSoft) {
       feedbackMessage = `✅ You got the words right — but don't forget your punctuation! Score counted. ${currentQuestion.explanation || ''}`;
       setSbFeedback({ correct: true, message: feedbackMessage });
       setFeedback({ message: feedbackMessage, type: 'correct', isCorrect: true });
       setScore(s => s + 1);
+      saveAnswer(currentQuestion, '(sentence built - soft pass)', true);
     } else {
       const correctSentences = Array.isArray(currentQuestion.correct_answers)
         ? currentQuestion.correct_answers
@@ -181,6 +217,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       feedbackMessage = `❌ Not quite. The correct answer is: "${displaySentence}" — ${currentQuestion.explanation || ''}`;
       setSbFeedback({ correct: false, message: feedbackMessage });
       setFeedback({ message: feedbackMessage, type: 'incorrect', isCorrect: false });
+      saveAnswer(currentQuestion, '(incorrect sentence build)', false);
 
       const newLives = lives - 1;
       setLives(newLives);
@@ -293,13 +330,14 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
               Test your English with 20 random questions!
             </p>
             <p style={{
-              fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
-              color: '#2C3E50',
-              marginBottom: '3rem',
+              fontSize: 'clamp(0.95rem, 3vw, 1.05rem)',
+              color: '#666',
+              marginBottom: '2.5rem',
               lineHeight: '1.5'
             }}>
-              You have <strong>3 lives</strong>. Good luck!
+              You have <strong>3 lives</strong>. Mix of multiple choice, gap fill, and sentence building.
             </p>
+
             <button
               onClick={startExercise}
               disabled={loading}
@@ -315,11 +353,12 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 maxWidth: '350px',
                 margin: '0 auto',
                 fontWeight: '600',
-                boxShadow: '0 4px 12px rgba(52, 152, 219, 0.3)'
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
               }}
             >
               {loading ? 'Loading...' : 'Start Practice'}
             </button>
+
             {onBack && (
               <button
                 onClick={onBack}
@@ -358,49 +397,73 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
               <div>Score: {score}</div>
             </div>
 
+            {/* Progress Bar */}
+            <div style={{
+              height: '6px',
+              backgroundColor: '#e0e0e0',
+              borderRadius: '3px',
+              marginBottom: '1.5rem',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${((currentQuestionIndex) / questions.length) * 100}%`,
+                background: displayGradient,
+                borderRadius: '3px',
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
+
             {/* Question Card */}
             <div style={{
               backgroundColor: 'white',
-              padding: 'clamp(1.5rem, 5vw, 2rem)',
+              padding: 'clamp(1.5rem, 5vw, 2.5rem)',
               borderRadius: '16px',
               boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-              minHeight: '60vh',
               display: 'flex',
               flexDirection: 'column',
-              width: '100%',
-              boxSizing: 'border-box'
+              gap: '1.5rem'
             }}>
+              {/* Question Type Badge */}
               <div style={{
-                fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)',
-                color: '#666',
-                marginBottom: '1rem',
-                fontWeight: '500'
+                display: 'inline-block',
+                alignSelf: 'flex-start',
+                padding: '4px 12px',
+                borderRadius: '20px',
+                fontSize: '0.8rem',
+                fontWeight: '600',
+                backgroundColor: currentQuestion.type === 'gap_fill' ? '#fff3cd'
+                  : currentQuestion.type === 'sentence_building' ? '#e8daef'
+                  : '#d4edda',
+                color: currentQuestion.type === 'gap_fill' ? '#856404'
+                  : currentQuestion.type === 'sentence_building' ? '#6c3483'
+                  : '#155724'
               }}>
-                {currentQuestion.level} | {currentQuestion.topic.replace(/_/g, ' ')}
-                {currentQuestion.type === 'sentence_building' && ' | Sentence Building'}
+                {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill'
+                  : currentQuestion.type === 'sentence_building' ? '🧩 Sentence Building'
+                  : '📝 Multiple Choice'}
               </div>
 
-              {/* Show question text for gap_fill and multiple_choice */}
-              {currentQuestion.type !== 'sentence_building' && (
-                <h2 style={{
-                  fontSize: 'clamp(1.3rem, 5vw, 1.6rem)',
-                  marginBottom: '2rem',
-                  lineHeight: '1.4',
+              {/* Question Text (not shown for pure sentence building) */}
+              {!(currentQuestion.type === 'sentence_building' && (!currentQuestion.question || !currentQuestion.question.trim())) && (
+                <div style={{
+                  fontSize: 'clamp(1.15rem, 4vw, 1.4rem)',
                   color: '#2C3E50',
-                  fontWeight: '600',
+                  lineHeight: '1.6',
+                  fontWeight: '500',
                   wordWrap: 'break-word',
                   overflowWrap: 'break-word'
                 }}>
                   {currentQuestion.question}
-                </h2>
+                </div>
               )}
 
+              {/* Hint */}
               {showHint && currentQuestion.hint && (
                 <div style={{
                   backgroundColor: '#fff3cd',
-                  padding: '1rem',
+                  padding: '0.8rem 1rem',
                   borderRadius: '8px',
-                  marginBottom: '1.5rem',
                   border: '1px solid #ffc107',
                   fontSize: 'clamp(0.9rem, 3vw, 1rem)',
                   color: '#856404'
@@ -606,58 +669,43 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 }}>
                   How difficult was this?
                 </h3>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  gap: 'clamp(0.5rem, 2vw, 1rem)',
-                  marginTop: '1rem'
-                }}>
-                  {[1, 2, 3, 4, 5].map((rating) => (
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
+                  {[1, 2, 3, 4, 5].map(star => (
                     <button
-                      key={rating}
-                      onClick={() => setDifficultyRating(rating)}
+                      key={star}
+                      onClick={() => setDifficultyRating(star)}
                       style={{
-                        fontSize: 'clamp(2rem, 7vw, 2.8rem)',
+                        fontSize: 'clamp(1.5rem, 5vw, 2rem)',
                         background: 'none',
                         border: 'none',
                         cursor: 'pointer',
-                        opacity: difficultyRating >= rating ? 1 : 0.3,
-                        padding: '0.3rem'
+                        opacity: star <= difficultyRating ? 1 : 0.3,
+                        transition: 'opacity 0.2s'
                       }}
                     >
                       ⭐
                     </button>
                   ))}
                 </div>
-                <div style={{
-                  fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)',
-                  color: '#666',
-                  marginTop: '0.75rem'
-                }}>
-                  1 = Too easy, 5 = Very hard
-                </div>
+                {difficultyRating > 0 && (
+                  <p style={{ fontSize: '0.9rem', color: '#888', marginTop: '0.5rem' }}>
+                    {difficultyRating <= 2 ? 'Too easy? Try a harder level!' : difficultyRating === 3 ? 'Just right!' : 'Challenge accepted!'}
+                  </p>
+                )}
               </div>
 
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.75rem',
-                alignItems: 'center'
-              }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <button
                   onClick={retry}
                   style={{
-                    padding: '1.25rem',
-                    fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
+                    padding: '1.2rem',
+                    fontSize: 'clamp(1.1rem, 4vw, 1.25rem)',
                     background: displayGradient,
                     color: 'white',
                     border: 'none',
-                    borderRadius: '12px',
+                    borderRadius: '10px',
                     cursor: 'pointer',
-                    width: '100%',
-                    maxWidth: '300px',
-                    fontWeight: '600',
-                    boxShadow: '0 4px 12px rgba(52, 152, 219, 0.3)'
+                    fontWeight: '600'
                   }}
                 >
                   Try Again
@@ -666,23 +714,24 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   <button
                     onClick={onBack}
                     style={{
-                      padding: '0.75rem 1.5rem',
-                      fontSize: 'clamp(0.9rem, 3vw, 1rem)',
+                      padding: '1rem',
+                      fontSize: 'clamp(1rem, 3.5vw, 1.1rem)',
                       backgroundColor: 'transparent',
                       color: '#666',
                       border: '1px solid #ddd',
-                      borderRadius: '8px',
+                      borderRadius: '10px',
                       cursor: 'pointer',
                       fontWeight: '500'
                     }}
                   >
-                    ← Choose Different Level
+                    ← Back to Levels
                   </button>
                 )}
               </div>
             </div>
           </div>
         )}
+
       </div>
     </div>
   );

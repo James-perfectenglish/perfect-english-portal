@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 const STAGES = [
   { name: 'Beginner', levels: ['A1', 'A2'], count: 20, gradient: 'linear-gradient(135deg, #43b581, #2ecc71)' },
   { name: 'Intermediate', levels: ['B1', 'B2'], count: 20, gradient: 'linear-gradient(135deg, #3498DB, #667eea)' },
-  { name: 'Advanced', levels: ['C1', 'C2'], count: 999, gradient: 'linear-gradient(135deg, #8e44ad, #e74c3c)' }
+  { name: 'Advanced', levels: ['C1', 'C2'], count: 999, gradient: 'linear-gradient(135deg, #ed8936, #f6ad55)' }
 ];
 
 export default function SurvivalMode({ onBack }) {
@@ -27,6 +27,34 @@ export default function SurvivalMode({ onBack }) {
     window.scrollTo(0, 0);
   }, [stage, stageTransition]);
 
+  // Save individual answer to student_answers table
+  const saveAnswer = async (question, studentAnswer, isCorrect) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const correctAnswers = Array.isArray(question.correct_answers)
+        ? question.correct_answers
+        : JSON.parse(question.correct_answers || '[]');
+      const correctAnswer = question.type === 'multiple_choice'
+        ? (question.correct_answer || correctAnswers[0] || '')
+        : (correctAnswers[0] || '');
+
+      await supabase
+        .from('student_answers')
+        .insert({
+          student_id: user.id,
+          question_id: question.id,
+          student_answer: studentAnswer,
+          correct_answer: correctAnswer,
+          is_correct: isCorrect,
+          answered_at: new Date().toISOString()
+        });
+    } catch (error) {
+      console.error('Error saving answer:', error);
+    }
+  };
+
   const fetchQuestionsForStage = async (stageIndex) => {
     const stageConfig = STAGES[stageIndex];
 
@@ -47,11 +75,18 @@ export default function SurvivalMode({ onBack }) {
 
     if (gapError || mcError) throw gapError || mcError;
 
+    // Reduced gap fill weighting: take fewer gap fills relative to multiple choice
     const shuffledGap = (gapFill || []).sort(() => Math.random() - 0.5);
     const shuffledMC = (mc || []).sort(() => Math.random() - 0.5);
 
-    // Mix them together and take what we need
-    const all = [...shuffledGap, ...shuffledMC].sort(() => Math.random() - 0.5);
+    // Take roughly 20% gap fill, 80% multiple choice
+    const gapCount = Math.min(Math.ceil(stageConfig.count * 0.2), shuffledGap.length);
+    const mcCount = Math.min(stageConfig.count - gapCount, shuffledMC.length);
+
+    const selectedGap = shuffledGap.slice(0, gapCount);
+    const selectedMC = shuffledMC.slice(0, mcCount);
+
+    const all = [...selectedGap, ...selectedMC].sort(() => Math.random() - 0.5);
     return all.slice(0, stageConfig.count);
   };
 
@@ -94,7 +129,6 @@ export default function SurvivalMode({ onBack }) {
   };
 
   const getCurrentStageConfig = () => {
-    // Calculate which stage we're in based on question index
     let qCount = 0;
     for (let i = 0; i < STAGES.length; i++) {
       const stageQuestionCount = i === STAGES.length - 1
@@ -128,7 +162,7 @@ export default function SurvivalMode({ onBack }) {
         const informalAnswers = currentQuestion.informal_accepted.map(a => a.toLowerCase().trim());
         if (informalAnswers.includes(answer)) {
           isCorrect = true;
-          feedbackMessage = `✅ Correct! ${currentQuestion.informal_feedback} ${currentQuestion.explanation}`;
+          feedbackMessage = `✅ Correct! ${currentQuestion.informal_feedback || ''} ${currentQuestion.explanation}`;
           feedbackType = 'informal';
         }
       }
@@ -148,6 +182,10 @@ export default function SurvivalMode({ onBack }) {
         const correctAnswer = correctAnswers[0] || 'N/A';
         feedbackMessage = `❌ Incorrect. The correct answer is: "${correctAnswer}". ${currentQuestion.explanation}`;
       }
+
+      // Track the answer
+      saveAnswer(currentQuestion, userAnswer.trim(), isCorrect);
+
     } else if (currentQuestion.type === 'multiple_choice') {
       if (selectedOption === currentQuestion.correct_answer) {
         isCorrect = true;
@@ -156,6 +194,9 @@ export default function SurvivalMode({ onBack }) {
       } else {
         feedbackMessage = `❌ Incorrect. The correct answer is: "${currentQuestion.correct_answer}". ${currentQuestion.explanation}`;
       }
+
+      // Track the answer
+      saveAnswer(currentQuestion, selectedOption || '', isCorrect);
     }
 
     setFeedback({ message: feedbackMessage, type: feedbackType, isCorrect });
@@ -310,7 +351,7 @@ export default function SurvivalMode({ onBack }) {
               style={{
                 padding: '1.25rem',
                 fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
-                background: 'linear-gradient(135deg, #e74c3c, #8e44ad)',
+                background: 'linear-gradient(135deg, #ed8936, #e74c3c)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '12px',
@@ -319,7 +360,7 @@ export default function SurvivalMode({ onBack }) {
                 maxWidth: '350px',
                 margin: '0 auto',
                 fontWeight: '600',
-                boxShadow: '0 4px 12px rgba(231, 76, 60, 0.3)'
+                boxShadow: '0 4px 12px rgba(237, 137, 54, 0.3)'
               }}
             >
               {loading ? 'Loading...' : '⚔️ Enter Survival Mode'}
@@ -422,58 +463,81 @@ export default function SurvivalMode({ onBack }) {
                 gap: '0.5rem',
                 marginBottom: '1rem'
               }}>
-                <div style={{
-                  background: STAGES[stageInfo.stageIndex].gradient,
-                  color: 'white',
-                  padding: '3px 14px',
-                  borderRadius: '12px',
-                  fontSize: 'clamp(0.75rem, 2.5vw, 0.85rem)',
-                  fontWeight: '600'
-                }}>
-                  ⚔️ {STAGES[stageInfo.stageIndex].name}
-                </div>
+                {STAGES.map((s, i) => (
+                  <div key={i} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }}>
+                    <div style={{
+                      width: i === stageInfo.stageIndex ? '28px' : '20px',
+                      height: i === stageInfo.stageIndex ? '28px' : '20px',
+                      borderRadius: '50%',
+                      background: i <= stageInfo.stageIndex ? s.gradient : '#e0e0e0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.65rem',
+                      color: 'white',
+                      fontWeight: '700',
+                      transition: 'all 0.3s'
+                    }}>
+                      {i + 1}
+                    </div>
+                    {i < STAGES.length - 1 && (
+                      <div style={{
+                        width: '20px',
+                        height: '2px',
+                        backgroundColor: i < stageInfo.stageIndex ? '#43b581' : '#e0e0e0'
+                      }} />
+                    )}
+                  </div>
+                ))}
               </div>
             )}
 
             {/* Question Card */}
             <div style={{
               backgroundColor: 'white',
-              padding: 'clamp(1.5rem, 5vw, 2rem)',
+              padding: 'clamp(1.5rem, 5vw, 2.5rem)',
               borderRadius: '16px',
               boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-              minHeight: '55vh',
               display: 'flex',
               flexDirection: 'column',
-              width: '100%',
-              boxSizing: 'border-box'
+              gap: '1.5rem'
             }}>
+              {/* Question Type Badge */}
               <div style={{
-                fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)',
-                color: '#666',
-                marginBottom: '1rem',
-                fontWeight: '500'
+                display: 'inline-block',
+                alignSelf: 'flex-start',
+                padding: '4px 12px',
+                borderRadius: '20px',
+                fontSize: '0.8rem',
+                fontWeight: '600',
+                backgroundColor: currentQuestion.type === 'gap_fill' ? '#fff3cd' : '#d4edda',
+                color: currentQuestion.type === 'gap_fill' ? '#856404' : '#155724'
               }}>
-                {currentQuestion.level} | {currentQuestion.topic.replace(/_/g, ' ')}
+                {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill' : '📝 Multiple Choice'}
               </div>
 
-              <h2 style={{
-                fontSize: 'clamp(1.3rem, 5vw, 1.6rem)',
-                marginBottom: '2rem',
-                lineHeight: '1.4',
+              {/* Question Text */}
+              <div style={{
+                fontSize: 'clamp(1.15rem, 4vw, 1.4rem)',
                 color: '#2C3E50',
-                fontWeight: '600',
+                lineHeight: '1.6',
+                fontWeight: '500',
                 wordWrap: 'break-word',
                 overflowWrap: 'break-word'
               }}>
                 {currentQuestion.question}
-              </h2>
+              </div>
 
+              {/* Hint */}
               {showHint && currentQuestion.hint && (
                 <div style={{
                   backgroundColor: '#fff3cd',
-                  padding: '1rem',
+                  padding: '0.8rem 1rem',
                   borderRadius: '8px',
-                  marginBottom: '1.5rem',
                   border: '1px solid #ffc107',
                   fontSize: 'clamp(0.9rem, 3vw, 1rem)',
                   color: '#856404'
@@ -572,8 +636,7 @@ export default function SurvivalMode({ onBack }) {
                       opacity:
                         (currentQuestion.type === 'gap_fill' && !userAnswer.trim()) ||
                         (currentQuestion.type === 'multiple_choice' && !selectedOption)
-                          ? 0.5
-                          : 1
+                          ? 0.5 : 1
                     }}
                   >
                     Check Answer
@@ -689,41 +752,36 @@ export default function SurvivalMode({ onBack }) {
                  '🎯 Keep practising!'}
               </div>
 
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.75rem',
-                alignItems: 'center'
-              }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <button
-                  onClick={startGame}
+                  onClick={() => {
+                    setStage('start');
+                    setQuestions([]);
+                    setCurrentQuestionIndex(0);
+                  }}
                   style={{
-                    padding: '1.25rem',
-                    fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
-                    background: 'linear-gradient(135deg, #e74c3c, #8e44ad)',
+                    padding: '1.2rem',
+                    fontSize: 'clamp(1.1rem, 4vw, 1.25rem)',
+                    background: 'linear-gradient(135deg, #ed8936, #e74c3c)',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '12px',
+                    borderRadius: '10px',
                     cursor: 'pointer',
-                    width: '100%',
-                    maxWidth: '300px',
-                    fontWeight: '600',
-                    boxShadow: '0 4px 12px rgba(231, 76, 60, 0.3)'
+                    fontWeight: '600'
                   }}
                 >
                   ⚔️ Try Again
                 </button>
-
                 {onBack && (
                   <button
                     onClick={onBack}
                     style={{
-                      padding: '0.75rem 1.5rem',
-                      fontSize: 'clamp(0.9rem, 3vw, 1rem)',
+                      padding: '1rem',
+                      fontSize: 'clamp(1rem, 3.5vw, 1.1rem)',
                       backgroundColor: 'transparent',
                       color: '#666',
                       border: '1px solid #ddd',
-                      borderRadius: '8px',
+                      borderRadius: '10px',
                       cursor: 'pointer',
                       fontWeight: '500'
                     }}
@@ -735,6 +793,7 @@ export default function SurvivalMode({ onBack }) {
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
