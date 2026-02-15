@@ -424,24 +424,41 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
               flexDirection: 'column',
               gap: '1.5rem'
             }}>
-              {/* Question Type Badge */}
+              {/* Question Type + Level/Topic Badges */}
               <div style={{
-                display: 'inline-block',
-                alignSelf: 'flex-start',
-                padding: '4px 12px',
-                borderRadius: '20px',
-                fontSize: '0.8rem',
-                fontWeight: '600',
-                backgroundColor: currentQuestion.type === 'gap_fill' ? '#fff3cd'
-                  : currentQuestion.type === 'sentence_building' ? '#e8daef'
-                  : '#d4edda',
-                color: currentQuestion.type === 'gap_fill' ? '#856404'
-                  : currentQuestion.type === 'sentence_building' ? '#6c3483'
-                  : '#155724'
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+                alignItems: 'center'
               }}>
-                {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill'
-                  : currentQuestion.type === 'sentence_building' ? '🧩 Sentence Building'
-                  : '📝 Multiple Choice'}
+                <div style={{
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '0.8rem',
+                  fontWeight: '600',
+                  backgroundColor: currentQuestion.type === 'gap_fill' ? '#fff3cd'
+                    : currentQuestion.type === 'sentence_building' ? '#e8daef'
+                    : '#d4edda',
+                  color: currentQuestion.type === 'gap_fill' ? '#856404'
+                    : currentQuestion.type === 'sentence_building' ? '#6c3483'
+                    : '#155724'
+                }}>
+                  {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill'
+                    : currentQuestion.type === 'sentence_building' ? '🧩 Sentence Building'
+                    : '📝 Multiple Choice'}
+                </div>
+                {(currentQuestion.level || currentQuestion.topic) && (
+                  <div style={{
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    backgroundColor: '#e8f4fd',
+                    color: '#2471a3'
+                  }}>
+                    {[currentQuestion.level, currentQuestion.topic].filter(Boolean).join(' · ')}
+                  </div>
+                )}
               </div>
 
               {/* Question Text (not shown for pure sentence building) */}

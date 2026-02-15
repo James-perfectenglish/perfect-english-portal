@@ -506,18 +506,35 @@ export default function SurvivalMode({ onBack }) {
               flexDirection: 'column',
               gap: '1.5rem'
             }}>
-              {/* Question Type Badge */}
+              {/* Question Type + Level/Topic Badges */}
               <div style={{
-                display: 'inline-block',
-                alignSelf: 'flex-start',
-                padding: '4px 12px',
-                borderRadius: '20px',
-                fontSize: '0.8rem',
-                fontWeight: '600',
-                backgroundColor: currentQuestion.type === 'gap_fill' ? '#fff3cd' : '#d4edda',
-                color: currentQuestion.type === 'gap_fill' ? '#856404' : '#155724'
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+                alignItems: 'center'
               }}>
-                {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill' : '📝 Multiple Choice'}
+                <div style={{
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '0.8rem',
+                  fontWeight: '600',
+                  backgroundColor: currentQuestion.type === 'gap_fill' ? '#fff3cd' : '#d4edda',
+                  color: currentQuestion.type === 'gap_fill' ? '#856404' : '#155724'
+                }}>
+                  {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill' : '📝 Multiple Choice'}
+                </div>
+                {(currentQuestion.level || currentQuestion.topic) && (
+                  <div style={{
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    backgroundColor: '#e8f4fd',
+                    color: '#2471a3'
+                  }}>
+                    {[currentQuestion.level, currentQuestion.topic].filter(Boolean).join(' · ')}
+                  </div>
+                )}
               </div>
 
               {/* Question Text */}
