@@ -13,7 +13,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const [score, setScore] = useState(0);
   const [showHint, setShowHint] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [difficultyRating, setDifficultyRating] = useState(0);
   const [sbFeedback, setSbFeedback] = useState(null);
 
   useEffect(() => {
@@ -686,45 +685,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   You ran out of lives! Don't worry - practice makes perfect. Try again!
                 </div>
               )}
-
-              <div style={{
-                backgroundColor: '#f5f7fa',
-                padding: 'clamp(1.5rem, 5vw, 2rem)',
-                borderRadius: '12px',
-                marginBottom: '2rem'
-              }}>
-                <h3 style={{
-                  fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
-                  color: '#2C3E50',
-                  marginBottom: '1rem',
-                  fontWeight: '600'
-                }}>
-                  How difficult was this?
-                </h3>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  {[1, 2, 3, 4, 5].map(star => (
-                    <button
-                      key={star}
-                      onClick={() => setDifficultyRating(star)}
-                      style={{
-                        fontSize: 'clamp(1.5rem, 5vw, 2rem)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        opacity: star <= difficultyRating ? 1 : 0.3,
-                        transition: 'opacity 0.2s'
-                      }}
-                    >
-                      ⭐
-                    </button>
-                  ))}
-                </div>
-                {difficultyRating > 0 && (
-                  <p style={{ fontSize: '0.9rem', color: '#888', marginTop: '0.5rem' }}>
-                    {difficultyRating <= 2 ? 'Too easy? Try a harder level!' : difficultyRating === 3 ? 'Just right!' : 'Challenge accepted!'}
-                  </p>
-                )}
-              </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <button
