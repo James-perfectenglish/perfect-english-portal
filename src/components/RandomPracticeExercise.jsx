@@ -40,8 +40,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
           question_id: question.question_number,
           student_answer: studentAnswer,
           correct_answer: correctAnswer,
-          is_correct: isCorrect,
-          answered_at: new Date().toISOString()
+          is_correct: isCorrect
         });
     } catch (error) {
       console.error('Error saving answer:', error);
@@ -191,7 +190,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   };
 
   // Handler for sentence_building questions — called by SentenceBuildingInput
-  const handleSentenceBuildingResult = (isCorrect, isSoft = false) => {
+  const handleSentenceBuildingResult = (isCorrect, isSoft = false, userAnswer = '') => {
     const currentQuestion = questions[currentQuestionIndex];
     let feedbackMessage = '';
 
@@ -200,13 +199,13 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setSbFeedback({ correct: true, message: feedbackMessage });
       setFeedback({ message: feedbackMessage, type: 'correct', isCorrect: true });
       setScore(s => s + 1);
-      saveAnswer(currentQuestion, '(sentence built correctly)', true);
+      saveAnswer(currentQuestion, userAnswer || '(correct)', true);
     } else if (isCorrect && isSoft) {
       feedbackMessage = `✅ You got the words right — but don't forget your punctuation! Score counted. ${currentQuestion.explanation || ''}`;
       setSbFeedback({ correct: true, message: feedbackMessage });
       setFeedback({ message: feedbackMessage, type: 'correct', isCorrect: true });
       setScore(s => s + 1);
-      saveAnswer(currentQuestion, '(sentence built - soft pass)', true);
+      saveAnswer(currentQuestion, userAnswer || '(soft pass)', true);
     } else {
       const correctSentences = Array.isArray(currentQuestion.correct_answers)
         ? currentQuestion.correct_answers
@@ -217,7 +216,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       feedbackMessage = `❌ Not quite. The correct answer is: "${displaySentence}" — ${currentQuestion.explanation || ''}`;
       setSbFeedback({ correct: false, message: feedbackMessage });
       setFeedback({ message: feedbackMessage, type: 'incorrect', isCorrect: false });
-      saveAnswer(currentQuestion, '(incorrect sentence build)', false);
+      saveAnswer(currentQuestion, userAnswer || '(incorrect)', false);
 
       const newLives = lives - 1;
       setLives(newLives);
@@ -686,7 +685,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 }}>
                   How difficult was this?
                 </h3>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                   {[1, 2, 3, 4, 5].map(star => (
                     <button
                       key={star}

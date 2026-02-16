@@ -47,8 +47,7 @@ export default function SurvivalMode({ onBack }) {
           question_id: question.question_number,
           student_answer: studentAnswer,
           correct_answer: correctAnswer,
-          is_correct: isCorrect,
-          answered_at: new Date().toISOString()
+          is_correct: isCorrect
         });
     } catch (error) {
       console.error('Error saving answer:', error);

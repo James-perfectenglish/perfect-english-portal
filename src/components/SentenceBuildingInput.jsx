@@ -11,25 +11,25 @@ function shuffleArray(arr) {
 
 function normalizeAnswer(words) {
   let result = words.map(w => w.text).join(' ');
-  result = result.replace(/ ([.,?!;:])/g, ' $1');
+  result = result.replace(/ ([.,?!;:])/g, '$1');
   return result.toLowerCase().trim();
 }
 
 /**
  * SentenceBuildingInput
- * 
+ *
  * Props:
- *  - words: string[] — the word tiles including distractors
- *  - questionType: 'translation' | 'build'
- *  - prompt: string | null — Spanish text for translation, null for build
- *  - correctSentences: string[] — accepted correct answers
- *  - explanation: string — shown in feedback
- *  - disabled: boolean — true after answer checked (disables interaction)
- *  - onResult: (isCorrect: boolean) => void — called when user checks answer
- *  - feedback: { correct, message } | null — feedback to display
- *  - showCheckButton: boolean — whether to show built-in check button (default true)
- *  - onAnswerReady: (hasAnswer: boolean) => void — notify parent when answer zone has words
- *  - getCheckFn: (fn) => void — exposes the check function to parent
+ * - words: string[] — the word tiles including distractors
+ * - questionType: 'translation' | 'build'
+ * - prompt: string | null — Spanish text for translation, null for build
+ * - correctSentences: string[] — accepted correct answers
+ * - explanation: string — shown in feedback
+ * - disabled: boolean — true after answer checked (disables interaction)
+ * - onResult: (isCorrect: boolean, isSoft: boolean, userAnswer: string) => void — called when user checks answer
+ * - feedback: { correct, message } | null — feedback to display
+ * - showCheckButton: boolean — whether to show built-in check button (default true)
+ * - onAnswerReady: (hasAnswer: boolean) => void — notify parent when answer zone has words
+ * - getCheckFn: (fn) => void — exposes the check function to parent
  */
 export default function SentenceBuildingInput({
   words = [],
@@ -80,12 +80,12 @@ export default function SentenceBuildingInput({
 
   const checkAnswer = () => {
     const userAnswer = normalizeAnswer(answerWords);
+
     const isCorrect = correctSentences.some(
       correct => correct.trim().toLowerCase() === userAnswer
     );
-
     if (isCorrect) {
-      if (onResult) onResult(true, false); // correct, not soft
+      if (onResult) onResult(true, false, userAnswer);
       return true;
     }
 
@@ -95,13 +95,12 @@ export default function SentenceBuildingInput({
     const isSoftCorrect = correctSentences.some(
       correct => stripPunctuation(correct.trim().toLowerCase()) === userStripped
     );
-
     if (isSoftCorrect) {
-      if (onResult) onResult(true, true); // correct but soft (punctuation issue)
+      if (onResult) onResult(true, true, userAnswer);
       return true;
     }
 
-    if (onResult) onResult(false, false); // incorrect
+    if (onResult) onResult(false, false, userAnswer);
     return false;
   };
 
@@ -120,9 +119,10 @@ export default function SentenceBuildingInput({
   const handlePointerDown = useCallback((word, zone, e) => {
     if (disabled) return;
     if (isDragging.current) return;
-    if (tapCooldown.current) return; // prevent rapid multi-taps
+    if (tapCooldown.current) return;
     e.preventDefault();
     e.stopPropagation();
+
     const touch = e.touches ? e.touches[0] : e;
     dragStartPos.current = { x: touch.clientX, y: touch.clientY };
     isDragging.current = false;
@@ -132,16 +132,13 @@ export default function SentenceBuildingInput({
       const t = moveE.touches ? moveE.touches[0] : moveE;
       const dx = t.clientX - dragStartPos.current.x;
       const dy = t.clientY - dragStartPos.current.y;
-
       if (!isDragging.current && Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
         isDragging.current = true;
         setDragWord(pendingWord);
       }
-
       if (isDragging.current) {
         moveE.preventDefault();
         setDragPos({ x: t.clientX, y: t.clientY });
-
         if (answerZoneRef.current) {
           const zr = answerZoneRef.current.getBoundingClientRect();
           if (t.clientY >= zr.top - 50 && t.clientY <= zr.bottom + 50) {
@@ -167,7 +164,6 @@ export default function SentenceBuildingInput({
       document.removeEventListener('touchend', handleUp);
 
       if (!isDragging.current) {
-        // TAP — with cooldown to prevent multi-selection
         tapCooldown.current = true;
         setTimeout(() => { tapCooldown.current = false; }, 200);
         if (zone === 'bank') {
@@ -178,11 +174,9 @@ export default function SentenceBuildingInput({
           setBankWords(prev => [...prev, word]);
         }
       } else {
-        // DROP
         setDragWord(null);
         setDragPos(null);
         isDragging.current = false;
-
         if (zone === 'bank') {
           setDropIndex(currentIdx => {
             setBankWords(prev => prev.filter(w => w.id !== word.id));
@@ -252,9 +246,13 @@ export default function SentenceBuildingInput({
 
   const dropIndicator = (
     <span style={{
-      display: 'inline-block', width: '3px', height: '36px',
-      backgroundColor: '#667eea', borderRadius: '2px',
-      margin: '4px 2px', verticalAlign: 'middle',
+      display: 'inline-block',
+      width: '3px',
+      height: '36px',
+      backgroundColor: '#667eea',
+      borderRadius: '2px',
+      margin: '4px 2px',
+      verticalAlign: 'middle',
       animation: 'sbPulse 0.8s ease-in-out infinite alternate'
     }} />
   );
@@ -284,8 +282,8 @@ export default function SentenceBuildingInput({
       {/* Prompt */}
       {questionType === 'translation' && prompt && (
         <div style={{
-          backgroundColor: '#FFFBEB', border: '1px solid #FDE68A',
-          borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1.25rem',
+          backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px',
+          padding: '1rem 1.25rem', marginBottom: '1.25rem',
           fontSize: 'clamp(1.1rem, 3.5vw, 1.25rem)', fontStyle: 'italic',
           color: '#78350F', lineHeight: '1.5'
         }}>
@@ -294,8 +292,8 @@ export default function SentenceBuildingInput({
       )}
       {questionType === 'build' && (
         <div style={{
-          backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE',
-          borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1.25rem',
+          backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '10px',
+          padding: '1rem 1.25rem', marginBottom: '1.25rem',
           fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', color: '#1E40AF', lineHeight: '1.5'
         }}>
           {prompt || "Arrange the words to make a correct sentence. You won't need all of them."}
@@ -305,8 +303,8 @@ export default function SentenceBuildingInput({
       {/* ANSWER ZONE */}
       <div style={{ marginBottom: '1.25rem' }}>
         <div style={{
-          fontSize: '0.8rem', fontWeight: '600', color: '#666',
-          marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.5px'
+          fontSize: '0.8rem', fontWeight: '600', color: '#666', marginBottom: '0.4rem',
+          textTransform: 'uppercase', letterSpacing: '0.5px'
         }}>
           Your answer
         </div>
@@ -316,8 +314,7 @@ export default function SentenceBuildingInput({
             minHeight: '70px',
             border: answerWords.length === 0 ? '2px dashed #AED6F1' : '2px solid #AED6F1',
             borderRadius: '12px', padding: '12px',
-            display: 'flex', flexWrap: 'wrap',
-            alignItems: 'center', alignContent: 'flex-start',
+            display: 'flex', flexWrap: 'wrap', alignItems: 'center', alignContent: 'flex-start',
             backgroundColor: '#F8FBFF'
           }}
         >
@@ -352,11 +349,12 @@ export default function SentenceBuildingInput({
       {/* WORD BANK */}
       <div style={{ marginBottom: '1.25rem' }}>
         <div style={{
-          fontSize: '0.8rem', fontWeight: '600', color: '#666',
-          marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.5px'
+          fontSize: '0.8rem', fontWeight: '600', color: '#666', marginBottom: '0.4rem',
+          textTransform: 'uppercase', letterSpacing: '0.5px'
         }}>
-          Word bank <span style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 'normal', color: '#999' }}>
-            — you won't need all the words
+          Word bank
+          <span style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 'normal', color: '#999' }}>
+            {' '}— you won't need all the words
           </span>
         </div>
         <div style={{
@@ -404,13 +402,11 @@ export default function SentenceBuildingInput({
             onClick={checkAnswer}
             disabled={answerWords.length === 0}
             style={{
-              flex: 1, padding: '1rem',
-              fontSize: 'clamp(1rem, 3.5vw, 1.15rem)',
+              flex: 1, padding: '1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)',
               background: 'linear-gradient(135deg, #667eea, #764ba2)',
               color: 'white', border: 'none', borderRadius: '10px',
               cursor: 'pointer', fontWeight: '600',
-              opacity: answerWords.length === 0 ? 0.5 : 1,
-              minWidth: '120px'
+              opacity: answerWords.length === 0 ? 0.5 : 1, minWidth: '120px'
             }}
           >
             Check Answer
@@ -418,8 +414,7 @@ export default function SentenceBuildingInput({
           <button
             onClick={resetWords}
             style={{
-              padding: '1rem 1.25rem',
-              fontSize: 'clamp(1rem, 3.5vw, 1.15rem)',
+              padding: '1rem 1.25rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)',
               backgroundColor: 'transparent', color: '#666',
               border: '1px solid #ddd', borderRadius: '10px',
               cursor: 'pointer', fontWeight: '500'
@@ -435,12 +430,10 @@ export default function SentenceBuildingInput({
         <button
           onClick={resetWords}
           style={{
-            padding: '0.5rem 1rem',
-            fontSize: 'clamp(0.85rem, 2.5vw, 0.9rem)',
+            padding: '0.5rem 1rem', fontSize: 'clamp(0.85rem, 2.5vw, 0.9rem)',
             backgroundColor: 'transparent', color: '#888',
             border: '1px solid #e2e8f0', borderRadius: '8px',
-            cursor: 'pointer', fontWeight: '500',
-            marginBottom: '0.5rem'
+            cursor: 'pointer', fontWeight: '500', marginBottom: '0.5rem'
           }}
         >
           🔄 Reset words
@@ -452,10 +445,9 @@ export default function SentenceBuildingInput({
         <div style={{
           position: 'fixed', left: dragPos.x, top: dragPos.y,
           transform: 'translate(-50%, -50%)',
-          padding: '10px 16px', backgroundColor: '#667eea',
-          color: 'white', borderRadius: '8px',
-          fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', fontWeight: '600',
-          boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)',
+          padding: '10px 16px', backgroundColor: '#667eea', color: 'white',
+          borderRadius: '8px', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)',
+          fontWeight: '600', boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)',
           pointerEvents: 'none', zIndex: 9999, whiteSpace: 'nowrap'
         }}>
           {dragWord.text}
