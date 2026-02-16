@@ -522,16 +522,32 @@ export default function SurvivalMode({ onBack }) {
                 }}>
                   {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill' : '📝 Multiple Choice'}
                 </div>
-                {(currentQuestion.level || currentQuestion.topic) && (
+                {currentQuestion.level && (
                   <div style={{
                     padding: '4px 12px',
                     borderRadius: '20px',
                     fontSize: '0.8rem',
                     fontWeight: '600',
-                    backgroundColor: '#e8f4fd',
-                    color: '#2471a3'
+                    backgroundColor: currentQuestion.level.startsWith('A') ? '#c6f6d5'
+                      : currentQuestion.level.startsWith('B') ? '#bee3f8'
+                      : '#feebc8',
+                    color: currentQuestion.level.startsWith('A') ? '#48bb78'
+                      : currentQuestion.level.startsWith('B') ? '#4299e1'
+                      : '#ed8936'
                   }}>
-                    {[currentQuestion.level, currentQuestion.topic].filter(Boolean).join(' · ')}
+                    {currentQuestion.level}
+                  </div>
+                )}
+                {currentQuestion.topic && (
+                  <div style={{
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    backgroundColor: '#f0f0f0',
+                    color: '#555'
+                  }}>
+                    {currentQuestion.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                   </div>
                 )}
               </div>
