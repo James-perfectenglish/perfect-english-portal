@@ -118,34 +118,20 @@ export default function SentenceBuilding({ onBack, onComplete }) {
     setStage('playing');
   };
 
-  // Compute target word count from the shortest correct answer's tile count
-  const getTargetWordCount = (question) => {
-    if (!question) return null;
-    const correctSentences = Array.isArray(question.correct_answers)
-      ? question.correct_answers
-      : JSON.parse(question.correct_answers || '[]');
-    if (correctSentences.length === 0) return null;
-
-    // Count tokens in the shortest correct answer
-    // Split on spaces, which matches how tiles work (punctuation is its own tile)
-    const counts = correctSentences.map(s => s.trim().split(/\s+/).length);
-    return Math.min(...counts);
-  };
-
   const handleResult = (isCorrect, isSoft = false) => {
     const q = questions[currentQ];
 
     if (isCorrect && !isSoft) {
-      // Perfect — words AND punctuation correct → score + star
+      // Perfect: words AND punctuation correct — earns a star
       setScore(s => s + 1);
       setStars(s => s + 1);
-      setFeedback({ correct: true, message: `✅ ⭐ Perfect! Words and punctuation correct. ${q.explanation || ''}` });
+      setFeedback({ correct: true, message: `⭐ Perfect! Words and punctuation all correct. ${q.explanation || ''}` });
     } else if (isCorrect && isSoft) {
-      // Words correct but punctuation wrong/missing → score but no star
+      // Words correct but punctuation missing/wrong — score counts, no star
       setScore(s => s + 1);
       setFeedback({
         correct: true,
-        message: `✅ Correct! The words are right. Add the punctuation next time for a ⭐! ${q.explanation || ''}`
+        message: `✅ Correct! The words are in the right order. Add the punctuation for a ⭐ next time! ${q.explanation || ''}`
       });
     } else {
       const correctSentences = Array.isArray(q.correct_answers)
@@ -213,8 +199,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
       questionType: hasPrompt ? 'translation' : 'build',
       prompt: hasPrompt ? question.question : null,
       correctSentences,
-      explanation: question.explanation || '',
-      targetWordCount: getTargetWordCount(question)
+      explanation: question.explanation || ''
     };
   };
 
@@ -442,8 +427,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
               fontWeight: 500
             }}>
               <span>Progress: {currentQ + 1}/{questions.length}</span>
-              <span>⭐ {stars}</span>
-              <span>Score: {score}/{questions.length}</span>
+              <span>Score: {score}/{questions.length} {stars > 0 && `⭐ ${stars}`}</span>
             </div>
 
             {/* Question card */}
@@ -453,42 +437,43 @@ export default function SentenceBuilding({ onBack, onComplete }) {
               padding: '1.5rem',
               marginBottom: '1.5rem'
             }}>
-              {/* Topic pill */}
-              {q.topic && (
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '0.5rem',
-                  marginBottom: '1rem'
-                }}>
-                  {q.level && (
-                    <span style={{
-                      padding: '4px 12px',
-                      borderRadius: '20px',
-                      fontSize: '0.8rem',
-                      fontWeight: '600',
-                      backgroundColor: q.level.startsWith('A') ? '#c6f6d5'
-                        : q.level.startsWith('B') ? '#bee3f8'
-                        : '#feebc8',
-                      color: q.level.startsWith('A') ? '#48bb78'
-                        : q.level.startsWith('B') ? '#4299e1'
-                        : '#ed8936'
-                    }}>
-                      {q.level}
-                    </span>
-                  )}
-                  <span style={{
+              {/* Topic & Level pills */}
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+                alignItems: 'center',
+                marginBottom: '1rem'
+              }}>
+                {q.level && (
+                  <div style={{
                     padding: '4px 12px',
                     borderRadius: '20px',
                     fontSize: '0.8rem',
                     fontWeight: '600',
-                    backgroundColor: '#f0f0f0',
-                    color: '#555'
+                    backgroundColor: q.level.startsWith('A') ? '#c6f6d5'
+                      : q.level.startsWith('B') ? '#bee3f8'
+                      : '#feebc8',
+                    color: q.level.startsWith('A') ? '#276749'
+                      : q.level.startsWith('B') ? '#2b6cb0'
+                      : '#c05621'
+                  }}>
+                    {q.level}
+                  </div>
+                )}
+                {q.topic && (
+                  <div style={{
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    backgroundColor: '#e8daef',
+                    color: '#6c3483'
                   }}>
                     {q.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                  </span>
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
 
               <SentenceBuildingInput
                 key={currentQ}
@@ -548,17 +533,17 @@ export default function SentenceBuilding({ onBack, onComplete }) {
             {/* Star summary */}
             {stars > 0 && (
               <div style={{
-                display: 'inline-block',
                 background: '#FFFBEB',
                 border: '1px solid #FDE68A',
-                borderRadius: '12px',
-                padding: '8px 20px',
-                marginBottom: '12px',
-                fontSize: '1.1rem',
+                borderRadius: '10px',
+                padding: '0.75rem 1.25rem',
+                margin: '0 auto 1rem',
+                maxWidth: '300px',
+                fontSize: '1rem',
                 color: '#92400E',
                 fontWeight: 600
               }}>
-                ⭐ {stars} perfect answer{stars !== 1 ? 's' : ''} (with punctuation!)
+                ⭐ {stars} perfect answer{stars !== 1 ? 's' : ''} (words + punctuation)
               </div>
             )}
 

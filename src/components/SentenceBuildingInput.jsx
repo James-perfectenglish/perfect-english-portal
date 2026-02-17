@@ -25,12 +25,11 @@ function normalizeAnswer(words) {
  * - correctSentences: string[] — accepted correct answers
  * - explanation: string — shown in feedback
  * - disabled: boolean — true after answer checked (disables interaction)
- * - onResult: (isCorrect: boolean, isSoft: boolean, userAnswer: string) => void
+ * - onResult: (isCorrect: boolean, isSoft: boolean, userAnswer: string) => void — called when user checks answer
  * - feedback: { correct, message } | null — feedback to display
  * - showCheckButton: boolean — whether to show built-in check button (default true)
  * - onAnswerReady: (hasAnswer: boolean) => void — notify parent when answer zone has words
  * - getCheckFn: (fn) => void — exposes the check function to parent
- * - targetWordCount: number | null — recommended number of tiles to use (shown as hint)
  */
 export default function SentenceBuildingInput({
   words = [],
@@ -43,8 +42,7 @@ export default function SentenceBuildingInput({
   feedback = null,
   showCheckButton = true,
   onAnswerReady,
-  getCheckFn,
-  targetWordCount = null
+  getCheckFn
 }) {
   const [bankWords, setBankWords] = useState([]);
   const [answerWords, setAnswerWords] = useState([]);
@@ -57,6 +55,13 @@ export default function SentenceBuildingInput({
   const answerZoneRef = useRef(null);
   const tapCooldown = useRef(false);
   const DRAG_THRESHOLD = 12;
+
+  // Calculate target tile count from the shortest correct answer
+  const targetTileCount = (() => {
+    if (!correctSentences || correctSentences.length === 0) return null;
+    const counts = correctSentences.map(s => s.trim().split(/\s+/).length);
+    return Math.min(...counts);
+  })();
 
   // Initialize words when they change
   useEffect(() => {
@@ -216,31 +221,6 @@ export default function SentenceBuildingInput({
   }, [disabled]);
 
   // =============================================
-  // TILE COUNT HINT
-  // =============================================
-  const tileCountHint = targetWordCount && !disabled ? (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      fontSize: '0.82rem',
-      color: answerWords.length === targetWordCount ? '#48bb78' : '#718096',
-      fontWeight: 500,
-      marginBottom: '0.4rem',
-      transition: 'color 0.2s ease'
-    }}>
-      <span>🎯 Use {targetWordCount} tiles</span>
-      {answerWords.length > 0 && (
-        <span style={{
-          color: answerWords.length === targetWordCount ? '#48bb78' : answerWords.length > targetWordCount ? '#f56565' : '#a0aec0'
-        }}>
-          ({answerWords.length}/{targetWordCount})
-        </span>
-      )}
-    </div>
-  ) : null;
-
-  // =============================================
   // STYLES
   // =============================================
   const tileStyle = (isDragSource = false) => ({
@@ -283,6 +263,10 @@ export default function SentenceBuildingInput({
       animation: 'sbPulse 0.8s ease-in-out infinite alternate'
     }} />
   );
+
+  // Tile count indicator state
+  const tileCountMatch = targetTileCount && answerWords.length === targetTileCount;
+  const tileCountOver = targetTileCount && answerWords.length > targetTileCount;
 
   return (
     <div>
@@ -330,9 +314,7 @@ export default function SentenceBuildingInput({
       {/* ANSWER ZONE */}
       <div style={{ marginBottom: '1.25rem' }}>
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-end',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           marginBottom: '0.4rem'
         }}>
           <div style={{
@@ -341,7 +323,19 @@ export default function SentenceBuildingInput({
           }}>
             Your answer
           </div>
-          {tileCountHint}
+          {targetTileCount && (
+            <div style={{
+              fontSize: '0.8rem',
+              fontWeight: '600',
+              color: tileCountMatch ? '#48bb78' : tileCountOver ? '#e53e3e' : '#8B5CF6',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              🎯 {answerWords.length}/{targetTileCount} tiles
+              {tileCountMatch && ' ✓'}
+            </div>
+          )}
         </div>
         <div
           ref={answerZoneRef}

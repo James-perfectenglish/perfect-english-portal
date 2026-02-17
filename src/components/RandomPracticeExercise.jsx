@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import SentenceBuildingInput from './SentenceBuildingInput';
 
+function isPunctuation(text) {
+  return /^[.,?!;:]+$/.test(text.trim());
+}
+
 export default function RandomPracticeExercise({ levels, levelTitle, levelSubtitle, gradient, onBack }) {
   const [stage, setStage] = useState('start');
   const [questions, setQuestions] = useState([]);
@@ -33,9 +37,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Build a level label to identify this practice set
-      const levelLabel = levels ? levels.join(',') : 'all';
-
       const { data, error } = await supabase
         .from('student_attempts')
         .select('score, total_questions')
@@ -43,7 +44,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         .like('exercise_id', `%practice%`);
 
       if (data && data.length > 0) {
-        // Filter to attempts that match our question count (20 questions = practice)
         const practiceAttempts = data.filter(a => a.total_questions >= 15);
         if (practiceAttempts.length > 0) {
           const scores = practiceAttempts.map(a => a.score);
@@ -234,23 +234,17 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     }
   };
 
-  // Handler for sentence_building questions
-  const handleSentenceBuildingResult = (isCorrect, isSoft = false, userAnswer = '') => {
+  // Handler for sentence_building questions — signature: (isCorrect, userAnswer)
+  const handleSentenceBuildingResult = (isCorrect, userAnswer = '') => {
     const currentQuestion = questions[currentQuestionIndex];
     let feedbackMessage = '';
 
-    if (isCorrect && !isSoft) {
-      feedbackMessage = `✅ ⭐ Perfect! Words and punctuation correct. ${currentQuestion.explanation || ''}`;
+    if (isCorrect) {
+      feedbackMessage = `✅ Correct! ${currentQuestion.explanation || ''}`;
       setSbFeedback({ correct: true, message: feedbackMessage });
       setFeedback({ message: feedbackMessage, type: 'correct', isCorrect: true });
       setScore(s => s + 1);
       saveAnswer(currentQuestion, userAnswer || '(correct)', true);
-    } else if (isCorrect && isSoft) {
-      feedbackMessage = `✅ Correct! The words are right. Add the punctuation next time for a ⭐! ${currentQuestion.explanation || ''}`;
-      setSbFeedback({ correct: true, message: feedbackMessage });
-      setFeedback({ message: feedbackMessage, type: 'correct', isCorrect: true });
-      setScore(s => s + 1);
-      saveAnswer(currentQuestion, userAnswer || '(soft pass)', true);
     } else {
       const correctSentences = Array.isArray(currentQuestion.correct_answers)
         ? currentQuestion.correct_answers
@@ -275,10 +269,12 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       : JSON.parse(question.correct_answers || '[]');
     const hasPrompt = question.question && question.question.trim() !== '';
 
-    // Compute target word count
+    // Compute target word count excluding punctuation
     let targetWordCount = null;
     if (correctSentences.length > 0) {
-      const counts = correctSentences.map(s => s.trim().split(/\s+/).length);
+      const counts = correctSentences.map(s =>
+        s.trim().split(/\s+/).filter(w => !isPunctuation(w)).length
+      );
       targetWordCount = Math.min(...counts);
     }
 
@@ -302,16 +298,9 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setSbFeedback(null);
       setShowHint(false);
     } else {
-      // Save attempt before showing results
-      saveAttempt(score + (feedback && feedback.isCorrect ? 0 : 0), questions.length);
+      saveAttempt(score, questions.length);
       setStage('finished');
     }
-  };
-
-  // When the last question's feedback triggers finish
-  const finishExercise = (finalScore) => {
-    saveAttempt(finalScore, questions.length);
-    setStage('finished');
   };
 
   const retry = () => {
@@ -324,7 +313,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const displaySubtitle = levelSubtitle || '';
   const displayGradient = gradient || 'linear-gradient(135deg, #3498DB, #667eea)';
 
-  // Score percentage for the results screen
   const scorePercent = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
 
   return (
@@ -435,7 +423,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         {/* PLAYING SCREEN */}
         {stage === 'playing' && currentQuestion && (
           <div style={{ width: '100%', maxWidth: '700px', margin: '0 auto' }}>
-            {/* Info Bar — no lives, just question count and score */}
+            {/* Info Bar — no lives */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
@@ -639,7 +627,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
               {/* Buttons */}
               <div style={{ marginTop: '1.5rem' }}>
-                {/* Check Answer — only for gap_fill and multiple_choice */}
                 {!feedback && currentQuestion.type !== 'sentence_building' && (
                   <button
                     onClick={checkAnswer}
@@ -667,7 +654,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   </button>
                 )}
 
-                {/* Next Question — shown after feedback */}
                 {feedback && (
                   <button
                     onClick={nextQuestion}
