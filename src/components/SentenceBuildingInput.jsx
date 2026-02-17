@@ -25,11 +25,12 @@ function normalizeAnswer(words) {
  * - correctSentences: string[] — accepted correct answers
  * - explanation: string — shown in feedback
  * - disabled: boolean — true after answer checked (disables interaction)
- * - onResult: (isCorrect: boolean, isSoft: boolean, userAnswer: string) => void — called when user checks answer
+ * - onResult: (isCorrect: boolean, isSoft: boolean, userAnswer: string) => void
  * - feedback: { correct, message } | null — feedback to display
  * - showCheckButton: boolean — whether to show built-in check button (default true)
  * - onAnswerReady: (hasAnswer: boolean) => void — notify parent when answer zone has words
  * - getCheckFn: (fn) => void — exposes the check function to parent
+ * - targetWordCount: number | null — recommended number of tiles to use (shown as hint)
  */
 export default function SentenceBuildingInput({
   words = [],
@@ -42,7 +43,8 @@ export default function SentenceBuildingInput({
   feedback = null,
   showCheckButton = true,
   onAnswerReady,
-  getCheckFn
+  getCheckFn,
+  targetWordCount = null
 }) {
   const [bankWords, setBankWords] = useState([]);
   const [answerWords, setAnswerWords] = useState([]);
@@ -214,6 +216,31 @@ export default function SentenceBuildingInput({
   }, [disabled]);
 
   // =============================================
+  // TILE COUNT HINT
+  // =============================================
+  const tileCountHint = targetWordCount && !disabled ? (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      fontSize: '0.82rem',
+      color: answerWords.length === targetWordCount ? '#48bb78' : '#718096',
+      fontWeight: 500,
+      marginBottom: '0.4rem',
+      transition: 'color 0.2s ease'
+    }}>
+      <span>🎯 Use {targetWordCount} tiles</span>
+      {answerWords.length > 0 && (
+        <span style={{
+          color: answerWords.length === targetWordCount ? '#48bb78' : answerWords.length > targetWordCount ? '#f56565' : '#a0aec0'
+        }}>
+          ({answerWords.length}/{targetWordCount})
+        </span>
+      )}
+    </div>
+  ) : null;
+
+  // =============================================
   // STYLES
   // =============================================
   const tileStyle = (isDragSource = false) => ({
@@ -264,7 +291,7 @@ export default function SentenceBuildingInput({
         <div style={{
           display: 'inline-block', padding: '3px 12px', borderRadius: '12px',
           fontSize: '0.8rem', fontWeight: '600', marginBottom: '1rem',
-          backgroundColor: '#FEF3C7', color: '#92400E'
+          backgroundColor: '#EDE9FE', color: '#6B21A8'
         }}>
           🇪🇸 Translate
         </div>
@@ -282,10 +309,10 @@ export default function SentenceBuildingInput({
       {/* Prompt */}
       {questionType === 'translation' && prompt && (
         <div style={{
-          backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px',
+          backgroundColor: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: '10px',
           padding: '1rem 1.25rem', marginBottom: '1.25rem',
           fontSize: 'clamp(1.1rem, 3.5vw, 1.25rem)', fontStyle: 'italic',
-          color: '#78350F', lineHeight: '1.5'
+          color: '#5B21B6', lineHeight: '1.5'
         }}>
           {prompt}
         </div>
@@ -303,10 +330,18 @@ export default function SentenceBuildingInput({
       {/* ANSWER ZONE */}
       <div style={{ marginBottom: '1.25rem' }}>
         <div style={{
-          fontSize: '0.8rem', fontWeight: '600', color: '#666', marginBottom: '0.4rem',
-          textTransform: 'uppercase', letterSpacing: '0.5px'
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end',
+          marginBottom: '0.4rem'
         }}>
-          Your answer
+          <div style={{
+            fontSize: '0.8rem', fontWeight: '600', color: '#666',
+            textTransform: 'uppercase', letterSpacing: '0.5px'
+          }}>
+            Your answer
+          </div>
+          {tileCountHint}
         </div>
         <div
           ref={answerZoneRef}

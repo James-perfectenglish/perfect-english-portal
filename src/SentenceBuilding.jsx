@@ -54,6 +54,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
   const [questions, setQuestions] = useState([]);
   const [currentQ, setCurrentQ] = useState(0);
   const [score, setScore] = useState(0);
+  const [stars, setStars] = useState(0);
   const [feedback, setFeedback] = useState(null);
   const [hasAnswer, setHasAnswer] = useState(false);
 
@@ -117,17 +118,34 @@ export default function SentenceBuilding({ onBack, onComplete }) {
     setStage('playing');
   };
 
+  // Compute target word count from the shortest correct answer's tile count
+  const getTargetWordCount = (question) => {
+    if (!question) return null;
+    const correctSentences = Array.isArray(question.correct_answers)
+      ? question.correct_answers
+      : JSON.parse(question.correct_answers || '[]');
+    if (correctSentences.length === 0) return null;
+
+    // Count tokens in the shortest correct answer
+    // Split on spaces, which matches how tiles work (punctuation is its own tile)
+    const counts = correctSentences.map(s => s.trim().split(/\s+/).length);
+    return Math.min(...counts);
+  };
+
   const handleResult = (isCorrect, isSoft = false) => {
     const q = questions[currentQ];
 
     if (isCorrect && !isSoft) {
+      // Perfect — words AND punctuation correct → score + star
       setScore(s => s + 1);
-      setFeedback({ correct: true, message: `✅ Correct! ${q.explanation || ''}` });
+      setStars(s => s + 1);
+      setFeedback({ correct: true, message: `✅ ⭐ Perfect! Words and punctuation correct. ${q.explanation || ''}` });
     } else if (isCorrect && isSoft) {
+      // Words correct but punctuation wrong/missing → score but no star
       setScore(s => s + 1);
       setFeedback({
         correct: true,
-        message: `✅ You got the words right — but don't forget your punctuation! Score counted. ${q.explanation || ''}`
+        message: `✅ Correct! The words are right. Add the punctuation next time for a ⭐! ${q.explanation || ''}`
       });
     } else {
       const correctSentences = Array.isArray(q.correct_answers)
@@ -160,6 +178,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
     setQuestions([]);
     setCurrentQ(0);
     setScore(0);
+    setStars(0);
     setFeedback(null);
     setHasAnswer(false);
     setStage('level-select');
@@ -170,6 +189,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
     window.scrollTo({ top: 0, behavior: 'instant' });
     setCurrentQ(0);
     setScore(0);
+    setStars(0);
     setFeedback(null);
     setHasAnswer(false);
     setStage('loading');
@@ -193,7 +213,8 @@ export default function SentenceBuilding({ onBack, onComplete }) {
       questionType: hasPrompt ? 'translation' : 'build',
       prompt: hasPrompt ? question.question : null,
       correctSentences,
-      explanation: question.explanation || ''
+      explanation: question.explanation || '',
+      targetWordCount: getTargetWordCount(question)
     };
   };
 
@@ -421,6 +442,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
               fontWeight: 500
             }}>
               <span>Progress: {currentQ + 1}/{questions.length}</span>
+              <span>⭐ {stars}</span>
               <span>Score: {score}/{questions.length}</span>
             </div>
 
@@ -431,6 +453,43 @@ export default function SentenceBuilding({ onBack, onComplete }) {
               padding: '1.5rem',
               marginBottom: '1.5rem'
             }}>
+              {/* Topic pill */}
+              {q.topic && (
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem',
+                  marginBottom: '1rem'
+                }}>
+                  {q.level && (
+                    <span style={{
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      fontSize: '0.8rem',
+                      fontWeight: '600',
+                      backgroundColor: q.level.startsWith('A') ? '#c6f6d5'
+                        : q.level.startsWith('B') ? '#bee3f8'
+                        : '#feebc8',
+                      color: q.level.startsWith('A') ? '#48bb78'
+                        : q.level.startsWith('B') ? '#4299e1'
+                        : '#ed8936'
+                    }}>
+                      {q.level}
+                    </span>
+                  )}
+                  <span style={{
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    backgroundColor: '#f0f0f0',
+                    color: '#555'
+                  }}>
+                    {q.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                  </span>
+                </div>
+              )}
+
               <SentenceBuildingInput
                 key={currentQ}
                 {...getQuestionProps(q)}
@@ -485,6 +544,24 @@ export default function SentenceBuilding({ onBack, onComplete }) {
             }}>
               {score}/{questions.length}
             </div>
+
+            {/* Star summary */}
+            {stars > 0 && (
+              <div style={{
+                display: 'inline-block',
+                background: '#FFFBEB',
+                border: '1px solid #FDE68A',
+                borderRadius: '12px',
+                padding: '8px 20px',
+                marginBottom: '12px',
+                fontSize: '1.1rem',
+                color: '#92400E',
+                fontWeight: 600
+              }}>
+                ⭐ {stars} perfect answer{stars !== 1 ? 's' : ''} (with punctuation!)
+              </div>
+            )}
+
             <p style={{ color: '#4a5568' }}>
               {score >= 9
                 ? 'Outstanding! Perfect sentence construction.'
