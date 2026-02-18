@@ -8,8 +8,8 @@ import SpanishVocabulary from './SpanishVocabulary'
 import VerbsFlashcards from './VerbsFlashcards'
 import SentenceBuilding from './SentenceBuilding'
 import ListeningExercise from './ListeningExercise'
-import BorrasFlashcards from "./BorrasFlashcards";
-import BorrasMemoryGame from "./BorrasMemoryGame";
+import BorrasFlashcards from "./BorrasFlashcards"
+import BorrasMemoryGame from "./BorrasMemoryGame"
 
 function ExerciseList({ userLevel }) {
   const [exercises, setExercises] = useState([])
@@ -48,7 +48,9 @@ function ExerciseList({ userLevel }) {
       'Irregular Verbs Flashcards',
       'Essential Phrasal Verbs',
       'Sentence Building',
-      'Listening Exercises'
+      'Listening Exercises',
+      'Borrás Flashcards',
+      'Borrás Memory Game'
     ]
     if (activeExercises.includes(exercise.title)) {
       setActiveExercise(exercise)
@@ -80,6 +82,12 @@ function ExerciseList({ userLevel }) {
     if (activeExercise.title === 'Listening Exercises') {
       return <ListeningExercise onBack={() => setActiveExercise(null)} />
     }
+    if (activeExercise.title === 'Borrás Flashcards') {
+      return <BorrasFlashcards onBack={() => setActiveExercise(null)} />
+    }
+    if (activeExercise.title === 'Borrás Memory Game') {
+      return <BorrasMemoryGame onBack={() => setActiveExercise(null)} />
+    }
   }
 
   if (loading) {
@@ -103,7 +111,9 @@ function ExerciseList({ userLevel }) {
     'Irregular Verbs Flashcards',
     'Essential Phrasal Verbs',
     'Sentence Building',
-    'Listening Exercises'
+    'Listening Exercises',
+    'Borrás Flashcards',
+    'Borrás Memory Game'
   ]
 
   return (
