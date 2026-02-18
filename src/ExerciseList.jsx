@@ -8,6 +8,8 @@ import SpanishVocabulary from './SpanishVocabulary'
 import VerbsFlashcards from './VerbsFlashcards'
 import SentenceBuilding from './SentenceBuilding'
 import ListeningExercise from './ListeningExercise'
+import BorrasFlashcards from "./BorrasFlashcards";
+import BorrasMemoryGame from "./BorrasMemoryGame";
 
 function ExerciseList({ userLevel }) {
   const [exercises, setExercises] = useState([])
