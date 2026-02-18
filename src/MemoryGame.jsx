@@ -254,13 +254,6 @@ export default function MemoryGame({
           borderRadius: '12px', padding: '2rem', textAlign: 'center',
           color: 'white', marginBottom: '1.5rem'
         }}>
-          {onBack && (
-            <button onClick={onBack} style={{
-              background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white',
-              padding: '6px 14px', borderRadius: '20px', cursor: 'pointer',
-              fontSize: '0.85rem', marginBottom: '1rem', display: 'block', margin: '0 auto 1rem'
-            }}>← Back to Exercises</button>
-          )}
           <h1 style={{ margin: 0, fontSize: 'clamp(1.8rem, 5vw, 2.2rem)', fontWeight: '700' }}>{title}</h1>
           <p style={{ margin: '0.5rem 0 0', opacity: 0.9, fontSize: 'clamp(0.9rem, 3vw, 1.1rem)' }}>{subtitle}</p>
           <span style={{

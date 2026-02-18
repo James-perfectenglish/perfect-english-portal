@@ -10,6 +10,8 @@ import SentenceBuilding from './SentenceBuilding'
 import ListeningExercise from './ListeningExercise'
 import BorrasFlashcards from "./BorrasFlashcards"
 import BorrasMemoryGame from "./BorrasMemoryGame"
+import HotelFlashcards from "./HotelFlashcards"
+import HotelMemoryGame from "./HotelMemoryGame"
 
 function ExerciseList({ userLevel }) {
   const [exercises, setExercises] = useState([])
@@ -50,7 +52,9 @@ function ExerciseList({ userLevel }) {
       'Sentence Building',
       'Listening Exercises',
       'Borrás Flashcards',
-      'Borrás Memory Game'
+      'Borrás Memory Game',
+      'Hotel Flashcards',
+      'Hotel Memory Game'
     ]
     if (activeExercises.includes(exercise.title)) {
       setActiveExercise(exercise)
@@ -88,6 +92,12 @@ function ExerciseList({ userLevel }) {
     if (activeExercise.title === 'Borrás Memory Game') {
       return <BorrasMemoryGame onBack={() => setActiveExercise(null)} />
     }
+    if (activeExercise.title === 'Hotel Flashcards') {
+      return <HotelFlashcards onBack={() => setActiveExercise(null)} />
+    }
+    if (activeExercise.title === 'Hotel Memory Game') {
+      return <HotelMemoryGame onBack={() => setActiveExercise(null)} />
+    }
   }
 
   if (loading) {
@@ -113,7 +123,9 @@ function ExerciseList({ userLevel }) {
     'Sentence Building',
     'Listening Exercises',
     'Borrás Flashcards',
-    'Borrás Memory Game'
+    'Borrás Memory Game',
+    'Hotel Flashcards',
+    'Hotel Memory Game'
   ]
 
   return (

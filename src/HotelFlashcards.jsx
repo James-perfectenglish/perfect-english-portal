@@ -1,65 +1,70 @@
 import { useState } from 'react';
 
 // ─────────────────────────────────────────────────────────────
-// CARD DATA — add new cards here as the course progresses
+// CARD DATA
+// Rounds 1–3: General (everyone)  20 words
+// Rounds 4–5: Client-facing       10 words
+// Rounds 6–7: Back office         10 words
 // ─────────────────────────────────────────────────────────────
-export const BORRAS_CARDS = [
-  // ── ROUND 1 · The Bathroom
-  { id: 1, round: 1, roundName: 'The Bathroom', partOfSpeech: 'noun', word: 'bath', definition: 'The large tub you lie in to wash your body.', example: 'This freestanding bath is our most popular model.', spanish: 'la bañera' },
-  { id: 2, round: 1, roundName: 'The Bathroom', partOfSpeech: 'noun', word: 'wash basin', definition: 'The bowl fixed to the wall where you wash your hands and face.', example: 'The wash basin in the showroom is made of white ceramic.', spanish: 'el lavabo' },
-  { id: 3, round: 1, roundName: 'The Bathroom', partOfSpeech: 'noun', word: 'toilet', definition: 'The bathroom fixture used for waste, with a seat and a flush.', example: 'This toilet has a soft-close seat and a silent flush.', spanish: 'el inodoro / el váter' },
-  { id: 4, round: 1, roundName: 'The Bathroom', partOfSpeech: 'noun', word: 'mirror', definition: 'The reflective glass panel fixed to a bathroom wall.', example: 'The mirror above the basin has a built-in LED light.', spanish: 'el espejo' },
-  { id: 5, round: 1, roundName: 'The Bathroom', partOfSpeech: 'noun', word: 'tap', definition: 'The device you turn or push to control the flow of water.', example: 'This tap is available in gold or brushed chrome.', spanish: 'el grifo' },
-  { id: 6, round: 1, roundName: 'The Bathroom', partOfSpeech: 'noun', word: 'seat', definition: 'The part of the toilet you sit on, usually with a soft-close cover.', example: 'The soft-close seat is included in the price.', spanish: 'la tapa / el asiento' },
+export const HOTEL_CARDS = [
 
-  // ── ROUND 2 · Shower & Storage
-  { id: 7, round: 2, roundName: 'Shower & Storage', partOfSpeech: 'noun', word: 'shower tray', definition: 'The flat base of a shower where water collects and drains away.', example: 'The shower tray is made from a stone resin composite.', spanish: 'el plato de ducha' },
-  { id: 8, round: 2, roundName: 'Shower & Storage', partOfSpeech: 'noun', word: 'mixer tap', definition: 'A single tap that blends hot and cold water to the right temperature.', example: 'The mixer tap has a long spout — perfect for filling the bath.', spanish: 'el grifo mezclador / el monomando' },
-  { id: 9, round: 2, roundName: 'Shower & Storage', partOfSpeech: 'noun', word: 'shower screen', definition: 'The glass panel that keeps water inside the shower area.', example: 'The shower screen is made of 8mm tempered glass.', spanish: 'la mampara de ducha' },
-  { id: 10, round: 2, roundName: 'Shower & Storage', partOfSpeech: 'noun', word: 'showerhead', definition: 'The part at the top of the shower where water comes out.', example: 'This showerhead has five different spray settings.', spanish: 'la alcachofa de ducha' },
-  { id: 11, round: 2, roundName: 'Shower & Storage', partOfSpeech: 'noun', word: 'cabinet', definition: 'A bathroom furniture unit with doors for storing towels and products.', example: 'The mirrored cabinet above the basin has two shelves inside.', spanish: 'el armario / el mueble de baño' },
-  { id: 12, round: 2, roundName: 'Shower & Storage', partOfSpeech: 'noun', word: 'towel rail', definition: 'A bar fixed to the wall for hanging towels — often heated.', example: 'The heated towel rail keeps your towels warm and dry.', spanish: 'el toallero (calefactado)' },
+  // ── ROUND 1 · The Hotel (general) ───────────────────────────
+  { id: 1, round: 1, roundName: 'The Hotel', partOfSpeech: 'noun', word: 'room', definition: 'A space in a hotel where a guest sleeps and stays during their visit.', example: 'The room on the third floor has a beautiful view of the sea.', spanish: 'la habitación' },
+  { id: 2, round: 1, roundName: 'The Hotel', partOfSpeech: 'noun', word: 'floor', definition: 'A level of a building — ground floor, first floor, second floor, etc.', example: 'The restaurant is on the ground floor, next to the lobby.', spanish: 'la planta' },
+  { id: 3, round: 1, roundName: 'The Hotel', partOfSpeech: 'noun', word: 'lift', definition: 'The machine you use to travel between floors without using the stairs.', example: 'Take the lift to the fifth floor — your room is on the right.', spanish: 'el ascensor' },
+  { id: 4, round: 1, roundName: 'The Hotel', partOfSpeech: 'noun', word: 'lobby', definition: 'The entrance area of a hotel where guests arrive and check in.', example: 'Please wait for us in the lobby — we will be there in five minutes.', spanish: 'el vestíbulo / el lobby' },
+  { id: 5, round: 1, roundName: 'The Hotel', partOfSpeech: 'noun', word: 'key card', definition: 'The plastic card you use like a key to open your hotel room door.', example: 'If your key card stops working, please come to reception.', spanish: 'la tarjeta llave' },
+  { id: 6, round: 1, roundName: 'The Hotel', partOfSpeech: 'noun', word: 'guest', definition: 'A person who is staying at the hotel as a paying customer.', example: 'All guests must show their passport when they check in.', spanish: 'el/la huésped' },
 
-  // ── ROUND 3 · Technical
-  { id: 13, round: 3, roundName: 'Technical', partOfSpeech: 'noun', word: 'plug', definition: 'A rubber or metal stopper that blocks the drain in a bath or basin.', example: 'The plug in the basin was missing when we arrived.', spanish: 'el tapón' },
-  { id: 14, round: 3, roundName: 'Technical', partOfSpeech: 'noun', word: 'overflow', definition: 'The small hole near the top of a bath or basin that prevents flooding.', example: 'The overflow stopped the bath from flooding the bathroom floor.', spanish: 'el rebosadero' },
-  { id: 15, round: 3, roundName: 'Technical', partOfSpeech: 'noun', word: 'fittings', definition: 'All the fixed items in a bathroom — taps, pipes, connectors and valves.', example: 'All the fittings in this bathroom suite are brushed gold.', spanish: 'la grifería / los accesorios' },
-  { id: 16, round: 3, roundName: 'Technical', partOfSpeech: 'noun', word: 'flooring', definition: 'The material used to cover the floor of a room.', example: 'The flooring in the showroom is large-format Italian porcelain.', spanish: 'el suelo / el pavimento' },
-  { id: 17, round: 3, roundName: 'Technical', partOfSpeech: 'noun', word: 'heater', definition: 'A device that produces warmth — in a bathroom, often a towel rail or underfloor system.', example: 'We installed underfloor heating as the main heater in the bathroom.', spanish: 'el calentador / el radiador' },
-  { id: 18, round: 3, roundName: 'Technical', partOfSpeech: 'noun', word: 'tile', definition: 'A flat piece of ceramic or stone used to cover walls or floors.', example: 'These tiles come from a factory in Castellón.', spanish: 'el azulejo (pared) / la baldosa (suelo)' },
+  // ── ROUND 2 · In Your Room (general) ────────────────────────
+  { id: 7, round: 2, roundName: 'In Your Room', partOfSpeech: 'noun', word: 'minibar', definition: 'A small fridge in the hotel room stocked with drinks and snacks to buy.', example: 'The minibar is restocked every morning by housekeeping.', spanish: 'el minibar' },
+  { id: 8, round: 2, roundName: 'In Your Room', partOfSpeech: 'noun', word: 'room service', definition: 'A hotel service where food and drinks are delivered directly to your room.', example: 'Room service is available 24 hours a day in this hotel.', spanish: 'el servicio de habitaciones' },
+  { id: 9, round: 2, roundName: 'In Your Room', partOfSpeech: 'noun', word: 'laundry', definition: 'A hotel service that washes and irons guests\' clothes for them.', example: 'Leave your laundry in the bag and we will return it by 6pm.', spanish: 'la lavandería / la ropa para lavar' },
+  { id: 10, round: 2, roundName: 'In Your Room', partOfSpeech: 'noun', word: 'amenities', definition: 'All the small extras provided in a hotel room — soap, shampoo, towels, etc.', example: 'Our deluxe rooms include premium amenities from a luxury brand.', spanish: 'los artículos de cortesía / los amenities' },
+  { id: 11, round: 2, roundName: 'In Your Room', partOfSpeech: 'noun', word: 'pillow', definition: 'The soft cushion you rest your head on when sleeping.', example: 'We can bring you an extra pillow — just call reception.', spanish: 'la almohada' },
+  { id: 12, round: 2, roundName: 'In Your Room', partOfSpeech: 'noun', word: 'towel', definition: 'The cloth you use to dry yourself after a shower or bath.', example: 'Please hang your towel on the rail if you do not need it changed.', spanish: 'la toalla' },
 
-  // ── ROUND 4 · Business
-  { id: 19, round: 4, roundName: 'Business', partOfSpeech: 'noun', word: 'order', definition: 'A request for goods — from a client to the showroom, or to a supplier.', example: 'Your order will arrive at the showroom on Friday.', spanish: 'el pedido' },
-  { id: 20, round: 4, roundName: 'Business', partOfSpeech: 'noun', word: 'return', definition: 'When a client sends a product back because it is damaged or incorrect.', example: 'We processed the return and sent a replacement the same day.', spanish: 'la devolución' },
-  { id: 21, round: 4, roundName: 'Business', partOfSpeech: 'noun', word: 'invoice', definition: 'An official document requesting payment for goods or services.', example: 'I will send the invoice by email this afternoon.', spanish: 'la factura' },
-  { id: 22, round: 4, roundName: 'Business', partOfSpeech: 'noun', word: 'leak', definition: 'Water or liquid that escapes from a pipe, joint or fitting.', example: 'There is a small leak under the basin — we need a plumber.', spanish: 'la fuga / la gotera' },
-  { id: 23, round: 4, roundName: 'Business', partOfSpeech: 'noun', word: 'accessory', definition: 'A small decorative or functional item that completes a bathroom design.', example: 'We sell accessories to match every tap range in the showroom.', spanish: 'el accesorio' },
-  { id: 24, round: 4, roundName: 'Business', partOfSpeech: 'noun', word: 'complaint', definition: 'When a client formally tells you they are unhappy with a product or service.', example: 'We received a complaint about the delivery — the bath arrived damaged.', spanish: 'la queja / la reclamación' },
+  // ── ROUND 3 · Making a Booking (general) ────────────────────
+  { id: 13, round: 3, roundName: 'Making a Booking', partOfSpeech: 'noun', word: 'reservation', definition: 'An arrangement made in advance to have a room kept for you.', example: 'I have a reservation for two nights under the name García.', spanish: 'la reserva' },
+  { id: 14, round: 3, roundName: 'Making a Booking', partOfSpeech: 'verb', word: 'to book', definition: 'To reserve a room or service in advance. Regular verb: book → booked → booked.', example: 'We booked the suite three months before the wedding.', spanish: 'reservar' },
+  { id: 15, round: 3, roundName: 'Making a Booking', partOfSpeech: 'verb', word: 'to cancel', definition: 'To say that a reservation is no longer needed. Regular verb: cancel → cancelled → cancelled.', example: 'The guest cancelled their booking two days before arrival.', spanish: 'cancelar' },
+  { id: 16, round: 3, roundName: 'Making a Booking', partOfSpeech: 'verb', word: 'to confirm', definition: 'To say officially that a booking is correct and certain. Regular verb: confirm → confirmed → confirmed.', example: 'We will send you an email to confirm your reservation.', spanish: 'confirmar' },
+  { id: 17, round: 3, roundName: 'Making a Booking', partOfSpeech: 'adjective', word: 'available', definition: 'Free to be used — not already booked or occupied.', example: 'I am sorry, we do not have any double rooms available this weekend.', spanish: 'disponible' },
+  { id: 18, round: 3, roundName: 'Making a Booking', partOfSpeech: 'noun', word: 'suite', definition: 'A large, luxurious set of rooms in a hotel, usually with a separate living area.', example: 'The honeymoon suite on the top floor has a private terrace.', spanish: 'la suite' },
 
-  // ── ROUND 5 · Action! (Verbs)
-  { id: 25, round: 5, roundName: 'Action!', partOfSpeech: 'verb', word: 'to fit', definition: 'To install something in position. Regular verb: fit → fitted → fitted.', example: 'We fitted the new shower tray on Tuesday.', spanish: 'instalar / colocar' },
-  { id: 26, round: 5, roundName: 'Action!', partOfSpeech: 'verb', word: 'to order', definition: 'To request goods from a supplier. Regular verb: order → ordered → ordered.', example: 'We ordered the cabinet last Monday — it arrives on Friday.', spanish: 'pedir / encargar' },
-  { id: 27, round: 5, roundName: 'Action!', partOfSpeech: 'verb', word: 'to deliver', definition: 'To bring goods to an address. Regular verb: deliver → delivered → delivered.', example: 'They delivered the bath to the hotel on Wednesday morning.', spanish: 'entregar' },
-  { id: 28, round: 5, roundName: 'Action!', partOfSpeech: 'verb', word: 'to pay', definition: 'To give money for goods or a service. Irregular verb: pay → paid → paid.', example: 'The client paid the invoice yesterday — thank you!', spanish: 'pagar' },
-  { id: 29, round: 5, roundName: 'Action!', partOfSpeech: 'verb', word: 'to change', definition: 'To replace one item with a different one. Regular verb: change → changed → changed.', example: 'We changed the old tap for a new chrome one.', spanish: 'cambiar' },
-  { id: 30, round: 5, roundName: 'Action!', partOfSpeech: 'verb', word: 'to complain', definition: 'To tell someone you are unhappy. Regular verb: complain → complained → complained.', example: 'The client complained about the colour of the tiles.', spanish: 'quejarse / reclamar' },
+  // ── ROUND 4 · At Reception (client-facing) ──────────────────
+  { id: 19, round: 4, roundName: 'At Reception', partOfSpeech: 'noun', word: 'check-in', definition: 'The process when a guest arrives, gives their name, and receives their room key.', example: 'Check-in is from 3pm — early check-in is available for an extra charge.', spanish: 'el check-in / el registro' },
+  { id: 20, round: 4, roundName: 'At Reception', partOfSpeech: 'noun', word: 'check-out', definition: 'The process when a guest pays their bill and returns their key before leaving.', example: 'Check-out time is 12 noon — late check-out can be arranged.', spanish: 'el check-out / la salida' },
+  { id: 21, round: 4, roundName: 'At Reception', partOfSpeech: 'noun', word: 'receptionist', definition: 'The person who works at the front desk, welcoming guests and managing arrivals.', example: 'Ask the receptionist — she will help you with directions to the beach.', spanish: 'el/la recepcionista' },
+  { id: 22, round: 4, roundName: 'At Reception', partOfSpeech: 'noun', word: 'concierge', definition: 'A hotel employee who helps guests with special requests, tickets, and local information.', example: 'The concierge can book a taxi to the airport for you.', spanish: 'el/la conserje' },
+  { id: 23, round: 4, roundName: 'At Reception', partOfSpeech: 'verb', word: 'to welcome', definition: 'To greet a guest warmly when they arrive. Regular verb: welcome → welcomed → welcomed.', example: 'We always welcome guests with a cold drink on hot days.', spanish: 'dar la bienvenida / recibir' },
+  { id: 24, round: 4, roundName: 'At Reception', partOfSpeech: 'noun', word: 'porter', definition: 'The hotel staff member who carries guests\' bags and helps with luggage.', example: 'The porter will take your bags up to your room immediately.', spanish: 'el/la botones / el mozo de equipaje' },
 
-  // ── ROUND 6 · More Verbs
-  { id: 31, round: 6, roundName: 'More Verbs', partOfSpeech: 'verb', word: 'to leak', definition: 'When water escapes from a pipe or fitting. Regular verb: leak → leaked → leaked.', example: 'The tap was leaking overnight — the floor was wet.', spanish: 'gotear / tener una fuga' },
-  { id: 32, round: 6, roundName: 'More Verbs', partOfSpeech: 'verb', word: 'to return', definition: 'To send a product back to a supplier. Regular verb: return → returned → returned.', example: 'The client returned the basin because it was cracked.', spanish: 'devolver' },
-  { id: 33, round: 6, roundName: 'More Verbs', partOfSpeech: 'verb', word: 'to tile', definition: 'To cover a wall or floor surface with tiles. Regular verb: tile → tiled → tiled.', example: 'The builders tiled the bathroom walls in white porcelain.', spanish: 'alicatar / poner azulejos' },
-  { id: 34, round: 6, roundName: 'More Verbs', partOfSpeech: 'verb', word: 'to invoice', definition: 'To send a bill to a client. Regular verb: invoice → invoiced → invoiced.', example: 'We invoiced the hotel after fitting all twelve bathrooms.', spanish: 'facturar' },
-  { id: 35, round: 6, roundName: 'More Verbs', partOfSpeech: 'adjective', word: 'modern', definition: 'New in design and style — not traditional or old-fashioned.', example: 'The client wanted a very modern look — no wood, no colour.', spanish: 'moderno/a' },
-  { id: 36, round: 6, roundName: 'More Verbs', partOfSpeech: 'adjective', word: 'shiny', definition: 'A very bright, reflective surface — like polished chrome or gloss tiles.', example: 'The shiny finish on these taps shows every fingerprint!', spanish: 'brillante' },
+  // ── ROUND 5 · Guest Services (client-facing) ────────────────
+  { id: 25, round: 5, roundName: 'Guest Services', partOfSpeech: 'noun', word: 'complaint', definition: 'When a guest formally tells you they are unhappy with something.', example: 'The guest made a complaint about the noise from the room next door.', spanish: 'la queja / la reclamación' },
+  { id: 26, round: 5, roundName: 'Guest Services', partOfSpeech: 'noun', word: 'double room', definition: 'A hotel room with one large bed, designed for two people.', example: 'We have one double room left for Saturday night.', spanish: 'la habitación doble' },
+  { id: 27, round: 5, roundName: 'Guest Services', partOfSpeech: 'noun', word: 'single room', definition: 'A hotel room with one small bed, designed for one person.', example: 'A single room is twenty euros less per night than a double.', spanish: 'la habitación individual' },
+  { id: 28, round: 5, roundName: 'Guest Services', partOfSpeech: 'noun', word: 'tip', definition: 'Extra money a guest gives to a staff member to thank them for good service.', example: 'The guest left a generous tip for the porter on the desk.', spanish: 'la propina' },
+  { id: 29, round: 5, roundName: 'Guest Services', partOfSpeech: 'noun', word: 'breakfast', definition: 'The morning meal — often included in the price of a hotel room.', example: 'Breakfast is served in the dining room from 7am to 10:30am.', spanish: 'el desayuno' },
+  { id: 30, round: 5, roundName: 'Guest Services', partOfSpeech: 'noun', word: 'upgrade', definition: 'When a guest is moved to a better room than the one they originally booked.', example: 'We gave the couple a free upgrade to the sea-view suite.', spanish: 'la mejora / el upgrade' },
 
-  // ── ROUND 7 · How Does It Look?
-  { id: 37, round: 7, roundName: 'How Does It Look?', partOfSpeech: 'adjective', word: 'matt', definition: 'A surface with no shine at all — the opposite of shiny.', example: 'Matt black taps are very fashionable right now.', spanish: 'mate' },
-  { id: 38, round: 7, roundName: 'How Does It Look?', partOfSpeech: 'adjective', word: 'bright', definition: 'Giving a lot of light, or describing a strong, vivid colour.', example: 'The showroom looks very bright thanks to the large skylights.', spanish: 'luminoso/a / vivo/a (colour)' },
-  { id: 39, round: 7, roundName: 'How Does It Look?', partOfSpeech: 'adjective', word: 'smooth', definition: 'A surface that is completely flat and even — no rough parts at all.', example: 'Run your hand across the bath — the surface is perfectly smooth.', spanish: 'liso/a / suave' },
+  // ── ROUND 6 · Back Office 1 ──────────────────────────────────
+  { id: 31, round: 6, roundName: 'Back Office', partOfSpeech: 'noun', word: 'housekeeping', definition: 'The department responsible for cleaning rooms and maintaining the hotel.', example: 'Call housekeeping and ask them to bring more towels to room 204.', spanish: 'el departamento de pisos / la limpieza' },
+  { id: 32, round: 6, roundName: 'Back Office', partOfSpeech: 'noun', word: 'maintenance', definition: 'The team that repairs and looks after the building, equipment and facilities.', example: 'Maintenance came to fix the air conditioning in room 318 this morning.', spanish: 'el departamento de mantenimiento' },
+  { id: 33, round: 6, roundName: 'Back Office', partOfSpeech: 'noun', word: 'occupancy', definition: 'The percentage of rooms that are currently occupied by guests.', example: 'Occupancy this weekend is at 98% — we are almost fully booked.', spanish: 'la ocupación' },
+  { id: 34, round: 6, roundName: 'Back Office', partOfSpeech: 'noun', word: 'revenue', definition: 'The total amount of money the hotel earns from rooms, food and services.', example: 'Revenue in August was 30% higher than the same month last year.', spanish: 'los ingresos / la facturación' },
+  { id: 35, round: 6, roundName: 'Back Office', partOfSpeech: 'noun', word: 'rota', definition: 'The schedule showing which staff member works on which day and time.', example: 'Check the rota for next week — you are on the early shift on Monday.', spanish: 'el turno / el cuadrante' },
+  { id: 36, round: 6, roundName: 'Back Office', partOfSpeech: 'noun', word: 'supplier', definition: 'A company that provides the hotel with food, products or equipment.', example: 'Our wine supplier delivers every Tuesday morning before 9am.', spanish: 'el/la proveedor/a' },
+
+  // ── ROUND 7 · Back Office 2 ──────────────────────────────────
+  { id: 37, round: 7, roundName: 'Back Office 2', partOfSpeech: 'noun', word: 'budget', definition: 'The amount of money a department is allowed to spend in a given period.', example: 'We need to order new bed linen, but we are over budget this month.', spanish: 'el presupuesto' },
+  { id: 38, round: 7, roundName: 'Back Office 2', partOfSpeech: 'noun', word: 'commission', definition: 'A percentage of a sale paid to an agent or platform that sends guests to the hotel.', example: 'Booking.com charges a 15% commission on every reservation.', spanish: 'la comisión' },
+  { id: 39, round: 7, roundName: 'Back Office 2', partOfSpeech: 'verb', word: 'to liaise', definition: 'To communicate and work closely with another person or department. Regular verb.', example: 'Please liaise with the kitchen team about the special dietary requests.', spanish: 'coordinarse / actuar de enlace' },
+  { id: 40, round: 7, roundName: 'Back Office 2', partOfSpeech: 'noun', word: 'invoice', definition: 'An official document requesting payment for goods or services supplied.', example: 'The supplier sent the invoice for last month\'s deliveries on Friday.', spanish: 'la factura' },
 ];
 
-function BorrasFlashcards({ onBack }) {
-  const rounds = [...new Set(BORRAS_CARDS.map(c => c.round))];
+function HotelFlashcards({ onBack }) {
+  const rounds = [...new Set(HOTEL_CARDS.map(c => c.round))];
   const [selectedRound, setSelectedRound] = useState('all');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -70,14 +75,14 @@ function BorrasFlashcards({ onBack }) {
   const [touchEnd, setTouchEnd] = useState(null);
 
   const filtered = selectedRound === 'all'
-    ? BORRAS_CARDS
-    : BORRAS_CARDS.filter(c => c.round === selectedRound);
+    ? HOTEL_CARDS
+    : HOTEL_CARDS.filter(c => c.round === selectedRound);
 
   const currentCard = filtered[currentIndex];
   const totalCards = filtered.length;
   const roundName = selectedRound === 'all'
     ? 'All Cards'
-    : BORRAS_CARDS.find(c => c.round === selectedRound)?.roundName;
+    : HOTEL_CARDS.find(c => c.round === selectedRound)?.roundName;
 
   function changeRound(r) {
     setSelectedRound(r);
@@ -140,23 +145,23 @@ function BorrasFlashcards({ onBack }) {
           color: 'white', marginBottom: '1.5rem'
         }}>
           <h1 style={{ margin: 0, fontSize: 'clamp(1.8rem, 5vw, 2.2rem)', fontWeight: '700' }}>
-            Borrás Flashcards
+            Hotel Flashcards
           </h1>
           <p style={{ margin: '0.5rem 0 0', opacity: 0.9, fontSize: 'clamp(0.9rem, 3vw, 1.1rem)' }}>
-            Bathroom vocabulary in context 🚿
+            Essential hotel vocabulary in context 🏨
           </p>
           <span style={{
             display: 'inline-block', background: '#48bb78', padding: '4px 12px',
             borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '0.5rem'
           }}>
-            Level: A1–B1 · {roundName}
+            Level: A2 · {roundName}
           </span>
         </div>
 
         {/* ROUND FILTER */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '1.5rem' }}>
           {['all', ...rounds].map(r => {
-            const label = r === 'all' ? 'All Cards' : `${r}. ${BORRAS_CARDS.find(c => c.round === r)?.roundName}`;
+            const label = r === 'all' ? 'All Cards' : `${r}. ${HOTEL_CARDS.find(c => c.round === r)?.roundName}`;
             const isActive = selectedRound === r;
             return (
               <button key={r} onClick={() => changeRound(r)} style={{
@@ -228,21 +233,16 @@ function BorrasFlashcards({ onBack }) {
                   boxShadow: '0 10px 40px rgba(0,0,0,0.15)', border: '3px solid #667eea',
                   boxSizing: 'border-box', gap: '1rem'
                 }}>
-                  {/* Part of speech */}
                   <span style={{
                     background: '#f0ebff', color: '#764ba2', fontSize: '0.75rem',
                     fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
                     padding: '3px 12px', borderRadius: '20px'
-                  }}>
-                    {currentCard.partOfSpeech}
-                  </span>
+                  }}>{currentCard.partOfSpeech}</span>
 
-                  {/* Definition */}
                   <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.2rem)', color: '#2d3748', fontWeight: '600', lineHeight: 1.5 }}>
                     {currentCard.definition}
                   </div>
 
-                  {/* Example */}
                   <div style={{
                     fontSize: 'clamp(0.9rem, 3vw, 1.05rem)', color: '#4a5568', fontStyle: 'italic',
                     lineHeight: 1.5, borderLeft: '3px solid #667eea', paddingLeft: '0.8rem',
@@ -251,7 +251,6 @@ function BorrasFlashcards({ onBack }) {
                     "{currentCard.example}"
                   </div>
 
-                  {/* Spanish */}
                   <div style={{
                     background: '#fffaf0', border: '1.5px solid #ed8936',
                     borderRadius: '10px', padding: '0.5rem 1.2rem',
@@ -304,7 +303,6 @@ function BorrasFlashcards({ onBack }) {
             )}
           </>
         ) : (
-          /* FINISHED */
           <div style={{
             backgroundColor: 'white', padding: 'clamp(2rem, 6vw, 3rem)',
             borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', textAlign: 'center'
@@ -342,4 +340,4 @@ function BorrasFlashcards({ onBack }) {
   );
 }
 
-export default BorrasFlashcards;
+export default HotelFlashcards;
