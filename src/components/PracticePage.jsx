@@ -85,7 +85,7 @@ export default function PracticePage() {
           marginBottom: '2rem',
           lineHeight: '1.5'
         }}>
-          Choose your level. 20 random questions, 3 lives. Let's go!
+          Choose your level. 20 random questions, a variety of exercises. Let's go!
         </p>
 
         {/* Level Cards */}

@@ -15,32 +15,17 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const [sbFeedback, setSbFeedback] = useState(null);
   const [bestScore, setBestScore] = useState(null);
   const [averageScore, setAverageScore] = useState(null);
-  const [exerciseUuid, setExerciseUuid] = useState(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [stage]);
 
-  // Look up or identify the exercise UUID for this level combination
-  useEffect(() => {
-    lookupExerciseId();
-  }, [levels]);
-
-  const lookupExerciseId = async () => {
-    // Try to find a matching exercise in the exercises table
-    // Convention: title like "Random Practice B1-B2"
-    const levelLabel = levels && levels.length > 0 ? levels.sort().join('-') : 'All';
-    const searchTitle = `Random Practice ${levelLabel}`;
-
-    const { data } = await supabase
-      .from('exercises')
-      .select('id')
-      .ilike('title', `%${searchTitle}%`)
-      .limit(1);
-
-    if (data && data.length > 0) {
-      setExerciseUuid(data[0].id);
+  // Build a consistent level key for tracking in the answers jsonb
+  const getLevelKey = () => {
+    if (levels && levels.length > 0) {
+      return levels.sort().join('-');
     }
+    return 'all';
   };
 
   // Save attempt and fetch history when finished
@@ -55,25 +40,39 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Only save if we have a valid exercise UUID
-      if (exerciseUuid) {
-        await supabase
-          .from('student_attempts')
-          .insert({
-            student_id: user.id,
-            exercise_id: exerciseUuid,
-            score: score
-          });
+      const levelKey = getLevelKey();
 
-        // Fetch all attempts for this exercise
-        const { data: attempts } = await supabase
-          .from('student_attempts')
-          .select('score')
-          .eq('student_id', user.id)
-          .eq('exercise_id', exerciseUuid);
+      // Save this attempt — exercise_id is null, metadata goes in answers jsonb
+      await supabase
+        .from('student_attempts')
+        .insert({
+          student_id: user.id,
+          exercise_id: null,
+          score: score,
+          answers: {
+            practice_type: 'random_practice',
+            levels: levelKey,
+            total_questions: questions.length
+          }
+        });
 
-        if (attempts && attempts.length > 0) {
-          const scores = attempts.map(a => a.score);
+      // Fetch all random practice attempts for this level
+      const { data: attempts } = await supabase
+        .from('student_attempts')
+        .select('score, answers')
+        .eq('student_id', user.id)
+        .is('exercise_id', null);
+
+      if (attempts && attempts.length > 0) {
+        // Filter to only this level's random practice attempts
+        const myAttempts = attempts.filter(a =>
+          a.answers &&
+          a.answers.practice_type === 'random_practice' &&
+          a.answers.levels === levelKey
+        );
+
+        if (myAttempts.length > 0) {
+          const scores = myAttempts.map(a => a.score);
           setBestScore(Math.max(...scores));
           setAverageScore(Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10);
         }
