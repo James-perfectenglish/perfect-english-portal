@@ -15,12 +15,13 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const [sbFeedback, setSbFeedback] = useState(null);
   const [bestScore, setBestScore] = useState(null);
   const [averageScore, setAverageScore] = useState(null);
+  const [scoreHistory, setScoreHistory] = useState([]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [stage]);
 
-  // Build a consistent level key for tracking in the answers jsonb
+  // Build a consistent level key for tracking
   const getLevelKey = () => {
     if (levels && levels.length > 0) {
       return levels.sort().join('-');
@@ -28,22 +29,61 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     return 'all';
   };
 
-  // Save attempt and fetch history when finished
+  // Load any existing score history on mount
   useEffect(() => {
-    if (stage === 'finished') {
-      saveAttemptAndFetchHistory();
-    }
-  }, [stage]);
+    loadScoreHistory();
+  }, []);
 
-  const saveAttemptAndFetchHistory = async () => {
+  const loadScoreHistory = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const { data: attempts, error } = await supabase
+        .from('student_attempts')
+        .select('score, answers')
+        .eq('student_id', user.id)
+        .is('exercise_id', null);
+
+      if (error) {
+        console.error('Error loading score history:', error);
+        return;
+      }
+
+      if (attempts && attempts.length > 0) {
+        const levelKey = getLevelKey();
+        const myAttempts = attempts.filter(a =>
+          a.answers &&
+          a.answers.practice_type === 'random_practice' &&
+          a.answers.levels === levelKey
+        );
+        setScoreHistory(myAttempts.map(a => a.score));
+      }
+    } catch (error) {
+      console.error('Error loading score history:', error);
+    }
+  };
+
+  // Save attempt and update history when finished
+  useEffect(() => {
+    if (stage === 'finished') {
+      saveAttemptAndUpdateHistory();
+    }
+  }, [stage]);
+
+  const saveAttemptAndUpdateHistory = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        // No user — just use local score for display
+        updateScoreDisplay([...scoreHistory, score]);
+        return;
+      }
+
       const levelKey = getLevelKey();
 
-      // Save this attempt — exercise_id is null, metadata goes in answers jsonb
-      await supabase
+      // Save this attempt
+      const { error: insertError } = await supabase
         .from('student_attempts')
         .insert({
           student_id: user.id,
@@ -56,15 +96,25 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
           }
         });
 
-      // Fetch all random practice attempts for this level
-      const { data: attempts } = await supabase
+      if (insertError) {
+        console.error('Error saving attempt:', insertError);
+      }
+
+      // Re-fetch all attempts fresh
+      const { data: attempts, error: fetchError } = await supabase
         .from('student_attempts')
         .select('score, answers')
         .eq('student_id', user.id)
         .is('exercise_id', null);
 
+      if (fetchError) {
+        console.error('Error fetching attempts:', fetchError);
+        // Fallback: use local history + current score
+        updateScoreDisplay([...scoreHistory, score]);
+        return;
+      }
+
       if (attempts && attempts.length > 0) {
-        // Filter to only this level's random practice attempts
         const myAttempts = attempts.filter(a =>
           a.answers &&
           a.answers.practice_type === 'random_practice' &&
@@ -73,12 +123,25 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
         if (myAttempts.length > 0) {
           const scores = myAttempts.map(a => a.score);
-          setBestScore(Math.max(...scores));
-          setAverageScore(Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10);
+          updateScoreDisplay(scores);
+          setScoreHistory(scores);
+          return;
         }
       }
+
+      // If DB fetch returned nothing usable, use local fallback
+      updateScoreDisplay([...scoreHistory, score]);
+
     } catch (error) {
-      console.error('Error saving/fetching scores:', error);
+      console.error('Error in save/fetch:', error);
+      updateScoreDisplay([...scoreHistory, score]);
+    }
+  };
+
+  const updateScoreDisplay = (scores) => {
+    if (scores.length > 0) {
+      setBestScore(Math.max(...scores));
+      setAverageScore(Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10);
     }
   };
 
@@ -457,22 +520,19 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 gap: '0.5rem',
                 alignItems: 'center'
               }}>
-                <div style={{
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  fontSize: '0.8rem',
-                  fontWeight: '600',
-                  backgroundColor: currentQuestion.type === 'gap_fill' ? '#fff3cd'
-                    : currentQuestion.type === 'sentence_building' ? '#e8daef'
-                    : '#d4edda',
-                  color: currentQuestion.type === 'gap_fill' ? '#856404'
-                    : currentQuestion.type === 'sentence_building' ? '#6c3483'
-                    : '#155724'
-                }}>
-                  {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill'
-                    : currentQuestion.type === 'sentence_building' ? '🧩 Sentence Building'
-                    : '📝 Multiple Choice'}
-                </div>
+                {/* Type badge — skip for sentence_building since the input shows its own */}
+                {currentQuestion.type !== 'sentence_building' && (
+                  <div style={{
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    backgroundColor: currentQuestion.type === 'gap_fill' ? '#fff3cd' : '#d4edda',
+                    color: currentQuestion.type === 'gap_fill' ? '#856404' : '#155724'
+                  }}>
+                    {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill' : '📝 Multiple Choice'}
+                  </div>
+                )}
                 {currentQuestion.level && (
                   <div style={{
                     padding: '4px 12px',
@@ -495,16 +555,17 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                     borderRadius: '20px',
                     fontSize: '0.8rem',
                     fontWeight: '600',
-                    backgroundColor: '#f0f0f0',
-                    color: '#555'
+                    backgroundColor: currentQuestion.topic === 'question_forms' ? '#FEE2E2' : '#f0f0f0',
+                    color: currentQuestion.topic === 'question_forms' ? '#DC2626' : '#555'
                   }}>
+                    {currentQuestion.topic === 'question_forms' ? '❓ ' : ''}
                     {currentQuestion.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                   </div>
                 )}
               </div>
 
-              {/* Question Text (not shown for pure sentence building) */}
-              {!(currentQuestion.type === 'sentence_building' && (!currentQuestion.question || !currentQuestion.question.trim())) && (
+              {/* Question Text — skip entirely for sentence_building (the input component handles it) */}
+              {currentQuestion.type !== 'sentence_building' && currentQuestion.question && (
                 <div style={{
                   fontSize: 'clamp(1.15rem, 4vw, 1.4rem)',
                   color: '#2C3E50',
