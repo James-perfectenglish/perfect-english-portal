@@ -54,7 +54,6 @@ export default function SentenceBuilding({ onBack, onComplete }) {
   const [questions, setQuestions] = useState([]);
   const [currentQ, setCurrentQ] = useState(0);
   const [score, setScore] = useState(0);
-  const [stars, setStars] = useState(0);
   const [feedback, setFeedback] = useState(null);
   const [hasAnswer, setHasAnswer] = useState(false);
 
@@ -121,18 +120,9 @@ export default function SentenceBuilding({ onBack, onComplete }) {
   const handleResult = (isCorrect, isSoft = false) => {
     const q = questions[currentQ];
 
-    if (isCorrect && !isSoft) {
-      // Perfect: words AND punctuation correct — earns a star
+    if (isCorrect) {
       setScore(s => s + 1);
-      setStars(s => s + 1);
-      setFeedback({ correct: true, message: `⭐ Perfect! Words and punctuation all correct. ${q.explanation || ''}` });
-    } else if (isCorrect && isSoft) {
-      // Words correct but punctuation missing/wrong — score counts, no star
-      setScore(s => s + 1);
-      setFeedback({
-        correct: true,
-        message: `✅ Correct! The words are in the right order. Add the punctuation for a ⭐ next time! ${q.explanation || ''}`
-      });
+      setFeedback({ correct: true, message: `✅ Correct! ${q.explanation || ''}` });
     } else {
       const correctSentences = Array.isArray(q.correct_answers)
         ? q.correct_answers
@@ -164,7 +154,6 @@ export default function SentenceBuilding({ onBack, onComplete }) {
     setQuestions([]);
     setCurrentQ(0);
     setScore(0);
-    setStars(0);
     setFeedback(null);
     setHasAnswer(false);
     setStage('level-select');
@@ -175,7 +164,6 @@ export default function SentenceBuilding({ onBack, onComplete }) {
     window.scrollTo({ top: 0, behavior: 'instant' });
     setCurrentQ(0);
     setScore(0);
-    setStars(0);
     setFeedback(null);
     setHasAnswer(false);
     setStage('loading');
@@ -427,7 +415,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
               fontWeight: 500
             }}>
               <span>Progress: {currentQ + 1}/{questions.length}</span>
-              <span>Score: {score}/{questions.length} {stars > 0 && `⭐ ${stars}`}</span>
+              <span>Score: {score}/{questions.length}</span>
             </div>
 
             {/* Question card */}
@@ -529,24 +517,6 @@ export default function SentenceBuilding({ onBack, onComplete }) {
             }}>
               {score}/{questions.length}
             </div>
-
-            {/* Star summary */}
-            {stars > 0 && (
-              <div style={{
-                background: '#FFFBEB',
-                border: '1px solid #FDE68A',
-                borderRadius: '10px',
-                padding: '0.75rem 1.25rem',
-                margin: '0 auto 1rem',
-                maxWidth: '300px',
-                fontSize: '1rem',
-                color: '#92400E',
-                fontWeight: 600
-              }}>
-                ⭐ {stars} perfect answer{stars !== 1 ? 's' : ''} (words + punctuation)
-              </div>
-            )}
-
             <p style={{ color: '#4a5568' }}>
               {score >= 9
                 ? 'Outstanding! Perfect sentence construction.'

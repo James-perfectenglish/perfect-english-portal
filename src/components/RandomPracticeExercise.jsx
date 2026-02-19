@@ -2,10 +2,6 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import SentenceBuildingInput from './SentenceBuildingInput';
 
-function isPunctuation(text) {
-  return /^[.,?!;:]+$/.test(text.trim());
-}
-
 export default function RandomPracticeExercise({ levels, levelTitle, levelSubtitle, gradient, onBack }) {
   const [stage, setStage] = useState('start');
   const [questions, setQuestions] = useState([]);
@@ -18,66 +14,72 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const [loading, setLoading] = useState(false);
   const [sbFeedback, setSbFeedback] = useState(null);
   const [bestScore, setBestScore] = useState(null);
-  const [avgScore, setAvgScore] = useState(null);
-  const [attemptCount, setAttemptCount] = useState(0);
+  const [averageScore, setAverageScore] = useState(null);
+  const [exerciseUuid, setExerciseUuid] = useState(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [stage]);
 
-  // Fetch historical scores when finished
+  // Look up or identify the exercise UUID for this level combination
   useEffect(() => {
-    if (stage === 'finished') {
-      fetchScoreHistory();
-    }
-  }, [stage]);
+    lookupExerciseId();
+  }, [levels]);
 
-  const fetchScoreHistory = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  const lookupExerciseId = async () => {
+    // Try to find a matching exercise in the exercises table
+    // Convention: title like "Random Practice B1-B2"
+    const levelLabel = levels && levels.length > 0 ? levels.sort().join('-') : 'All';
+    const searchTitle = `Random Practice ${levelLabel}`;
 
-      const { data, error } = await supabase
-        .from('student_attempts')
-        .select('score, total_questions')
-        .eq('student_id', user.id)
-        .like('exercise_id', `%practice%`);
+    const { data } = await supabase
+      .from('exercises')
+      .select('id')
+      .ilike('title', `%${searchTitle}%`)
+      .limit(1);
 
-      if (data && data.length > 0) {
-        const practiceAttempts = data.filter(a => a.total_questions >= 15);
-        if (practiceAttempts.length > 0) {
-          const scores = practiceAttempts.map(a => a.score);
-          const best = Math.max(...scores);
-          const avg = scores.reduce((sum, s) => sum + s, 0) / scores.length;
-          setBestScore(best);
-          setAvgScore(Math.round(avg * 10) / 10);
-          setAttemptCount(practiceAttempts.length);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching score history:', error);
+    if (data && data.length > 0) {
+      setExerciseUuid(data[0].id);
     }
   };
 
-  // Save attempt when exercise finishes
-  const saveAttempt = async (finalScore, totalQuestions) => {
+  // Save attempt and fetch history when finished
+  useEffect(() => {
+    if (stage === 'finished') {
+      saveAttemptAndFetchHistory();
+    }
+  }, [stage]);
+
+  const saveAttemptAndFetchHistory = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const levelLabel = levels ? levels.join('-') : 'all';
+      // Only save if we have a valid exercise UUID
+      if (exerciseUuid) {
+        await supabase
+          .from('student_attempts')
+          .insert({
+            student_id: user.id,
+            exercise_id: exerciseUuid,
+            score: score
+          });
 
-      await supabase
-        .from('student_attempts')
-        .insert({
-          student_id: user.id,
-          exercise_id: `practice-${levelLabel}`,
-          score: finalScore,
-          total_questions: totalQuestions,
-          passed: finalScore >= Math.floor(totalQuestions * 0.7)
-        });
+        // Fetch all attempts for this exercise
+        const { data: attempts } = await supabase
+          .from('student_attempts')
+          .select('score')
+          .eq('student_id', user.id)
+          .eq('exercise_id', exerciseUuid);
+
+        if (attempts && attempts.length > 0) {
+          const scores = attempts.map(a => a.score);
+          setBestScore(Math.max(...scores));
+          setAverageScore(Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10);
+        }
+      }
     } catch (error) {
-      console.error('Error saving attempt:', error);
+      console.error('Error saving/fetching scores:', error);
     }
   };
 
@@ -162,8 +164,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setSelectedOption(null);
       setShowHint(false);
       setBestScore(null);
-      setAvgScore(null);
-      setAttemptCount(0);
+      setAverageScore(null);
     } catch (error) {
       console.error('Error fetching questions:', error);
       alert('Failed to load questions. Please try again.');
@@ -234,8 +235,8 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     }
   };
 
-  // Handler for sentence_building questions — signature: (isCorrect, userAnswer)
-  const handleSentenceBuildingResult = (isCorrect, userAnswer = '') => {
+  // Handler for sentence_building questions
+  const handleSentenceBuildingResult = (isCorrect, isSoft = false, userAnswer = '') => {
     const currentQuestion = questions[currentQuestionIndex];
     let feedbackMessage = '';
 
@@ -269,22 +270,12 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       : JSON.parse(question.correct_answers || '[]');
     const hasPrompt = question.question && question.question.trim() !== '';
 
-    // Compute target word count excluding punctuation
-    let targetWordCount = null;
-    if (correctSentences.length > 0) {
-      const counts = correctSentences.map(s =>
-        s.trim().split(/\s+/).filter(w => !isPunctuation(w)).length
-      );
-      targetWordCount = Math.min(...counts);
-    }
-
     return {
       words: options,
       questionType: hasPrompt ? 'translation' : 'build',
       prompt: hasPrompt ? question.question : null,
       correctSentences,
-      explanation: question.explanation || '',
-      targetWordCount
+      explanation: question.explanation || ''
     };
   };
 
@@ -298,7 +289,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setSbFeedback(null);
       setShowHint(false);
     } else {
-      saveAttempt(score, questions.length);
       setStage('finished');
     }
   };
@@ -310,10 +300,8 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const currentQuestion = questions[currentQuestionIndex];
 
   const displayTitle = levelTitle ? `${levelTitle} Practice` : 'Random Practice';
-  const displaySubtitle = levelSubtitle || '';
   const displayGradient = gradient || 'linear-gradient(135deg, #3498DB, #667eea)';
-
-  const scorePercent = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
+  const scorePercent = questions.length > 0 ? (score / questions.length) * 100 : 0;
 
   return (
     <div style={{
@@ -423,7 +411,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         {/* PLAYING SCREEN */}
         {stage === 'playing' && currentQuestion && (
           <div style={{ width: '100%', maxWidth: '700px', margin: '0 auto' }}>
-            {/* Info Bar — no lives */}
+            {/* Info Bar */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
@@ -669,7 +657,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                       fontWeight: '600'
                     }}
                   >
-                    {currentQuestionIndex < questions.length - 1 ? 'Next Question →' : 'See Results'}
+                    {currentQuestionIndex < questions.length - 1 ? 'Next Question →' : 'Finish'}
                   </button>
                 )}
               </div>
@@ -677,7 +665,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
           </div>
         )}
 
-        {/* FINISHED SCREEN — Score Summary */}
+        {/* FINISHED SCREEN */}
         {stage === 'finished' && (
           <div style={{ width: '100%', maxWidth: '600px', margin: '2rem auto 0' }}>
             <div style={{
@@ -695,15 +683,19 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
               }}>
                 Practice Complete!
               </h1>
+
               <div style={{
-                fontSize: 'clamp(1.2rem, 4vw, 1.4rem)',
-                marginBottom: '2rem',
+                fontSize: 'clamp(1rem, 3.5vw, 1.15rem)',
+                marginBottom: '1.5rem',
                 color: '#666'
               }}>
-                {score >= 18 ? '🌟 Excellent!' : score >= 15 ? '👍 Great job!' : score >= 10 ? '👌 Good effort!' : '💪 Keep practicing!'}
+                {scorePercent >= 90 ? '🌟 Outstanding work!'
+                  : scorePercent >= 75 ? '👍 Great job!'
+                  : scorePercent >= 50 ? '👌 Good effort!'
+                  : '💪 Keep practicing!'}
               </div>
 
-              {/* Score Cards */}
+              {/* Score cards */}
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: bestScore !== null ? '1fr 1fr 1fr' : '1fr',
@@ -712,76 +704,78 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
               }}>
                 {/* Current Score */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #667eea15, #764ba215)',
-                  border: '2px solid #667eea',
+                  background: displayGradient,
                   borderRadius: '12px',
-                  padding: '1.25rem 1rem'
+                  padding: '1.25rem 1rem',
+                  color: 'white'
                 }}>
                   <div style={{
                     fontSize: '0.8rem',
                     fontWeight: '600',
-                    color: '#667eea',
+                    opacity: 0.9,
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px',
-                    marginBottom: '0.5rem'
+                    marginBottom: '0.4rem'
                   }}>
-                    This Attempt
+                    This attempt
                   </div>
                   <div style={{
-                    fontSize: 'clamp(2rem, 8vw, 2.8rem)',
+                    fontSize: 'clamp(2rem, 8vw, 2.5rem)',
                     fontWeight: '700',
-                    color: '#2C3E50'
+                    lineHeight: 1.1
                   }}>
                     {score}/{questions.length}
                   </div>
                   <div style={{
-                    fontSize: '0.9rem',
-                    color: '#666',
-                    marginTop: '4px'
+                    fontSize: '0.85rem',
+                    opacity: 0.85,
+                    marginTop: '0.25rem'
                   }}>
-                    {scorePercent}%
+                    {Math.round(scorePercent)}%
                   </div>
                 </div>
 
                 {/* Best Score */}
                 {bestScore !== null && (
                   <div style={{
-                    background: score > bestScore ? '#f0fff415' : '#f7fafc',
-                    border: `2px solid ${score > bestScore ? '#48bb78' : '#e2e8f0'}`,
+                    background: score >= bestScore ? '#f0fff4' : '#f7fafc',
+                    border: score >= bestScore ? '2px solid #48bb78' : '2px solid #e2e8f0',
                     borderRadius: '12px',
                     padding: '1.25rem 1rem'
                   }}>
                     <div style={{
                       fontSize: '0.8rem',
                       fontWeight: '600',
-                      color: score > bestScore ? '#48bb78' : '#718096',
+                      color: '#718096',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px',
-                      marginBottom: '0.5rem'
+                      marginBottom: '0.4rem'
                     }}>
-                      {score > bestScore ? '🎉 New Best!' : 'Best Score'}
+                      Best
                     </div>
                     <div style={{
-                      fontSize: 'clamp(2rem, 8vw, 2.8rem)',
+                      fontSize: 'clamp(2rem, 8vw, 2.5rem)',
                       fontWeight: '700',
-                      color: '#2C3E50'
+                      color: '#2C3E50',
+                      lineHeight: 1.1
                     }}>
-                      {score > bestScore ? score : bestScore}
+                      {bestScore}/{questions.length}
                     </div>
-                    <div style={{
-                      fontSize: '0.9rem',
-                      color: '#666',
-                      marginTop: '4px'
-                    }}>
-                      {score > bestScore
-                        ? `was ${bestScore}`
-                        : `/${questions.length}`}
-                    </div>
+                    {score >= bestScore && score > 0 && (
+                      <div style={{
+                        fontSize: '0.85rem',
+                        color: '#48bb78',
+                        fontWeight: '600',
+                        marginTop: '0.25rem'
+                      }}>
+                        {score > bestScore ? '🎉 New best!' : '🏆 Matched!'}
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* Average Score */}
-                {avgScore !== null && (
+                {averageScore !== null && (
                   <div style={{
                     background: '#f7fafc',
                     border: '2px solid #e2e8f0',
@@ -794,23 +788,24 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                       color: '#718096',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px',
-                      marginBottom: '0.5rem'
+                      marginBottom: '0.4rem'
                     }}>
                       Average
                     </div>
                     <div style={{
-                      fontSize: 'clamp(2rem, 8vw, 2.8rem)',
+                      fontSize: 'clamp(2rem, 8vw, 2.5rem)',
                       fontWeight: '700',
-                      color: '#2C3E50'
+                      color: '#2C3E50',
+                      lineHeight: 1.1
                     }}>
-                      {avgScore}
+                      {averageScore}
                     </div>
                     <div style={{
-                      fontSize: '0.9rem',
-                      color: '#666',
-                      marginTop: '4px'
+                      fontSize: '0.85rem',
+                      color: '#718096',
+                      marginTop: '0.25rem'
                     }}>
-                      {attemptCount} attempt{attemptCount !== 1 ? 's' : ''}
+                      out of {questions.length}
                     </div>
                   </div>
                 )}
