@@ -160,7 +160,8 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
     const base = {
       padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)',
       borderRadius: '8px',
-      border: '2px solid #e2e8f0',
+      border: 'none',
+      boxShadow: 'inset 0 0 0 2px #e2e8f0',
       cursor: feedback ? 'default' : 'pointer',
       fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)',
       fontWeight: '500',
@@ -174,20 +175,17 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
       justifyContent: 'center',
       userSelect: 'none',
       outline: 'none',
-      WebkitTapHighlightColor: 'transparent',
-      backfaceVisibility: 'hidden',
-      transform: 'translateZ(0)'
+      WebkitTapHighlightColor: 'transparent'
     };
     if (!feedback) {
-      if (selected === option) return { ...base, borderColor: '#667eea', backgroundColor: '#EDE9FE', color: '#553C9A' };
+      if (selected === option) return { ...base, boxShadow: 'inset 0 0 0 2px #667eea', backgroundColor: '#EDE9FE', color: '#553C9A' };
       return base;
     }
     const oddOne = feedback.oddOne;
     const isOdd = option.toLowerCase().trim() === oddOne.toLowerCase().trim();
     const wasSelected = selected === option;
-    if (isOdd && feedback.correct) return { ...base, borderColor: '#48bb78', backgroundColor: '#f0fff4', color: '#276749', boxShadow: '0 0 0 3px rgba(72, 187, 120, 0.3)' };
-    if (isOdd && !feedback.correct) return { ...base, borderColor: '#48bb78', backgroundColor: '#f0fff4', color: '#276749', boxShadow: '0 0 0 3px rgba(72, 187, 120, 0.3)' };
-    if (wasSelected && !feedback.correct) return { ...base, borderColor: '#f56565', backgroundColor: '#fff5f5', color: '#c53030' };
+    if (isOdd) return { ...base, boxShadow: 'inset 0 0 0 2px #48bb78, 0 0 0 3px rgba(72, 187, 120, 0.3)', backgroundColor: '#f0fff4', color: '#276749' };
+    if (wasSelected && !feedback.correct) return { ...base, boxShadow: 'inset 0 0 0 2px #f56565', backgroundColor: '#fff5f5', color: '#c53030' };
     return { ...base, opacity: 0.5 };
   };
 
@@ -277,8 +275,8 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '1rem' }}>
                 {(Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]')).map((option, idx) => (
                   <div key={idx} className="ooo-option" tabIndex={-1} onClick={() => handleSelect(option)} style={getOptionStyle(option)}
-                    onMouseEnter={e => { if (!feedback) { e.currentTarget.style.borderColor = '#667eea'; e.currentTarget.style.transform = 'translateZ(0) translateY(-1px)'; } }}
-                    onMouseLeave={e => { if (!feedback && selected !== option) { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'translateZ(0)'; } }}
+                    onMouseEnter={e => { if (!feedback) { e.currentTarget.style.boxShadow = 'inset 0 0 0 2px #667eea'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
+                    onMouseLeave={e => { if (!feedback && selected !== option) { e.currentTarget.style.boxShadow = 'inset 0 0 0 2px #e2e8f0'; e.currentTarget.style.transform = 'none'; } }}
                   >{option}</div>
                 ))}
               </div>
