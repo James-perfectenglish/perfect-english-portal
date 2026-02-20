@@ -156,7 +156,9 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      userSelect: 'none'
+      userSelect: 'none',
+      outline: 'none',
+      WebkitTapHighlightColor: 'transparent'
     };
     if (!feedback) {
       if (selected === option) return { ...base, borderColor: '#667eea', backgroundColor: '#EDE9FE', color: '#553C9A' };
