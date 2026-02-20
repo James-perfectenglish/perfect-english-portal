@@ -1,12 +1,19 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 
-// Inject global CSS to kill browser focus outlines on option tiles
+// Inject global CSS to kill all browser outlines on option tiles
 const STYLE_ID = 'ooo-focus-fix';
 if (typeof document !== 'undefined' && !document.getElementById(STYLE_ID)) {
   const style = document.createElement('style');
   style.id = STYLE_ID;
-  style.textContent = '.ooo-option:focus, .ooo-option:focus-visible { outline: none !important; -webkit-tap-highlight-color: transparent; }';
+  style.textContent = `
+    .ooo-option, .ooo-option:focus, .ooo-option:focus-visible, .ooo-option:focus-within, 
+    .ooo-option:active, .ooo-option:visited, .ooo-option:target, .ooo-option * { 
+      outline: none !important; 
+      outline-width: 0 !important;
+      -webkit-tap-highlight-color: transparent !important; 
+    }
+  `;
   document.head.appendChild(style);
 }
 
@@ -167,7 +174,9 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
       justifyContent: 'center',
       userSelect: 'none',
       outline: 'none',
-      WebkitTapHighlightColor: 'transparent'
+      WebkitTapHighlightColor: 'transparent',
+      backfaceVisibility: 'hidden',
+      transform: 'translateZ(0)'
     };
     if (!feedback) {
       if (selected === option) return { ...base, borderColor: '#667eea', backgroundColor: '#EDE9FE', color: '#553C9A' };
@@ -267,9 +276,9 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '1rem' }}>
                 {(Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]')).map((option, idx) => (
-                  <div key={idx} className="ooo-option" onClick={() => handleSelect(option)} style={getOptionStyle(option)}
-                    onMouseEnter={e => { if (!feedback) { e.currentTarget.style.borderColor = '#667eea'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
-                    onMouseLeave={e => { if (!feedback && selected !== option) { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'none'; } }}
+                  <div key={idx} className="ooo-option" tabIndex={-1} onClick={() => handleSelect(option)} style={getOptionStyle(option)}
+                    onMouseEnter={e => { if (!feedback) { e.currentTarget.style.borderColor = '#667eea'; e.currentTarget.style.transform = 'translateZ(0) translateY(-1px)'; } }}
+                    onMouseLeave={e => { if (!feedback && selected !== option) { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'translateZ(0)'; } }}
                   >{option}</div>
                 ))}
               </div>
