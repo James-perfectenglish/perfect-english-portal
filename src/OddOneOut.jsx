@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 
+// Inject global CSS to kill browser focus outlines on option tiles
+const STYLE_ID = 'ooo-focus-fix';
+if (typeof document !== 'undefined' && !document.getElementById(STYLE_ID)) {
+  const style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = '.ooo-option:focus, .ooo-option:focus-visible { outline: none !important; -webkit-tap-highlight-color: transparent; }';
+  document.head.appendChild(style);
+}
+
 function shuffleArray(arr) {
   const shuffled = [...arr];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -258,7 +267,7 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '1rem' }}>
                 {(Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]')).map((option, idx) => (
-                  <div key={idx} onClick={() => handleSelect(option)} style={getOptionStyle(option)}
+                  <div key={idx} className="ooo-option" onClick={() => handleSelect(option)} style={getOptionStyle(option)}
                     onMouseEnter={e => { if (!feedback) { e.currentTarget.style.borderColor = '#667eea'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
                     onMouseLeave={e => { if (!feedback && selected !== option) { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'none'; } }}
                   >{option}</div>
