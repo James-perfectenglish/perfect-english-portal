@@ -12,6 +12,8 @@ import BorrasFlashcards from "./BorrasFlashcards"
 import BorrasMemoryGame from "./BorrasMemoryGame"
 import HotelFlashcards from "./HotelFlashcards"
 import HotelMemoryGame from "./HotelMemoryGame"
+import OddOneOut from "./OddOneOut"
+import ErrorCorrection from "./ErrorCorrection"
 
 function ExerciseList({ userLevel }) {
   const [exercises, setExercises] = useState([])
@@ -54,7 +56,9 @@ function ExerciseList({ userLevel }) {
       'Borrás Flashcards',
       'Borrás Memory Game',
       'Hotel Flashcards',
-      'Hotel Memory Game'
+      'Hotel Memory Game',
+      'Odd One Out',
+      'Error Correction'
     ]
     if (activeExercises.includes(exercise.title)) {
       setActiveExercise(exercise)
@@ -98,6 +102,12 @@ function ExerciseList({ userLevel }) {
     if (activeExercise.title === 'Hotel Memory Game') {
       return <HotelMemoryGame onBack={() => setActiveExercise(null)} />
     }
+    if (activeExercise.title === 'Odd One Out') {
+      return <OddOneOut onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
+    }
+    if (activeExercise.title === 'Error Correction') {
+      return <ErrorCorrection onComplete={() => setActiveExercise(null)} onBack={() => setActiveExercise(null)} />
+    }
   }
 
   if (loading) {
@@ -125,7 +135,9 @@ function ExerciseList({ userLevel }) {
     'Borrás Flashcards',
     'Borrás Memory Game',
     'Hotel Flashcards',
-    'Hotel Memory Game'
+    'Hotel Memory Game',
+    'Odd One Out',
+    'Error Correction'
   ]
 
   return (
