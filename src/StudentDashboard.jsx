@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
 const TRACK_CONFIG = {
-  general:  { label: 'General English',      emoji: '📚', description: 'Mixed vocabulary, grammar and skills across all areas',     color: '#667eea', topicFilter: null },
-  business: { label: 'Business English',     emoji: '💼', description: 'Professional communication and workplace vocabulary',        color: '#ed8936', topicFilter: 'business' },
-  hotels:   { label: 'Hotel English',        emoji: '🏨', description: 'Vocabulary and phrases for the hospitality industry',        color: '#48bb78', topicFilter: 'hotels' },
-  bathroom: { label: 'Bathroom & Interiors', emoji: '🚿', description: 'Product vocabulary for the Borrás showroom',                 color: '#4299e1', topicFilter: 'borras' },
-  exam:     { label: 'Exam Preparation',     emoji: '🎓', description: 'Targeted practice for English language exams',               color: '#9f7aea', topicFilter: 'exam' },
+  general:  { label: 'General English',      emoji: '📚', description: 'Mixed vocabulary, grammar and skills across all areas',  color: '#667eea', topicFilter: null },
+  business: { label: 'Business English',     emoji: '💼', description: 'Professional communication and workplace vocabulary',     color: '#ed8936', topicFilter: 'business' },
+  hotels:   { label: 'Hotel English',        emoji: '🏨', description: 'Vocabulary and phrases for the hospitality industry',     color: '#48bb78', topicFilter: 'hotels' },
+  bathroom: { label: 'Bathroom & Interiors', emoji: '🚿', description: 'Product vocabulary for the Borrás showroom',              color: '#4299e1', topicFilter: 'borras' },
+  exam:     { label: 'Exam Preparation',     emoji: '🎓', description: 'Targeted practice for English language exams',            color: '#9f7aea', topicFilter: 'exam' },
 }
 
 const TYPE_INFO = {
@@ -33,7 +33,6 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
   async function fetchDashboardData() {
     const userId = session.user.id
 
-    // Two clean separate queries — no FK join needed
     const [{ data: answers }, { data: attemptData }] = await Promise.all([
       supabase
         .from('student_answers')
@@ -41,9 +40,9 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         .eq('student_id', userId),
       supabase
         .from('student_attempts')
-        .select('score, created_at')
+        .select('score, completed_at')
         .eq('student_id', userId)
-        .order('created_at', { ascending: false })
+        .order('completed_at', { ascending: false })
         .limit(50)
     ])
 
@@ -53,7 +52,6 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
       const accuracy = Math.round((correct / total) * 100)
       setStats({ total, correct, accuracy })
 
-      // Look up question types separately using the question_ids we have
       const questionIds = [...new Set(answers.map(a => a.question_id).filter(Boolean))]
       if (questionIds.length > 0) {
         const { data: questions } = await supabase
@@ -87,7 +85,7 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
 
   const studentTracks = Array.isArray(profile.tracks) ? profile.tracks : []
   const lessonsPassed = attempts.filter(a => (a.score ?? 0) >= 70).length
-  const daysStudied   = new Set(attempts.map(a => new Date(a.created_at).toDateString())).size
+  const daysStudied   = new Set(attempts.map(a => new Date(a.completed_at).toDateString())).size
   const hasData       = stats && stats.total > 0
   const hasAttempts   = attempts.length > 0
 
