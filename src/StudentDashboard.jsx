@@ -18,17 +18,66 @@ const TYPE_INFO = {
   error_correction:  { label: 'Error Correction',  emoji: '🚨' },
 }
 
-// Convert a raw DB score to a 0-100 percentage.
-// RandomPracticeExercise saves raw correct count (e.g. 17) with total_questions in answers jsonb.
-// Named exercises may save a percentage directly — if score > 20 we assume it's already a %.
+// Map profile.level to the level group used in PracticePage
+const LEVEL_TO_GROUP = {
+  'A1': 'beginner', 'A2': 'beginner',
+  'B1': 'intermediate', 'B2': 'intermediate',
+  'C1': 'advanced', 'C2': 'advanced',
+}
+
 function toPercent(score, answers) {
   if (score === null || score === undefined) return 0
   const total = answers?.total_questions
   if (total && total > 0) return Math.round((score / total) * 100)
-  // Fallback: if score looks like a percentage already (>20), use as-is
   if (score > 20) return score
-  // Otherwise assume out of 20
   return Math.round((score / 20) * 100)
+}
+
+// Work out what to recommend next
+function getRecommendation(profile, attempts, studentTracks) {
+  // If they have tracks, recommend the first one
+  if (studentTracks.length > 0) {
+    const key   = studentTracks[0]
+    const track = TRACK_CONFIG[key]
+    if (track) {
+      return {
+        emoji: track.emoji,
+        title: track.label,
+        desc: attempts.length === 0
+          ? 'Start your first session on this track'
+          : 'Continue where you left off',
+        href: `/practice?track=${key}`,
+        color: track.color,
+        tag: 'Your track',
+      }
+    }
+  }
+
+  // If they have a level, recommend practice at that level
+  if (profile.level) {
+    const group = LEVEL_TO_GROUP[profile.level]
+    const levelLabel = profile.level
+    return {
+      emoji: '🎯',
+      title: `${levelLabel} Practice`,
+      desc: attempts.length === 0
+        ? `Start your first ${levelLabel} practice session`
+        : `Keep building on your ${levelLabel} progress`,
+      href: '/practice',
+      color: '#667eea',
+      tag: 'Your level',
+    }
+  }
+
+  // Fallback
+  return {
+    emoji: '🎲',
+    title: 'Random Practice',
+    desc: 'Mix of all question types and levels — a great place to start',
+    href: '/practice',
+    color: '#667eea',
+    tag: 'Suggested',
+  }
 }
 
 export default function StudentDashboard({ profile, session, handleLogout }) {
@@ -75,7 +124,6 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         if (questions) {
           const typeMap = {}
           questions.forEach(q => { typeMap[q.question_number] = q.type })
-
           const byType = {}
           answers.forEach(a => {
             const type = typeMap[a.question_id]
@@ -92,22 +140,22 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
     }
 
     if (attemptData) {
-      // Normalise all scores to percentages before storing in state
       const normalised = attemptData.map(a => ({
         ...a,
         scorePercent: toPercent(a.score, a.answers)
       }))
-      setAttempts([...normalised].reverse()) // chronological for chart
+      setAttempts([...normalised].reverse())
     }
 
     setLoading(false)
   }
 
-  const studentTracks = Array.isArray(profile.tracks) ? profile.tracks : []
-  const lessonsPassed = attempts.filter(a => a.scorePercent >= 70).length
-  const daysStudied   = new Set(attempts.map(a => new Date(a.completed_at).toDateString())).size
-  const hasData       = stats && stats.total > 0
-  const hasAttempts   = attempts.length > 0
+  const studentTracks  = Array.isArray(profile.tracks) ? profile.tracks : []
+  const lessonsPassed  = attempts.filter(a => a.scorePercent >= 70).length
+  const daysStudied    = new Set(attempts.map(a => new Date(a.completed_at).toDateString())).size
+  const hasData        = stats && stats.total > 0
+  const hasAttempts    = attempts.length > 0
+  const recommendation = getRecommendation(profile, attempts, studentTracks)
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '3rem', color: '#667eea' }}>Loading your dashboard...</div>
@@ -174,9 +222,15 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
       {/* QUICK START */}
       <Section
         title="🚀 Quick Start"
-        subtitle={studentTracks.length > 0 ? 'Or jump straight into general practice' : 'Where would you like to start?'}
+        subtitle="Jump straight into a session"
       >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+
+          {/* Recommended Next — always first */}
+          <Link to={recommendation.href} style={{ textDecoration: 'none' }}>
+            <RecommendedCard recommendation={recommendation} />
+          </Link>
+
           <Link to="/practice" style={{ textDecoration: 'none' }}>
             <QuickLinkCard emoji="🎯" title="Random Practice" desc="20 mixed questions covering all topics and types" color="#667eea" />
           </Link>
@@ -226,6 +280,42 @@ function Section({ title, subtitle, children }) {
   )
 }
 
+function RecommendedCard({ recommendation: r }) {
+  return (
+    <div
+      style={{
+        background: `linear-gradient(135deg, ${r.color}18, ${r.color}08)`,
+        border: `2px solid ${r.color}50`,
+        borderRadius: '12px',
+        padding: '1rem',
+        cursor: 'pointer',
+        height: '100%',
+        boxSizing: 'border-box',
+        position: 'relative',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 8px 20px ${r.color}25` }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}
+    >
+      {/* Tag */}
+      <div style={{
+        position: 'absolute', top: '0.75rem', right: '0.75rem',
+        fontSize: '0.62rem', fontWeight: '700', letterSpacing: '0.5px',
+        textTransform: 'uppercase', color: r.color,
+        backgroundColor: `${r.color}18`, padding: '2px 7px', borderRadius: '99px',
+      }}>
+        ⭐ {r.tag}
+      </div>
+      <div style={{ fontSize: '1.75rem', marginBottom: '0.35rem' }}>{r.emoji}</div>
+      <div style={{ fontWeight: '700', color: '#2C3E50', fontSize: '0.95rem', marginBottom: '0.2rem', paddingRight: '3rem' }}>
+        {r.title}
+      </div>
+      <div style={{ fontSize: '0.76rem', color: '#718096', lineHeight: '1.4', marginBottom: '0.6rem' }}>{r.desc}</div>
+      <div style={{ fontSize: '0.78rem', fontWeight: '600', color: r.color }}>Start now →</div>
+    </div>
+  )
+}
+
 function ScoreTrendChart({ attempts }) {
   const recent = attempts.slice(-10)
   return (
@@ -235,13 +325,7 @@ function ScoreTrendChart({ attempts }) {
           const pct   = a.scorePercent ?? 0
           const barH  = Math.max(4, (pct / 100) * 90)
           const color = pct >= 70 ? '#48bb78' : pct >= 50 ? '#ed8936' : '#fc8181'
-          return (
-            <div
-              key={i}
-              title={`Session ${i + 1}: ${pct}%`}
-              style={{ flex: 1, height: `${barH}px`, backgroundColor: color, borderRadius: '4px 4px 0 0', minWidth: '8px' }}
-            />
-          )
+          return <div key={i} title={`Session ${i + 1}: ${pct}%`} style={{ flex: 1, height: `${barH}px`, backgroundColor: color, borderRadius: '4px 4px 0 0', minWidth: '8px' }} />
         })}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', borderTop: '1px solid #e2e8f0', paddingTop: '4px' }}>
