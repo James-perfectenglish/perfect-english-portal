@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
 // ─── TRACK DEFINITIONS ────────────────────────────────────────────────────────
-// Add new tracks here. The key must match what you store in profiles.tracks[]
-// topicFilter: null = all topics (no filter), otherwise must match question_bank.topic values
 const TRACK_CONFIG = {
   general: {
     label: 'General English',
@@ -45,19 +43,19 @@ const TRACK_CONFIG = {
 
 // ─── QUESTION TYPE DISPLAY INFO ───────────────────────────────────────────────
 const TYPE_INFO = {
-  gap_fill:          { label: 'Gap Fill',           emoji: '✏️', color: '#d69e2e' },
-  multiple_choice:   { label: 'Multiple Choice',    emoji: '📝', color: '#38a169' },
-  sentence_building: { label: 'Sentence Building',  emoji: '🧩', color: '#667eea' },
-  odd_one_out:       { label: 'Odd One Out',         emoji: '🔍', color: '#3182ce' },
-  error_correction:  { label: 'Error Correction',   emoji: '🚨', color: '#e53e3e' },
+  gap_fill:          { label: 'Gap Fill',          emoji: '✏️', color: '#d69e2e' },
+  multiple_choice:   { label: 'Multiple Choice',   emoji: '📝', color: '#38a169' },
+  sentence_building: { label: 'Sentence Building', emoji: '🧩', color: '#667eea' },
+  odd_one_out:       { label: 'Odd One Out',        emoji: '🔍', color: '#3182ce' },
+  error_correction:  { label: 'Error Correction',  emoji: '🚨', color: '#e53e3e' },
 }
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function StudentDashboard({ profile, session, handleLogout }) {
-  const [stats, setStats]             = useState(null)
-  const [attempts, setAttempts]       = useState([])
+  const [stats, setStats]                 = useState(null)
+  const [attempts, setAttempts]           = useState([])
   const [typeBreakdown, setTypeBreakdown] = useState({})
-  const [loading, setLoading]         = useState(true)
+  const [loading, setLoading]             = useState(true)
 
   const firstName = profile.full_name?.split(' ')[0] || 'there'
   const hour      = new Date().getHours()
@@ -70,26 +68,25 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
   async function fetchDashboardData() {
     const userId = session.user.id
 
-    // All answers for this student — join question_bank to get type
+    // All answers for this student across every exercise type
     const { data: answers } = await supabase
       .from('student_answers')
       .select('is_correct, question_bank(type)')
-      .eq('user_id', userId)
+      .eq('student_id', userId)
 
-    // Recent practice sessions for score trend + average
+    // All practice sessions (random practice + named exercises) for trend + stats
     const { data: attemptData } = await supabase
       .from('student_attempts')
       .select('score, created_at')
-      .eq('user_id', userId)
+      .eq('student_id', userId)
       .order('created_at', { ascending: false })
-      .limit(20)
+      .limit(50)
 
     if (answers && answers.length > 0) {
-      const total   = answers.length
-      const correct = answers.filter(a => a.is_correct).length
+      const total    = answers.length
+      const correct  = answers.filter(a => a.is_correct).length
       const accuracy = Math.round((correct / total) * 100)
 
-      // Group accuracy by question type
       const byType = {}
       answers.forEach(a => {
         const type = a.question_bank?.type
@@ -106,16 +103,22 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
     }
 
     if (attemptData) {
-      setAttempts([...attemptData].reverse()) // chronological for chart
+      setAttempts([...attemptData].reverse())
     }
 
     setLoading(false)
   }
 
   const studentTracks = Array.isArray(profile.tracks) ? profile.tracks : []
-  const avgScore = attempts.length > 0
-    ? Math.round(attempts.reduce((sum, a) => sum + (a.score ?? 0), 0) / attempts.length)
-    : null
+
+  const lessonsPassed = attempts.filter(a => (a.score ?? 0) >= 70).length
+
+  const daysStudied = new Set(
+    attempts.map(a => new Date(a.created_at).toDateString())
+  ).size
+
+  const hasData     = stats && stats.total > 0
+  const hasAttempts = attempts.length > 0
 
   if (loading) {
     return (
@@ -125,12 +128,9 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
     )
   }
 
-  const hasData = stats && stats.total > 0
-
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: '1.25rem 1rem 4rem' }}>
 
-      {/* ── GREETING ── */}
       <div style={{ marginBottom: '1.5rem' }}>
         <h1 style={{ fontSize: 'clamp(1.4rem, 4vw, 2rem)', color: '#2C3E50', margin: '0 0 0.3rem' }}>
           {greeting}, {firstName}! 👋
@@ -142,47 +142,24 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         </p>
       </div>
 
-      {/* ── STAT CARDS ── */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
         gap: '0.75rem',
         marginBottom: '1rem',
       }}>
-        <StatCard
-          emoji="📊"
-          label="Questions Answered"
-          value={hasData ? stats.total.toLocaleString() : '—'}
-          color="#667eea"
-        />
-        <StatCard
-          emoji="🎯"
-          label="Overall Accuracy"
-          value={hasData ? `${stats.accuracy}%` : '—'}
-          color={hasData ? (stats.accuracy >= 70 ? '#48bb78' : stats.accuracy >= 50 ? '#ed8936' : '#fc8181') : '#667eea'}
-        />
-        <StatCard
-          emoji="🏆"
-          label="Avg Session Score"
-          value={avgScore !== null ? `${avgScore}%` : '—'}
-          color={avgScore !== null ? (avgScore >= 70 ? '#48bb78' : avgScore >= 50 ? '#ed8936' : '#fc8181') : '#667eea'}
-        />
-        <StatCard
-          emoji="📅"
-          label="Sessions Completed"
-          value={attempts.length > 0 ? attempts.length : '—'}
-          color="#9f7aea"
-        />
+        <StatCard emoji="📊" label="Questions Answered" value={hasData     ? stats.total.toLocaleString() : '—'} />
+        <StatCard emoji="🎯" label="Overall Accuracy"   value={hasData     ? `${stats.accuracy}%`          : '—'} />
+        <StatCard emoji="🏆" label="Lessons Passed"     value={hasAttempts ? lessonsPassed                  : '—'} />
+        <StatCard emoji="📅" label="Days Studied"       value={hasAttempts ? daysStudied                    : '—'} />
       </div>
 
-      {/* ── SCORE TREND ── */}
       {attempts.length > 1 && (
         <Section title="📈 Score Trend" subtitle={`Your last ${Math.min(attempts.length, 10)} sessions`}>
           <ScoreTrendChart attempts={attempts} />
         </Section>
       )}
 
-      {/* ── STRENGTHS & WEAKNESSES ── */}
       {Object.keys(typeBreakdown).length > 0 && (
         <Section title="💪 Strengths & Weaknesses" subtitle="Accuracy by question type">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
@@ -197,7 +174,6 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         </Section>
       )}
 
-      {/* ── MY TRACKS ── */}
       {studentTracks.length > 0 && (
         <Section title="🗺️ My Tracks" subtitle="Your personalised learning paths — click to start a focused practice session">
           <div style={{
@@ -214,7 +190,6 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         </Section>
       )}
 
-      {/* ── QUICK START ── */}
       <Section
         title="🚀 Quick Start"
         subtitle={studentTracks.length > 0 ? 'Or jump straight into general practice' : 'Where would you like to start?'}
@@ -243,7 +218,6 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         </div>
       </Section>
 
-      {/* ── FOOTER: LEVEL + LOGOUT ── */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -259,32 +233,31 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         <button
           onClick={handleLogout}
           style={{
-            padding: '0.4rem 1.1rem',
-            backgroundColor: 'transparent',
-            color: '#a0aec0',
-            border: '1px solid #e2e8f0',
+            padding: '0.5rem 1.25rem',
+            backgroundColor: '#f44336',
+            color: 'white',
+            border: 'none',
             cursor: 'pointer',
             borderRadius: '6px',
-            fontSize: '0.85rem',
+            fontSize: '0.875rem',
+            fontWeight: '500',
           }}
         >
-          Log out
+          Logout
         </button>
       </div>
     </div>
   )
 }
 
-// ─── SUB-COMPONENTS ──────────────────────────────────────────────────────────
-
-function StatCard({ emoji, label, value, color }) {
+function StatCard({ emoji, label, value }) {
   return (
     <div style={{
       background: 'white',
       borderRadius: '12px',
       padding: '1rem',
       boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      borderTop: `3px solid ${color}`,
+      borderTop: '3px solid #667eea',
       textAlign: 'center',
     }}>
       <div style={{ fontSize: '1.4rem', marginBottom: '0.2rem' }}>{emoji}</div>
@@ -327,10 +300,8 @@ function Section({ title, subtitle, children }) {
 
 function ScoreTrendChart({ attempts }) {
   const recent = attempts.slice(-10)
-
   return (
     <div>
-      {/* Bar chart */}
       <div style={{
         display: 'flex',
         alignItems: 'flex-end',
@@ -358,8 +329,6 @@ function ScoreTrendChart({ attempts }) {
           )
         })}
       </div>
-
-      {/* X-axis labels */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -370,8 +339,6 @@ function ScoreTrendChart({ attempts }) {
         <span style={{ fontSize: '0.68rem', color: '#a0aec0' }}>Older</span>
         <span style={{ fontSize: '0.68rem', color: '#a0aec0' }}>Most recent</span>
       </div>
-
-      {/* Legend */}
       <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
         {[['#48bb78', '70%+ (Pass)'], ['#ed8936', '50–69%'], ['#fc8181', 'Below 50%']].map(([c, l]) => (
           <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -403,18 +370,8 @@ function TypeBar({ info, pct, total }) {
             </span>
           </span>
         </div>
-        <div style={{
-          background: '#edf2f7',
-          borderRadius: '99px',
-          height: '7px',
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            width: `${pct}%`,
-            height: '100%',
-            backgroundColor: barColor,
-            borderRadius: '99px',
-          }} />
+        <div style={{ background: '#edf2f7', borderRadius: '99px', height: '7px', overflow: 'hidden' }}>
+          <div style={{ width: `${pct}%`, height: '100%', backgroundColor: barColor, borderRadius: '99px' }} />
         </div>
       </div>
     </div>
@@ -422,8 +379,6 @@ function TypeBar({ info, pct, total }) {
 }
 
 function TrackCard({ trackKey, track }) {
-  // Links to /practice with a ?track= param
-  // PracticePage will need updating to read this and pass topicFilter to RandomPracticeExercise
   return (
     <Link to={`/practice?track=${trackKey}`} style={{ textDecoration: 'none' }}>
       <div
@@ -435,6 +390,7 @@ function TrackCard({ trackKey, track }) {
           cursor: 'pointer',
           height: '100%',
           boxSizing: 'border-box',
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
         }}
         onMouseEnter={e => {
           e.currentTarget.style.transform = 'translateY(-2px)'
@@ -465,18 +421,23 @@ function QuickLinkCard({ emoji, title, desc, color }) {
     <div
       style={{
         background: `${color}0f`,
-        border: `2px solid ${color}28`,
+        border: `2px solid ${color}40`,
         borderRadius: '12px',
         padding: '1rem',
         cursor: 'pointer',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease',
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.transform = 'translateY(-2px)'
-        e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.08)'
+        e.currentTarget.style.transform = 'translateY(-3px)'
+        e.currentTarget.style.boxShadow = `0 8px 20px ${color}30`
+        e.currentTarget.style.background = `${color}1a`
+        e.currentTarget.style.borderColor = `${color}90`
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = 'none'
         e.currentTarget.style.boxShadow = 'none'
+        e.currentTarget.style.background = `${color}0f`
+        e.currentTarget.style.borderColor = `${color}40`
       }}
     >
       <div style={{ fontSize: '1.75rem', marginBottom: '0.35rem' }}>{emoji}</div>
