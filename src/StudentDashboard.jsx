@@ -18,6 +18,19 @@ const TYPE_INFO = {
   error_correction:  { label: 'Error Correction',  emoji: '🚨' },
 }
 
+// Convert a raw DB score to a 0-100 percentage.
+// RandomPracticeExercise saves raw correct count (e.g. 17) with total_questions in answers jsonb.
+// Named exercises may save a percentage directly — if score > 20 we assume it's already a %.
+function toPercent(score, answers) {
+  if (score === null || score === undefined) return 0
+  const total = answers?.total_questions
+  if (total && total > 0) return Math.round((score / total) * 100)
+  // Fallback: if score looks like a percentage already (>20), use as-is
+  if (score > 20) return score
+  // Otherwise assume out of 20
+  return Math.round((score / 20) * 100)
+}
+
 export default function StudentDashboard({ profile, session, handleLogout }) {
   const [stats, setStats]                 = useState(null)
   const [attempts, setAttempts]           = useState([])
@@ -40,7 +53,7 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         .eq('student_id', userId),
       supabase
         .from('student_attempts')
-        .select('score, completed_at')
+        .select('score, completed_at, answers')
         .eq('student_id', userId)
         .order('completed_at', { ascending: false })
         .limit(50)
@@ -78,13 +91,20 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
       setStats({ total: 0, correct: 0, accuracy: 0 })
     }
 
-    if (attemptData) setAttempts([...attemptData].reverse())
+    if (attemptData) {
+      // Normalise all scores to percentages before storing in state
+      const normalised = attemptData.map(a => ({
+        ...a,
+        scorePercent: toPercent(a.score, a.answers)
+      }))
+      setAttempts([...normalised].reverse()) // chronological for chart
+    }
 
     setLoading(false)
   }
 
   const studentTracks = Array.isArray(profile.tracks) ? profile.tracks : []
-  const lessonsPassed = attempts.filter(a => (a.score ?? 0) >= 70).length
+  const lessonsPassed = attempts.filter(a => a.scorePercent >= 70).length
   const daysStudied   = new Set(attempts.map(a => new Date(a.completed_at).toDateString())).size
   const hasData       = stats && stats.total > 0
   const hasAttempts   = attempts.length > 0
@@ -212,10 +232,16 @@ function ScoreTrendChart({ attempts }) {
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '90px', padding: '0 2px' }}>
         {recent.map((a, i) => {
-          const pct   = a.score ?? 0
+          const pct   = a.scorePercent ?? 0
           const barH  = Math.max(4, (pct / 100) * 90)
           const color = pct >= 70 ? '#48bb78' : pct >= 50 ? '#ed8936' : '#fc8181'
-          return <div key={i} title={`Session ${i + 1}: ${pct}%`} style={{ flex: 1, height: `${barH}px`, backgroundColor: color, borderRadius: '4px 4px 0 0', minWidth: '8px' }} />
+          return (
+            <div
+              key={i}
+              title={`Session ${i + 1}: ${pct}%`}
+              style={{ flex: 1, height: `${barH}px`, backgroundColor: color, borderRadius: '4px 4px 0 0', minWidth: '8px' }}
+            />
+          )
         })}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', borderTop: '1px solid #e2e8f0', paddingTop: '4px' }}>
