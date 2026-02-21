@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
 const TRACK_CONFIG = {
-  general:  { label: 'General English',      emoji: '📚', description: 'Mixed vocabulary, grammar and skills across all areas',  color: '#667eea', topicFilter: null },
-  business: { label: 'Business English',     emoji: '💼', description: 'Professional communication and workplace vocabulary',     color: '#ed8936', topicFilter: 'business' },
-  hotels:   { label: 'Hotel English',        emoji: '🏨', description: 'Vocabulary and phrases for the hospitality industry',     color: '#48bb78', topicFilter: 'hotels' },
-  bathroom: { label: 'Bathroom & Interiors', emoji: '🚿', description: 'Product vocabulary for the Borrás showroom',              color: '#4299e1', topicFilter: 'borras' },
-  exam:     { label: 'Exam Preparation',     emoji: '🎓', description: 'Targeted practice for English language exams',            color: '#9f7aea', topicFilter: 'exam' },
+  general:  { label: 'General English',      emoji: '📚', description: 'Mixed vocabulary, grammar and skills across all areas',        color: '#667eea', topicFilter: null },
+  business: { label: 'Business English',     emoji: '💼', description: 'Professional communication and workplace vocabulary',           color: '#ed8936', topicFilter: 'business' },
+  hotels:   { label: 'Hotel English',        emoji: '🏨', description: 'Vocabulary and phrases for the hospitality industry',           color: '#48bb78', topicFilter: 'hotels' },
+  bathroom: { label: 'Bathroom & Interiors', emoji: '🚿', description: 'Product vocabulary for the Borrás showroom',                    color: '#4299e1', topicFilter: 'borras' },
+  exam:     { label: 'Exam Preparation',     emoji: '🎓', description: 'Targeted practice for English language exams',                  color: '#9f7aea', topicFilter: 'exam' },
+  spanish:  { label: 'Spanish Practice',     emoji: '🇪🇸', description: 'English practice with Spanish — ideal for A2 towards B1',     color: '#e53e3e', topicFilter: 'spanish' },
 }
 
 const TYPE_INFO = {
@@ -18,7 +19,6 @@ const TYPE_INFO = {
   error_correction:  { label: 'Error Correction',  emoji: '🚨' },
 }
 
-// Map profile.level to the level group used in PracticePage
 const LEVEL_TO_GROUP = {
   'A1': 'beginner', 'A2': 'beginner',
   'B1': 'intermediate', 'B2': 'intermediate',
@@ -33,9 +33,7 @@ function toPercent(score, answers) {
   return Math.round((score / 20) * 100)
 }
 
-// Work out what to recommend next
 function getRecommendation(profile, attempts, studentTracks) {
-  // If they have tracks, recommend the first one
   if (studentTracks.length > 0) {
     const key   = studentTracks[0]
     const track = TRACK_CONFIG[key]
@@ -48,14 +46,12 @@ function getRecommendation(profile, attempts, studentTracks) {
           : 'Continue where you left off',
         href: `/practice?track=${key}`,
         color: track.color,
-        tag: 'Your track',
+        tag: 'Recommended: your track',
       }
     }
   }
 
-  // If they have a level, recommend practice at that level
   if (profile.level) {
-    const group = LEVEL_TO_GROUP[profile.level]
     const levelLabel = profile.level
     return {
       emoji: '🎯',
@@ -65,18 +61,17 @@ function getRecommendation(profile, attempts, studentTracks) {
         : `Keep building on your ${levelLabel} progress`,
       href: '/practice',
       color: '#667eea',
-      tag: 'Your level',
+      tag: 'Recommended: your level',
     }
   }
 
-  // Fallback
   return {
     emoji: '🎲',
     title: 'Random Practice',
     desc: 'Mix of all question types and levels — a great place to start',
     href: '/practice',
     color: '#667eea',
-    tag: 'Suggested',
+    tag: 'Recommended',
   }
 }
 
@@ -220,17 +215,11 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
       )}
 
       {/* QUICK START */}
-      <Section
-        title="🚀 Quick Start"
-        subtitle="Jump straight into a session"
-      >
+      <Section title="🚀 Quick Start" subtitle="Jump straight into a session">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
-
-          {/* Recommended Next — always first */}
           <Link to={recommendation.href} style={{ textDecoration: 'none' }}>
             <RecommendedCard recommendation={recommendation} />
           </Link>
-
           <Link to="/practice" style={{ textDecoration: 'none' }}>
             <QuickLinkCard emoji="🎯" title="Random Practice" desc="20 mixed questions covering all topics and types" color="#667eea" />
           </Link>
@@ -297,19 +286,16 @@ function RecommendedCard({ recommendation: r }) {
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 8px 20px ${r.color}25` }}
       onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}
     >
-      {/* Tag */}
       <div style={{
         position: 'absolute', top: '0.75rem', right: '0.75rem',
-        fontSize: '0.62rem', fontWeight: '700', letterSpacing: '0.5px',
+        fontSize: '0.62rem', fontWeight: '700', letterSpacing: '0.4px',
         textTransform: 'uppercase', color: r.color,
         backgroundColor: `${r.color}18`, padding: '2px 7px', borderRadius: '99px',
       }}>
         ⭐ {r.tag}
       </div>
       <div style={{ fontSize: '1.75rem', marginBottom: '0.35rem' }}>{r.emoji}</div>
-      <div style={{ fontWeight: '700', color: '#2C3E50', fontSize: '0.95rem', marginBottom: '0.2rem', paddingRight: '3rem' }}>
-        {r.title}
-      </div>
+      <div style={{ fontWeight: '700', color: '#2C3E50', fontSize: '0.95rem', marginBottom: '0.2rem', paddingRight: '3rem' }}>{r.title}</div>
       <div style={{ fontSize: '0.76rem', color: '#718096', lineHeight: '1.4', marginBottom: '0.6rem' }}>{r.desc}</div>
       <div style={{ fontSize: '0.78rem', fontWeight: '600', color: r.color }}>Start now →</div>
     </div>
