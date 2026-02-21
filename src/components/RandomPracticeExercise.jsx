@@ -2,6 +2,16 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import SentenceBuildingInput from './SentenceBuildingInput';
 
+// ── Question mix per round (easy to tweak!) ──
+const QUESTION_MIX = {
+  gap_fill: 3,
+  multiple_choice: 7,
+  sentence_building: 4,
+  odd_one_out: 3,
+  error_correction: 3,
+  // Total: 20
+};
+
 // Inject CSS for focus fix on OOO and EC tiles
 const RP_STYLE_ID = 'rp-focus-fix';
 if (typeof document !== 'undefined' && !document.getElementById(RP_STYLE_ID)) {
@@ -15,6 +25,16 @@ if (typeof document !== 'undefined' && !document.getElementById(RP_STYLE_ID)) {
     }
   `;
   document.head.appendChild(style);
+}
+
+// Proper Fisher-Yates shuffle — gives truly random order
+function shuffleArray(arr) {
+  const shuffled = [...arr];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 const normaliseEC = (s) => s.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -69,7 +89,12 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       if (attempts && attempts.length > 0) {
         const levelKey = getLevelKey();
         const myAttempts = attempts.filter(a => a.answers && a.answers.practice_type === 'random_practice' && a.answers.levels === levelKey);
-        setScoreHistory(myAttempts.map(a => a.score));
+        const scores = myAttempts.map(a => a.score);
+        setScoreHistory(scores);
+        if (scores.length > 0) {
+          setBestScore(Math.max(...scores));
+          setAverageScore(Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10);
+        }
       }
     } catch (error) { console.error('Error loading score history:', error); }
   };
@@ -134,21 +159,22 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       if (gfRes.error || mcRes.error || sbRes.error || oooRes.error || ecRes.error)
         throw gfRes.error || mcRes.error || sbRes.error || oooRes.error || ecRes.error;
 
-      const shuffle = (arr) => (arr || []).sort(() => Math.random() - 0.5);
-      const shuffledGF = shuffle(gfRes.data).slice(0, 3);
-      const shuffledMC = shuffle(mcRes.data).slice(0, 7);
-      const shuffledSB = shuffle(sbRes.data).slice(0, 4);
-      const shuffledOOO = shuffle(oooRes.data).slice(0, 3);
-      const shuffledEC = shuffle(ecRes.data).slice(0, 3);
+      const pick = (data, type) => shuffleArray(data || []).slice(0, QUESTION_MIX[type] || 0);
 
-      const allQuestions = [...shuffledGF, ...shuffledMC, ...shuffledSB, ...shuffledOOO, ...shuffledEC].sort(() => Math.random() - 0.5);
+      const allQuestions = shuffleArray([
+        ...pick(gfRes.data, 'gap_fill'),
+        ...pick(mcRes.data, 'multiple_choice'),
+        ...pick(sbRes.data, 'sentence_building'),
+        ...pick(oooRes.data, 'odd_one_out'),
+        ...pick(ecRes.data, 'error_correction')
+      ]);
 
       if (allQuestions.length === 0) { alert('No questions available for this level yet. Check back soon!'); setLoading(false); return; }
 
       setQuestions(allQuestions); setStage('playing'); setCurrentQuestionIndex(0); setScore(0);
       setFeedback(null); setSbFeedback(null); setUserAnswer(''); setSelectedOption(null);
       setOooSelected(null); setEcSelectedWordIndex(null); setEcCorrection('');
-      setShowHint(false); setBestScore(null); setAverageScore(null);
+      setShowHint(false);
     } catch (error) { console.error('Error fetching questions:', error); alert('Failed to load questions. Please try again.'); }
     finally { setLoading(false); }
   };
