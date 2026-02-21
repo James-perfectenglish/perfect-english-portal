@@ -102,27 +102,50 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     } catch (error) { console.error('Error loading score history:', error); }
   };
 
-  useEffect(() => { if (stage === 'finished') saveAttemptAndUpdateHistory(); }, [stage]);
+  // No useEffect on stage — we compute everything BEFORE showing the finished screen
 
-  const saveAttemptAndUpdateHistory = async () => {
+  const finishExercise = async () => {
+    // Show a brief loading state
+    setStage('saving');
     const currentScore = scoreRef.current;
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { updateScoreDisplay([...scoreHistory, currentScore]); return; }
+      if (!user) {
+        updateScoreDisplay([...scoreHistory, currentScore]);
+        setStage('finished');
+        return;
+      }
       const levelKey = getLevelKey();
+      // Save this attempt
       const { error: insertError } = await supabase.from('student_attempts').insert({
         student_id: user.id, exercise_id: null, score: currentScore,
         answers: { practice_type: 'random_practice', levels: levelKey, total_questions: questions.length }
       });
       if (insertError) console.error('Error saving attempt:', insertError);
+      // Fetch ALL attempts for this level
       const { data: attempts, error: fetchError } = await supabase.from('student_attempts').select('score, answers').eq('student_id', user.id).is('exercise_id', null);
-      if (fetchError) { console.error('Error fetching attempts:', fetchError); updateScoreDisplay([...scoreHistory, currentScore]); return; }
+      if (fetchError) {
+        console.error('Error fetching attempts:', fetchError);
+        updateScoreDisplay([...scoreHistory, currentScore]);
+        setStage('finished');
+        return;
+      }
       if (attempts && attempts.length > 0) {
         const myAttempts = attempts.filter(a => a.answers && a.answers.practice_type === 'random_practice' && a.answers.levels === levelKey);
-        if (myAttempts.length > 0) { const scores = myAttempts.map(a => a.score); updateScoreDisplay(scores); setScoreHistory(scores); return; }
+        if (myAttempts.length > 0) {
+          const scores = myAttempts.map(a => a.score);
+          updateScoreDisplay(scores);
+          setScoreHistory(scores);
+          setStage('finished');
+          return;
+        }
       }
       updateScoreDisplay([...scoreHistory, currentScore]);
-    } catch (error) { console.error('Error in save/fetch:', error); updateScoreDisplay([...scoreHistory, currentScore]); }
+    } catch (error) {
+      console.error('Error in save/fetch:', error);
+      updateScoreDisplay([...scoreHistory, currentScore]);
+    }
+    setStage('finished');
   };
 
   const updateScoreDisplay = (scores) => {
@@ -286,7 +309,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setUserAnswer(''); setSelectedOption(null); setFeedback(null); setSbFeedback(null);
       setOooSelected(null); setEcSelectedWordIndex(null); setEcCorrection(''); setShowHint(false);
-    } else { setStage('finished'); }
+    } else { finishExercise(); }
   };
 
   const retry = () => { startExercise(); };
@@ -509,6 +532,16 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   <button onClick={nextQuestion} style={{ padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)', backgroundColor: '#3498DB', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', width: '100%', fontWeight: '600' }}>{currentQuestionIndex < questions.length - 1 ? 'Next Question →' : 'Finish'}</button>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* SAVING SCREEN — brief loading while we fetch history */}
+        {stage === 'saving' && (
+          <div style={{ width: '100%', maxWidth: '600px', margin: '4rem auto 0', textAlign: 'center' }}>
+            <div style={{ backgroundColor: 'white', padding: '3rem', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📊</div>
+              <div style={{ fontSize: '1.2rem', color: '#2C3E50', fontWeight: '600' }}>Calculating your results...</div>
             </div>
           </div>
         )}
