@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import SentenceBuildingInput from './SentenceBuildingInput';
 
@@ -57,6 +57,9 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const [selectedOption, setSelectedOption] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [score, setScore] = useState(0);
+  const scoreRef = useRef(0);
+  // Keep ref in sync so effects always see current score
+  useEffect(() => { scoreRef.current = score; }, [score]);
   const [showHint, setShowHint] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sbFeedback, setSbFeedback] = useState(null);
@@ -102,23 +105,24 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   useEffect(() => { if (stage === 'finished') saveAttemptAndUpdateHistory(); }, [stage]);
 
   const saveAttemptAndUpdateHistory = async () => {
+    const currentScore = scoreRef.current;
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { updateScoreDisplay([...scoreHistory, score]); return; }
+      if (!user) { updateScoreDisplay([...scoreHistory, currentScore]); return; }
       const levelKey = getLevelKey();
       const { error: insertError } = await supabase.from('student_attempts').insert({
-        student_id: user.id, exercise_id: null, score: score,
+        student_id: user.id, exercise_id: null, score: currentScore,
         answers: { practice_type: 'random_practice', levels: levelKey, total_questions: questions.length }
       });
       if (insertError) console.error('Error saving attempt:', insertError);
       const { data: attempts, error: fetchError } = await supabase.from('student_attempts').select('score, answers').eq('student_id', user.id).is('exercise_id', null);
-      if (fetchError) { console.error('Error fetching attempts:', fetchError); updateScoreDisplay([...scoreHistory, score]); return; }
+      if (fetchError) { console.error('Error fetching attempts:', fetchError); updateScoreDisplay([...scoreHistory, currentScore]); return; }
       if (attempts && attempts.length > 0) {
         const myAttempts = attempts.filter(a => a.answers && a.answers.practice_type === 'random_practice' && a.answers.levels === levelKey);
         if (myAttempts.length > 0) { const scores = myAttempts.map(a => a.score); updateScoreDisplay(scores); setScoreHistory(scores); return; }
       }
-      updateScoreDisplay([...scoreHistory, score]);
-    } catch (error) { console.error('Error in save/fetch:', error); updateScoreDisplay([...scoreHistory, score]); }
+      updateScoreDisplay([...scoreHistory, currentScore]);
+    } catch (error) { console.error('Error in save/fetch:', error); updateScoreDisplay([...scoreHistory, currentScore]); }
   };
 
   const updateScoreDisplay = (scores) => {
@@ -374,10 +378,10 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 {currentQuestion.type !== 'sentence_building' && (
                   <div style={{
                     padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
-                    backgroundColor: currentQuestion.type === 'gap_fill' ? '#fff3cd' : currentQuestion.type === 'odd_one_out' ? '#E0F2FE' : currentQuestion.type === 'error_correction' ? '#FEF3C7' : '#d4edda',
-                    color: currentQuestion.type === 'gap_fill' ? '#856404' : currentQuestion.type === 'odd_one_out' ? '#0369A1' : currentQuestion.type === 'error_correction' ? '#92400E' : '#155724'
+                    backgroundColor: currentQuestion.type === 'gap_fill' ? '#fff3cd' : currentQuestion.type === 'odd_one_out' ? '#E0F2FE' : currentQuestion.type === 'error_correction' ? '#FEE2E2' : '#d4edda',
+                    color: currentQuestion.type === 'gap_fill' ? '#856404' : currentQuestion.type === 'odd_one_out' ? '#0369A1' : currentQuestion.type === 'error_correction' ? '#DC2626' : '#155724'
                   }}>
-                    {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill' : currentQuestion.type === 'odd_one_out' ? '🔍 Odd One Out' : currentQuestion.type === 'error_correction' ? '✏️ Error Correction' : '📝 Multiple Choice'}
+                    {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill' : currentQuestion.type === 'odd_one_out' ? '🔍 Odd One Out' : currentQuestion.type === 'error_correction' ? '🚨 Error Correction' : '📝 Multiple Choice'}
                   </div>
                 )}
                 {currentQuestion.level && (
