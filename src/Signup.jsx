@@ -7,9 +7,17 @@ function Signup() {
   const [fullName, setFullName] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [honeypot, setHoneypot] = useState('') // never shown to real users
 
   const handleSignup = async (e) => {
     e.preventDefault()
+
+    // If this field has anything in it, it's a bot — silently do nothing
+    if (honeypot) {
+      setMessage('Success! Please check your email to confirm your account.')
+      return
+    }
+
     setLoading(true)
     setMessage('')
 
@@ -67,6 +75,18 @@ function Signup() {
             required
             minLength="6"
             style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+          />
+        </div>
+
+        {/* Honeypot — hidden from real users, bots fill it in automatically */}
+        <div style={{ display: 'none' }} aria-hidden="true">
+          <label>Website:</label>
+          <input
+            type="text"
+            value={honeypot}
+            onChange={(e) => setHoneypot(e.target.value)}
+            tabIndex="-1"
+            autoComplete="off"
           />
         </div>
 
