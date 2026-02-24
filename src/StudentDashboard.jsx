@@ -66,9 +66,10 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
   const [stats, setStats]                 = useState(null)
   const [attempts, setAttempts]           = useState([])
   const [typeBreakdown, setTypeBreakdown] = useState({})
-  const [lessonsPassed, setLessonsPassed] = useState(0)
-  const [daysStudied, setDaysStudied]     = useState(0)
-  const [loading, setLoading]             = useState(true)
+  const [lessonsPassed, setLessonsPassed]       = useState(0)
+  const [daysStudied, setDaysStudied]           = useState(0)
+  const [listeningCompleted, setListeningCompleted] = useState(0)
+  const [loading, setLoading]                   = useState(true)
 
   const firstName = profile.full_name?.split(' ')[0] || 'there'
   const hour      = new Date().getHours()
@@ -107,7 +108,7 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
       .from('student_answers')
       .select('is_correct, question_id')
       .eq('student_id', userId)
-      .order('answered_at', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(2000)
 
     if (recentAnswers && recentAnswers.length > 0) {
@@ -153,6 +154,15 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
       setAttempts([...normalised].reverse()) // chronological for chart
     }
 
+    // ── 5. Get completed listening sessions ──
+    const { count: listenCount } = await supabase
+      .from('listening_sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('student_id', userId)
+      .eq('stage_reached', 'review')
+
+    setListeningCompleted(listenCount || 0)
+
     setLoading(false)
   }
 
@@ -185,6 +195,7 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         <StatCard emoji="📊" label="Questions Answered" value={hasData     ? stats.total.toLocaleString() : '—'} />
         <StatCard emoji="🎯" label="Overall Accuracy"   value={hasData     ? `${stats.accuracy}%`          : '—'} />
         <StatCard emoji="🏆" label="Lessons Passed"     value={hasAttempts ? lessonsPassed                  : '—'} />
+        <StatCard emoji="🎧" label="Listening Done"     value={listeningCompleted > 0 ? listeningCompleted  : '—'} />
         <StatCard emoji="📅" label="Days Studied"       value={hasAttempts ? daysStudied                    : '—'} />
       </div>
 
