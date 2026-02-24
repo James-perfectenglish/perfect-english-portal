@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
+
+const TURNSTILE_SITE_KEY = '0x4AAAAAAChUFyqzDKDJIHBT'
 
 function Signup() {
   const [email, setEmail] = useState('')
@@ -7,14 +9,38 @@ function Signup() {
   const [fullName, setFullName] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
-  const [honeypot, setHoneypot] = useState('') // never shown to real users
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const widgetRef = useRef(null)
+
+  useEffect(() => {
+    // Load Turnstile script
+    const script = document.createElement('script')
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
+    script.async = true
+    script.defer = true
+    document.head.appendChild(script)
+
+    script.onload = () => {
+      if (window.turnstile && widgetRef.current) {
+        window.turnstile.render(widgetRef.current, {
+          sitekey: TURNSTILE_SITE_KEY,
+          callback: (token) => setTurnstileToken(token),
+          'expired-callback': () => setTurnstileToken(''),
+          'error-callback': () => setTurnstileToken(''),
+        })
+      }
+    }
+
+    return () => {
+      document.head.removeChild(script)
+    }
+  }, [])
 
   const handleSignup = async (e) => {
     e.preventDefault()
 
-    // If this field has anything in it, it's a bot — silently do nothing
-    if (honeypot) {
-      setMessage('Success! Please check your email to confirm your account.')
+    if (!turnstileToken) {
+      setMessage('Error: Please complete the security check.')
       return
     }
 
@@ -25,6 +51,7 @@ function Signup() {
       email,
       password,
       options: {
+        captchaToken: turnstileToken,
         data: {
           full_name: fullName,
         }
@@ -33,6 +60,11 @@ function Signup() {
 
     if (error) {
       setMessage('Error: ' + error.message)
+      // Reset Turnstile so they can try again
+      if (window.turnstile && widgetRef.current) {
+        window.turnstile.reset(widgetRef.current)
+        setTurnstileToken('')
+      }
     } else {
       setMessage('Success! Please check your email to confirm your account.')
     }
@@ -78,28 +110,19 @@ function Signup() {
           />
         </div>
 
-        {/* Honeypot — hidden from real users, bots fill it in automatically */}
-        <div style={{ display: 'none' }} aria-hidden="true">
-          <label>Website:</label>
-          <input
-            type="text"
-            value={honeypot}
-            onChange={(e) => setHoneypot(e.target.value)}
-            tabIndex="-1"
-            autoComplete="off"
-          />
-        </div>
+        {/* Turnstile widget renders here */}
+        <div ref={widgetRef} style={{ marginBottom: '15px' }} />
 
         <button 
           type="submit" 
-          disabled={loading}
+          disabled={loading || !turnstileToken}
           style={{ 
             width: '100%', 
             padding: '10px', 
-            backgroundColor: '#2196F3',
+            backgroundColor: loading || !turnstileToken ? '#aaa' : '#2196F3',
             color: 'white',
             border: 'none',
-            cursor: 'pointer'
+            cursor: loading || !turnstileToken ? 'not-allowed' : 'pointer'
           }}
         >
           {loading ? 'Loading...' : 'Sign Up'}
