@@ -19,12 +19,6 @@ const TYPE_INFO = {
   error_correction:  { label: 'Error Correction',  emoji: '🚨' },
 }
 
-const LEVEL_TO_GROUP = {
-  'A1': 'beginner', 'A2': 'beginner',
-  'B1': 'intermediate', 'B2': 'intermediate',
-  'C1': 'advanced', 'C2': 'advanced',
-}
-
 function toPercent(score, answers) {
   if (score === null || score === undefined) return 0
   const total = answers?.total_questions
@@ -41,30 +35,23 @@ function getRecommendation(profile, attempts, studentTracks) {
       return {
         emoji: track.emoji,
         title: track.label,
-        desc: attempts.length === 0
-          ? 'Start your first session on this track'
-          : 'Continue where you left off',
+        desc: attempts.length === 0 ? 'Start your first session on this track' : 'Continue where you left off',
         href: `/practice?track=${key}`,
         color: track.color,
         tag: 'Recommended: your track',
       }
     }
   }
-
   if (profile.level) {
-    const levelLabel = profile.level
     return {
       emoji: '🎯',
-      title: `${levelLabel} Practice`,
-      desc: attempts.length === 0
-        ? `Start your first ${levelLabel} practice session`
-        : `Keep building on your ${levelLabel} progress`,
+      title: `${profile.level} Practice`,
+      desc: attempts.length === 0 ? `Start your first ${profile.level} practice session` : `Keep building on your ${profile.level} progress`,
       href: '/practice',
       color: '#667eea',
       tag: 'Recommended: your level',
     }
   }
-
   return {
     emoji: '🎲',
     title: 'Random Practice',
@@ -79,6 +66,8 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
   const [stats, setStats]                 = useState(null)
   const [attempts, setAttempts]           = useState([])
   const [typeBreakdown, setTypeBreakdown] = useState({})
+  const [lessonsPassed, setLessonsPassed] = useState(0)
+  const [daysStudied, setDaysStudied]     = useState(0)
   const [loading, setLoading]             = useState(true)
 
   const firstName = profile.full_name?.split(' ')[0] || 'there'
@@ -90,26 +79,39 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
   async function fetchDashboardData() {
     const userId = session.user.id
 
-    const [{ data: answers }, { data: attemptData }] = await Promise.all([
-      supabase
-        .from('student_answers')
-        .select('is_correct, question_id')
-        .eq('student_id', userId),
-      supabase
-        .from('student_attempts')
-        .select('score, completed_at, answers')
-        .eq('student_id', userId)
-        .order('completed_at', { ascending: false })
-        .limit(50)
-    ])
+    // ── 1. Get total answer count (no row limit problem) ──
+    const { count: totalCount } = await supabase
+      .from('student_answers')
+      .select('*', { count: 'exact', head: true })
+      .eq('student_id', userId)
 
-    if (answers && answers.length > 0) {
-      const total    = answers.length
-      const correct  = answers.filter(a => a.is_correct).length
-      const accuracy = Math.round((correct / total) * 100)
-      setStats({ total, correct, accuracy })
+    // ── 2. Get correct answer count ──
+    const { count: correctCount } = await supabase
+      .from('student_answers')
+      .select('*', { count: 'exact', head: true })
+      .eq('student_id', userId)
+      .eq('is_correct', true)
 
-      const questionIds = [...new Set(answers.map(a => a.question_id).filter(Boolean))]
+    if (totalCount > 0) {
+      setStats({
+        total: totalCount,
+        correct: correctCount,
+        accuracy: Math.round((correctCount / totalCount) * 100)
+      })
+    } else {
+      setStats({ total: 0, correct: 0, accuracy: 0 })
+    }
+
+    // ── 3. Get recent answers for type breakdown (last 2000 is plenty) ──
+    const { data: recentAnswers } = await supabase
+      .from('student_answers')
+      .select('is_correct, question_id')
+      .eq('student_id', userId)
+      .order('answered_at', { ascending: false })
+      .limit(2000)
+
+    if (recentAnswers && recentAnswers.length > 0) {
+      const questionIds = [...new Set(recentAnswers.map(a => a.question_id).filter(Boolean))]
       if (questionIds.length > 0) {
         const { data: questions } = await supabase
           .from('question_bank')
@@ -120,7 +122,7 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
           const typeMap = {}
           questions.forEach(q => { typeMap[q.question_number] = q.type })
           const byType = {}
-          answers.forEach(a => {
+          recentAnswers.forEach(a => {
             const type = typeMap[a.question_id]
             if (!type) return
             if (!byType[type]) byType[type] = { correct: 0, total: 0 }
@@ -130,24 +132,31 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
           setTypeBreakdown(byType)
         }
       }
-    } else {
-      setStats({ total: 0, correct: 0, accuracy: 0 })
     }
 
-    if (attemptData) {
+    // ── 4. Get attempts ──
+    const { data: attemptData } = await supabase
+      .from('student_attempts')
+      .select('score, completed_at, answers')
+      .eq('student_id', userId)
+      .order('completed_at', { ascending: false })
+      .limit(100)
+
+    if (attemptData && attemptData.length > 0) {
       const normalised = attemptData.map(a => ({
         ...a,
         scorePercent: toPercent(a.score, a.answers)
       }))
-      setAttempts([...normalised].reverse())
+      // Compute these here so they're always in sync with the data
+      setLessonsPassed(normalised.filter(a => a.scorePercent >= 70).length)
+      setDaysStudied(new Set(normalised.map(a => new Date(a.completed_at).toDateString())).size)
+      setAttempts([...normalised].reverse()) // chronological for chart
     }
 
     setLoading(false)
   }
 
   const studentTracks  = Array.isArray(profile.tracks) ? profile.tracks : []
-  const lessonsPassed  = attempts.filter(a => a.scorePercent >= 70).length
-  const daysStudied    = new Set(attempts.map(a => new Date(a.completed_at).toDateString())).size
   const hasData        = stats && stats.total > 0
   const hasAttempts    = attempts.length > 0
   const recommendation = getRecommendation(profile, attempts, studentTracks)
@@ -234,10 +243,7 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         <div style={{ fontSize: '0.875rem', color: '#718096' }}>
           Your level: <strong style={{ color: '#667eea' }}>{profile.level || 'Not assigned yet'}</strong>
         </div>
-        <button
-          onClick={handleLogout}
-          style={{ padding: '0.5rem 1.25rem', backgroundColor: '#f44336', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500' }}
-        >
+        <button onClick={handleLogout} style={{ padding: '0.5rem 1.25rem', backgroundColor: '#f44336', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500' }}>
           Logout
         </button>
       </div>
@@ -272,26 +278,11 @@ function Section({ title, subtitle, children }) {
 function RecommendedCard({ recommendation: r }) {
   return (
     <div
-      style={{
-        background: `linear-gradient(135deg, ${r.color}18, ${r.color}08)`,
-        border: `2px solid ${r.color}50`,
-        borderRadius: '12px',
-        padding: '1rem',
-        cursor: 'pointer',
-        height: '100%',
-        boxSizing: 'border-box',
-        position: 'relative',
-        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-      }}
+      style={{ background: `linear-gradient(135deg, ${r.color}18, ${r.color}08)`, border: `2px solid ${r.color}50`, borderRadius: '12px', padding: '1rem', cursor: 'pointer', height: '100%', boxSizing: 'border-box', position: 'relative', transition: 'transform 0.15s ease, box-shadow 0.15s ease' }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 8px 20px ${r.color}25` }}
       onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}
     >
-      <div style={{
-        position: 'absolute', top: '0.75rem', right: '0.75rem',
-        fontSize: '0.62rem', fontWeight: '700', letterSpacing: '0.4px',
-        textTransform: 'uppercase', color: r.color,
-        backgroundColor: `${r.color}18`, padding: '2px 7px', borderRadius: '99px',
-      }}>
+      <div style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', fontSize: '0.62rem', fontWeight: '700', letterSpacing: '0.4px', textTransform: 'uppercase', color: r.color, backgroundColor: `${r.color}18`, padding: '2px 7px', borderRadius: '99px' }}>
         ⭐ {r.tag}
       </div>
       <div style={{ fontSize: '1.75rem', marginBottom: '0.35rem' }}>{r.emoji}</div>
