@@ -169,9 +169,11 @@ export default function TeacherDashboard({ profile, handleLogout }) {
 
   const sorted = [...students].sort((a, b) => {
     let av = a[sortKey], bv = b[sortKey]
-    if (av === null || av === undefined) av = sortDir === 'asc' ? Infinity : -Infinity
-    if (bv === null || bv === undefined) bv = sortDir === 'asc' ? Infinity : -Infinity
-    if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+    if (av == null && bv == null) return 0
+    if (av == null) return 1
+    if (bv == null) return -1
+    if (typeof av === 'string' && typeof bv === 'string')
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
     return sortDir === 'asc' ? av - bv : bv - av
   })
 
