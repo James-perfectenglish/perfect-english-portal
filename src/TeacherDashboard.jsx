@@ -71,20 +71,41 @@ export default function TeacherDashboard({ profile, handleLogout }) {
 
     const ids = profiles.map(p => p.id)
 
-    // 2. Get answer counts per student (correct and total)
+    // 2. Get total and correct counts per student using count queries (no row limit problem)
+    const totalCountsPromises  = ids.map(id =>
+      supabase.from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', id)
+    )
+    const correctCountsPromises = ids.map(id =>
+      supabase.from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', id).eq('is_correct', true)
+    )
+    const [totalResults, correctResults] = await Promise.all([
+      Promise.all(totalCountsPromises),
+      Promise.all(correctCountsPromises),
+    ])
+    const totalMap   = {}
+    const correctMap = {}
+    ids.forEach((id, i) => {
+      totalMap[id]   = totalResults[i].count   || 0
+      correctMap[id] = correctResults[i].count || 0
+    })
+
+    // 3. Get recent answers for type breakdown only (last 500 per student is plenty)
     const { data: answers } = await supabase
       .from('student_answers')
       .select('student_id, is_correct, question_id')
       .in('student_id', ids)
+      .order('answered_at', { ascending: false })
+      .limit(500)
 
-    // 3. Get attempts per student
+    // 4. Get attempts per student
     const { data: attempts } = await supabase
       .from('student_attempts')
       .select('student_id, score, completed_at, answers')
       .in('student_id', ids)
       .order('completed_at', { ascending: false })
+      .limit(1000)
 
-    // 4. Get question types for type breakdown
+    // 5. Get question types for type breakdown
     let typeMap = {}
     if (answers && answers.length > 0) {
       const questionIds = [...new Set(answers.map(a => a.question_id).filter(Boolean))]
@@ -97,13 +118,13 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       }
     }
 
-    // 5. Aggregate per student
+    // 6. Aggregate per student
     const studentMap = {}
     profiles.forEach(p => {
       studentMap[p.id] = {
         ...p,
-        totalAnswers: 0,
-        correctAnswers: 0,
+        totalAnswers:   totalMap[p.id]   || 0,
+        correctAnswers: correctMap[p.id] || 0,
         accuracy: 0,
         lessonsPassed: 0,
         lastActive: null,
@@ -113,12 +134,11 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       }
     })
 
+    // Type breakdown from recent answers sample
     if (answers) {
       answers.forEach(a => {
         const s = studentMap[a.student_id]
         if (!s) return
-        s.totalAnswers++
-        if (a.is_correct) s.correctAnswers++
         const type = typeMap[a.question_id]
         if (type) {
           if (!s.typeStats[type]) s.typeStats[type] = { correct: 0, total: 0 }
@@ -132,11 +152,9 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       attempts.forEach(a => {
         const s = studentMap[a.student_id]
         if (!s) return
-        // last active
         if (!s.lastActive || new Date(a.completed_at) > new Date(s.lastActive)) {
           s.lastActive = a.completed_at
         }
-        // lessons passed
         const total = a.answers?.total_questions
         let pct = a.score
         if (total && total > 0) pct = Math.round((a.score / total) * 100)
@@ -149,7 +167,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     Object.values(studentMap).forEach(s => {
       s.accuracy = s.totalAnswers > 0 ? Math.round((s.correctAnswers / s.totalAnswers) * 100) : 0
       const typeEntries = Object.entries(s.typeStats)
-        .filter(([, d]) => d.total >= 5) // need at least 5 answers to be meaningful
+        .filter(([, d]) => d.total >= 5)
         .map(([type, d]) => ({ type, pct: Math.round((d.correct / d.total) * 100) }))
         .sort((a, b) => b.pct - a.pct)
       if (typeEntries.length > 0) {
