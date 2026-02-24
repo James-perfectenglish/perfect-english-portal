@@ -7,6 +7,7 @@ import Admin from './Admin'
 import ExerciseList from './ExerciseList'
 import PracticePage from './components/PracticePage'
 import StudentDashboard from './StudentDashboard'
+import TeacherDashboard from './TeacherDashboard'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -147,35 +148,27 @@ function Dashboard({ session }) {
               padding: 0,
             }}>
               <li>
-                <Link to="/" style={{
-                  textDecoration: 'none',
-                  color: '#4a5568',
-                  fontWeight: '500',
-                  fontSize: 'clamp(0.875rem, 2vw, 1rem)',
-                }}>
+                <Link to="/" style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>
                   Home
                 </Link>
               </li>
               <li>
-                <Link to="/practice" style={{
-                  textDecoration: 'none',
-                  color: '#4a5568',
-                  fontWeight: '500',
-                  fontSize: 'clamp(0.875rem, 2vw, 1rem)',
-                }}>
+                <Link to="/practice" style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>
                   Practice
                 </Link>
               </li>
               <li>
-                <Link to="/exercises" style={{
-                  textDecoration: 'none',
-                  color: '#4a5568',
-                  fontWeight: '500',
-                  fontSize: 'clamp(0.875rem, 2vw, 1rem)',
-                }}>
+                <Link to="/exercises" style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>
                   Exercises
                 </Link>
               </li>
+              {profile?.is_teacher && (
+                <li>
+                  <Link to="/teacher" style={{ textDecoration: 'none', color: '#667eea', fontWeight: '700', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>
+                    👩‍🏫 Teacher
+                  </Link>
+                </li>
+              )}
             </ul>
           </nav>
         </div>
@@ -195,6 +188,14 @@ function Dashboard({ session }) {
         />
         <Route path="/practice" element={<PracticePage />} />
         <Route path="/exercises" element={<ExercisesPage profile={profile} />} />
+        <Route
+          path="/teacher"
+          element={
+            profile?.is_teacher
+              ? <TeacherDashboard profile={profile} handleLogout={handleLogout} />
+              : <Navigate to="/" />
+          }
+        />
       </Routes>
     </div>
   )
