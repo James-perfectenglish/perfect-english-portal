@@ -24,29 +24,15 @@ function shuffleArray(arr) {
   return s;
 }
 
-/**
- * MatchingPairs — shared component used by MatchingExercise and RandomPracticeExercise.
- *
- * Props:
- *   pairs    — array of { left: {type, content, label?}, right: {type, content, label?} }
- *              type can be: "text" | "audio" | "image"
- *              content: text string, audio URL, or image URL
- *   disabled — boolean, disables all interaction (shown after completion)
- *   onResult — callback(isCorrect: boolean, wrongAttempts: number) fired when all pairs matched
- *
- * Usage: always mount with a key prop to reset state between questions:
- *   <MatchingPairs key={questionIndex} pairs={parsedPairs} disabled={!!feedback} onResult={handleResult} />
- */
 export default function MatchingPairs({ pairs, disabled, onResult }) {
-  // Build left items (in order) and shuffle right items on first render only
   const leftItems = pairs.map((p, i) => ({ ...p.left, id: i }));
   const [rightItems] = useState(() => shuffleArray(pairs.map((p, i) => ({ ...p.right, id: i }))));
 
-  const [leftSelected, setLeftSelected] = useState(null); // id of selected left tile, or null
-  const [matched, setMatched] = useState(new Set());      // set of pair ids that are correctly matched
-  const [wrongFlash, setWrongFlash] = useState(null);     // { leftId, rightId } while flashing red
+  const [leftSelected, setLeftSelected] = useState(null);
+  const [matched, setMatched] = useState(new Set());
+  const [wrongFlash, setWrongFlash] = useState(null);
   const [wrongAttempts, setWrongAttempts] = useState(0);
-  const [playingId, setPlayingId] = useState(null);       // key of currently playing audio tile
+  const [playingId, setPlayingId] = useState(null);
   const audioRef = useRef(null);
   const wrongFlashTimer = useRef(null);
 
@@ -68,10 +54,14 @@ export default function MatchingPairs({ pairs, disabled, onResult }) {
     audio.onended = () => setPlayingId(null);
   };
 
-  const handleLeftTap = (id) => {
+  // Tapping anywhere on a left tile selects it — and plays audio if it's an audio tile
+  const handleLeftTap = (item) => {
     if (wrongFlash || disabled) return;
-    if (matched.has(id)) return;
-    setLeftSelected(prev => prev === id ? null : id); // tap again to deselect
+    if (matched.has(item.id)) return;
+    setLeftSelected(prev => prev === item.id ? null : item.id);
+    if (item.type === 'audio') {
+      playAudio(item.content, `left-${item.id}`);
+    }
   };
 
   const handleRightTap = (item) => {
@@ -80,20 +70,15 @@ export default function MatchingPairs({ pairs, disabled, onResult }) {
     if (leftSelected === null) return;
 
     if (leftSelected === item.id) {
-      // ✅ Correct match
       const newMatched = new Set(matched);
       newMatched.add(item.id);
       setMatched(newMatched);
       setLeftSelected(null);
-
       if (newMatched.size === leftItems.length) {
-        // All pairs matched — report result
         stopAudio();
-        const isClean = wrongAttempts === 0;
-        onResult(isClean, wrongAttempts);
+        onResult(wrongAttempts === 0, wrongAttempts);
       }
     } else {
-      // ❌ Wrong match — flash red briefly then reset
       const newWrong = wrongAttempts + 1;
       setWrongAttempts(newWrong);
       setWrongFlash({ leftId: leftSelected, rightId: item.id });
@@ -109,22 +94,21 @@ export default function MatchingPairs({ pairs, disabled, onResult }) {
       const isPlaying = playingId === key;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-          <button
-            onClick={(e) => { e.stopPropagation(); playAudio(item.content, key); }}
-            style={{
-              width: '44px', height: '44px', borderRadius: '50%',
-              border: 'none',
-              background: isPlaying
-                ? 'linear-gradient(135deg, #764ba2, #667eea)'
-                : 'linear-gradient(135deg, #667eea, #764ba2)',
-              color: 'white', fontSize: '1.1rem', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: isPlaying ? '0 0 0 3px rgba(102,126,234,0.35)' : '0 2px 6px rgba(102,126,234,0.3)',
-              transition: 'all 0.2s', flexShrink: 0,
-            }}
-          >
+          <div style={{
+            width: '44px', height: '44px', borderRadius: '50%',
+            background: isPlaying
+              ? 'linear-gradient(135deg, #764ba2, #667eea)'
+              : 'linear-gradient(135deg, #667eea, #764ba2)',
+            color: 'white', fontSize: '1.1rem',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: isPlaying
+              ? '0 0 0 3px rgba(102,126,234,0.35)'
+              : '0 2px 6px rgba(102,126,234,0.3)',
+            transition: 'all 0.2s', flexShrink: 0,
+            pointerEvents: 'none', // tile handles the tap, not this inner div
+          }}>
             {isPlaying ? '⏹' : '▶'}
-          </button>
+          </div>
           {item.label && (
             <span style={{ fontSize: '0.75rem', color: '#718096', textAlign: 'center', lineHeight: 1.2 }}>
               {item.label}
@@ -151,7 +135,6 @@ export default function MatchingPairs({ pairs, disabled, onResult }) {
       );
     }
 
-    // Default: text
     return (
       <span style={{
         fontSize: 'clamp(0.82rem, 2.6vw, 0.98rem)',
@@ -176,24 +159,16 @@ export default function MatchingPairs({ pairs, disabled, onResult }) {
       border: 'none',
       cursor: (isMatched || disabled) ? 'default' : 'pointer',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '62px',
       transition: 'all 0.18s ease',
       userSelect: 'none',
       WebkitTapHighlightColor: 'transparent',
-      width: '100%',
       boxSizing: 'border-box',
       position: 'relative',
     };
 
-    if (isMatched) {
-      return { ...base, boxShadow: 'inset 0 0 0 2px #48bb78', backgroundColor: '#f0fff4', color: '#276749', opacity: 0.6 };
-    }
-    if (isWrongLeft || isWrongRight) {
-      return { ...base, boxShadow: 'inset 0 0 0 2px #f56565', backgroundColor: '#fff5f5', color: '#c53030', transform: 'scale(0.97)' };
-    }
-    if (isSelected) {
-      return { ...base, boxShadow: 'inset 0 0 0 2px #667eea', backgroundColor: '#EDE9FE', color: '#553C9A', transform: 'scale(1.01)' };
-    }
+    if (isMatched) return { ...base, boxShadow: 'inset 0 0 0 2px #48bb78', backgroundColor: '#f0fff4', color: '#276749', opacity: 0.6 };
+    if (isWrongLeft || isWrongRight) return { ...base, boxShadow: 'inset 0 0 0 2px #f56565', backgroundColor: '#fff5f5', color: '#c53030', transform: 'scale(0.97)' };
+    if (isSelected) return { ...base, boxShadow: 'inset 0 0 0 2px #667eea', backgroundColor: '#EDE9FE', color: '#553C9A', transform: 'scale(1.01)' };
     return { ...base, boxShadow: 'inset 0 0 0 2px #e2e8f0', backgroundColor: 'white', color: '#2d3748' };
   };
 
@@ -202,46 +177,45 @@ export default function MatchingPairs({ pairs, disabled, onResult }) {
 
   return (
     <div>
-      {/* Two-column grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-        {/* Left column — question side */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {leftItems.map(item => (
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '10px',
+        marginBottom: '10px',
+        alignItems: 'stretch',
+      }}>
+        {leftItems.map((leftItem, i) => {
+          const rightItem = rightItems[i];
+          return [
             <div
-              key={item.id}
+              key={`left-${leftItem.id}`}
               className="matching-tile"
               tabIndex={-1}
-              onClick={() => handleLeftTap(item.id)}
-              style={getTileStyle(item, 'left')}
+              onClick={() => handleLeftTap(leftItem)}
+              style={getTileStyle(leftItem, 'left')}
             >
-              {matched.has(item.id) && (
+              {matched.has(leftItem.id) && (
                 <span style={{ position: 'absolute', top: '4px', right: '6px', fontSize: '0.7rem', color: '#48bb78' }}>✓</span>
               )}
-              {renderContent(item, 'left')}
-            </div>
-          ))}
-        </div>
+              {renderContent(leftItem, 'left')}
+            </div>,
 
-        {/* Right column — answer side */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {rightItems.map(item => (
             <div
-              key={item.id}
+              key={`right-${rightItem.id}`}
               className="matching-tile"
               tabIndex={-1}
-              onClick={() => handleRightTap(item)}
-              style={getTileStyle(item, 'right')}
+              onClick={() => handleRightTap(rightItem)}
+              style={getTileStyle(rightItem, 'right')}
             >
-              {matched.has(item.id) && (
+              {matched.has(rightItem.id) && (
                 <span style={{ position: 'absolute', top: '4px', right: '6px', fontSize: '0.7rem', color: '#48bb78' }}>✓</span>
               )}
-              {renderContent(item, 'right')}
-            </div>
-          ))}
-        </div>
+              {renderContent(rightItem, 'right')}
+            </div>,
+          ];
+        })}
       </div>
 
-      {/* Status hint */}
       {!allMatched && !disabled && (
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -250,9 +224,7 @@ export default function MatchingPairs({ pairs, disabled, onResult }) {
           <span style={{ color: leftSelected !== null ? '#667eea' : '#a0aec0', fontWeight: leftSelected !== null ? 500 : 400 }}>
             {leftSelected !== null ? '→ Now tap its match on the right' : 'Tap a tile on the left to begin'}
           </span>
-          <span style={{ color: '#cbd5e0' }}>
-            {matched.size}/{pairsCount}
-          </span>
+          <span style={{ color: '#cbd5e0' }}>{matched.size}/{pairsCount}</span>
         </div>
       )}
     </div>
