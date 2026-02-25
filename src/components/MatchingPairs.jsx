@@ -24,17 +24,6 @@ function shuffleArray(arr) {
   return s;
 }
 
-/**
- * MatchingPairs — shared component used by MatchingExercise and RandomPracticeExercise.
- *
- * Props:
- *   pairs    — array of { left: {type, content, label?}, right: {type, content, label?} }
- *              type can be: "text" | "audio" | "image"
- *   disabled — boolean, disables all interaction after completion
- *   onResult — callback(isCorrect: boolean, wrongAttempts: number) fired when all pairs matched
- *
- * Always mount with a key prop to reset state between questions.
- */
 export default function MatchingPairs({ pairs, disabled, onResult }) {
   const leftItems = pairs.map((p, i) => ({ ...p.left, id: i }));
   const [rightItems] = useState(() => shuffleArray(pairs.map((p, i) => ({ ...p.right, id: i }))));
@@ -65,10 +54,14 @@ export default function MatchingPairs({ pairs, disabled, onResult }) {
     audio.onended = () => setPlayingId(null);
   };
 
-  const handleLeftTap = (id) => {
+  // Tapping anywhere on a left tile selects it — and plays audio if it's an audio tile
+  const handleLeftTap = (item) => {
     if (wrongFlash || disabled) return;
-    if (matched.has(id)) return;
-    setLeftSelected(prev => prev === id ? null : id);
+    if (matched.has(item.id)) return;
+    setLeftSelected(prev => prev === item.id ? null : item.id);
+    if (item.type === 'audio') {
+      playAudio(item.content, `left-${item.id}`);
+    }
   };
 
   const handleRightTap = (item) => {
@@ -101,27 +94,21 @@ export default function MatchingPairs({ pairs, disabled, onResult }) {
       const isPlaying = playingId === key;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-          <button
-            onClick={() => {
-              // No stopPropagation — click bubbles to tile div, selecting it in the same tap
-              playAudio(item.content, key);
-            }}
-            style={{
-              width: '44px', height: '44px', borderRadius: '50%',
-              border: 'none',
-              background: isPlaying
-                ? 'linear-gradient(135deg, #764ba2, #667eea)'
-                : 'linear-gradient(135deg, #667eea, #764ba2)',
-              color: 'white', fontSize: '1.1rem', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: isPlaying
-                ? '0 0 0 3px rgba(102,126,234,0.35)'
-                : '0 2px 6px rgba(102,126,234,0.3)',
-              transition: 'all 0.2s', flexShrink: 0,
-            }}
-          >
+          <div style={{
+            width: '44px', height: '44px', borderRadius: '50%',
+            background: isPlaying
+              ? 'linear-gradient(135deg, #764ba2, #667eea)'
+              : 'linear-gradient(135deg, #667eea, #764ba2)',
+            color: 'white', fontSize: '1.1rem',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: isPlaying
+              ? '0 0 0 3px rgba(102,126,234,0.35)'
+              : '0 2px 6px rgba(102,126,234,0.3)',
+            transition: 'all 0.2s', flexShrink: 0,
+            pointerEvents: 'none', // tile handles the tap, not this inner div
+          }}>
             {isPlaying ? '⏹' : '▶'}
-          </button>
+          </div>
           {item.label && (
             <span style={{ fontSize: '0.75rem', color: '#718096', textAlign: 'center', lineHeight: 1.2 }}>
               {item.label}
@@ -172,7 +159,6 @@ export default function MatchingPairs({ pairs, disabled, onResult }) {
       border: 'none',
       cursor: (isMatched || disabled) ? 'default' : 'pointer',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      // No minHeight here — height is governed by the CSS grid row so both sides always match
       transition: 'all 0.18s ease',
       userSelect: 'none',
       WebkitTapHighlightColor: 'transparent',
@@ -191,11 +177,6 @@ export default function MatchingPairs({ pairs, disabled, onResult }) {
 
   return (
     <div>
-      {/*
-        Flat grid — each pair renders as two adjacent cells in the same row.
-        CSS grid automatically makes both tiles in a row the same height.
-        Left items stay in original order; right items are shuffled.
-      */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
@@ -210,7 +191,7 @@ export default function MatchingPairs({ pairs, disabled, onResult }) {
               key={`left-${leftItem.id}`}
               className="matching-tile"
               tabIndex={-1}
-              onClick={() => handleLeftTap(leftItem.id)}
+              onClick={() => handleLeftTap(leftItem)}
               style={getTileStyle(leftItem, 'left')}
             >
               {matched.has(leftItem.id) && (
