@@ -26,13 +26,14 @@ function formatDate(dateStr) {
 }
 
 function exportCSV(students) {
-  const headers = ['Name', 'Level', 'Questions Answered', 'Accuracy %', 'Lessons Passed', 'Best Type', 'Worst Type', 'Last Active']
+  const headers = ['Name', 'Level', 'Questions Answered', 'Accuracy %', 'Lessons Passed', 'Listening Done', 'Best Type', 'Worst Type', 'Last Active']
   const rows = students.map(s => [
     s.full_name || 'Unknown',
     s.level || '—',
     s.totalAnswers,
     s.accuracy,
     s.lessonsPassed,
+    s.listeningCompleted || 0,
     s.bestType ? (TYPE_INFO[s.bestType]?.label || s.bestType) : '—',
     s.worstType ? (TYPE_INFO[s.worstType]?.label || s.worstType) : '—',
     s.lastActive ? new Date(s.lastActive).toLocaleDateString('en-GB') : '—'
@@ -105,7 +106,16 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       .order('completed_at', { ascending: false })
       .limit(1000)
 
-    // 5. Get question types for type breakdown
+    // 5. Get completed listening sessions per student
+    const listenCountsPromises = ids.map(id =>
+      supabase.from('listening_sessions').select('*', { count: 'exact', head: true })
+        .eq('student_id', id).eq('stage_reached', 'review')
+    )
+    const listenResults = await Promise.all(listenCountsPromises)
+    const listenMap = {}
+    ids.forEach((id, i) => { listenMap[id] = listenResults[i].count || 0 })
+
+    // 6. Get question types for type breakdown
     let typeMap = {}
     if (answers && answers.length > 0) {
       const questionIds = [...new Set(answers.map(a => a.question_id).filter(Boolean))]
@@ -118,13 +128,14 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       }
     }
 
-    // 6. Aggregate per student
+    // 7. Aggregate per student
     const studentMap = {}
     profiles.forEach(p => {
       studentMap[p.id] = {
         ...p,
-        totalAnswers:   totalMap[p.id]   || 0,
-        correctAnswers: correctMap[p.id] || 0,
+        totalAnswers:      totalMap[p.id]   || 0,
+        correctAnswers:    correctMap[p.id] || 0,
+        listeningCompleted: listenMap[p.id] || 0,
         accuracy: 0,
         lessonsPassed: 0,
         lastActive: null,
@@ -202,7 +213,8 @@ export default function TeacherDashboard({ profile, handleLogout }) {
   const avgAccuracy = students.length > 0
     ? Math.round(students.reduce((sum, s) => sum + s.accuracy, 0) / students.length)
     : 0
-  const totalQuestions = students.reduce((sum, s) => sum + s.totalAnswers, 0)
+  const totalQuestions  = students.reduce((sum, s) => sum + s.totalAnswers, 0)
+  const totalListening  = students.reduce((sum, s) => sum + s.listeningCompleted, 0)
 
   if (loading) return <div style={{ textAlign: 'center', padding: '3rem', color: '#667eea' }}>Loading class data...</div>
 
@@ -257,6 +269,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
         <SummaryCard emoji="🟢" label="Active This Week"   value={activeThisWeek} />
         <SummaryCard emoji="🎯" label="Class Accuracy"     value={`${avgAccuracy}%`} />
         <SummaryCard emoji="📊" label="Questions Answered" value={totalQuestions.toLocaleString()} />
+        <SummaryCard emoji="🎧" label="Listening Sessions"  value={totalListening} />
       </div>
 
       {/* PUBLIC MODE */}
@@ -309,8 +322,9 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                   ['level',        'Level'],
                   ['totalAnswers', 'Questions'],
                   ['accuracy',     'Accuracy'],
-                  ['lessonsPassed','Passed'],
-                  ['bestType',     'Best Type'],
+                  ['lessonsPassed',       'Passed'],
+                  ['listeningCompleted',  '🎧 Listening'],
+                  ['bestType',           'Best Type'],
                   ['worstType',    'Worst Type'],
                   ['lastActive',   'Last Active'],
                 ].map(([key, label]) => (
@@ -344,6 +358,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                     </span>
                   </td>
                   <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568' }}>{s.lessonsPassed}</td>
+                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568' }}>{s.listeningCompleted || '—'}</td>
                   <td style={{ padding: '0.6rem 0.75rem', color: '#38a169', fontSize: '0.8rem' }}>
                     {s.bestType ? `${TYPE_INFO[s.bestType]?.emoji || ''} ${TYPE_INFO[s.bestType]?.label || s.bestType}` : '—'}
                   </td>
