@@ -183,7 +183,11 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         queryForType('sentence_building'),
         queryForType('odd_one_out'),
         queryForType('error_correction'),
-        queryForType('matching'),
+        (() => {
+  let q = supabase.from('question_bank').select('*').eq('type', 'matching').is('sequence_group', null);
+  if (levels && levels.length > 0) q = q.in('level', levels);
+  return q;
+})(),
       ]);
 
       if (gfRes.error || mcRes.error || sbRes.error || oooRes.error || ecRes.error || matchRes.error) {
