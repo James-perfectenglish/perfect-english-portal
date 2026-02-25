@@ -12,6 +12,7 @@ import ListeningExercise from './ListeningExercise'
 import OddOneOut from './OddOneOut'
 import ErrorCorrection from './ErrorCorrection'
 import MatchingExercise from './MatchingExercise'
+import SentenceAuction from './SentenceAuction'
 
 // Unified flashcard template + data
 import FlashcardTemplate from './FlashcardTemplate'
@@ -39,6 +40,7 @@ const ACTIVE_EXERCISES = [
   'Odd One Out',
   'Error Correction',
   'Matching',
+  'Sentence Auction',
 ]
 
 function ExerciseList({ userLevel }) {
@@ -138,6 +140,7 @@ function ExerciseList({ userLevel }) {
     if (t === 'Odd One Out') return <OddOneOut onComplete={back} onBack={back} />
     if (t === 'Error Correction') return <ErrorCorrection onComplete={back} onBack={back} />
     if (t === 'Matching') return <MatchingExercise onComplete={back} onBack={back} />
+    if (t === 'Sentence Auction') return <SentenceAuction onComplete={back} onBack={back} />
   }
 
   // ── Exercise list ──
