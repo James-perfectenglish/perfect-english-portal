@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import WordOfTheDay from './WordOfTheDay'
 
 const TRACK_CONFIG = {
   general:  { label: 'General English',      emoji: '📚', description: 'Mixed vocabulary, grammar and skills across all areas',        color: '#667eea', topicFilter: null },
@@ -189,7 +190,7 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
             : 'Welcome to your dashboard. Start with Random Practice to begin tracking your progress.'}
         </p>
       </div>
-
+<WordOfTheDay profile={profile} />
       {/* STAT CARDS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
         <StatCard emoji="📊" label="Questions Answered" value={hasData     ? stats.total.toLocaleString() : '—'} />
