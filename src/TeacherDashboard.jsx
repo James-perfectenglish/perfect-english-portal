@@ -49,30 +49,33 @@ function exportCSV(students) {
 }
 
 export default function TeacherDashboard({ profile, handleLogout }) {
-  const [students, setStudents]     = useState([])
-  const [loading, setLoading]       = useState(true)
-  const [privateMode, setPrivateMode] = useState(false)
-  const [sortKey, setSortKey]       = useState('lastActive')
-  const [sortDir, setSortDir]       = useState('desc')
+  const [students, setStudents]         = useState([])
+  const [loading, setLoading]           = useState(true)
+  const [privateMode, setPrivateMode]   = useState(false)
+  const [sortKey, setSortKey]           = useState('lastActive')
+  const [sortDir, setSortDir]           = useState('desc')
 
-  useEffect(() => { fetchAllData() }, [])
+  // Word of the Day state
+  const [wotdSubmissions, setWotdSubmissions] = useState([])
+  const [wotdWords, setWotdWords]             = useState([])
+  const [wotdLoading, setWotdLoading]         = useState(true)
+  const [wotdOpen, setWotdOpen]               = useState(true)
+  const [wotdFilter, setWotdFilter]           = useState('all') // all | today | correct | incorrect
+  const [wotdProfileMap, setWotdProfileMap]   = useState({})
+
+  useEffect(() => { fetchAllData(); fetchWotdData() }, [])
 
   async function fetchAllData() {
-    // 1. Get all approved non-teacher students
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, full_name, level, approved')
       .eq('approved', true)
       .eq('is_teacher', false)
 
-    if (!profiles || profiles.length === 0) {
-      setLoading(false)
-      return
-    }
+    if (!profiles || profiles.length === 0) { setLoading(false); return }
 
     const ids = profiles.map(p => p.id)
 
-    // 2. Get total and correct counts per student using count queries (no row limit problem)
     const totalCountsPromises  = ids.map(id =>
       supabase.from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', id)
     )
@@ -83,14 +86,12 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       Promise.all(totalCountsPromises),
       Promise.all(correctCountsPromises),
     ])
-    const totalMap   = {}
-    const correctMap = {}
+    const totalMap = {}, correctMap = {}
     ids.forEach((id, i) => {
-      totalMap[id]   = totalResults[i].count   || 0
+      totalMap[id]   = totalResults[i].count || 0
       correctMap[id] = correctResults[i].count || 0
     })
 
-    // 3. Get recent answers for type breakdown only (last 500 per student is plenty)
     const { data: answers } = await supabase
       .from('student_answers')
       .select('student_id, is_correct, question_id')
@@ -98,7 +99,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       .order('answered_at', { ascending: false })
       .limit(500)
 
-    // 4. Get attempts per student
     const { data: attempts } = await supabase
       .from('student_attempts')
       .select('student_id, score, completed_at, answers')
@@ -106,7 +106,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       .order('completed_at', { ascending: false })
       .limit(1000)
 
-    // 5. Get completed listening sessions per student
     const listenCountsPromises = ids.map(id =>
       supabase.from('listening_sessions').select('*', { count: 'exact', head: true })
         .eq('student_id', id).eq('stage_reached', 'review')
@@ -115,7 +114,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     const listenMap = {}
     ids.forEach((id, i) => { listenMap[id] = listenResults[i].count || 0 })
 
-    // 6. Get question types for type breakdown
     let typeMap = {}
     if (answers && answers.length > 0) {
       const questionIds = [...new Set(answers.map(a => a.question_id).filter(Boolean))]
@@ -128,24 +126,18 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       }
     }
 
-    // 7. Aggregate per student
     const studentMap = {}
     profiles.forEach(p => {
       studentMap[p.id] = {
         ...p,
-        totalAnswers:      totalMap[p.id]   || 0,
-        correctAnswers:    correctMap[p.id] || 0,
+        totalAnswers: totalMap[p.id] || 0,
+        correctAnswers: correctMap[p.id] || 0,
         listeningCompleted: listenMap[p.id] || 0,
-        accuracy: 0,
-        lessonsPassed: 0,
-        lastActive: null,
-        typeStats: {},
-        bestType: null,
-        worstType: null,
+        accuracy: 0, lessonsPassed: 0, lastActive: null,
+        typeStats: {}, bestType: null, worstType: null,
       }
     })
 
-    // Type breakdown from recent answers sample
     if (answers) {
       answers.forEach(a => {
         const s = studentMap[a.student_id]
@@ -163,9 +155,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       attempts.forEach(a => {
         const s = studentMap[a.student_id]
         if (!s) return
-        if (!s.lastActive || new Date(a.completed_at) > new Date(s.lastActive)) {
-          s.lastActive = a.completed_at
-        }
+        if (!s.lastActive || new Date(a.completed_at) > new Date(s.lastActive)) s.lastActive = a.completed_at
         const total = a.answers?.total_questions
         let pct = a.score
         if (total && total > 0) pct = Math.round((a.score / total) * 100)
@@ -174,7 +164,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       })
     }
 
-    // Compute accuracy and best/worst type
     Object.values(studentMap).forEach(s => {
       s.accuracy = s.totalAnswers > 0 ? Math.round((s.correctAnswers / s.totalAnswers) * 100) : 0
       const typeEntries = Object.entries(s.typeStats)
@@ -189,6 +178,52 @@ export default function TeacherDashboard({ profile, handleLogout }) {
 
     setStudents(Object.values(studentMap))
     setLoading(false)
+  }
+
+  async function fetchWotdData() {
+    setWotdLoading(true)
+
+    // Get all submissions with word details
+    const { data: subs } = await supabase
+      .from('word_of_the_day_submissions')
+      .select(`
+        id,
+        student_id,
+        sentence,
+        is_correct,
+        is_soft_pass,
+        ai_feedback,
+        submitted_at,
+        word_of_the_day (
+          id, date, word, part_of_speech, level, language
+        )
+      `)
+      .order('submitted_at', { ascending: false })
+      .limit(200)
+
+    if (subs && subs.length > 0) {
+      // Get student names
+      const studentIds = [...new Set(subs.map(s => s.student_id))]
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, level')
+        .in('id', studentIds)
+
+      const profileMap = {}
+      if (profiles) profiles.forEach(p => { profileMap[p.id] = p })
+      setWotdProfileMap(profileMap)
+
+      setWotdSubmissions(subs)
+
+      // Unique words that have been submitted
+      const wordMap = {}
+      subs.forEach(s => {
+        if (s.word_of_the_day) wordMap[s.word_of_the_day.id] = s.word_of_the_day
+      })
+      setWotdWords(Object.values(wordMap).sort((a, b) => new Date(b.date) - new Date(a.date)))
+    }
+
+    setWotdLoading(false)
   }
 
   function handleSort(key) {
@@ -210,11 +245,33 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     if (!s.lastActive) return false
     return (new Date() - new Date(s.lastActive)) < 7 * 24 * 60 * 60 * 1000
   }).length
-  const avgAccuracy = students.length > 0
-    ? Math.round(students.reduce((sum, s) => sum + s.accuracy, 0) / students.length)
-    : 0
-  const totalQuestions  = students.reduce((sum, s) => sum + s.totalAnswers, 0)
-  const totalListening  = students.reduce((sum, s) => sum + s.listeningCompleted, 0)
+  const avgAccuracy    = students.length > 0
+    ? Math.round(students.reduce((sum, s) => sum + s.accuracy, 0) / students.length) : 0
+  const totalQuestions = students.reduce((sum, s) => sum + s.totalAnswers, 0)
+  const totalListening = students.reduce((sum, s) => sum + s.listeningCompleted, 0)
+
+  // WOTD filtered submissions
+  const today = new Date().toISOString().split('T')[0]
+  const filteredSubs = wotdSubmissions.filter(s => {
+    if (wotdFilter === 'today')    return s.word_of_the_day?.date === today
+    if (wotdFilter === 'correct')  return s.is_correct
+    if (wotdFilter === 'incorrect') return !s.is_correct
+    return true
+  })
+
+  // Group by word date for display
+  const subsByWord = {}
+  filteredSubs.forEach(s => {
+    const key = s.word_of_the_day?.id
+    if (!key) return
+    if (!subsByWord[key]) subsByWord[key] = { word: s.word_of_the_day, subs: [] }
+    subsByWord[key].subs.push(s)
+  })
+  const groupedWords = Object.values(subsByWord).sort((a, b) => new Date(b.word.date) - new Date(a.word.date))
+
+  const wotdTotal   = wotdSubmissions.length
+  const wotdCorrect = wotdSubmissions.filter(s => s.is_correct).length
+  const wotdToday   = wotdSubmissions.filter(s => s.word_of_the_day?.date === today).length
 
   if (loading) return <div style={{ textAlign: 'center', padding: '3rem', color: '#667eea' }}>Loading class data...</div>
 
@@ -224,28 +281,15 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       {/* HEADER */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: 'clamp(1.4rem, 4vw, 2rem)', color: '#2C3E50', margin: '0 0 0.25rem' }}>
-            Teacher Dashboard
-          </h1>
+          <h1 style={{ fontSize: 'clamp(1.4rem, 4vw, 2rem)', color: '#2C3E50', margin: '0 0 0.25rem' }}>Teacher Dashboard</h1>
           <p style={{ color: '#718096', margin: 0, fontSize: '0.9rem' }}>
             {students.length} students · {activeThisWeek} active this week
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Toggle */}
           <button
             onClick={() => setPrivateMode(m => !m)}
-            style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '8px',
-              border: `2px solid ${privateMode ? '#667eea' : '#e2e8f0'}`,
-              background: privateMode ? '#667eea' : 'white',
-              color: privateMode ? 'white' : '#718096',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              fontWeight: '600',
-              transition: 'all 0.2s',
-            }}
+            style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: `2px solid ${privateMode ? '#667eea' : '#e2e8f0'}`, background: privateMode ? '#667eea' : 'white', color: privateMode ? 'white' : '#718096', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', transition: 'all 0.2s' }}
           >
             {privateMode ? '🔒 Private View' : '👁 Public View'}
           </button>
@@ -269,15 +313,13 @@ export default function TeacherDashboard({ profile, handleLogout }) {
         <SummaryCard emoji="🟢" label="Active This Week"   value={activeThisWeek} />
         <SummaryCard emoji="🎯" label="Class Accuracy"     value={`${avgAccuracy}%`} />
         <SummaryCard emoji="📊" label="Questions Answered" value={totalQuestions.toLocaleString()} />
-        <SummaryCard emoji="🎧" label="Listening Sessions"  value={totalListening} />
+        <SummaryCard emoji="🎧" label="Listening Sessions" value={totalListening} />
       </div>
 
       {/* PUBLIC MODE */}
       {!privateMode && (
-        <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: '0 0 1rem' }}>
-            👁 Public View — Class Overview
-          </h2>
+        <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: '0 0 1rem' }}>👁 Public View — Class Overview</h2>
           <p style={{ fontSize: '0.85rem', color: '#718096', marginBottom: '1rem', background: '#f7fafc', padding: '0.75rem', borderRadius: '8px' }}>
             Screen-share safe — shows initials only, no individual performance data visible.
           </p>
@@ -307,10 +349,8 @@ export default function TeacherDashboard({ profile, handleLogout }) {
 
       {/* PRIVATE MODE */}
       {privateMode && (
-        <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflowX: 'auto' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: '0 0 0.5rem' }}>
-            🔒 Private View — Full Student Data
-          </h2>
+        <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflowX: 'auto', marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: '0 0 0.5rem' }}>🔒 Private View — Full Student Data</h2>
           <p style={{ fontSize: '0.78rem', color: '#718096', margin: '0 0 1rem' }}>
             Click column headers to sort. Best/worst type needs at least 5 answers to show.
           </p>
@@ -318,21 +358,18 @@ export default function TeacherDashboard({ profile, handleLogout }) {
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                 {[
-                  ['full_name',    'Student'],
-                  ['level',        'Level'],
-                  ['totalAnswers', 'Questions'],
-                  ['accuracy',     'Accuracy'],
-                  ['lessonsPassed',       'Passed'],
-                  ['listeningCompleted',  '🎧 Listening'],
-                  ['bestType',           'Best Type'],
-                  ['worstType',    'Worst Type'],
-                  ['lastActive',   'Last Active'],
+                  ['full_name',          'Student'],
+                  ['level',              'Level'],
+                  ['totalAnswers',       'Questions'],
+                  ['accuracy',          'Accuracy'],
+                  ['lessonsPassed',     'Passed'],
+                  ['listeningCompleted','🎧 Listening'],
+                  ['bestType',          'Best Type'],
+                  ['worstType',         'Worst Type'],
+                  ['lastActive',        'Last Active'],
                 ].map(([key, label]) => (
-                  <th
-                    key={key}
-                    onClick={() => handleSort(key)}
-                    style={{ padding: '0.5rem 0.75rem', textAlign: 'left', color: '#718096', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}
-                  >
+                  <th key={key} onClick={() => handleSort(key)}
+                    style={{ padding: '0.5rem 0.75rem', textAlign: 'left', color: '#718096', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
                     {label} {sortKey === key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                   </th>
                 ))}
@@ -344,11 +381,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                   <td style={{ padding: '0.6rem 0.75rem', fontWeight: '600', color: '#2C3E50' }}>{s.full_name || '—'}</td>
                   <td style={{ padding: '0.6rem 0.75rem' }}>
                     {s.level ? (
-                      <span style={{
-                        padding: '2px 8px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: '700',
-                        background: s.level?.startsWith('A') ? '#c6f6d5' : s.level?.startsWith('B') ? '#bee3f8' : '#fbd38d',
-                        color: s.level?.startsWith('A') ? '#276749' : s.level?.startsWith('B') ? '#2a69ac' : '#744210',
-                      }}>{s.level}</span>
+                      <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: '700', background: s.level?.startsWith('A') ? '#c6f6d5' : s.level?.startsWith('B') ? '#bee3f8' : '#fbd38d', color: s.level?.startsWith('A') ? '#276749' : s.level?.startsWith('B') ? '#2a69ac' : '#744210' }}>{s.level}</span>
                     ) : '—'}
                   </td>
                   <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568' }}>{s.totalAnswers.toLocaleString()}</td>
@@ -372,11 +405,149 @@ export default function TeacherDashboard({ profile, handleLogout }) {
               ))}
             </tbody>
           </table>
-          {students.length === 0 && (
-            <p style={{ textAlign: 'center', color: '#a0aec0', padding: '2rem' }}>No student data yet.</p>
-          )}
+          {students.length === 0 && <p style={{ textAlign: 'center', color: '#a0aec0', padding: '2rem' }}>No student data yet.</p>}
         </div>
       )}
+
+      {/* ── WORD OF THE DAY SUBMISSIONS ── */}
+      <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+
+        {/* Section header — clickable to collapse */}
+        <div
+          onClick={() => setWotdOpen(o => !o)}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', cursor: 'pointer', borderBottom: wotdOpen ? '1px solid #e2e8f0' : 'none', background: '#fafafa' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.1rem' }}>📖</span>
+            <div>
+              <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: 0 }}>Word of the Day — Student Sentences</h2>
+              <p style={{ fontSize: '0.75rem', color: '#718096', margin: 0 }}>{wotdTotal} submissions · {wotdCorrect} correct · {wotdToday} today</p>
+            </div>
+          </div>
+          <span style={{ color: '#a0aec0', fontSize: '1.1rem' }}>{wotdOpen ? '▲' : '▼'}</span>
+        </div>
+
+        {wotdOpen && (
+          <div style={{ padding: '1.25rem' }}>
+
+            {wotdLoading && <p style={{ color: '#718096', textAlign: 'center', padding: '1rem' }}>Loading submissions...</p>}
+
+            {!wotdLoading && wotdTotal === 0 && (
+              <p style={{ color: '#a0aec0', textAlign: 'center', padding: '1rem' }}>No submissions yet — check back once students have used the Word of the Day!</p>
+            )}
+
+            {!wotdLoading && wotdTotal > 0 && (
+              <>
+                {/* Filter bar */}
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+                  {[
+                    ['all',       'All',       '#667eea'],
+                    ['today',     'Today',     '#48bb78'],
+                    ['correct',   '✅ Correct', '#38a169'],
+                    ['incorrect', '❌ Incorrect','#e53e3e'],
+                  ].map(([val, label, colour]) => (
+                    <button
+                      key={val}
+                      onClick={() => setWotdFilter(val)}
+                      style={{
+                        padding: '0.35rem 0.9rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer', border: `2px solid ${wotdFilter === val ? colour : '#e2e8f0'}`,
+                        background: wotdFilter === val ? colour : 'white',
+                        color: wotdFilter === val ? 'white' : '#718096',
+                        transition: 'all 0.15s'
+                      }}
+                    >{label}</button>
+                  ))}
+                  <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: '#a0aec0', alignSelf: 'center' }}>
+                    {filteredSubs.length} submission{filteredSubs.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+
+                {/* Grouped by word */}
+                {groupedWords.length === 0 && (
+                  <p style={{ color: '#a0aec0', textAlign: 'center', padding: '1rem' }}>No submissions match this filter.</p>
+                )}
+
+                {groupedWords.map(({ word, subs }) => {
+                  const levelColour = word.level === 'A1/A2' ? '#48bb78' : word.level === 'B1/B2' ? '#4299e1' : '#ed8936'
+                  const correctCount = subs.filter(s => s.is_correct).length
+                  return (
+                    <div key={word.id} style={{ marginBottom: '1.5rem' }}>
+                      {/* Word header */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '1.15rem', fontWeight: '800', color: '#2C3E50' }}>{word.word}</span>
+                        <span style={{ fontSize: '0.75rem', color: '#a0aec0', fontStyle: 'italic' }}>{word.part_of_speech}</span>
+                        <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: '700', background: levelColour + '22', color: levelColour }}>{word.level}</span>
+                        {word.language === 'es' && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: '700', background: '#fff0f0', color: '#e53e3e' }}>🇪🇸 Spanish</span>}
+                        <span style={{ fontSize: '0.75rem', color: '#a0aec0' }}>
+                          {new Date(word.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </span>
+                        <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: '#718096', fontWeight: '600' }}>
+                          {correctCount}/{subs.length} correct
+                        </span>
+                      </div>
+
+                      {/* Submissions for this word */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {subs.map(sub => {
+                          const studentProfile = wotdProfileMap[sub.student_id]
+                          return (
+                            <div key={sub.id} style={{
+                              display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
+                              background: sub.is_correct ? '#f0fff4' : '#fff5f5',
+                              border: `1px solid ${sub.is_correct ? '#c6f6d5' : '#fed7d7'}`,
+                              borderRadius: '10px', padding: '0.75rem 1rem'
+                            }}>
+                              {/* Avatar */}
+                              <div style={{
+                                width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
+                                background: sub.is_correct ? 'linear-gradient(135deg, #48bb78, #38a169)' : 'linear-gradient(135deg, #fc8181, #e53e3e)',
+                                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontWeight: '700', fontSize: '0.8rem'
+                              }}>
+                                {initials(studentProfile?.full_name)}
+                              </div>
+
+                              {/* Content */}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '0.25rem' }}>
+                                  <span style={{ fontWeight: '600', color: '#2C3E50', fontSize: '0.85rem' }}>
+                                    {studentProfile?.full_name || 'Unknown'}
+                                  </span>
+                                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                                    {studentProfile?.level && (
+                                      <span style={{ padding: '1px 7px', borderRadius: '99px', fontSize: '0.68rem', fontWeight: '700', background: studentProfile.level?.startsWith('A') ? '#c6f6d5' : studentProfile.level?.startsWith('B') ? '#bee3f8' : '#fbd38d', color: studentProfile.level?.startsWith('A') ? '#276749' : studentProfile.level?.startsWith('B') ? '#2a69ac' : '#744210' }}>
+                                        {studentProfile.level}
+                                      </span>
+                                    )}
+                                    <span style={{ fontSize: '0.72rem', color: '#a0aec0' }}>{formatDate(sub.submitted_at)}</span>
+                                    {sub.is_soft_pass && <span style={{ fontSize: '0.68rem', background: '#fbd38d', color: '#744210', padding: '1px 6px', borderRadius: '99px', fontWeight: '600' }}>soft pass</span>}
+                                  </div>
+                                </div>
+
+                                {/* Student's sentence */}
+                                <p style={{ margin: '0 0 0.35rem', fontSize: '0.9rem', color: '#2d3748', fontStyle: 'italic' }}>
+                                  "{sub.sentence}"
+                                </p>
+
+                                {/* AI feedback */}
+                                {sub.ai_feedback && (
+                                  <p style={{ margin: 0, fontSize: '0.78rem', color: sub.is_correct ? '#276749' : '#9b2c2c', lineHeight: '1.4' }}>
+                                    {sub.is_correct ? '✅ ' : '❌ '}{sub.ai_feedback}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
