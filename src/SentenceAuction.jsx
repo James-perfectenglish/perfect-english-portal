@@ -360,22 +360,13 @@ export default function SentenceAuction({ onBack, onComplete }) {
             </div>
           )}
 
-          {/* Theme + level/topic pills */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
-            {auctionLevel && (
-              <span style={{ background: levelColour.bg, color: levelColour.text, padding: '3px 10px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 600 }}>
-                {auctionLevel}
-              </span>
-            )}
-            {auction?.topic && (
-              <span style={{ background: levelColour.bg, color: levelColour.text, padding: '3px 10px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 600 }}>
-                {auction.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-              </span>
-            )}
-          </div>
-
+          {/* Theme pill in level colour */}
           {auction?.question && auction.question.trim() && (
-            <div style={{ fontSize: '1rem', color: '#4a5568', fontStyle: 'italic', marginBottom: '14px', lineHeight: 1.5 }}>{auction.question}</div>
+            <div style={{ marginBottom: '16px' }}>
+              <span style={{ background: levelColour.bg, color: levelColour.text, padding: '5px 14px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600 }}>
+                {auction.question}
+              </span>
+            </div>
           )}
 
           {stage === 'bidding' && (

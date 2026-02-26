@@ -64,42 +64,22 @@ const findErrorIndex = (questionWords, correctAnswer) => {
   return { index: -1, correctWord: '' };
 };
 
-// Call the Anthropic API to soft-mark a correction at B2/C1/C2
+// Call our serverless function to soft-mark a correction at B2/C1/C2
 const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement, correctAnswerSentence) => {
   try {
-    const prompt = `You are marking an English error correction exercise.
-
-Original sentence (contains one error): "${originalSentence}"
-The error word is: "${errorWord}"
-The student replaced it with: "${studentReplacement}"
-The model answer is: "${correctAnswerSentence}"
-
-Decide: is the student's replacement grammatically correct AND does it fix the error in the original sentence?
-Only answer YES if their word genuinely works as a valid correction, even if different from the model answer.
-Answer NO if it is grammatically wrong, changes the meaning inappropriately, or does not fix the error.
-
-Reply with exactly one JSON object and nothing else:
-{"valid": true, "reason": "one short sentence explaining why it works"}
-or
-{"valid": false, "reason": "one short sentence explaining why it does not work"}`;
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/mark-correction', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 120,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      body: JSON.stringify({ originalSentence, errorWord, studentReplacement, correctAnswerSentence })
     });
-
-    const data = await response.json();
-    const text = data.content?.find(b => b.type === 'text')?.text || '';
-    const clean = text.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean);
+    if (!response.ok) return null;
+    const result = await response.json();
+    // valid: null means the API itself errored — fall through to normal fail
+    if (result.valid === null) return null;
+    return result;
   } catch (e) {
     console.error('AI marking error:', e);
-    return null; // fall through to normal fail if API errors
+    return null; // fall through to normal fail if request errors
   }
 };
 
