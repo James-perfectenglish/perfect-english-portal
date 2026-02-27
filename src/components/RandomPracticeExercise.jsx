@@ -29,7 +29,6 @@ if (typeof document !== 'undefined' && !document.getElementById(RP_STYLE_ID)) {
   document.head.appendChild(style);
 }
 
-// Proper Fisher-Yates shuffle — gives truly random order
 function shuffleArray(arr) {
   const shuffled = [...arr];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -68,31 +67,23 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const [bestScore, setBestScore] = useState(null);
   const [averageScore, setAverageScore] = useState(null);
 
-  // Local score history — survives across rounds, no async needed
   const allScoresRef = useRef([]);
 
-  // OOO state
   const [oooSelected, setOooSelected] = useState(null);
 
-  // EC state
   const [ecSelectedWordIndex, setEcSelectedWordIndex] = useState(null);
   const [ecCorrection, setEcCorrection] = useState('');
 
-  // Matching state — matchingDone becomes true once MatchingPairs fires onResult
   const [matchingDone, setMatchingDone] = useState(false);
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [stage]);
+  useEffect(() => { window.scrollTo(0, 0); }, [stage]);
 
   const getLevelKey = () => {
     if (levels && levels.length > 0) return levels.sort().join('-');
     return 'all';
   };
 
-  useEffect(() => {
-    loadScoreHistory();
-  }, []);
+  useEffect(() => { loadScoreHistory(); }, []);
 
   const loadScoreHistory = async () => {
     try {
@@ -108,9 +99,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       const scores = attempts
         .filter(a => a.answers && a.answers.practice_type === 'random_practice' && a.answers.levels === levelKey)
         .map(a => a.score);
-      if (scores.length > 0) {
-        allScoresRef.current = scores;
-      }
+      if (scores.length > 0) allScoresRef.current = scores;
     } catch (error) {
       console.error('Error loading score history:', error);
     }
@@ -184,10 +173,10 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         queryForType('odd_one_out'),
         queryForType('error_correction'),
         (() => {
-  let q = supabase.from('question_bank').select('*').eq('type', 'matching').is('sequence_group', null);
-  if (levels && levels.length > 0) q = q.in('level', levels);
-  return q;
-})(),
+          let q = supabase.from('question_bank').select('*').eq('type', 'matching').is('sequence_group', null);
+          if (levels && levels.length > 0) q = q.in('level', levels);
+          return q;
+        })(),
       ]);
 
       if (gfRes.error || mcRes.error || sbRes.error || oooRes.error || ecRes.error || matchRes.error) {
@@ -269,13 +258,18 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         feedbackMessage = `❌ Incorrect. The correct answer is: "${correctAnswers[0] || 'N/A'}". ${currentQuestion.explanation}`;
       }
       saveAnswer(currentQuestion, userAnswer.trim(), isCorrect);
+
     } else if (currentQuestion.type === 'multiple_choice') {
-      if (selectedOption === currentQuestion.correct_answer) {
+      const correctAnswers = Array.isArray(currentQuestion.correct_answers)
+        ? currentQuestion.correct_answers
+        : JSON.parse(currentQuestion.correct_answers || '[]');
+      const mcCorrect = currentQuestion.correct_answer || correctAnswers[0] || '';
+      if (selectedOption === mcCorrect) {
         isCorrect = true;
         feedbackMessage = `✅ Correct! ${currentQuestion.explanation}`;
         feedbackType = 'correct';
       } else {
-        feedbackMessage = `❌ Incorrect. The correct answer is: "${currentQuestion.correct_answer}". ${currentQuestion.explanation}`;
+        feedbackMessage = `❌ Incorrect. The correct answer is: "${mcCorrect}". ${currentQuestion.explanation}`;
       }
       saveAnswer(currentQuestion, selectedOption || '', isCorrect);
     }
@@ -284,7 +278,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     if (isCorrect) setScore(score + 1);
   };
 
-  // OOO handler
   const handleOOOSelect = (option) => {
     if (feedback) return;
     setOooSelected(option);
@@ -302,7 +295,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     saveAnswer(cq, option, isCorrect);
   };
 
-  // EC handlers
   const handleECWordTap = (index) => {
     if (feedback) return;
     setEcSelectedWordIndex(index);
@@ -335,7 +327,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     saveAnswer(cq, `${words[ecSelectedWordIndex]} → ${ecCorrection.trim()}`, isCorrect);
   };
 
-  // SB handler
   const handleSentenceBuildingResult = (isCorrect, isSoft = false, userAnswer = '') => {
     const cq = questions[currentQuestionIndex];
     if (isCorrect) {
@@ -356,7 +347,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     }
   };
 
-  // Matching handler — called by MatchingPairs when all pairs are matched
   const handleMatchingResult = (isCorrect, wrongAttempts) => {
     const cq = questions[currentQuestionIndex];
     setMatchingDone(true);
@@ -409,14 +399,12 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const displayGradient = gradient || 'linear-gradient(135deg, #3498DB, #667eea)';
   const scorePercent = questions.length > 0 ? (score / questions.length) * 100 : 0;
 
-  // Parse matching pairs for current question (only when type is matching)
   const matchingPairs = currentQuestion?.type === 'matching'
     ? (Array.isArray(currentQuestion.options)
       ? currentQuestion.options
       : JSON.parse(currentQuestion.options || '[]'))
     : null;
 
-  // OOO option style
   const getOOOStyle = (option) => {
     const base = {
       padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)',
@@ -441,7 +429,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     return { ...base, opacity: 0.5 };
   };
 
-  // EC word tile style
   const getECTileStyle = (index) => {
     const base = {
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -522,7 +509,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         {/* ── PLAYING SCREEN ── */}
         {stage === 'playing' && currentQuestion && (
           <div style={{ width: '100%', maxWidth: '700px', margin: '0 auto' }}>
-            {/* Progress bar + counter */}
             <div style={{
               display: 'flex', justifyContent: 'space-between', marginBottom: '1rem',
               fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2C3E50', fontWeight: '500',
@@ -538,7 +524,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
               }} />
             </div>
 
-            {/* Question Card */}
             <div style={{
               backgroundColor: 'white',
               padding: 'clamp(1.5rem, 5vw, 2.5rem)',
@@ -589,7 +574,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 )}
               </div>
 
-              {/* Question Text — skip for SB, EC, and matching (they render their own) */}
+              {/* Question Text */}
               {currentQuestion.type !== 'sentence_building' &&
                currentQuestion.type !== 'error_correction' &&
                currentQuestion.type !== 'matching' &&
@@ -798,7 +783,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   </div>
                 )}
 
-                {/* ── FEEDBACK (non-SB types) ── */}
+                {/* ── FEEDBACK ── */}
                 {feedback && currentQuestion.type !== 'sentence_building' && (
                   <div style={{
                     backgroundColor: feedback.isCorrect ? '#d4edda' : '#f8d7da',
@@ -812,7 +797,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
               {/* ── Buttons ── */}
               <div style={{ marginTop: '1.5rem' }}>
-                {/* Check Answer button — not for SB, OOO, EC, or matching */}
                 {!feedback &&
                  currentQuestion.type !== 'sentence_building' &&
                  currentQuestion.type !== 'odd_one_out' &&
@@ -836,7 +820,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   >Check Answer</button>
                 )}
 
-                {/* Next button — appears after feedback for all types */}
                 {feedback && (
                   <button
                     onClick={nextQuestion}
