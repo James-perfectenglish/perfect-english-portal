@@ -320,7 +320,10 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       ? cq.correct_answers
       : JSON.parse(cq.correct_answers || '[]');
     const correctedWords = [...words];
-    correctedWords[ecSelectedWordIndex] = ecCorrection.trim();
+    const originalWord = words[ecSelectedWordIndex];
+    const trailingPunct = originalWord.match(/[.,!?;:]+$/)?.[0] || '';
+    const cleanCorrection = ecCorrection.trim().replace(/[.,!?;:]+$/, '');
+    correctedWords[ecSelectedWordIndex] = cleanCorrection + trailingPunct;
     const correctedSentence = correctedWords.join(' ');
     const isCorrect = correctAnswers.some(ca => normaliseEC(correctedSentence) === normaliseEC(ca));
     const errorInfo = findErrorIndex(words, correctAnswers[0]);

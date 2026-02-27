@@ -74,12 +74,11 @@ const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement,
     });
     if (!response.ok) return null;
     const result = await response.json();
-    // valid: null means the API itself errored — fall through to normal fail
     if (result.valid === null) return null;
     return result;
   } catch (e) {
     console.error('AI marking error:', e);
-    return null; // fall through to normal fail if request errors
+    return null;
   }
 };
 
@@ -153,8 +152,12 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
     const words = q.question.trim().split(/\s+/);
     const correctAnswers = Array.isArray(q.correct_answers) ? q.correct_answers : JSON.parse(q.correct_answers || '[]');
 
+    // ── Carry trailing punctuation from the tapped word onto the correction ──
+    const originalWord = words[selectedWordIndex];
+    const trailingPunct = originalWord.match(/[.,!?;:]+$/)?.[0] || '';
+    const cleanCorrection = correction.trim().replace(/[.,!?;:]+$/, '');
     const correctedWords = [...words];
-    correctedWords[selectedWordIndex] = correction.trim();
+    correctedWords[selectedWordIndex] = cleanCorrection + trailingPunct;
     const correctedSentence = correctedWords.join(' ');
 
     const isExactMatch = correctAnswers.some(ca => normalise(correctedSentence) === normalise(ca));
@@ -167,9 +170,9 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
         type: 'pass',
         message: `✅ Correct! ${q.explanation || ''}`,
         errorIndex: selectedWordIndex,
-        correctWord: correction.trim()
+        correctWord: cleanCorrection + trailingPunct
       });
-      saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, true, false);
+      saveAnswer(q, `${words[selectedWordIndex]} → ${cleanCorrection + trailingPunct}`, true, false);
       return;
     }
 
@@ -193,13 +196,13 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
           type: 'soft-pass',
           message: `✅ Good — that works too! ${aiResult.reason} The model answer was "${errorInfo.correctWord}". ${q.explanation || ''}`,
           errorIndex: selectedWordIndex,
-          correctWord: correction.trim()
+          correctWord: cleanCorrection + trailingPunct
         });
         saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, true, true);
         return;
       }
 
-      // AI said no — but give useful feedback on whether they at least found the right word
+      // AI said no — give useful feedback
       const foundRightWord = selectedWordIndex === errorInfo.index;
       let message;
       if (foundRightWord) {
