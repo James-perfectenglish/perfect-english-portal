@@ -224,24 +224,26 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const checkAnswer = () => {
     const currentQuestion = questions[currentQuestionIndex];
     let isCorrect = false;
-    let feedbackMessage = '';
     let feedbackType = 'incorrect';
+    let explanation = currentQuestion.explanation || '';
 
     if (currentQuestion.type === 'gap_fill') {
       const answer = userAnswer.toLowerCase().trim();
       const correctAnswers = Array.isArray(currentQuestion.correct_answers)
         ? currentQuestion.correct_answers.map(a => a.toLowerCase().trim())
         : [];
+
       if (correctAnswers.includes(answer)) {
         isCorrect = true;
-        feedbackMessage = `✅ Correct! ${currentQuestion.explanation}`;
         feedbackType = 'correct';
       } else if (currentQuestion.informal_accepted && Array.isArray(currentQuestion.informal_accepted)) {
         const informalAnswers = currentQuestion.informal_accepted.map(a => a.toLowerCase().trim());
         if (informalAnswers.includes(answer)) {
           isCorrect = true;
-          feedbackMessage = `✅ Correct! ${currentQuestion.informal_feedback || ''} ${currentQuestion.explanation}`;
           feedbackType = 'informal';
+          if (currentQuestion.informal_feedback) {
+            explanation = `${currentQuestion.informal_feedback} ${explanation}`;
+          }
         }
       }
       if (!isCorrect && currentQuestion.acceptable_alternatives && Array.isArray(currentQuestion.acceptable_alternatives)) {
@@ -250,13 +252,18 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         );
         if (alternative) {
           isCorrect = true;
-          feedbackMessage = `✅ ${alternative.feedback} ${currentQuestion.explanation}`;
           feedbackType = 'alternative';
+          explanation = `${alternative.feedback} ${explanation}`;
         }
       }
-      if (!isCorrect) {
-        feedbackMessage = `❌ Incorrect. The correct answer is: "${correctAnswers[0] || 'N/A'}". ${currentQuestion.explanation}`;
-      }
+
+      setFeedback({
+        type: feedbackType,
+        isCorrect,
+        studentAnswer: userAnswer.trim(),
+        correctAnswer: correctAnswers[0] || 'N/A',
+        explanation,
+      });
       saveAnswer(currentQuestion, userAnswer.trim(), isCorrect);
 
     } else if (currentQuestion.type === 'multiple_choice') {
@@ -266,15 +273,19 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       const mcCorrect = currentQuestion.correct_answer || correctAnswers[0] || '';
       if (selectedOption === mcCorrect) {
         isCorrect = true;
-        feedbackMessage = `✅ Correct! ${currentQuestion.explanation}`;
         feedbackType = 'correct';
-      } else {
-        feedbackMessage = `❌ Incorrect. The correct answer is: "${mcCorrect}". ${currentQuestion.explanation}`;
       }
+
+      setFeedback({
+        type: feedbackType,
+        isCorrect,
+        studentAnswer: selectedOption || '',
+        correctAnswer: mcCorrect,
+        explanation,
+      });
       saveAnswer(currentQuestion, selectedOption || '', isCorrect);
     }
 
-    setFeedback({ message: feedbackMessage, type: feedbackType, isCorrect });
     if (isCorrect) setScore(score + 1);
   };
 
@@ -453,6 +464,73 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const ecWords = currentQuestion && currentQuestion.type === 'error_correction'
     ? currentQuestion.question.trim().split(/\s+/)
     : [];
+
+  // ── Structured feedback panel for gap_fill and multiple_choice ──
+  const renderStructuredFeedback = () => {
+    if (!feedback || !currentQuestion) return null;
+    if (currentQuestion.type !== 'gap_fill' && currentQuestion.type !== 'multiple_choice') return null;
+
+    const isCorrect = feedback.isCorrect;
+    const borderColor = isCorrect ? '#48bb78' : '#f56565';
+    const bgColor = isCorrect ? '#f0fff4' : '#fff5f5';
+    const headerBg = isCorrect ? '#48bb78' : '#f56565';
+
+    return (
+      <div style={{
+        marginTop: '1rem',
+        borderRadius: '12px',
+        border: `2px solid ${borderColor}`,
+        overflow: 'hidden',
+        fontSize: 'clamp(0.95rem, 3vw, 1.05rem)',
+      }}>
+        {/* Header */}
+        <div style={{
+          backgroundColor: headerBg,
+          color: 'white',
+          padding: '0.6rem 1rem',
+          fontWeight: '700',
+          fontSize: 'clamp(0.95rem, 3vw, 1.05rem)',
+        }}>
+          {isCorrect ? '✅ Correct!' : '❌ Incorrect'}
+        </div>
+
+        {/* Body */}
+        <div style={{ backgroundColor: bgColor, padding: '1rem' }}>
+
+          {/* Your answer */}
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem', alignItems: 'flex-start' }}>
+            <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px' }}>
+              Your answer:
+            </span>
+            <span style={{
+              fontWeight: '600',
+              color: isCorrect ? '#276749' : '#c53030',
+              wordBreak: 'break-word',
+            }}>
+              {feedback.studentAnswer || '(no answer)'}
+            </span>
+          </div>
+
+          {/* Correct answer — always shown so students can confirm even when correct */}
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'flex-start' }}>
+            <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px' }}>
+              Correct answer:
+            </span>
+            <span style={{ fontWeight: '700', color: '#276749', wordBreak: 'break-word' }}>
+              {feedback.correctAnswer}
+            </span>
+          </div>
+
+          {/* Divider */}
+          {feedback.explanation && (
+            <div style={{ borderTop: `1px solid ${borderColor}`, paddingTop: '0.75rem', color: '#4a5568', lineHeight: '1.6' }}>
+              💡 {feedback.explanation}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div style={{ width: '100%', minHeight: '100vh', backgroundColor: '#f8f9fa', boxSizing: 'border-box' }}>
@@ -634,6 +712,35 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   </div>
                 )}
 
+                {/* ── MULTIPLE CHOICE: show options greyed out after answer ── */}
+                {currentQuestion.type === 'multiple_choice' && feedback && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                    {currentQuestion.options.map((option, index) => {
+                      const isCorrectOption = option === feedback.correctAnswer;
+                      const wasSelected = option === feedback.studentAnswer;
+                      let bg = '#f7fafc';
+                      let border = '#e2e8f0';
+                      let color = '#a0aec0';
+                      if (isCorrectOption) { bg = '#f0fff4'; border = '#48bb78'; color = '#276749'; }
+                      else if (wasSelected && !feedback.isCorrect) { bg = '#fff5f5'; border = '#f56565'; color = '#c53030'; }
+                      return (
+                        <div key={index} style={{
+                          padding: '0.9rem 1.2rem',
+                          fontSize: 'clamp(1rem, 3.5vw, 1.1rem)',
+                          backgroundColor: bg,
+                          color,
+                          border: `2px solid ${border}`,
+                          borderRadius: '10px',
+                          fontWeight: isCorrectOption || wasSelected ? '600' : '400',
+                          wordWrap: 'break-word',
+                        }}>
+                          {isCorrectOption ? '✓ ' : wasSelected && !feedback.isCorrect ? '✗ ' : ''}{option}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* ── SENTENCE BUILDING ── */}
                 {currentQuestion.type === 'sentence_building' && (
                   <SentenceBuildingInput
@@ -783,8 +890,13 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   </div>
                 )}
 
-                {/* ── FEEDBACK ── */}
-                {feedback && currentQuestion.type !== 'sentence_building' && (
+                {/* ── STRUCTURED FEEDBACK (gap_fill + multiple_choice) ── */}
+                {renderStructuredFeedback()}
+
+                {/* ── SIMPLE FEEDBACK (all other types) ── */}
+                {feedback && currentQuestion.type !== 'sentence_building' &&
+                 currentQuestion.type !== 'gap_fill' &&
+                 currentQuestion.type !== 'multiple_choice' && (
                   <div style={{
                     backgroundColor: feedback.isCorrect ? '#d4edda' : '#f8d7da',
                     color: feedback.isCorrect ? '#155724' : '#721c24',
