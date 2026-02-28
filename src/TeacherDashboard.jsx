@@ -25,6 +25,12 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
+function latestOf(...dates) {
+  const valid = dates.filter(Boolean)
+  if (valid.length === 0) return null
+  return valid.reduce((best, d) => new Date(d) > new Date(best) ? d : best)
+}
+
 function exportCSV(students) {
   const headers = ['Name', 'Level', 'Questions Answered', 'Accuracy %', 'Lessons Passed', 'Listening Done', 'Best Type', 'Worst Type', 'Last Active']
   const rows = students.map(s => [
@@ -60,7 +66,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
   const [wotdWords, setWotdWords]             = useState([])
   const [wotdLoading, setWotdLoading]         = useState(true)
   const [wotdOpen, setWotdOpen]               = useState(true)
-  const [wotdFilter, setWotdFilter]           = useState('all') // all | today | correct | incorrect
+  const [wotdFilter, setWotdFilter]           = useState('all')
   const [wotdProfileMap, setWotdProfileMap]   = useState({})
 
   useEffect(() => { fetchAllData(); fetchWotdData() }, [])
@@ -76,7 +82,8 @@ export default function TeacherDashboard({ profile, handleLogout }) {
 
     const ids = profiles.map(p => p.id)
 
-    const totalCountsPromises  = ids.map(id =>
+    // ── Answer counts ──
+    const totalCountsPromises   = ids.map(id =>
       supabase.from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', id)
     )
     const correctCountsPromises = ids.map(id =>
@@ -92,13 +99,15 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       correctMap[id] = correctResults[i].count || 0
     })
 
+    // ── Recent answers for type breakdown + answered_at for lastActive ──
     const { data: answers } = await supabase
       .from('student_answers')
-      .select('student_id, is_correct, question_id')
+      .select('student_id, is_correct, question_id, answered_at')
       .in('student_id', ids)
       .order('answered_at', { ascending: false })
-      .limit(500)
+      .limit(2000)
 
+    // ── Attempts ──
     const { data: attempts } = await supabase
       .from('student_attempts')
       .select('student_id, score, completed_at, answers')
@@ -106,6 +115,15 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       .order('completed_at', { ascending: false })
       .limit(1000)
 
+    // ── Listening sessions ──
+    const { data: listeningSessions } = await supabase
+      .from('listening_sessions')
+      .select('student_id, completed_at')
+      .in('student_id', ids)
+      .order('completed_at', { ascending: false })
+      .limit(500)
+
+    // Listening completed counts
     const listenCountsPromises = ids.map(id =>
       supabase.from('listening_sessions').select('*', { count: 'exact', head: true })
         .eq('student_id', id).eq('stage_reached', 'review')
@@ -114,6 +132,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     const listenMap = {}
     ids.forEach((id, i) => { listenMap[id] = listenResults[i].count || 0 })
 
+    // ── Question type map ──
     let typeMap = {}
     if (answers && answers.length > 0) {
       const questionIds = [...new Set(answers.map(a => a.question_id).filter(Boolean))]
@@ -126,6 +145,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       }
     }
 
+    // ── Build student map ──
     const studentMap = {}
     profiles.forEach(p => {
       studentMap[p.id] = {
@@ -134,14 +154,20 @@ export default function TeacherDashboard({ profile, handleLogout }) {
         correctAnswers: correctMap[p.id] || 0,
         listeningCompleted: listenMap[p.id] || 0,
         accuracy: 0, lessonsPassed: 0, lastActive: null,
+        lastAnswered: null, lastListened: null, lastAttempt: null,
         typeStats: {}, bestType: null, worstType: null,
       }
     })
 
+    // ── Track latest answered_at per student ──
     if (answers) {
       answers.forEach(a => {
         const s = studentMap[a.student_id]
         if (!s) return
+        // lastAnswered
+        if (!s.lastAnswered || new Date(a.answered_at) > new Date(s.lastAnswered))
+          s.lastAnswered = a.answered_at
+        // type breakdown
         const type = typeMap[a.question_id]
         if (type) {
           if (!s.typeStats[type]) s.typeStats[type] = { correct: 0, total: 0 }
@@ -151,11 +177,23 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       })
     }
 
+    // ── Track latest listening session per student ──
+    if (listeningSessions) {
+      listeningSessions.forEach(ls => {
+        const s = studentMap[ls.student_id]
+        if (!s) return
+        if (!s.lastListened || new Date(ls.completed_at) > new Date(s.lastListened))
+          s.lastListened = ls.completed_at
+      })
+    }
+
+    // ── Track latest attempt + lessonsPassed ──
     if (attempts) {
       attempts.forEach(a => {
         const s = studentMap[a.student_id]
         if (!s) return
-        if (!s.lastActive || new Date(a.completed_at) > new Date(s.lastActive)) s.lastActive = a.completed_at
+        if (!s.lastAttempt || new Date(a.completed_at) > new Date(s.lastAttempt))
+          s.lastAttempt = a.completed_at
         const total = a.answers?.total_questions
         let pct = a.score
         if (total && total > 0) pct = Math.round((a.score / total) * 100)
@@ -164,7 +202,9 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       })
     }
 
+    // ── Derive lastActive from all three sources ──
     Object.values(studentMap).forEach(s => {
+      s.lastActive = latestOf(s.lastAnswered, s.lastListened, s.lastAttempt)
       s.accuracy = s.totalAnswers > 0 ? Math.round((s.correctAnswers / s.totalAnswers) * 100) : 0
       const typeEntries = Object.entries(s.typeStats)
         .filter(([, d]) => d.total >= 5)
@@ -183,7 +223,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
   async function fetchWotdData() {
     setWotdLoading(true)
 
-    // Get all submissions with word details
     const { data: subs } = await supabase
       .from('word_of_the_day_submissions')
       .select(`
@@ -202,7 +241,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       .limit(200)
 
     if (subs && subs.length > 0) {
-      // Get student names
       const studentIds = [...new Set(subs.map(s => s.student_id))]
       const { data: profiles } = await supabase
         .from('profiles')
@@ -212,10 +250,8 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       const profileMap = {}
       if (profiles) profiles.forEach(p => { profileMap[p.id] = p })
       setWotdProfileMap(profileMap)
-
       setWotdSubmissions(subs)
 
-      // Unique words that have been submitted
       const wordMap = {}
       subs.forEach(s => {
         if (s.word_of_the_day) wordMap[s.word_of_the_day.id] = s.word_of_the_day
@@ -250,16 +286,14 @@ export default function TeacherDashboard({ profile, handleLogout }) {
   const totalQuestions = students.reduce((sum, s) => sum + s.totalAnswers, 0)
   const totalListening = students.reduce((sum, s) => sum + s.listeningCompleted, 0)
 
-  // WOTD filtered submissions
   const today = new Date().toISOString().split('T')[0]
   const filteredSubs = wotdSubmissions.filter(s => {
-    if (wotdFilter === 'today')    return s.word_of_the_day?.date === today
-    if (wotdFilter === 'correct')  return s.is_correct
+    if (wotdFilter === 'today')     return s.word_of_the_day?.date === today
+    if (wotdFilter === 'correct')   return s.is_correct
     if (wotdFilter === 'incorrect') return !s.is_correct
     return true
   })
 
-  // Group by word date for display
   const subsByWord = {}
   filteredSubs.forEach(s => {
     const key = s.word_of_the_day?.id
@@ -412,7 +446,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       {/* ── WORD OF THE DAY SUBMISSIONS ── */}
       <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
 
-        {/* Section header — clickable to collapse */}
         <div
           onClick={() => setWotdOpen(o => !o)}
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', cursor: 'pointer', borderBottom: wotdOpen ? '1px solid #e2e8f0' : 'none', background: '#fafafa' }}
@@ -438,19 +471,19 @@ export default function TeacherDashboard({ profile, handleLogout }) {
 
             {!wotdLoading && wotdTotal > 0 && (
               <>
-                {/* Filter bar */}
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
                   {[
-                    ['all',       'All',       '#667eea'],
-                    ['today',     'Today',     '#48bb78'],
-                    ['correct',   '✅ Correct', '#38a169'],
+                    ['all',       'All',        '#667eea'],
+                    ['today',     'Today',      '#48bb78'],
+                    ['correct',   '✅ Correct',  '#38a169'],
                     ['incorrect', '❌ Incorrect','#e53e3e'],
                   ].map(([val, label, colour]) => (
                     <button
                       key={val}
                       onClick={() => setWotdFilter(val)}
                       style={{
-                        padding: '0.35rem 0.9rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer', border: `2px solid ${wotdFilter === val ? colour : '#e2e8f0'}`,
+                        padding: '0.35rem 0.9rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer',
+                        border: `2px solid ${wotdFilter === val ? colour : '#e2e8f0'}`,
                         background: wotdFilter === val ? colour : 'white',
                         color: wotdFilter === val ? 'white' : '#718096',
                         transition: 'all 0.15s'
@@ -462,7 +495,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                   </span>
                 </div>
 
-                {/* Grouped by word */}
                 {groupedWords.length === 0 && (
                   <p style={{ color: '#a0aec0', textAlign: 'center', padding: '1rem' }}>No submissions match this filter.</p>
                 )}
@@ -472,7 +504,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                   const correctCount = subs.filter(s => s.is_correct).length
                   return (
                     <div key={word.id} style={{ marginBottom: '1.5rem' }}>
-                      {/* Word header */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '1.15rem', fontWeight: '800', color: '#2C3E50' }}>{word.word}</span>
                         <span style={{ fontSize: '0.75rem', color: '#a0aec0', fontStyle: 'italic' }}>{word.part_of_speech}</span>
@@ -486,7 +517,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                         </span>
                       </div>
 
-                      {/* Submissions for this word */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         {subs.map(sub => {
                           const studentProfile = wotdProfileMap[sub.student_id]
@@ -497,7 +527,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                               border: `1px solid ${sub.is_correct ? '#c6f6d5' : '#fed7d7'}`,
                               borderRadius: '10px', padding: '0.75rem 1rem'
                             }}>
-                              {/* Avatar */}
                               <div style={{
                                 width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
                                 background: sub.is_correct ? 'linear-gradient(135deg, #48bb78, #38a169)' : 'linear-gradient(135deg, #fc8181, #e53e3e)',
@@ -507,7 +536,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                                 {initials(studentProfile?.full_name)}
                               </div>
 
-                              {/* Content */}
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '0.25rem' }}>
                                   <span style={{ fontWeight: '600', color: '#2C3E50', fontSize: '0.85rem' }}>
@@ -524,12 +552,10 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                                   </div>
                                 </div>
 
-                                {/* Student's sentence */}
                                 <p style={{ margin: '0 0 0.35rem', fontSize: '0.9rem', color: '#2d3748', fontStyle: 'italic' }}>
                                   "{sub.sentence}"
                                 </p>
 
-                                {/* AI feedback */}
                                 {sub.ai_feedback && (
                                   <p style={{ margin: 0, fontSize: '0.78rem', color: sub.is_correct ? '#276749' : '#9b2c2c', lineHeight: '1.4' }}>
                                     {sub.is_correct ? '✅ ' : '❌ '}{sub.ai_feedback}

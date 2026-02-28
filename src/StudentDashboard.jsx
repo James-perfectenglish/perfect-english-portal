@@ -105,12 +105,12 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
       setStats({ total: 0, correct: 0, accuracy: 0 })
     }
 
-    // ── 3. Get recent answers for type breakdown (last 2000 is plenty) ──
+    // ── 3. Get recent answers for type breakdown + activity dates ──
     const { data: recentAnswers } = await supabase
       .from('student_answers')
-      .select('is_correct, question_id')
+      .select('is_correct, question_id, answered_at')
       .eq('student_id', userId)
-      .order('created_at', { ascending: false })
+      .order('answered_at', { ascending: false })
       .limit(2000)
 
     if (recentAnswers && recentAnswers.length > 0) {
@@ -151,8 +151,15 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         scorePercent: toPercent(a.score, a.answers)
       }))
       setLessonsPassed(normalised.filter(a => a.scorePercent >= 70).length)
-      setDaysStudied(new Set(normalised.map(a => new Date(a.completed_at).toDateString())).size)
+      // Count distinct days from both attempts AND individual answers for accuracy
+      const attemptDays = normalised.map(a => new Date(a.completed_at).toDateString())
+      const answerDays  = (recentAnswers || []).map(a => new Date(a.answered_at).toDateString())
+      setDaysStudied(new Set([...attemptDays, ...answerDays]).size)
       setAttempts([...normalised].reverse()) // chronological for chart
+    } else if (recentAnswers && recentAnswers.length > 0) {
+      // Has answered questions but no completed attempts yet
+      const answerDays = recentAnswers.map(a => new Date(a.answered_at).toDateString())
+      setDaysStudied(new Set(answerDays).size)
     }
 
     // ── 5. Get completed listening sessions ──
