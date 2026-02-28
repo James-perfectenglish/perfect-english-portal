@@ -121,6 +121,43 @@ export default function SentenceBuildingInput({
   };
 
   // =============================================
+  // ROW-AWARE DROP INDEX CALCULATION
+  // Works correctly when answer zone wraps onto multiple lines.
+  // Strategy:
+  //   1. Iterate tiles in DOM order (which matches answerWords order)
+  //   2. If cursor Y is above this tile's row → insert before it
+  //   3. If cursor Y is on this tile's row → use X midpoint to decide
+  //   4. If cursor Y is below this tile's row → keep going
+  //   Default: append at end
+  // =============================================
+  const calcDropIndex = (cursorX, cursorY) => {
+    const refs = answerRefs.current;
+    const ROW_TOLERANCE = 8; // px — accounts for sub-pixel differences within a row
+
+    for (let i = 0; i < refs.length; i++) {
+      const el = refs[i];
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+
+      const aboveTile  = cursorY < r.top - ROW_TOLERANCE;
+      const onSameRow  = cursorY >= r.top - ROW_TOLERANCE && cursorY <= r.bottom + ROW_TOLERANCE;
+
+      if (aboveTile) {
+        // Cursor is above this tile's row entirely — insert before it
+        return i;
+      }
+      if (onSameRow) {
+        // Cursor is on the same row — check X midpoint
+        if (cursorX < r.left + r.width / 2) return i;
+        // Otherwise keep scanning rightward along this row (or fall to next row)
+      }
+      // cursorY is below this tile's row — continue to next tile
+    }
+
+    return refs.length; // append at end
+  };
+
+  // =============================================
   // DRAG AND DROP
   // =============================================
   const handlePointerDown = useCallback((word, zone, e) => {
@@ -149,14 +186,7 @@ export default function SentenceBuildingInput({
         if (answerZoneRef.current) {
           const zr = answerZoneRef.current.getBoundingClientRect();
           if (t.clientY >= zr.top - 50 && t.clientY <= zr.bottom + 50) {
-            let newIdx = answerRefs.current.length;
-            for (let i = 0; i < answerRefs.current.length; i++) {
-              const el = answerRefs.current[i];
-              if (!el) continue;
-              const r = el.getBoundingClientRect();
-              if (t.clientX < r.left + r.width / 2) { newIdx = i; break; }
-            }
-            setDropIndex(newIdx);
+            setDropIndex(calcDropIndex(t.clientX, t.clientY));
           } else {
             setDropIndex(null);
           }
