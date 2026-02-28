@@ -505,22 +505,22 @@ export default function SentenceAuction({ onBack, onComplete }) {
             )}
           </div>
 
-          {/* Stats */}
+          {/* Stats — clamp font size to prevent overflow on mobile */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '24px' }}>
-            <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 0.75rem', color: 'white', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 600, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Final budget</div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{finalBudget.toLocaleString()}</div>
-              <div style={{ fontSize: '0.8rem', opacity: 0.85 }}>started with {STARTING_BUDGET.toLocaleString()} pta</div>
+            <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1rem 0.5rem', color: 'white', textAlign: 'center', overflow: 'hidden' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 600, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Final budget</div>
+              <div style={{ fontSize: 'clamp(1rem, 4.5vw, 1.8rem)', fontWeight: 700, lineHeight: 1.2 }}>{finalBudget.toLocaleString()}</div>
+              <div style={{ fontSize: '0.72rem', opacity: 0.85, marginTop: '2px' }}>started with {STARTING_BUDGET.toLocaleString()} pta</div>
             </div>
-            <div style={{ background: '#f0fff4', border: '2px solid #c6f6d5', borderRadius: '12px', padding: '1.25rem 0.75rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#718096', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Won</div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#276749' }}>+{totalGained}</div>
-              <div style={{ fontSize: '0.8rem', color: '#718096' }}>from correct bids</div>
+            <div style={{ background: '#f0fff4', border: '2px solid #c6f6d5', borderRadius: '12px', padding: '1rem 0.5rem', textAlign: 'center', overflow: 'hidden' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#718096', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Won</div>
+              <div style={{ fontSize: 'clamp(1rem, 4.5vw, 1.8rem)', fontWeight: 700, color: '#276749', lineHeight: 1.2 }}>+{totalGained}</div>
+              <div style={{ fontSize: '0.72rem', color: '#718096', marginTop: '2px' }}>from correct bids</div>
             </div>
-            <div style={{ background: '#fff5f5', border: '2px solid #fed7d7', borderRadius: '12px', padding: '1.25rem 0.75rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#718096', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Lost</div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#c53030' }}>-{totalLost}</div>
-              <div style={{ fontSize: '0.8rem', color: '#718096' }}>on wrong bids</div>
+            <div style={{ background: '#fff5f5', border: '2px solid #fed7d7', borderRadius: '12px', padding: '1rem 0.5rem', textAlign: 'center', overflow: 'hidden' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#718096', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Lost</div>
+              <div style={{ fontSize: 'clamp(1rem, 4.5vw, 1.8rem)', fontWeight: 700, color: '#c53030', lineHeight: 1.2 }}>-{totalLost}</div>
+              <div style={{ fontSize: '0.72rem', color: '#718096', marginTop: '2px' }}>on wrong bids</div>
             </div>
           </div>
 
