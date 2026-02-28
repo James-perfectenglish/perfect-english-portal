@@ -43,7 +43,54 @@ const ACTIVE_EXERCISES = [
   'Sentence Auction',
 ]
 
-function ExerciseList({ userLevel }) {
+// ── Track mapping ──
+// 'general' = shown to all students regardless of track
+// Other track names match what's stored in profiles.tracks
+const EXERCISE_TRACK_MAP = {
+  'Prepositions Practice':      ['general'],
+  'Business Phrasal Verbs':     ['general', 'business'],
+  'Office Vocabulary':          ['general', 'business'],
+  'Spanish Vocabulary':         ['spanish'],
+  'Irregular Verbs Flashcards': ['general', 'spanish'],
+  'Essential Phrasal Verbs':    ['general'],
+  'Sentence Building':          ['general'],
+  'Listening Exercises':        ['general', 'hotels'],
+  'Borrás Flashcards':          ['bathroom', 'spanish'],
+  'Borrás Memory Game':         ['bathroom', 'spanish'],
+  'Hotel Flashcards':           ['hotels'],
+  'Hotel Memory Game':          ['hotels'],
+  'Odd One Out':                ['general'],
+  'Error Correction':           ['general'],
+  'Matching':                   ['general'],
+  'Sentence Auction':           ['general'],
+}
+
+// Which tracks are "specific" — exercises tagged ONLY to these are hidden from others
+const SPECIFIC_TRACKS = ['bathroom', 'hotels', 'spanish']
+
+// Given a student's tracks array, should this exercise be shown?
+function shouldShowExercise(exerciseTitle, userTracks) {
+  // No tracks assigned = see everything (teacher view, or unassigned student)
+  if (!userTracks || userTracks.length === 0) return true
+
+  const exerciseTracks = EXERCISE_TRACK_MAP[exerciseTitle] || ['general']
+
+  // Always show general exercises
+  if (exerciseTracks.includes('general')) return true
+
+  // Show if the exercise matches any of the user's tracks
+  return exerciseTracks.some(t => userTracks.includes(t))
+}
+
+// Is this exercise specifically for the user's track(s)? (for badge + ordering)
+function isTrackExercise(exerciseTitle, userTracks) {
+  if (!userTracks || userTracks.length === 0) return false
+  const exerciseTracks = EXERCISE_TRACK_MAP[exerciseTitle] || ['general']
+  // It's a "track exercise" if it matches a specific (non-general) track the user has
+  return exerciseTracks.some(t => SPECIFIC_TRACKS.includes(t) && userTracks.includes(t))
+}
+
+function ExerciseList({ userLevel, userTracks = [] }) {
   const [exercises, setExercises] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeExercise, setActiveExercise] = useState(null)
@@ -55,17 +102,31 @@ function ExerciseList({ userLevel }) {
 
   useEffect(() => {
     fetchExercises()
-  }, [userLevel])
+  }, [userLevel, userTracks])
 
   const fetchExercises = async () => {
     const { data } = await supabase
       .from('exercises')
       .select('*')
       .order('recommended_order', { ascending: true })
+
     if (data) {
-      const recommended = data.filter(e => e.level === userLevel)
-      const others = data.filter(e => e.level !== userLevel)
-      setExercises([...recommended, ...others])
+      const hasTracks = userTracks && userTracks.length > 0
+
+      // Filter out exercises that don't belong to this student's tracks
+      const visible = data.filter(e => shouldShowExercise(e.title, userTracks))
+
+      if (hasTracks) {
+        // Track exercises first, then general ones
+        const trackOnes = visible.filter(e => isTrackExercise(e.title, userTracks))
+        const generalOnes = visible.filter(e => !isTrackExercise(e.title, userTracks))
+        setExercises([...trackOnes, ...generalOnes])
+      } else {
+        // No tracks — use level-based ordering (original behaviour)
+        const recommended = visible.filter(e => e.level === userLevel)
+        const others = visible.filter(e => e.level !== userLevel)
+        setExercises([...recommended, ...others])
+      }
     }
     setLoading(false)
   }
@@ -155,34 +216,66 @@ function ExerciseList({ userLevel }) {
     )
   }
 
+  const hasTracks = userTracks && userTracks.length > 0
+
   return (
     <div style={{ marginTop: '30px' }}>
-      <h2 style={{ color: '#2d3748', marginBottom: '5px' }}>Recommended Exercises</h2>
+      <h2 style={{ color: '#2d3748', marginBottom: '5px' }}>
+        {hasTracks ? 'Your Exercises' : 'Recommended Exercises'}
+      </h2>
       <p style={{ color: '#718096', fontSize: '0.9rem', marginBottom: '20px' }}>
-        Exercises matched to your level appear first
+        {hasTracks
+          ? 'Your track exercises appear first'
+          : 'Exercises matched to your level appear first'}
       </p>
       <div style={{ display: 'grid', gap: '20px' }}>
         {exercises.map((exercise) => {
           const isActive = ACTIVE_EXERCISES.includes(exercise.title)
+          const isTrack = isTrackExercise(exercise.title, userTracks)
+          const isLevelMatch = !hasTracks && exercise.level === userLevel
+
+          // Border colour: purple for track match, blue-ish for level match, grey otherwise
+          const borderStyle = isTrack
+            ? '2px solid #667eea'
+            : isLevelMatch
+              ? '2px solid #667eea'
+              : '1px solid #e2e8f0'
+
+          const bgColour = isTrack
+            ? '#f7f8ff'
+            : isLevelMatch
+              ? '#f7f8ff'
+              : '#f9f9f9'
+
           return (
             <div
               key={exercise.id}
               style={{
-                border: exercise.level === userLevel ? '2px solid #667eea' : '1px solid #e2e8f0',
+                border: borderStyle,
                 borderRadius: '8px',
                 padding: '20px',
-                backgroundColor: exercise.level === userLevel ? '#f7f8ff' : '#f9f9f9',
+                backgroundColor: bgColour,
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '6px' }}>
                 <h3 style={{ color: '#2d3748', margin: 0 }}>{exercise.title}</h3>
-                {exercise.level === userLevel && (
-                  <span style={{
-                    background: '#667eea', color: 'white',
-                    padding: '2px 10px', borderRadius: '20px',
-                    fontSize: '0.8rem', fontWeight: 600,
-                  }}>Recommended</span>
-                )}
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {isTrack && (
+                    <span style={{
+                      background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                      color: 'white',
+                      padding: '2px 10px', borderRadius: '20px',
+                      fontSize: '0.8rem', fontWeight: 600,
+                    }}>⭐ Your Track</span>
+                  )}
+                  {isLevelMatch && (
+                    <span style={{
+                      background: '#667eea', color: 'white',
+                      padding: '2px 10px', borderRadius: '20px',
+                      fontSize: '0.8rem', fontWeight: 600,
+                    }}>Recommended</span>
+                  )}
+                </div>
               </div>
               <p style={{ color: '#4a5568', marginTop: '8px' }}>{exercise.description}</p>
               <div style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>

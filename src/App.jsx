@@ -165,7 +165,7 @@ function Dashboard({ session }) {
               {profile?.is_teacher && (
                 <li>
                   <Link to="/teacher" style={{ textDecoration: 'none', color: '#667eea', fontWeight: '700', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>
-                    👨‍💻  Teacher
+                    👨‍💻 Teacher
                   </Link>
                 </li>
               )}
@@ -211,7 +211,7 @@ function ExercisesPage({ profile }) {
       }}>
         All Exercises
       </h1>
-      <ExerciseList userLevel={profile.level} />
+      <ExerciseList userLevel={profile.level} userTracks={profile.tracks || []} />
     </div>
   )
 }
