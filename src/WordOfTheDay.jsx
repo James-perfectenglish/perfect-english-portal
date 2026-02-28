@@ -20,7 +20,7 @@ export default function WordOfTheDay({ profile }) {
   const [loading, setLoading]         = useState(true)
   const [noWord, setNoWord]           = useState(false)
 
-  const language = profile?.language || 'en'
+  const language = Array.isArray(profile?.tracks) && profile.tracks.includes('spanish') ? 'es' : 'en'
   const bucket   = levelBucket(profile?.level)
   const today    = new Date().toISOString().split('T')[0]
 
