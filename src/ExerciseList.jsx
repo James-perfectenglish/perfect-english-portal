@@ -151,7 +151,7 @@ function ExerciseList({ userLevel, userTracks = [] }) {
       <FlashcardTemplate flashcardSetId={PHRASAL_VERBS_ID} setName="phrasal-verbs" onBack={back} />
     )
     if (t === 'Sentence Building') return <SentenceBuilding onComplete={back} onBack={back} />
-    if (t === 'Listening Exercises') return <ListeningExercise onBack={back} />
+    if (t === 'Listening Exercises') return <ListeningExercise onBack={back} userTracks={userTracks} />
     if (t === 'Borrás Flashcards') return (
       <FlashcardTemplate
         title="Borrás Flashcards"

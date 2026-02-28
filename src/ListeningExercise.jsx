@@ -13,7 +13,7 @@ const SPEED_OPTIONS = [
   { label: 'Faster', value: 1.1 }
 ];
 
-export default function ListeningExercise({ onBack }) {
+export default function ListeningExercise({ onBack, userTracks = [] }) {
   const [stage, setStage]               = useState('level-select');
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [exerciseList, setExerciseList] = useState([]);
@@ -38,8 +38,17 @@ export default function ListeningExercise({ onBack }) {
 
   useEffect(() => { fetchCounts(); }, []);
 
+  // Build a Supabase query filtered by the student's tracks.
+  // If no tracks assigned, show everything (teacher / unassigned student).
+  const applyTrackFilter = (query) => {
+    if (!userTracks || userTracks.length === 0) return query;
+    return query.overlaps('tracks', userTracks);
+  };
+
   const fetchCounts = async () => {
-    const { data } = await supabase.from('listening_exercises').select('level');
+    let query = supabase.from('listening_exercises').select('level');
+    query = applyTrackFilter(query);
+    const { data } = await query;
     if (data) {
       const counts = {};
       LEVELS.forEach(lv => { counts[lv.key] = data.filter(e => lv.dbLevels.includes(e.level)).length; });
@@ -56,7 +65,13 @@ export default function ListeningExercise({ onBack }) {
 
   const fetchExerciseList = async (dbLevels) => {
     setListLoading(true);
-    const { data } = await supabase.from('listening_exercises').select('id, title, description, level, topic, duration_seconds, image_url').in('level', dbLevels).order('created_at', { ascending: true });
+    let query = supabase
+      .from('listening_exercises')
+      .select('id, title, description, level, topic, duration_seconds, image_url')
+      .in('level', dbLevels)
+      .order('created_at', { ascending: true });
+    query = applyTrackFilter(query);
+    const { data } = await query;
     if (data) setExerciseList(data);
     setListLoading(false);
   };
@@ -149,7 +164,7 @@ export default function ListeningExercise({ onBack }) {
   const submitDetail = () => { setDetailSubmitted(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
   const moveToDetail = () => {
-    saveListeningSession('gist');   // track reaching detail stage
+    saveListeningSession('gist');
     setExerciseStage('detail');
     setIsPlaying(false);
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
@@ -157,7 +172,7 @@ export default function ListeningExercise({ onBack }) {
   };
 
   const moveToReview = () => {
-    saveListeningSession('review'); // track completion
+    saveListeningSession('review');
     setExerciseStage('review');
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
