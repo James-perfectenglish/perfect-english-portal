@@ -38,19 +38,30 @@ export default function WordOfTheDay({ profile }) {
       .eq('language', language)
       .single()
 
-    // 2. Fallback — try same level, any language (en)
+    // 2. Fallback — same level, any language (catches null or non-en language rows)
     if (!wordData) {
       const { data: fallbackData } = await supabase
         .from('word_of_the_day')
         .select('*')
         .eq('date', today)
         .eq('level', bucket)
-        .eq('language', 'en')
+        .limit(1)
         .single()
       wordData = fallbackData
     }
 
-    // 3. Fallback — random word from question bank vocabulary
+    // 3. Fallback — today's date, any level, any language
+    if (!wordData) {
+      const { data: anyLevel } = await supabase
+        .from('word_of_the_day')
+        .select('*')
+        .eq('date', today)
+        .limit(1)
+        .single()
+      wordData = anyLevel
+    }
+
+    // 4. Last resort — random word from question bank vocabulary
     if (!wordData) {
       const { data: qbWord } = await supabase
         .from('question_bank')
@@ -60,7 +71,6 @@ export default function WordOfTheDay({ profile }) {
         .limit(50)
 
       if (qbWord && qbWord.length > 0) {
-        // Pick a random one and synthesise a word-of-the-day style object
         const picked = qbWord[Math.floor(Math.random() * qbWord.length)]
         const answers = Array.isArray(picked.correct_answers)
           ? picked.correct_answers
@@ -108,7 +118,6 @@ export default function WordOfTheDay({ profile }) {
     setIsMarking(true)
 
     try {
-      // Call AI marker
       const response = await fetch('/api/mark-sentence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,7 +132,6 @@ export default function WordOfTheDay({ profile }) {
 
       const result = response.ok ? await response.json() : { valid: null, feedback: '' }
       const isCorrect = result.valid === true
-      const isSoftPass = false // sentence marking is binary — correct or not
 
       setFeedback({
         valid: result.valid,
@@ -141,7 +149,7 @@ export default function WordOfTheDay({ profile }) {
               word_id:     word.id,
               sentence:    sentence.trim(),
               is_correct:  isCorrect,
-              is_soft_pass: isSoftPass,
+              is_soft_pass: false,
               ai_feedback: result.feedback
             })
             .select()
@@ -203,9 +211,6 @@ export default function WordOfTheDay({ profile }) {
           <span style={{ background: 'rgba(255,255,255,0.2)', color: 'white', padding: '2px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600' }}>
             {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
           </span>
-          {word?.from_question_bank && (
-            <span style={{ background: 'rgba(255,255,255,0.2)', color: 'white', padding: '2px 10px', borderRadius: '20px', fontSize: '0.7rem' }}>vocab pick</span>
-          )}
         </div>
       </div>
 
