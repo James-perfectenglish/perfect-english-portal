@@ -19,6 +19,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
   const [exerciseList, setExerciseList] = useState([]);
   const [exerciseCounts, setExerciseCounts] = useState({});
   const [listLoading, setListLoading]   = useState(false);
+  const [completedIds, setCompletedIds] = useState(new Set());
   const [currentExercise, setCurrentExercise] = useState(null);
   const [gistQuestions, setGistQuestions]   = useState([]);
   const [detailQuestions, setDetailQuestions] = useState([]);
@@ -73,6 +74,19 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
     query = applyTrackFilter(query);
     const { data } = await query;
     if (data) setExerciseList(data);
+
+    // Fetch which ones this student has done
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: sessions } = await supabase
+          .from('listening_sessions')
+          .select('exercise_id')
+          .eq('student_id', user.id);
+        if (sessions) setCompletedIds(new Set(sessions.map(s => s.exercise_id)));
+      }
+    } catch (e) { /* silent */ }
+
     setListLoading(false);
   };
 
@@ -369,7 +383,10 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
                       {ex.duration_seconds && <span>{Math.ceil(ex.duration_seconds / 60)} min</span>}
                     </div>
                   </div>
-                  <div style={{ fontSize: '1.3rem', color: '#cbd5e0', flexShrink: 0 }}>→</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                    {completedIds.has(ex.id) && <span style={{ fontSize: '1rem' }}>✅</span>}
+                    <span style={{ fontSize: '1.3rem', color: '#cbd5e0' }}>→</span>
+                  </div>
                 </div>
               ))}
             </div>

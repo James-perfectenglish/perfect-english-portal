@@ -137,7 +137,6 @@ export default function ExerciseList({ userLevel, userTracks = [], isTeacher = f
       { onConflict: 'student_id,exercise_title', ignoreDuplicates: true }
     )
     setOpenedTitles(prev => new Set([...prev, title]))
-    if (title === 'Listening Exercises') setHasNewListening(false)
   }
 
   const startExercise = (exercise) => {
