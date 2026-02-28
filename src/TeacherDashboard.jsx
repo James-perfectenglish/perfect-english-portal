@@ -457,7 +457,9 @@ export default function TeacherDashboard({ profile, handleLogout }) {
               <p style={{ fontSize: '0.75rem', color: '#718096', margin: 0 }}>{wotdTotal} submissions · {wotdCorrect} correct · {wotdToday} today</p>
             </div>
           </div>
-          <span style={{ color: '#a0aec0', fontSize: '1.1rem' }}>{wotdOpen ? '▲' : '▼'}</span>
+          <div style={{ background: wotdOpen ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#e2e8f0', borderRadius: '8px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
+            {wotdOpen ? '👨‍🏫' : '🔒'}
+          </div>
         </div>
 
         {wotdOpen && (
