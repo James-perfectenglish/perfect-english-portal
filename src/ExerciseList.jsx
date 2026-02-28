@@ -13,296 +13,390 @@ import OddOneOut from './OddOneOut'
 import ErrorCorrection from './ErrorCorrection'
 import MatchingExercise from './MatchingExercise'
 import SentenceAuction from './SentenceAuction'
-
-// Unified flashcard template + data
 import FlashcardTemplate from './FlashcardTemplate'
 import MemoryGame from './MemoryGame'
 import { BORRAS_CARDS } from './data/BorrasCards'
 import { HOTEL_CARDS } from './data/HotelCards'
 
-// Flashcard set IDs from Supabase
 const IRREGULAR_VERBS_ID = 1
-const PHRASAL_VERBS_ID = 2
+const PHRASAL_VERBS_ID   = 2
 
-const ACTIVE_EXERCISES = [
-  'Prepositions Practice',
-  'Business Phrasal Verbs',
-  'Office Vocabulary',
-  'Spanish Vocabulary',
-  'Irregular Verbs Flashcards',
-  'Essential Phrasal Verbs',
-  'Sentence Building',
-  'Listening Exercises',
-  'Borrás Flashcards',
-  'Borrás Memory Game',
-  'Hotel Flashcards',
-  'Hotel Memory Game',
-  'Odd One Out',
-  'Error Correction',
-  'Matching',
-  'Sentence Auction',
+const ACTIVE_EXERCISES = new Set([
+  'Prepositions Practice', 'Business Phrasal Verbs', 'Office Vocabulary',
+  'Spanish Vocabulary', 'Irregular Verbs Flashcards', 'Essential Phrasal Verbs',
+  'Sentence Building', 'Listening Exercises', 'Borrás Flashcards', 'Borrás Memory Game',
+  'Hotel Flashcards', 'Hotel Memory Game', 'Odd One Out', 'Error Correction',
+  'Matching', 'Sentence Auction',
+])
+
+const EXERCISE_ICONS = {
+  'Prepositions Practice':      '📐',
+  'Business Phrasal Verbs':     '💼',
+  'Office Vocabulary':          '🖥️',
+  'Spanish Vocabulary':         '🇪🇸',
+  'Irregular Verbs Flashcards': '📚',
+  'Essential Phrasal Verbs':    '📖',
+  'Sentence Building':          '🏗️',
+  'Listening Exercises':        '🎧',
+  'Borrás Flashcards':          '🚿',
+  'Borrás Memory Game':         '🧩',
+  'Hotel Flashcards':           '🏨',
+  'Hotel Memory Game':          '🎮',
+  'Odd One Out':                '🔍',
+  'Error Correction':           '🚨',
+  'Matching':                   '🔗',
+  'Sentence Auction':           '🏛️',
+}
+
+const TABS = [
+  { key: 'learn',    label: 'Learn'    },
+  { key: 'practice', label: 'Practice' },
+  { key: 'listen',   label: 'Listen'   },
+  { key: 'play',     label: 'Play'     },
 ]
 
-// ── Track mapping ──
-// 'general' = shown to all students regardless of track
-// Other track names match what's stored in profiles.tracks
-const EXERCISE_TRACK_MAP = {
-  'Prepositions Practice':      ['general'],
-  'Business Phrasal Verbs':     ['general', 'business'],
-  'Office Vocabulary':          ['general', 'business'],
-  'Spanish Vocabulary':         ['spanish'],
-  'Irregular Verbs Flashcards': ['general', 'spanish'],
-  'Essential Phrasal Verbs':    ['general'],
-  'Sentence Building':          ['general'],
-  'Listening Exercises':        ['general', 'hotels'],
-  'Borrás Flashcards':          ['bathroom', 'spanish'],
-  'Borrás Memory Game':         ['bathroom', 'spanish'],
-  'Hotel Flashcards':           ['hotels'],
-  'Hotel Memory Game':          ['hotels'],
-  'Odd One Out':                ['general'],
-  'Error Correction':           ['general'],
-  'Matching':                   ['general'],
-  'Sentence Auction':           ['general'],
-}
+const SPECIFIC_TRACKS = ['bathroom', 'hotels', 'spanish', 'business', 'law', 'sports']
 
-// Which tracks are "specific" — exercises tagged ONLY to these are hidden from others
-const SPECIFIC_TRACKS = ['bathroom', 'hotels', 'spanish']
-
-// Given a student's tracks array, should this exercise be shown?
-function shouldShowExercise(exerciseTitle, userTracks) {
-  // No tracks assigned = see everything (teacher view, or unassigned student)
+function shouldShowExercise(exercise, userTracks) {
   if (!userTracks || userTracks.length === 0) return true
-
-  const exerciseTracks = EXERCISE_TRACK_MAP[exerciseTitle] || ['general']
-
-  // Always show general exercises
-  if (exerciseTracks.includes('general')) return true
-
-  // Show if the exercise matches any of the user's tracks
-  return exerciseTracks.some(t => userTracks.includes(t))
+  const exTracks = exercise.tracks || ['general']
+  if (exTracks.includes('general')) return true
+  return exTracks.some(t => userTracks.includes(t))
 }
 
-// Is this exercise specifically for the user's track(s)? (for badge + ordering)
-function isTrackExercise(exerciseTitle, userTracks) {
+function isForYouFn(exercise, userTracks) {
   if (!userTracks || userTracks.length === 0) return false
-  const exerciseTracks = EXERCISE_TRACK_MAP[exerciseTitle] || ['general']
-  // It's a "track exercise" if it matches a specific (non-general) track the user has
-  return exerciseTracks.some(t => SPECIFIC_TRACKS.includes(t) && userTracks.includes(t))
+  const exTracks = exercise.tracks || ['general']
+  return exTracks.some(t => SPECIFIC_TRACKS.includes(t) && userTracks.includes(t))
 }
 
-function ExerciseList({ userLevel, userTracks = [] }) {
-  const [exercises, setExercises] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [activeExercise, setActiveExercise] = useState(null)
+export default function ExerciseList({ userLevel, userTracks = [], isTeacher = false, onTeacherClick }) {
+  const [exercises, setExercises]             = useState([])
+  const [loading, setLoading]                 = useState(true)
+  const [activeTab, setActiveTab]             = useState('learn')
+  const [isListView, setIsListView]           = useState(false)
+  const [activeExercise, setActiveExercise]   = useState(null)
+  const [openedTitles, setOpenedTitles]       = useState(new Set())
+  const [hasNewListening, setHasNewListening] = useState(false)
+
   const location = useLocation()
 
-  useEffect(() => {
-    setActiveExercise(null)
-  }, [location.key])
+  useEffect(() => { setActiveExercise(null) }, [location.key])
+  useEffect(() => { fetchAll() }, [userTracks])
 
-  useEffect(() => {
-    fetchExercises()
-  }, [userLevel, userTracks])
+  const fetchAll = async () => {
+    setLoading(true)
+    await Promise.all([fetchExercises(), fetchOpenedTitles(), fetchListeningNew()])
+    setLoading(false)
+  }
 
   const fetchExercises = async () => {
     const { data } = await supabase
       .from('exercises')
       .select('*')
       .order('recommended_order', { ascending: true })
+    if (data) setExercises(data)
+  }
 
-    if (data) {
-      const hasTracks = userTracks && userTracks.length > 0
+  const fetchOpenedTitles = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('exercise_opens')
+      .select('exercise_title')
+      .eq('student_id', user.id)
+    if (data) setOpenedTitles(new Set(data.map(r => r.exercise_title)))
+  }
 
-      // Filter out exercises that don't belong to this student's tracks
-      const visible = data.filter(e => shouldShowExercise(e.title, userTracks))
+  const fetchListeningNew = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
 
-      if (hasTracks) {
-        // Track exercises first, then general ones
-        const trackOnes = visible.filter(e => isTrackExercise(e.title, userTracks))
-        const generalOnes = visible.filter(e => !isTrackExercise(e.title, userTracks))
-        setExercises([...trackOnes, ...generalOnes])
-      } else {
-        // No tracks — use level-based ordering (original behaviour)
-        const recommended = visible.filter(e => e.level === userLevel)
-        const others = visible.filter(e => e.level !== userLevel)
-        setExercises([...recommended, ...others])
-      }
-    }
-    setLoading(false)
+    // All listenings available to this student
+    let q = supabase.from('listening_exercises').select('id')
+    if (userTracks && userTracks.length > 0) q = q.overlaps('tracks', userTracks)
+    const { data: available } = await q
+    if (!available || available.length === 0) return
+
+    // Listenings they've completed at least once
+    const { data: sessions } = await supabase
+      .from('listening_sessions')
+      .select('exercise_id')
+      .eq('student_id', user.id)
+
+    const completedIds = new Set((sessions || []).map(s => s.exercise_id))
+    setHasNewListening(available.some(e => !completedIds.has(e.id)))
+  }
+
+  const recordOpen = async (title) => {
+    if (openedTitles.has(title)) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('exercise_opens').upsert(
+      { student_id: user.id, exercise_title: title },
+      { onConflict: 'student_id,exercise_title', ignoreDuplicates: true }
+    )
+    setOpenedTitles(prev => new Set([...prev, title]))
+    if (title === 'Listening Exercises') setHasNewListening(false)
   }
 
   const startExercise = (exercise) => {
-    if (ACTIVE_EXERCISES.includes(exercise.title)) setActiveExercise(exercise)
+    if (!ACTIVE_EXERCISES.has(exercise.title)) return
+    recordOpen(exercise.title)
+    setActiveExercise(exercise)
   }
 
   const back = () => setActiveExercise(null)
 
-  // ── Exercise routing ──
+  const isNew = (exercise) => {
+    if (exercise.title === 'Listening Exercises') return hasNewListening
+    return !openedTitles.has(exercise.title)
+  }
+
+  // ── Exercise routing ──────────────────────────────────────────────────────
   if (activeExercise) {
     const t = activeExercise.title
-    if (t === 'Prepositions Practice') return <Prepositions onComplete={back} onBack={back} />
-    if (t === 'Business Phrasal Verbs') return <PhrasalVerbs onComplete={back} onBack={back} />
-    if (t === 'Office Vocabulary') return <OfficeVocabulary onComplete={back} onBack={back} />
-    if (t === 'Spanish Vocabulary') return <SpanishVocabulary onComplete={back} onBack={back} />
-    if (t === 'Irregular Verbs Flashcards') return (
-      <FlashcardTemplate flashcardSetId={IRREGULAR_VERBS_ID} setName="irregular-verbs" onBack={back} />
-    )
-    if (t === 'Essential Phrasal Verbs') return (
-      <FlashcardTemplate flashcardSetId={PHRASAL_VERBS_ID} setName="phrasal-verbs" onBack={back} />
-    )
-    if (t === 'Sentence Building') return <SentenceBuilding onComplete={back} onBack={back} />
-    if (t === 'Listening Exercises') return <ListeningExercise onBack={back} userTracks={userTracks} />
-    if (t === 'Borrás Flashcards') return (
+    if (t === 'Prepositions Practice')      return <Prepositions onComplete={back} onBack={back} />
+    if (t === 'Business Phrasal Verbs')     return <PhrasalVerbs onComplete={back} onBack={back} />
+    if (t === 'Office Vocabulary')          return <OfficeVocabulary onComplete={back} onBack={back} />
+    if (t === 'Spanish Vocabulary')         return <SpanishVocabulary onComplete={back} onBack={back} />
+    if (t === 'Irregular Verbs Flashcards') return <FlashcardTemplate flashcardSetId={IRREGULAR_VERBS_ID} setName="irregular-verbs" onBack={back} />
+    if (t === 'Essential Phrasal Verbs')    return <FlashcardTemplate flashcardSetId={PHRASAL_VERBS_ID} setName="phrasal-verbs" onBack={back} />
+    if (t === 'Sentence Building')          return <SentenceBuilding onComplete={back} onBack={back} />
+    if (t === 'Listening Exercises')        return <ListeningExercise onBack={back} userTracks={userTracks} />
+    if (t === 'Borrás Flashcards')          return (
       <FlashcardTemplate
-        title="Borrás Flashcards"
-        subtitle="Bathroom vocabulary in context 🚿"
-        levelBadge="Level: A1–B1"
-        setName="borras"
-        cards={BORRAS_CARDS}
-        hasRounds={true}
-        showMemoryGame={true}
-        onBack={back}
+        title="Borrás Flashcards" subtitle="Bathroom vocabulary in context 🚿"
+        levelBadge="Level: A1–B1" setName="borras"
+        cards={BORRAS_CARDS} hasRounds={true} showMemoryGame={true} onBack={back}
       />
     )
     if (t === 'Borrás Memory Game') return (
       <MemoryGame
-        title="Borrás Memory Game"
-        subtitle="Match the English word to its Spanish translation 🚿"
-        levelBadge="Level: A1–B1"
-        cards={BORRAS_CARDS}
-        gameName="borras"
-        cardBackImage="/og-image.png"
-        onBack={back}
+        title="Borrás Memory Game" subtitle="Match the English word to its Spanish translation 🚿"
+        levelBadge="Level: A1–B1" cards={BORRAS_CARDS}
+        gameName="borras" cardBackImage="/og-image.png" onBack={back}
       />
     )
     if (t === 'Hotel Flashcards') return (
       <FlashcardTemplate
-        title="Hotel Flashcards"
-        subtitle="Essential hotel vocabulary in context 🏨"
-        levelBadge="Level: A2"
-        setName="hotel"
-        cards={HOTEL_CARDS}
-        hasRounds={true}
-        showMemoryGame={true}
-        onBack={back}
+        title="Hotel Flashcards" subtitle="Essential hotel vocabulary in context 🏨"
+        levelBadge="Level: A2" setName="hotel"
+        cards={HOTEL_CARDS} hasRounds={true} showMemoryGame={true} onBack={back}
       />
     )
     if (t === 'Hotel Memory Game') return (
       <MemoryGame
-        title="Hotel Memory Game"
-        subtitle="Match the English word to its Spanish translation 🏨"
-        levelBadge="Level: A2"
-        cards={HOTEL_CARDS}
-        gameName="hotel"
-        cardBackImage="/og-image.png"
-        onBack={back}
+        title="Hotel Memory Game" subtitle="Match the English word to its Spanish translation 🏨"
+        levelBadge="Level: A2" cards={HOTEL_CARDS}
+        gameName="hotel" cardBackImage="/og-image.png" onBack={back}
       />
     )
-    if (t === 'Odd One Out') return <OddOneOut onComplete={back} onBack={back} />
+    if (t === 'Odd One Out')      return <OddOneOut onComplete={back} onBack={back} />
     if (t === 'Error Correction') return <ErrorCorrection onComplete={back} onBack={back} />
-    if (t === 'Matching') return <MatchingExercise onComplete={back} onBack={back} />
+    if (t === 'Matching')         return <MatchingExercise onComplete={back} onBack={back} />
     if (t === 'Sentence Auction') return <SentenceAuction onComplete={back} onBack={back} />
   }
 
-  // ── Exercise list ──
-  if (loading) return <div>Loading exercises...</div>
+  // ── Filter + sort for active tab ──────────────────────────────────────────
+  const tabExercises = exercises
+    .filter(e => shouldShowExercise(e, userTracks))
+    .filter(e => (e.category || 'practice') === activeTab)
 
-  if (exercises.length === 0) {
+  const forYouList  = tabExercises.filter(e => isForYouFn(e, userTracks))
+  const generalList = tabExercises.filter(e => !isForYouFn(e, userTracks))
+  const hasBoth     = forYouList.length > 0 && generalList.length > 0
+
+  // ── Sub-components ────────────────────────────────────────────────────────
+
+  const LevelBadge = ({ level }) => {
+    const key = level?.[0] || 'B'
+    const styles = {
+      A:   { background: '#f0fff4', color: '#276749' },
+      B:   { background: '#ebf8ff', color: '#2b6cb0' },
+      C:   { background: '#fffaf0', color: '#c05621' },
+    }
+    const s = styles[key] || styles.B
     return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <p>No exercises available yet.</p>
-        <p>Check back soon!</p>
+      <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '2px 7px', borderRadius: '10px', flexShrink: 0, ...s }}>
+        {level}
+      </span>
+    )
+  }
+
+  const ForYouBadge = () => (
+    <span style={{ fontSize: '0.6rem', fontWeight: 700, background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+      ⭐️ For You
+    </span>
+  )
+
+  const NewBadge = () => (
+    <span style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.4px', flexShrink: 0, whiteSpace: 'nowrap', borderRadius: '8px', padding: '2px 7px', border: '1.5px solid transparent', background: 'linear-gradient(white, white) padding-box, linear-gradient(135deg, #667eea, #764ba2) border-box', display: 'inline-block' }}>
+      <span style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', fontWeight: 800, fontSize: '0.6rem' }}>
+        NEW
+      </span>
+    </span>
+  )
+
+  const SectionLabel = ({ children }) => (
+    <div style={{ gridColumn: 'span 2', fontSize: '0.7rem', fontWeight: 700, color: '#b0b8cc', textTransform: 'uppercase', letterSpacing: '0.6px', padding: '8px 4px 2px' }}>
+      {children}
+    </div>
+  )
+
+  const GridCard = ({ exercise }) => {
+    const fy      = isForYouFn(exercise, userTracks)
+    const newFlag = isNew(exercise)
+    const active  = ACTIVE_EXERCISES.has(exercise.title)
+    const icon    = EXERCISE_ICONS[exercise.title] || '📝'
+    const isWide  = exercise.category === 'listen'
+
+    const cardStyle = {
+      border: `1.5px solid ${fy ? '#667eea' : '#e8e8f0'}`,
+      borderRadius: '14px',
+      padding: isWide ? '12px 14px' : '12px',
+      background: fy ? 'linear-gradient(160deg, #f7f8ff 0%, #fdf5ff 100%)' : 'white',
+      cursor: active ? 'pointer' : 'default',
+      position: 'relative',
+      display: 'flex',
+      flexDirection: isWide ? 'row' : 'column',
+      alignItems: isWide ? 'center' : 'flex-start',
+      gap: isWide ? '12px' : '5px',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+      gridColumn: isWide ? 'span 2' : 'span 1',
+    }
+
+    if (isWide) {
+      return (
+        <div style={cardStyle} onClick={() => active && startExercise(exercise)}>
+          <div style={{ fontSize: '2rem', flexShrink: 0 }}>{icon}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#2d3748', lineHeight: 1.25 }}>{exercise.title}</div>
+            <div style={{ fontSize: '0.71rem', color: '#718096', lineHeight: 1.4, marginTop: '3px' }}>{exercise.description}</div>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
+              <LevelBadge level={exercise.level} />
+              {fy && <ForYouBadge />}
+              {newFlag && <NewBadge />}
+              {active
+                ? <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#667eea', marginLeft: 'auto' }}>Start →</span>
+                : <span style={{ fontSize: '0.65rem', color: '#a0aec0', fontStyle: 'italic' }}>Coming soon</span>
+              }
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div style={cardStyle} onClick={() => active && startExercise(exercise)}>
+        {newFlag && <div style={{ position: 'absolute', top: 8, left: 8 }}><NewBadge /></div>}
+        {fy      && <div style={{ position: 'absolute', top: 8, right: 8 }}><ForYouBadge /></div>}
+        <div style={{ fontSize: '1.5rem', marginTop: (newFlag || fy) ? '18px' : '0' }}>{icon}</div>
+        <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#2d3748', lineHeight: 1.25 }}>{exercise.title}</div>
+        <div style={{ fontSize: '0.71rem', color: '#718096', lineHeight: 1.4 }}>{exercise.description}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap', gap: '3px' }}>
+          <LevelBadge level={exercise.level} />
+          {active
+            ? <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#667eea' }}>→</span>
+            : <span style={{ fontSize: '0.65rem', color: '#a0aec0', fontStyle: 'italic' }}>Soon</span>
+          }
+        </div>
       </div>
     )
   }
 
-  const hasTracks = userTracks && userTracks.length > 0
+  const ListCard = ({ exercise }) => {
+    const fy      = isForYouFn(exercise, userTracks)
+    const newFlag = isNew(exercise)
+    const active  = ACTIVE_EXERCISES.has(exercise.title)
+    const icon    = EXERCISE_ICONS[exercise.title] || '📝'
 
-  return (
-    <div style={{ marginTop: '30px' }}>
-      <h2 style={{ color: '#2d3748', marginBottom: '5px' }}>
-        {hasTracks ? 'Your Exercises' : 'Recommended Exercises'}
-      </h2>
-      <p style={{ color: '#718096', fontSize: '0.9rem', marginBottom: '20px' }}>
-        {hasTracks
-          ? 'Your track exercises appear first'
-          : 'Exercises matched to your level appear first'}
-      </p>
-      <div style={{ display: 'grid', gap: '20px' }}>
-        {exercises.map((exercise) => {
-          const isActive = ACTIVE_EXERCISES.includes(exercise.title)
-          const isTrack = isTrackExercise(exercise.title, userTracks)
-          const isLevelMatch = !hasTracks && exercise.level === userLevel
-
-          // Border colour: purple for track match, blue-ish for level match, grey otherwise
-          const borderStyle = isTrack
-            ? '2px solid #667eea'
-            : isLevelMatch
-              ? '2px solid #667eea'
-              : '1px solid #e2e8f0'
-
-          const bgColour = isTrack
-            ? '#f7f8ff'
-            : isLevelMatch
-              ? '#f7f8ff'
-              : '#f9f9f9'
-
-          return (
-            <div
-              key={exercise.id}
-              style={{
-                border: borderStyle,
-                borderRadius: '8px',
-                padding: '20px',
-                backgroundColor: bgColour,
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '6px' }}>
-                <h3 style={{ color: '#2d3748', margin: 0 }}>{exercise.title}</h3>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {isTrack && (
-                    <span style={{
-                      background: 'linear-gradient(135deg, #667eea, #764ba2)',
-                      color: 'white',
-                      padding: '2px 10px', borderRadius: '20px',
-                      fontSize: '0.8rem', fontWeight: 600,
-                    }}>⭐ Your Track</span>
-                  )}
-                  {isLevelMatch && (
-                    <span style={{
-                      background: '#667eea', color: 'white',
-                      padding: '2px 10px', borderRadius: '20px',
-                      fontSize: '0.8rem', fontWeight: 600,
-                    }}>Recommended</span>
-                  )}
-                </div>
-              </div>
-              <p style={{ color: '#4a5568', marginTop: '8px' }}>{exercise.description}</p>
-              <div style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
-                <span>📚 {exercise.topic}</span>
-                <span style={{ marginLeft: '15px' }}>🎯 Level: {exercise.level}</span>
-                {exercise.passing_score
-                  ? <span style={{ marginLeft: '15px' }}>✅ Pass: {exercise.passing_score}%</span>
-                  : <span style={{ marginLeft: '15px' }}>✅ Self-paced</span>
-                }
-              </div>
-              <button
-                onClick={() => startExercise(exercise)}
-                style={{
-                  marginTop: '15px', padding: '10px 20px',
-                  backgroundColor: isActive ? '#667eea' : '#cbd5e0',
-                  color: 'white', border: 'none', borderRadius: '6px',
-                  cursor: isActive ? 'pointer' : 'not-allowed', fontWeight: 600,
-                }}
-              >
-                {isActive ? 'Start Exercise' : 'Coming Soon'}
-              </button>
-            </div>
-          )
-        })}
+    return (
+      <div
+        style={{ border: `1.5px solid ${fy ? '#667eea' : '#e8e8f0'}`, borderRadius: '12px', padding: '12px 14px', background: fy ? 'linear-gradient(160deg, #f7f8ff 0%, #fdf5ff 100%)' : 'white', cursor: active ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+        onClick={() => active && startExercise(exercise)}
+      >
+        <div style={{ fontSize: '1.6rem', flexShrink: 0 }}>{icon}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#2d3748' }}>{exercise.title}</div>
+          <div style={{ fontSize: '0.74rem', color: '#718096', marginTop: '2px' }}>{exercise.description}</div>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '5px', flexWrap: 'wrap' }}>
+            <LevelBadge level={exercise.level} />
+            {fy && <ForYouBadge />}
+            {newFlag && <NewBadge />}
+            {!active && <span style={{ fontSize: '0.65rem', color: '#a0aec0', fontStyle: 'italic' }}>Coming soon</span>}
+          </div>
+        </div>
+        {active && <div style={{ fontSize: '1rem', color: '#cbd5e0', flexShrink: 0 }}>→</div>}
       </div>
+    )
+  }
+
+  // ── Main render ───────────────────────────────────────────────────────────
+  return (
+    <div style={{ maxWidth: '860px', margin: '0 auto', padding: '0 0 80px', minHeight: '60vh' }}>
+
+      {/* Controls */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '1rem 1rem 0.5rem' }}>
+        <div>
+          <div style={{ fontSize: 'clamp(1.1rem, 4vw, 1.4rem)', fontWeight: 700, color: '#2d3748' }}>Exercises</div>
+          <div style={{ fontSize: '0.78rem', color: '#718096', marginTop: '2px' }}>⭐️ For You exercises appear first</div>
+        </div>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0, marginTop: '2px' }}>
+          {isTeacher && (
+            <button
+              onClick={onTeacherClick}
+              title="Teacher dashboard"
+              style={{ width: '34px', height: '34px', borderRadius: '8px', background: 'linear-gradient(135deg, #667eea, #764ba2)', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(102,126,234,0.4)' }}
+            >
+              👨‍🏫
+            </button>
+          )}
+          <button
+            onClick={() => setIsListView(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#f0f0f5', borderRadius: '8px', padding: '5px 9px', cursor: 'pointer', border: 'none', fontSize: '0.72rem', fontWeight: 600, color: '#4a5568', whiteSpace: 'nowrap' }}
+          >
+            {isListView ? '⊞ Grid' : '☰ List'}
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '0.75rem 1rem', scrollbarWidth: 'none' }}>
+        {TABS.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            style={{ padding: '8px 18px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s', border: activeTab === tab.key ? '2px solid transparent' : '2px solid #e2e8f0', background: activeTab === tab.key ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'white', color: activeTab === tab.key ? 'white' : '#4a5568', boxShadow: activeTab === tab.key ? '0 2px 8px rgba(102,126,234,0.35)' : 'none' }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Exercise content */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#718096' }}>Loading exercises...</div>
+      ) : tabExercises.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#718096' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🚧</div>
+          More exercises coming soon!
+        </div>
+      ) : isListView ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 10px' }}>
+          {hasBoth && <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#b0b8cc', textTransform: 'uppercase', letterSpacing: '0.6px', padding: '8px 4px 2px' }}>⭐️ For You</div>}
+          {forYouList.map(e => <ListCard key={e.id} exercise={e} />)}
+          {hasBoth && <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#b0b8cc', textTransform: 'uppercase', letterSpacing: '0.6px', padding: '8px 4px 2px' }}>All Exercises</div>}
+          {generalList.map(e => <ListCard key={e.id} exercise={e} />)}
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', padding: '0 10px' }}>
+          {hasBoth && <SectionLabel>⭐️ For You</SectionLabel>}
+          {forYouList.map(e => <GridCard key={e.id} exercise={e} />)}
+          {hasBoth && <SectionLabel>All Exercises</SectionLabel>}
+          {generalList.map(e => <GridCard key={e.id} exercise={e} />)}
+        </div>
+      )}
     </div>
   )
 }
-
-export default ExerciseList
