@@ -15,14 +15,15 @@ export default async function handler(req, res) {
   const isSpanish = language === 'es';
 
   const prompt = isSpanish
-    ? `Eres un profesor de inglés corrigiendo el ejercicio de "Palabra del día" de un estudiante.
+    ? `Eres un profesor de español corrigiendo el ejercicio de "Palabra del día" de un estudiante.
 
 Palabra: "${word}" (${partOfSpeech})
 Definición: "${definition}"
 Frase del estudiante: "${studentSentence}"
 
-El estudiante debe escribir una frase en INGLÉS usando esta palabra española de forma que demuestre que entiende su significado.
-Evalúa: ¿La frase está en inglés? ¿Es gramaticalmente correcta? ¿Usa la palabra o su equivalente en inglés de forma apropiada?
+El estudiante debe escribir una frase en ESPAÑOL usando esta palabra de forma que demuestre que entiende su significado.
+Evalúa: ¿La frase está en español? ¿Es gramaticalmente correcta? ¿Usa la palabra de forma apropiada y coherente con la definición?
+Sé alentador pero honesto. Los errores menores de puntuación están bien — céntrate en el uso correcto de la palabra.
 
 Responde SOLO con un objeto JSON:
 {"valid": true, "feedback": "una frase corta de felicitación explicando por qué funciona bien"}
