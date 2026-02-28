@@ -84,7 +84,7 @@ function Dashboard({ session }) {
           <nav>
             <ul style={{ listStyle: 'none', display: 'flex', gap: 'clamp(0.5rem, 3vw, 2rem)', margin: 0, padding: 0 }}>
               <li><Link to="/"          style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Home</Link></li>
-              <li><Link to="/practice"  style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Practice</Link></li>
+              <li><Link to="/practice"  style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Test</Link></li>
               <li><Link to="/exercises" style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Exercises</Link></li>
             </ul>
           </nav>
