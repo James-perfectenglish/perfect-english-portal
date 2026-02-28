@@ -80,7 +80,7 @@ export default function PracticePage({ isTeacher = false, onTeacherClick }) {
             margin: 0,
             fontWeight: '700'
           }}>
-            Random Practice
+            Test Yourself
           </h1>
           {isTeacher && onTeacherClick && (
             <button
