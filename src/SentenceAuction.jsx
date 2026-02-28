@@ -546,7 +546,7 @@ export default function SentenceAuction({ onBack, onComplete }) {
                       {tierLevel && (
                         <span style={{ background: tierLevel.colour + '30', color: tierLevel.colour, padding: '2px 8px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, flexShrink: 0, border: `1px solid ${tierLevel.colour}60` }}>{tierLevel.label}</span>
                       )}
-                      <span style={{ fontSize: '0.8rem', color: '#a0aec0', flexShrink: 0 }}>{entry.auctions_completed} auctions</span>
+
                       <div style={{ marginLeft: 'auto', fontWeight: 700, fontSize: '1.05rem', color: entry.final_budget >= STARTING_BUDGET ? '#276749' : entry.final_budget > 0 ? '#c05621' : '#c53030' }}>
                         {entry.final_budget.toLocaleString()} pta
                       </div>
