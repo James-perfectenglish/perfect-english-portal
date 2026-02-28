@@ -94,7 +94,7 @@ function Dashboard({ session }) {
       {/* ROUTES */}
       <Routes>
         <Route path="/"          element={<StudentDashboard profile={profile} session={session} handleLogout={handleLogout} />} />
-        <Route path="/practice"  element={<PracticePage />} />
+        <Route path="/practice"  element={<PracticePageWrapper profile={profile} />} />
         <Route path="/exercises" element={<ExercisesPage profile={profile} />} />
         <Route path="/teacher"   element={profile?.is_teacher ? <TeacherDashboard profile={profile} handleLogout={handleLogout} /> : <Navigate to="/" />} />
       </Routes>
@@ -109,6 +109,16 @@ function ExercisesPage({ profile }) {
       userLevel={profile.level}
       userTracks={profile.tracks || []}
       isTeacher={profile.is_teacher || false}
+      onTeacherClick={() => navigate('/teacher')}
+    />
+  )
+}
+
+function PracticePageWrapper({ profile }) {
+  const navigate = useNavigate()
+  return (
+    <PracticePage
+      isTeacher={profile?.is_teacher || false}
       onTeacherClick={() => navigate('/teacher')}
     />
   )

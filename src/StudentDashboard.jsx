@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import WordOfTheDay from './WordOfTheDay'
 
@@ -71,6 +71,7 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
   const [daysStudied, setDaysStudied]           = useState(0)
   const [listeningCompleted, setListeningCompleted] = useState(0)
   const [loading, setLoading]                   = useState(true)
+  const navigate = useNavigate()
 
   const firstName = profile.full_name?.split(' ')[0] || 'there'
   const hour      = new Date().getHours()
@@ -149,7 +150,6 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         ...a,
         scorePercent: toPercent(a.score, a.answers)
       }))
-      // Compute these here so they're always in sync with the data
       setLessonsPassed(normalised.filter(a => a.scorePercent >= 70).length)
       setDaysStudied(new Set(normalised.map(a => new Date(a.completed_at).toDateString())).size)
       setAttempts([...normalised].reverse()) // chronological for chart
@@ -180,17 +180,43 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: '1.25rem 1rem 4rem' }}>
 
       {/* GREETING */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ fontSize: 'clamp(1.4rem, 4vw, 2rem)', color: '#2C3E50', margin: '0 0 0.3rem' }}>
-          {greeting}, {firstName}! 👋
-        </h1>
-        <p style={{ color: '#718096', margin: 0, fontSize: '0.95rem' }}>
-          {hasData
-            ? `You've answered ${stats.total.toLocaleString()} questions so far — keep it up!`
-            : 'Welcome to your dashboard. Start with Random Practice to begin tracking your progress.'}
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: 'clamp(1.4rem, 4vw, 2rem)', color: '#2C3E50', margin: '0 0 0.3rem' }}>
+            {greeting}, {firstName}! 👋
+          </h1>
+          <p style={{ color: '#718096', margin: 0, fontSize: '0.95rem' }}>
+            {hasData
+              ? `You've answered ${stats.total.toLocaleString()} questions so far — keep it up!`
+              : 'Welcome to your dashboard. Start with Random Practice to begin tracking your progress.'}
+          </p>
+        </div>
+        {profile.is_teacher && (
+          <button
+            onClick={() => navigate('/teacher')}
+            title="Teacher Dashboard"
+            style={{
+              background: 'linear-gradient(135deg, #667eea, #764ba2)',
+              border: 'none',
+              borderRadius: '10px',
+              width: '42px',
+              height: '42px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.2rem',
+              cursor: 'pointer',
+              flexShrink: 0,
+              boxShadow: '0 2px 8px rgba(102,126,234,0.4)',
+            }}
+          >
+            👨‍🏫
+          </button>
+        )}
       </div>
-<WordOfTheDay profile={profile} />
+
+      <WordOfTheDay profile={profile} />
+
       {/* STAT CARDS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
         <StatCard emoji="📊" label="Questions Answered" value={hasData     ? stats.total.toLocaleString() : '—'} />

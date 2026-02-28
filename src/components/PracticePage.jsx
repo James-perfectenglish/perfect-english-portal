@@ -36,7 +36,7 @@ const LEVEL_CONFIG = [
   }
 ];
 
-export default function PracticePage() {
+export default function PracticePage({ isTeacher = false, onTeacherClick }) {
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [survivalMode, setSurvivalMode] = useState(false);
   const location = useLocation();
@@ -71,14 +71,44 @@ export default function PracticePage() {
       boxSizing: 'border-box'
     }}>
       <div style={{ maxWidth: '700px', margin: '0 auto', textAlign: 'center' }}>
-        <h1 style={{
-          fontSize: 'clamp(1.8rem, 6vw, 2.5rem)',
-          color: '#2C3E50',
-          marginBottom: '0.5rem',
-          fontWeight: '700'
-        }}>
-          Random Practice
-        </h1>
+
+        {/* Heading row with optional teacher button */}
+        <div style={{ position: 'relative', marginBottom: '0.5rem' }}>
+          <h1 style={{
+            fontSize: 'clamp(1.8rem, 6vw, 2.5rem)',
+            color: '#2C3E50',
+            margin: 0,
+            fontWeight: '700'
+          }}>
+            Random Practice
+          </h1>
+          {isTeacher && onTeacherClick && (
+            <button
+              onClick={onTeacherClick}
+              title="Teacher Dashboard"
+              style={{
+                position: 'absolute',
+                top: '50%',
+                right: 0,
+                transform: 'translateY(-50%)',
+                background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                border: 'none',
+                borderRadius: '10px',
+                width: '42px',
+                height: '42px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.2rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(102,126,234,0.4)',
+              }}
+            >
+              👨‍🏫
+            </button>
+          )}
+        </div>
+
         <p style={{
           fontSize: 'clamp(1rem, 3vw, 1.15rem)',
           color: '#666',
