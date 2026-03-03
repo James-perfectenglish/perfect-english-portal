@@ -40,6 +40,34 @@ function shuffleArray(arr) {
   return shuffled;
 }
 
+// ── Levenshtein distance ──
+// Returns the minimum number of single-character edits (insert, delete, substitute)
+// needed to transform string a into string b.
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+// Returns true if the student answer is a likely typo of any correct answer.
+// Rules: distance 1 always qualifies; distance 2 only if the correct answer is 6+ chars.
+function isFuzzyMatch(studentAnswer, correctAnswers) {
+  for (const correct of correctAnswers) {
+    const dist = levenshtein(studentAnswer, correct);
+    if (dist === 1) return true;
+    if (dist === 2 && correct.length >= 6) return true;
+  }
+  return false;
+}
+
 const normaliseEC = (s) => s.toLowerCase().trim().replace(/\s+/g, ' ');
 
 const findErrorIndex = (questionWords, correctAnswer) => {
@@ -319,7 +347,15 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         }
       }
 
-      // 4 — AI soft-mark (fires when all static checks fail)
+      // 4 — Fuzzy match (typo detection via Levenshtein distance)
+      // Distance 1 always qualifies; distance 2 only for answers 6+ chars long.
+      // Awarded full point — just shows an amber spelling nudge.
+      if (!isCorrect && isFuzzyMatch(answer, correctAnswers)) {
+        isCorrect = true;
+        feedbackType = 'fuzzy';
+      }
+
+      // 5 — AI soft-mark (fires when all static checks fail)
       if (!isCorrect) {
         setIsChecking(true);
         const lang = getQuestionLanguage(currentQuestion);
@@ -604,13 +640,20 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     if (!feedback || !currentQuestion) return null;
     if (currentQuestion.type !== 'gap_fill' && currentQuestion.type !== 'multiple_choice') return null;
 
+    const isFuzzy    = feedback.type === 'fuzzy';
     const isSoftPass = feedback.type === 'soft-pass';
-    const isCorrect = feedback.isCorrect;
+    const isCorrect  = feedback.isCorrect;
 
-    const borderColor = isSoftPass ? '#f6ad55' : isCorrect ? '#48bb78' : '#f56565';
-    const bgColor    = isSoftPass ? '#fffbeb' : isCorrect ? '#f0fff4' : '#fff5f5';
-    const headerBg   = isSoftPass ? '#f6ad55' : isCorrect ? '#48bb78' : '#f56565';
-    const headerText = isSoftPass ? '✅ Also correct!' : isCorrect ? '✅ Correct!' : '❌ Incorrect';
+    const borderColor = (isFuzzy || isSoftPass) ? '#f6ad55' : isCorrect ? '#48bb78' : '#f56565';
+    const bgColor     = (isFuzzy || isSoftPass) ? '#fffbeb' : isCorrect ? '#f0fff4' : '#fff5f5';
+    const headerBg    = (isFuzzy || isSoftPass) ? '#f6ad55' : isCorrect ? '#48bb78' : '#f56565';
+    const headerText  = isFuzzy
+      ? '✅ Correct — but watch your spelling!'
+      : isSoftPass
+        ? '✅ Also correct!'
+        : isCorrect
+          ? '✅ Correct!'
+          : '❌ Incorrect';
 
     return (
       <div style={{
@@ -658,8 +701,15 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
             </span>
           </div>
 
-          {/* Explanation */}
-          {feedback.explanation && (
+          {/* Fuzzy nudge message */}
+          {isFuzzy && (
+            <div style={{ borderTop: `1px solid ${borderColor}`, paddingTop: '0.75rem', color: '#744210', lineHeight: '1.6' }}>
+              ✏️ Almost perfect — watch your spelling next time!
+            </div>
+          )}
+
+          {/* Explanation (non-fuzzy) */}
+          {!isFuzzy && feedback.explanation && (
             <div style={{ borderTop: `1px solid ${borderColor}`, paddingTop: '0.75rem', color: '#4a5568', lineHeight: '1.6' }}>
               💡 {feedback.explanation}
             </div>
