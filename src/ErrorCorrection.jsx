@@ -275,7 +275,8 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
   // LEVEL SELECT
   if (stage === 'level-select') {
     return (
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
         <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.8rem' }}>✏️ Error Correction</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Find and fix the mistake in each sentence</p>
@@ -320,12 +321,14 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
           )}
         </div>
       </div>
+      </div>
     );
   }
 
   // EXERCISE
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
       <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.8rem' }}>✏️ Error Correction</h1>
         <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Tap the wrong word, then type the correction</p>
@@ -496,6 +499,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }
