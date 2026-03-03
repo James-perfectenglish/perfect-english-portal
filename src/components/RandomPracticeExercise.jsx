@@ -806,8 +806,8 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                     {currentQuestion.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                   </div>
                 )}
-                {/* AI marker badge for EC */}
-                {currentQuestion.type === 'error_correction' && (
+                {/* AI marker badge for EC and gap fill */}
+                {(currentQuestion.type === 'error_correction' || currentQuestion.type === 'gap_fill') && (
                   <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>
                     🤖 AI marked
                   </div>
