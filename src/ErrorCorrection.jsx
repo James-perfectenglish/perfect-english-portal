@@ -49,9 +49,6 @@ const LEVELS = [
 const GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
 const QUESTIONS_PER_ROUND = 10;
 
-// Levels where the AI soft-marker is used
-const AI_MARKED_LEVELS = ['B2', 'C1', 'C2'];
-
 const normalise = (s) => s.toLowerCase().trim().replace(/\s+/g, ' ');
 
 const findErrorIndex = (questionWords, correctAnswer) => {
@@ -64,13 +61,16 @@ const findErrorIndex = (questionWords, correctAnswer) => {
   return { index: -1, correctWord: '' };
 };
 
-// Call our serverless function to soft-mark a correction at B2/C1/C2
-const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement, correctAnswerSentence) => {
+// Detect language from question topic
+const getQuestionLanguage = (question) => question?.topic === 'spanish' ? 'es' : 'en';
+
+// Call serverless function to soft-mark a correction — all levels
+const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en') => {
   try {
     const response = await fetch('/api/mark-correction', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ originalSentence, errorWord, studentReplacement, correctAnswerSentence })
+      body: JSON.stringify({ originalSentence, errorWord, studentReplacement, correctAnswerSentence, language })
     });
     if (!response.ok) return null;
     const result = await response.json();
@@ -152,7 +152,6 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
     const words = q.question.trim().split(/\s+/);
     const correctAnswers = Array.isArray(q.correct_answers) ? q.correct_answers : JSON.parse(q.correct_answers || '[]');
 
-    // ── Carry trailing punctuation from the tapped word onto the correction ──
     const originalWord = words[selectedWordIndex];
     const trailingPunct = originalWord.match(/[.,!?;:]+$/)?.[0] || '';
     const cleanCorrection = correction.trim().replace(/[.,!?;:]+$/, '');
@@ -176,55 +175,41 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
       return;
     }
 
-    // For B2/C1/C2 — ask the AI before calling it wrong
-    const useAI = AI_MARKED_LEVELS.includes(q.level);
+    // AI soft-mark — all levels
+    setIsChecking(true);
+    const lang = getQuestionLanguage(q);
+    const aiResult = await aiMarkCorrection(
+      q.question,
+      words[selectedWordIndex],
+      correction.trim(),
+      correctAnswers[0],
+      lang
+    );
+    setIsChecking(false);
 
-    if (useAI) {
-      setIsChecking(true);
-      const aiResult = await aiMarkCorrection(
-        q.question,
-        words[selectedWordIndex],
-        correction.trim(),
-        correctAnswers[0]
-      );
-      setIsChecking(false);
-
-      if (aiResult?.valid) {
-        // ✅ SOFT PASS — valid alternative answer
-        setScore(s => s + 1);
-        setFeedback({
-          type: 'soft-pass',
-          message: `✅ Good — that works too! ${aiResult.reason} The model answer was "${errorInfo.correctWord}". ${q.explanation || ''}`,
-          errorIndex: selectedWordIndex,
-          correctWord: cleanCorrection + trailingPunct
-        });
-        saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, true, true);
-        return;
-      }
-
-      // AI said no — give useful feedback
-      const foundRightWord = selectedWordIndex === errorInfo.index;
-      let message;
-      if (foundRightWord) {
-        message = `❌ Good — you found the error in "${words[errorInfo.index]}", but "${correction.trim()}" doesn't quite work here. ${aiResult?.reason ? aiResult.reason + ' ' : ''}It should be "${errorInfo.correctWord}". ${q.explanation || ''}`;
-      } else {
-        message = `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${q.explanation || ''}`;
-      }
-      setFeedback({ type: 'fail', message, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
-      saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, false, false);
-
-    } else {
-      // A1/A2/B1 — simple comparison, no API
-      const foundRightWord = selectedWordIndex === errorInfo.index;
-      let message;
-      if (foundRightWord) {
-        message = `❌ You found the error, but the correction should be "${errorInfo.correctWord}". ${q.explanation || ''}`;
-      } else {
-        message = `❌ The error is in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${q.explanation || ''}`;
-      }
-      setFeedback({ type: 'fail', message, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
-      saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, false, false);
+    if (aiResult?.valid) {
+      // ✅ SOFT PASS — valid alternative answer
+      setScore(s => s + 1);
+      setFeedback({
+        type: 'soft-pass',
+        message: `✅ Good — that works too! ${aiResult.reason} The model answer was "${errorInfo.correctWord}". ${q.explanation || ''}`,
+        errorIndex: selectedWordIndex,
+        correctWord: cleanCorrection + trailingPunct
+      });
+      saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, true, true);
+      return;
     }
+
+    // AI said no
+    const foundRightWord = selectedWordIndex === errorInfo.index;
+    let message;
+    if (foundRightWord) {
+      message = `❌ Good — you found the error in "${words[errorInfo.index]}", but "${correction.trim()}" doesn't quite work here. ${aiResult?.reason ? aiResult.reason + ' ' : ''}It should be "${errorInfo.correctWord}". ${q.explanation || ''}`;
+    } else {
+      message = `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${q.explanation || ''}`;
+    }
+    setFeedback({ type: 'fail', message, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
+    saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, false, false);
   };
 
   const nextQuestion = () => {
@@ -251,20 +236,13 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
 
   const getWordTileStyle = (index) => {
     const base = {
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)',
-      margin: '4px 3px',
-      borderRadius: '8px',
-      fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)',
-      fontWeight: '500',
+      margin: '4px 3px', borderRadius: '8px',
+      fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)', fontWeight: '500',
       cursor: (feedback || isChecking) ? 'default' : 'pointer',
-      transition: 'all 0.15s ease',
-      userSelect: 'none',
-      backgroundColor: 'white',
-      border: '2px solid #e2e8f0',
-      color: '#2d3748'
+      transition: 'all 0.15s ease', userSelect: 'none',
+      backgroundColor: 'white', border: '2px solid #e2e8f0', color: '#2d3748'
     };
 
     if (feedback) {
@@ -288,11 +266,10 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
     return base;
   };
 
-  // Feedback colours — three states: pass (green), soft-pass (amber), fail (red)
   const feedbackStyle = feedback ? {
-    pass:      { bg: '#f0fff4', border: '#c6f6d5', color: '#276749' },
+    pass:        { bg: '#f0fff4', border: '#c6f6d5', color: '#276749' },
     'soft-pass': { bg: '#fffbeb', border: '#fbd38d', color: '#744210' },
-    fail:      { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c' },
+    fail:        { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c' },
   }[feedback.type] : null;
 
   // LEVEL SELECT
@@ -374,13 +351,11 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
             </div>
 
             <div style={{ border: '2px solid #e2e8f0', borderRadius: '8px', padding: '1.5rem', marginBottom: '1.5rem' }}>
-              {/* Topic & Level pills */}
+              {/* Topic, Level & AI badge */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
                 {q.level && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: q.level.startsWith('A') ? '#276749' : q.level.startsWith('B') ? '#2b6cb0' : '#c05621' }}>{q.level}</div>}
                 {q.topic && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.topic === 'punctuation' ? '#FEE2E2' : '#e8daef', color: q.topic === 'punctuation' ? '#DC2626' : '#6c3483' }}>{q.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>}
-                {AI_MARKED_LEVELS.includes(q.level) && (
-                  <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>🤖 AI marked</div>
-                )}
+                <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>🤖 AI marked</div>
               </div>
 
               {/* Instruction */}
@@ -398,15 +373,9 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
 
               {/* Sentence with tappable word tiles */}
               <div style={{
-                backgroundColor: '#F8FBFF',
-                padding: '1.25rem',
-                borderRadius: '10px',
-                border: '1px solid #AED6F1',
-                lineHeight: '2.4',
-                marginBottom: '1.25rem',
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center'
+                backgroundColor: '#F8FBFF', padding: '1.25rem', borderRadius: '10px',
+                border: '1px solid #AED6F1', lineHeight: '2.4', marginBottom: '1.25rem',
+                display: 'flex', flexWrap: 'wrap', alignItems: 'center'
               }}>
                 {questionWords.map((word, index) => (
                   <span
@@ -430,16 +399,13 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
                   </span>
                 ))}
 
-                {/* Correction indicator after feedback */}
                 {feedback && feedback.errorIndex >= 0 && (
                   <div style={{ width: '100%', marginTop: '0.75rem', fontSize: '1rem', paddingLeft: '4px' }}>
                     <span style={{ color: '#c53030', textDecoration: 'line-through', fontWeight: 500 }}>
                       {questionWords[feedback.errorIndex]}
                     </span>
                     <span style={{ margin: '0 8px', color: '#718096' }}>→</span>
-                    <span style={{ color: '#276749', fontWeight: 600 }}>
-                      {feedback.correctWord}
-                    </span>
+                    <span style={{ color: '#276749', fontWeight: 600 }}>{feedback.correctWord}</span>
                   </div>
                 )}
               </div>
@@ -459,22 +425,17 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
                       Your correction for "{questionWords[selectedWordIndex]}":
                     </div>
                     <input
-                      type="text"
-                      value={correction}
+                      type="text" value={correction}
                       onChange={(e) => setCorrection(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && checkAnswer()}
                       placeholder="Type the correct word..."
                       autoFocus
                       style={{
-                        width: '100%',
-                        padding: '0.9rem 1rem',
+                        width: '100%', padding: '0.9rem 1rem',
                         fontSize: 'clamp(1rem, 3.5vw, 1.15rem)',
-                        borderRadius: '8px',
-                        border: '2px solid #667eea',
-                        boxSizing: 'border-box',
-                        color: '#2d3748',
-                        fontWeight: 500,
-                        backgroundColor: '#EDE9FE'
+                        borderRadius: '8px', border: '2px solid #667eea',
+                        boxSizing: 'border-box', color: '#2d3748',
+                        fontWeight: 500, backgroundColor: '#EDE9FE'
                       }}
                     />
                   </div>
@@ -502,10 +463,8 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
               {/* Feedback — three colours */}
               {feedback && feedbackStyle && (
                 <div style={{
-                  backgroundColor: feedbackStyle.bg,
-                  border: `1px solid ${feedbackStyle.border}`,
-                  color: feedbackStyle.color,
-                  padding: '1rem 1.25rem', borderRadius: '10px',
+                  backgroundColor: feedbackStyle.bg, border: `1px solid ${feedbackStyle.border}`,
+                  color: feedbackStyle.color, padding: '1rem 1.25rem', borderRadius: '10px',
                   fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: '1.6', marginBottom: '0.75rem'
                 }}>{feedback.message}</div>
               )}

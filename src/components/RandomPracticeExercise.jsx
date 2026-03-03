@@ -14,8 +14,7 @@ const QUESTION_MIX = {
   // Total: 20
 };
 
-// Levels where AI soft-marking is used for error correction
-const AI_MARKED_EC_LEVELS = ['B2', 'C1', 'C2'];
+// AI soft-marking is used for error correction at all levels
 
 // Inject CSS for focus fix on OOO, EC, and matching tiles
 const RP_STYLE_ID = 'rp-focus-fix';
@@ -411,8 +410,8 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       return;
     }
 
-    // AI soft-mark for B2/C1/C2
-    const useAI = AI_MARKED_EC_LEVELS.includes(cq.level);
+    // AI soft-mark for all levels
+    const useAI = true;
     if (useAI) {
       setIsChecking(true);
       const lang = getQuestionLanguage(cq);
@@ -793,8 +792,8 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                     {currentQuestion.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                   </div>
                 )}
-                {/* AI marker badge for EC at B2/C1/C2 */}
-                {currentQuestion.type === 'error_correction' && AI_MARKED_EC_LEVELS.includes(currentQuestion.level) && (
+                {/* AI marker badge for EC */}
+                {currentQuestion.type === 'error_correction' && (
                   <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>
                     🤖 AI marked
                   </div>
