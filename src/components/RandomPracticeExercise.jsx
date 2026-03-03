@@ -227,14 +227,28 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
       const pick = (data, type) => shuffleArray(data || []).slice(0, QUESTION_MIX[type] || 0);
 
-      const allQuestions = shuffleArray([
+      const TARGET_TOTAL = Object.values(QUESTION_MIX).reduce((a, b) => a + b, 0); // 20
+
+      const pickedMC = pick(mcRes.data, 'multiple_choice');
+      let baseQuestions = [
         ...pick(gfRes.data, 'gap_fill'),
-        ...pick(mcRes.data, 'multiple_choice'),
+        ...pickedMC,
         ...pick(sbRes.data, 'sentence_building'),
         ...pick(oooRes.data, 'odd_one_out'),
         ...pick(ecRes.data, 'error_correction'),
         ...pick(matchRes.data, 'matching'),
-      ]);
+      ];
+
+      // Top up to TARGET_TOTAL if some types had fewer questions than requested
+      // Fill shortfall with extra multiple_choice (most plentiful type)
+      if (baseQuestions.length < TARGET_TOTAL) {
+        const shortfall = TARGET_TOTAL - baseQuestions.length;
+        const mcUsedIds = new Set(pickedMC.map(q => q.id));
+        const extraMC = shuffleArray((mcRes.data || []).filter(q => !mcUsedIds.has(q.id))).slice(0, shortfall);
+        baseQuestions = [...baseQuestions, ...extraMC];
+      }
+
+      const allQuestions = shuffleArray(baseQuestions);
 
       if (allQuestions.length === 0) {
         alert('No questions available for this level yet. Check back soon!');
