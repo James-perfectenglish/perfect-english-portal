@@ -32,30 +32,16 @@ const LEVELS = [
 const GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
 const QUESTIONS_PER_ROUND = 8;
 
-/**
- * Builds an ordered question list from raw DB data.
- *
- * - Questions with sequence_group play in their numbered order within the group.
- * - The group itself is shuffled as a single block among other questions.
- * - Questions without sequence_group are individual blocks, shuffled freely.
- * - Final list sliced to QUESTIONS_PER_ROUND.
- */
 function buildQuestionList(data) {
   const sequenced = data.filter(q => q.sequence_group);
   const free = data.filter(q => !q.sequence_group);
-
   const groups = {};
   sequenced.forEach(q => {
     if (!groups[q.sequence_group]) groups[q.sequence_group] = [];
     groups[q.sequence_group].push(q);
   });
   Object.values(groups).forEach(g => g.sort((a, b) => a.sequence_order - b.sequence_order));
-
-  const blocks = [
-    ...Object.values(groups),
-    ...free.map(q => [q]),
-  ];
-
+  const blocks = [...Object.values(groups), ...free.map(q => [q])];
   return shuffleArray(blocks).flat().slice(0, QUESTIONS_PER_ROUND);
 }
 
@@ -76,9 +62,7 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
     const { data } = await query;
     if (data) {
       const counts = {};
-      LEVELS.forEach(lv => {
-        counts[lv.key] = data.filter(q => lv.dbLevels.includes(q.level)).length;
-      });
+      LEVELS.forEach(lv => { counts[lv.key] = data.filter(q => lv.dbLevels.includes(q.level)).length; });
       setQuestionCounts(counts);
     }
   };
@@ -91,20 +75,13 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
   };
 
   const fetchQuestions = async (dbLevels) => {
-    let query = supabase
-      .from('question_bank')
-      .select('*')
-      .eq('type', 'matching')
-      .in('level', dbLevels);
+    let query = supabase.from('question_bank').select('*').eq('type', 'matching').in('level', dbLevels);
     if (topicFilter) query = query.eq('topic', topicFilter);
     const { data, error } = await query;
     if (error) { console.error('Matching fetch error:', error); setStage('playing'); return; }
-
     const ordered = data && data.length > 0 ? buildQuestionList(data) : [];
     setQuestions(ordered);
-    setCurrentQ(0);
-    setScore(0);
-    setQuestionResult(null);
+    setCurrentQ(0); setScore(0); setQuestionResult(null);
     setStage('playing');
   };
 
@@ -132,22 +109,14 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
     window.scrollTo({ top: 0, behavior: 'instant' });
     const nextIdx = currentQ + 1;
     setQuestionResult(null);
-    if (nextIdx >= questions.length) {
-      setStage('finished');
-    } else {
-      setCurrentQ(nextIdx);
-    }
+    if (nextIdx >= questions.length) { setStage('finished'); }
+    else { setCurrentQ(nextIdx); }
   };
 
   const backToLevelSelect = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-    setSelectedLevel(null);
-    setQuestions([]);
-    setCurrentQ(0);
-    setScore(0);
-    setQuestionResult(null);
-    setStage('level-select');
-    fetchCounts();
+    setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0);
+    setQuestionResult(null); setStage('level-select'); fetchCounts();
   };
 
   const restartExercise = () => {
@@ -159,15 +128,16 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
   const q = questions[currentQ];
   const parsedPairs = q ? (Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]')) : [];
 
-  // ── LEVEL SELECT ──────────────────────────────────────────────
+  // ── LEVEL SELECT ────────────────────────────────────────────
   if (stage === 'level-select') {
     return (
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{ background: GRADIENT, borderRadius: '12px 12px 0 0', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white' }}>
+      <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
+        <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🔗 Matching</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Match the pairs — translations, definitions, and sounds</p>
         </div>
-        <div style={{ background: 'white', padding: '2rem', borderRadius: '0 0 12px 12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
+        <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
           <h2 style={{ color: '#2d3748', fontSize: '1.15rem', fontWeight: 600, margin: '0 0 6px', textAlign: 'center' }}>Choose your level</h2>
           <p style={{ color: '#718096', fontSize: '0.9rem', margin: '0 0 24px', textAlign: 'center' }}>Select a difficulty to start practising</p>
           <div style={{ display: 'grid', gap: '16px' }}>
@@ -175,18 +145,12 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
               const count = questionCounts[level.key] || 0;
               const available = count > 0;
               return (
-                <div
-                  key={level.key}
-                  onClick={() => available && selectLevel(level)}
-                  style={{
-                    border: `2px solid ${available ? level.colour : '#e2e8f0'}`,
-                    borderRadius: '12px', padding: '1.25rem 1.5rem',
-                    cursor: available ? 'pointer' : 'default',
-                    background: available ? level.colourLight : '#f9fafb',
-                    opacity: available ? 1 : 0.55,
-                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                    display: 'flex', alignItems: 'center', gap: '1rem',
-                  }}
+                <div key={level.key} onClick={() => available && selectLevel(level)} style={{
+                  border: `2px solid ${available ? level.colour : '#e2e8f0'}`, borderRadius: '12px', padding: '1.25rem 1.5rem',
+                  cursor: available ? 'pointer' : 'default', background: available ? level.colourLight : '#f9fafb',
+                  opacity: available ? 1 : 0.55, transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                  display: 'flex', alignItems: 'center', gap: '1rem',
+                }}
                   onMouseEnter={e => { if (available) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 4px 16px ${level.colour}30`; } }}
                   onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
@@ -213,13 +177,15 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
           )}
         </div>
       </div>
+      </div>
     );
   }
 
-  // ── EXERCISE ──────────────────────────────────────────────────
+  // ── EXERCISE ────────────────────────────────────────────
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <div style={{ background: GRADIENT, borderRadius: '12px 12px 0 0', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white' }}>
+    <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
+      <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🔗 Matching</h1>
         <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Tap a tile on the left, then its match on the right</p>
         {selectedLevel && (
@@ -227,12 +193,8 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
         )}
       </div>
 
-      <div style={{ background: 'white', padding: '2rem', borderRadius: '0 0 12px 12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
-
-        {stage === 'loading' && (
-          <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#666' }}>Loading...</div>
-        )}
-
+      <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
+        {stage === 'loading' && <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#666' }}>Loading...</div>}
         {stage === 'playing' && questions.length === 0 && (
           <div style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🔗</div>
@@ -241,49 +203,29 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
             <button onClick={backToLevelSelect} style={{ marginTop: '1rem', padding: '0.75rem 1.5rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>← Choose Another Level</button>
           </div>
         )}
-
         {stage === 'playing' && q && (
           <>
-            {/* Progress + sequence indicator */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f7fafc', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '0.9rem', color: '#4a5568', fontWeight: 500 }}>
               <span>Set: {currentQ + 1} / {questions.length}</span>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 {q.sequence_group && (
-                  <span style={{ fontSize: '0.78rem', background: '#EDE9FE', color: '#553C9A', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>
-                    Part {q.sequence_order}
-                  </span>
+                  <span style={{ fontSize: '0.78rem', background: '#EDE9FE', color: '#553C9A', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>Part {q.sequence_order}</span>
                 )}
                 <span>Score: {score} / {currentQ + (questionResult ? 1 : 0)}</span>
               </div>
             </div>
-
-            {/* Level + topic badges */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '16px' }}>
-              {q.level && (
-                <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: q.level.startsWith('A') ? '#276749' : q.level.startsWith('B') ? '#2b6cb0' : '#c05621' }}>{q.level}</div>
-              )}
-              {q.topic && (
-                <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#e8daef', color: '#6c3483' }}>{q.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
-              )}
+              {q.level && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: q.level.startsWith('A') ? '#276749' : q.level.startsWith('B') ? '#2b6cb0' : '#c05621' }}>{q.level}</div>}
+              {q.topic && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#e8daef', color: '#6c3483' }}>{q.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>}
             </div>
-
-            {/* Optional instruction text */}
             {q.question && q.question.trim() && (
-              <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', color: '#2d3748', fontWeight: 500, marginBottom: '20px', lineHeight: 1.5 }}>
-                {q.question}
-              </div>
+              <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', color: '#2d3748', fontWeight: 500, marginBottom: '20px', lineHeight: 1.5 }}>{q.question}</div>
             )}
-
-            {/* The matching grid */}
             <MatchingPairs key={currentQ} pairs={parsedPairs} disabled={!!questionResult} onResult={handleResult} />
-
-            {/* Feedback */}
             {questionResult && (
               <div style={{ marginTop: '16px' }}>
                 <div style={{ backgroundColor: questionResult.isCorrect ? '#f0fff4' : '#fff3cd', border: `1px solid ${questionResult.isCorrect ? '#c6f6d5' : '#feebc8'}`, color: questionResult.isCorrect ? '#276749' : '#856404', padding: '1rem 1.25rem', borderRadius: '10px', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: '1.6', marginBottom: '1rem' }}>
-                  {questionResult.isCorrect
-                    ? '✅ Perfect! All pairs matched correctly.'
-                    : `👍 All matched! You had ${questionResult.wrongAttempts} wrong attempt${questionResult.wrongAttempts !== 1 ? 's' : ''} along the way.`}
+                  {questionResult.isCorrect ? '✅ Perfect! All pairs matched correctly.' : `👍 All matched! You had ${questionResult.wrongAttempts} wrong attempt${questionResult.wrongAttempts !== 1 ? 's' : ''} along the way.`}
                   {q.explanation && <div style={{ marginTop: '8px', opacity: 0.85 }}>{q.explanation}</div>}
                 </div>
                 <button onClick={nextQuestion} style={{ width: '100%', padding: '1rem', fontSize: '1rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '600' }}>
@@ -293,22 +235,13 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
             )}
           </>
         )}
-
-        {/* Finished */}
         {stage === 'finished' && (
           <div style={{ background: '#f7fafc', border: '2px solid #e2e8f0', borderRadius: '8px', padding: '2rem', textAlign: 'center', marginTop: '1rem' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>
-              {score >= questions.length * 0.9 ? '🏆' : score >= questions.length * 0.7 ? '⭐' : score >= questions.length * 0.5 ? '👍' : '💪'}
-            </div>
+            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>{score >= questions.length * 0.9 ? '🏆' : score >= questions.length * 0.7 ? '⭐' : score >= questions.length * 0.5 ? '👍' : '💪'}</div>
             <h2 style={{ color: '#2d3748', margin: '0 0 12px' }}>Exercise Complete!</h2>
-            <div style={{ fontSize: '3rem', fontWeight: 700, margin: '12px 0', color: score >= questions.length * 0.7 ? '#48bb78' : score >= questions.length * 0.5 ? '#ed8936' : '#f56565' }}>
-              {score} / {questions.length}
-            </div>
+            <div style={{ fontSize: '3rem', fontWeight: 700, margin: '12px 0', color: score >= questions.length * 0.7 ? '#48bb78' : score >= questions.length * 0.5 ? '#ed8936' : '#f56565' }}>{score} / {questions.length}</div>
             <p style={{ color: '#4a5568' }}>
-              {score >= questions.length * 0.9 ? 'Outstanding! Flawless matching — you really know your vocabulary connections.'
-                : score >= questions.length * 0.7 ? 'Great work! Strong vocabulary connections.'
-                : score >= questions.length * 0.5 ? 'Good effort. Keep building those vocabulary links.'
-                : 'Keep going — the connections will come with practice!'}
+              {score >= questions.length * 0.9 ? 'Outstanding! Flawless matching — you really know your vocabulary connections.' : score >= questions.length * 0.7 ? 'Great work! Strong vocabulary connections.' : score >= questions.length * 0.5 ? 'Good effort. Keep building those vocabulary links.' : 'Keep going — the connections will come with practice!'}
             </p>
             <p style={{ color: '#718096', fontSize: '0.88rem' }}>A point is awarded for each set matched with no wrong attempts.</p>
             <div style={{ marginTop: '20px', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -319,6 +252,7 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 
 const LEVELS = [
-  { key: 'beginner',     label: 'Beginner',     sublabel: 'A1 – A2', description: 'Short, clear conversations and announcements with everyday vocabulary.', colour: '#48bb78', colourLight: '#f0fff4', dbLevels: ['A1', 'A2'], icon: '🌱' },
-  { key: 'intermediate', label: 'Intermediate', sublabel: 'B1 – B2', description: 'Longer dialogues, workplace scenarios, and natural-speed speech.',          colour: '#4299e1', colourLight: '#ebf8ff', dbLevels: ['B1', 'B2'], icon: '📘' },
-  { key: 'advanced',     label: 'Advanced',     sublabel: 'C1 – C2', description: 'Complex discussions, implied meaning, and fast-paced natural speech.',       colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '🎓' }
+  { key: 'beginner',     label: 'Beginner',     sublabel: 'B1 \u2013 B2', description: 'Short, clear conversations and announcements with everyday vocabulary.', colour: '#48bb78', colourLight: '#f0fff4', dbLevels: ['A1', 'A2'], icon: '\U0001f331' },
+  { key: 'intermediate', label: 'Intermediate', sublabel: 'B1 \u2013 B2', description: 'Longer dialogues, workplace scenarios, and natural-speed speech.',          colour: '#4299e1', colourLight: '#ebf8ff', dbLevels: ['B1', 'B2'], icon: '\U0001f4d8' },
+  { key: 'advanced',     label: 'Advanced',     sublabel: 'C1 \u2013 C2', description: 'Complex discussions, implied meaning, and fast-paced natural speech.',       colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '\U0001f393' }
 ];
 
 const SPEED_OPTIONS = [
@@ -39,8 +39,6 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
 
   useEffect(() => { fetchCounts(); }, []);
 
-  // Build a Supabase query filtered by the student's tracks.
-  // If no tracks assigned, show everything (teacher / unassigned student).
   const applyTrackFilter = (query) => {
     if (!userTracks || userTracks.length === 0) return query;
     return query.overlaps('tracks', userTracks);
@@ -66,27 +64,17 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
 
   const fetchExerciseList = async (dbLevels) => {
     setListLoading(true);
-    let query = supabase
-      .from('listening_exercises')
-      .select('id, title, description, level, topic, duration_seconds, image_url')
-      .in('level', dbLevels)
-      .order('created_at', { ascending: true });
+    let query = supabase.from('listening_exercises').select('id, title, description, level, topic, duration_seconds, image_url').in('level', dbLevels).order('created_at', { ascending: true });
     query = applyTrackFilter(query);
     const { data } = await query;
     if (data) setExerciseList(data);
-
-    // Fetch which ones this student has done
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: sessions } = await supabase
-          .from('listening_sessions')
-          .select('exercise_id')
-          .eq('student_id', user.id);
+        const { data: sessions } = await supabase.from('listening_sessions').select('exercise_id').eq('student_id', user.id);
         if (sessions) setCompletedIds(new Set(sessions.map(s => s.exercise_id)));
       }
     } catch (e) { /* silent */ }
-
     setListLoading(false);
   };
 
@@ -104,7 +92,6 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
-  // ── Session tracking ──
   const saveListeningSession = async (stageReached) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -120,12 +107,9 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
         detail_correct: dc,
         detail_total:   detailQuestions.length,
       });
-    } catch (e) {
-      console.error('Error saving listening session:', e);
-    }
+    } catch (e) { console.error('Error saving listening session:', e); }
   };
 
-  // ── Audio ──
   const togglePlay = () => {
     if (!audioRef.current) return;
     if (isPlaying) { audioRef.current.pause(); setIsPlaying(false); }
@@ -166,9 +150,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
   const isAnswerCorrect = (q, userAnswer) => {
     const ua = (userAnswer || '').toLowerCase().trim();
     if (q.type === 'gap_fill') {
-      const correct = q.correct_answers
-        ? (Array.isArray(q.correct_answers) ? q.correct_answers : JSON.parse(q.correct_answers))
-        : [q.correct_answer];
+      const correct = q.correct_answers ? (Array.isArray(q.correct_answers) ? q.correct_answers : JSON.parse(q.correct_answers)) : [q.correct_answer];
       return correct.map(a => a.toLowerCase().trim()).includes(ua);
     }
     return ua === (q.correct_answer || '').toLowerCase().trim();
@@ -212,7 +194,6 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
   const gistAllAnswered   = gistQuestions.length > 0   && gistQuestions.every(q => gistAnswers[q.id]?.trim());
   const detailAllAnswered = detailQuestions.length > 0 && detailQuestions.every(q => detailAnswers[q.id]?.trim());
 
-  // ── Shared renderers ──
   const renderAudioPlayer = (stageLabel) => {
     const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
     return (
@@ -220,7 +201,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
         <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#667eea', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{stageLabel}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button onClick={togglePlay} style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            {isPlaying ? '⏸' : '▶'}
+            {isPlaying ? '\u23f8' : '\u25b6'}
           </button>
           <div style={{ flex: 1 }}>
             <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden', marginBottom: '6px' }}>
@@ -273,7 +254,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
         )}
         {isSubmitted && (
           <div style={{ marginTop: '10px', padding: '10px', borderRadius: '6px', background: correct ? '#c6f6d5' : '#fed7d7', color: correct ? '#22543d' : '#742a2a', borderLeft: `4px solid ${correct ? '#48bb78' : '#f56565'}`, fontSize: '0.9rem', lineHeight: 1.5 }}>
-            <strong>{correct ? '✓ Correct!' : `✗ Incorrect — ${q.correct_answer}`}</strong>
+            <strong>{correct ? '\u2713 Correct!' : `\u2717 Incorrect \u2014 ${q.correct_answer}`}</strong>
             {q.explanation && <><br />{q.explanation}</>}
           </div>
         )}
@@ -294,17 +275,18 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
     <audio ref={audioRef} src={currentExercise?.audio_url} onEnded={handleAudioEnded} onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata} preload="metadata" />
   );
 
-  // ═══════════════════════════════════════════
+  // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
   // RENDER: LEVEL SELECT
-  // ═══════════════════════════════════════════
+  // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
   if (stage === 'level-select') {
     return (
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px 12px 0 0', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white' }}>
+      <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
+        <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Listening Exercises</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Practise your listening skills with audio exercises</p>
         </div>
-        <div style={{ background: 'white', padding: '2rem', borderRadius: '0 0 12px 12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
+        <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
           <h2 style={{ color: '#2d3748', fontSize: '1.15rem', fontWeight: 600, margin: '0 0 6px', textAlign: 'center' }}>Choose your level</h2>
           <p style={{ color: '#718096', fontSize: '0.9rem', margin: '0 0 24px', textAlign: 'center' }}>Select a difficulty to see available exercises</p>
           <div style={{ display: 'grid', gap: '16px' }}>
@@ -328,14 +310,14 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
                       {available ? `${count} exercise${count !== 1 ? 's' : ''} available` : 'Coming soon'}
                     </span>
                   </div>
-                  {available && <div style={{ fontSize: '1.3rem', color: level.colour, flexShrink: 0 }}>→</div>}
+                  {available && <div style={{ fontSize: '1.3rem', color: level.colour, flexShrink: 0 }}>\u2192</div>}
                 </div>
               );
             })}
           </div>
           {onBack && (
             <div style={{ textAlign: 'center', marginTop: '24px' }}>
-              <button onClick={onBack} style={{ padding: '10px 24px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', fontSize: '0.95rem' }}>← Back to Exercises</button>
+              <button onClick={onBack} style={{ padding: '10px 24px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', fontSize: '0.95rem' }}>\u2190 Back to Exercises</button>
             </div>
           )}
         </div>
@@ -343,22 +325,23 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
     );
   }
 
-  // ═══════════════════════════════════════════
+  // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
   // RENDER: EXERCISE LIST
-  // ═══════════════════════════════════════════
+  // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
   if (stage === 'exercise-list') {
     return (
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px 12px 0 0', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white' }}>
+      <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
+        <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Listening Exercises</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Choose an exercise to start listening</p>
           {selectedLevel && <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>Level: {selectedLevel.sublabel}</span>}
         </div>
-        <div style={{ background: 'white', padding: '2rem', borderRadius: '0 0 12px 12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
+        <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
           {listLoading && <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#666' }}>Loading exercises...</div>}
           {!listLoading && exerciseList.length === 0 && (
             <div style={{ textAlign: 'center', padding: '2rem' }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🎧</div>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>\U0001f3a7</div>
               <h2 style={{ color: '#2C3E50', marginBottom: '0.5rem' }}>Coming Soon!</h2>
               <p style={{ color: '#666' }}>Listening exercises for this level are being added.</p>
             </div>
@@ -373,7 +356,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
                 >
                   {ex.image_url
                     ? <img src={ex.image_url} alt="" style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} />
-                    : <div style={{ width: '56px', height: '56px', borderRadius: '10px', background: selectedLevel.colourLight, border: `1px solid ${selectedLevel.colour}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>🎧</div>
+                    : <div style={{ width: '56px', height: '56px', borderRadius: '10px', background: selectedLevel.colourLight, border: `1px solid ${selectedLevel.colour}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>\U0001f3a7</div>
                   }
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, color: '#2d3748', fontSize: '1rem', marginBottom: '2px' }}>{ex.title}</div>
@@ -384,82 +367,75 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                    {completedIds.has(ex.id) && <span style={{ fontSize: '1rem' }}>✅</span>}
-                    <span style={{ fontSize: '1.3rem', color: '#cbd5e0' }}>→</span>
+                    {completedIds.has(ex.id) && <span style={{ fontSize: '1rem' }}>\u2705</span>}
+                    <span style={{ fontSize: '1.3rem', color: '#cbd5e0' }}>\u2192</span>
                   </div>
                 </div>
               ))}
             </div>
           )}
           <div style={{ textAlign: 'center', marginTop: '24px' }}>
-            <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', fontSize: '0.95rem' }}>← Change Level</button>
+            <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', fontSize: '0.95rem' }}>\u2190 Change Level</button>
           </div>
         </div>
       </div>
     );
   }
 
-  // ═══════════════════════════════════════════
+  // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
   // RENDER: EXERCISE PAGE
-  // ═══════════════════════════════════════════
+  // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
   if (stage === 'exercise' && currentExercise) {
     return (
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
         {renderAudioElement()}
-        <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px 12px 0 0', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white' }}>
+        <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.8rem' }}>{currentExercise.title}</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.9 }}>{currentExercise.description}</p>
           {selectedLevel && <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>Level: {currentExercise.level}</span>}
         </div>
-        <div style={{ background: 'white', padding: '2rem', borderRadius: '0 0 12px 12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
-
-          {/* INTRO */}
+        <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
           {exerciseStage === 'intro' && (
             <>
               {renderImage()}
               {currentExercise.intro_text && <div style={{ background: '#f7fafc', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.25rem', border: '1px solid #e2e8f0', fontSize: '1rem', color: '#2d3748', lineHeight: 1.7 }}>{currentExercise.intro_text}</div>}
-              <button onClick={() => setExerciseStage('gist')} style={{ width: '100%', padding: '1rem', fontSize: '1.05rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 600 }}>Start Listening — Exercise 1</button>
+              <button onClick={() => setExerciseStage('gist')} style={{ width: '100%', padding: '1rem', fontSize: '1.05rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 600 }}>Start Listening \u2014 Exercise 1</button>
             </>
           )}
-
-          {/* GIST */}
           {exerciseStage === 'gist' && (
             <>
               {renderImage()}
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Exercise 1 — Gist</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Exercise 1 \u2014 Gist</div>
               <p style={{ color: '#718096', fontSize: '0.9rem', marginBottom: '1rem', marginTop: 0 }}>Listen and answer the question. What is the general idea?</p>
               {renderAudioPlayer('First Listen')}
               {gistQuestions.map(q => renderQuestion(q, gistAnswers, selectGistAnswer, gistSubmitted, {}))}
               {!gistSubmitted && <button onClick={submitGist} disabled={!gistAllAnswered} style={{ width: '100%', padding: '1rem', fontSize: '1rem', background: gistAllAnswered ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#cbd5e0', color: 'white', border: 'none', borderRadius: '10px', cursor: gistAllAnswered ? 'pointer' : 'not-allowed', fontWeight: 600 }}>Check Answer</button>}
-              {gistSubmitted && <button onClick={moveToDetail} style={{ width: '100%', padding: '1rem', fontSize: '1rem', marginTop: '0.5rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 600 }}>Continue to Exercise 2 →</button>}
+              {gistSubmitted && <button onClick={moveToDetail} style={{ width: '100%', padding: '1rem', fontSize: '1rem', marginTop: '0.5rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 600 }}>Continue to Exercise 2 \u2192</button>}
             </>
           )}
-
-          {/* DETAIL */}
           {exerciseStage === 'detail' && (
             <>
               {renderImage()}
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Exercise 2 — Detail</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Exercise 2 \u2014 Detail</div>
               <p style={{ color: '#718096', fontSize: '0.9rem', marginBottom: '1rem', marginTop: 0 }}>Listen again more carefully and answer the questions below.</p>
               {renderAudioPlayer('Second Listen')}
               {detailQuestions.map(q => renderQuestion(q, detailAnswers, selectDetailAnswer, detailSubmitted, gapInputs))}
               {!detailSubmitted && <button onClick={submitDetail} disabled={!detailAllAnswered} style={{ width: '100%', padding: '1rem', fontSize: '1rem', background: detailAllAnswered ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#cbd5e0', color: 'white', border: 'none', borderRadius: '10px', cursor: detailAllAnswered ? 'pointer' : 'not-allowed', fontWeight: 600 }}>Submit Answers</button>}
-              {detailSubmitted && <button onClick={moveToReview} style={{ width: '100%', padding: '1rem', fontSize: '1rem', marginTop: '0.5rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 600 }}>See Results →</button>}
+              {detailSubmitted && <button onClick={moveToReview} style={{ width: '100%', padding: '1rem', fontSize: '1rem', marginTop: '0.5rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 600 }}>See Results \u2192</button>}
             </>
           )}
-
-          {/* REVIEW */}
           {exerciseStage === 'review' && (
             <>
               <div style={{ background: totalCorrect >= Math.ceil(totalQuestions * 0.7) ? '#f0fff4' : '#fff5f5', border: `2px solid ${totalCorrect >= Math.ceil(totalQuestions * 0.7) ? '#48bb78' : '#f56565'}`, borderRadius: '8px', padding: '1.5rem', marginBottom: '1.5rem', textAlign: 'center' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>{totalCorrect >= totalQuestions ? '🏆' : totalCorrect >= Math.ceil(totalQuestions * 0.7) ? '⭐' : '💪'}</div>
+                <div style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>{totalCorrect >= totalQuestions ? '\U0001f3c6' : totalCorrect >= Math.ceil(totalQuestions * 0.7) ? '\u2b50' : '\U0001f4aa'}</div>
                 <div style={{ fontSize: '1.8rem', fontWeight: 700, color: totalCorrect >= Math.ceil(totalQuestions * 0.7) ? '#48bb78' : '#f56565' }}>{totalCorrect}/{totalQuestions}</div>
                 <p style={{ color: '#4a5568', margin: '6px 0 0', fontSize: '0.95rem' }}>
-                  {totalCorrect >= totalQuestions ? 'Perfect! Excellent listening!' : totalCorrect >= Math.ceil(totalQuestions * 0.7) ? 'Well done! Strong listening skills.' : 'Keep practising — try listening again for the details you missed.'}
+                  {totalCorrect >= totalQuestions ? 'Perfect! Excellent listening!' : totalCorrect >= Math.ceil(totalQuestions * 0.7) ? 'Well done! Strong listening skills.' : 'Keep practising \u2014 try listening again for the details you missed.'}
                 </p>
               </div>
               {renderImage()}
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Review — Listen Again</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Review \u2014 Listen Again</div>
               <p style={{ color: '#718096', fontSize: '0.9rem', marginBottom: '1rem', marginTop: 0 }}>Listen one more time and follow along with the transcript.</p>
               {renderAudioPlayer('Third Listen')}
               {currentExercise.transcript && (
@@ -478,6 +454,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
             </>
           )}
         </div>
+      </div>
       </div>
     );
   }
