@@ -72,7 +72,7 @@ export default function SentenceAuction({ onBack, onComplete }) {
   };
 
   const fetchCounts = async () => {
-    const { data } = await supabase.from('question_bank').select('level').eq('type', 'sentence_auction');
+    const { data } = await supabase.from('question_bank').select('level').eq('type', 'sentence_auction').neq('topic', 'spanish');
     if (data) {
       const counts = {};
       LEVELS.forEach(lv => { counts[lv.key] = data.filter(q => lv.dbLevels.includes(q.level)).length; });
@@ -86,7 +86,7 @@ export default function SentenceAuction({ onBack, onComplete }) {
   };
 
   const fetchAuctions = async (dbLevels) => {
-    const { data, error } = await supabase.from('question_bank').select('*').eq('type', 'sentence_auction').in('level', dbLevels);
+    const { data, error } = await supabase.from('question_bank').select('*').eq('type', 'sentence_auction').neq('topic', 'spanish').in('level', dbLevels);
     if (error) { console.error(error); setStage('bidding'); return; }
     const shuffled = shuffleArray(data || []).slice(0, AUCTIONS_PER_ROUND);
     setAuctions(shuffled); setCurrentIdx(0); setBudget(STARTING_BUDGET);

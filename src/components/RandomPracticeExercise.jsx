@@ -215,7 +215,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         queryForType('odd_one_out'),
         queryForType('error_correction'),
         (() => {
-          let q = supabase.from('question_bank').select('*').eq('type', 'matching').is('sequence_group', null);
+          let q = supabase.from('question_bank').select('*').eq('type', type).neq('topic', 'spanish');
           if (levels && levels.length > 0) q = q.in('level', levels);
           return q;
         })(),
