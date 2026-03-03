@@ -1,46 +1,45 @@
-// api/mark-correction.js
-// Vercel serverless function — proxies AI marking requests to Anthropic
-// Add ANTHROPIC_API_KEY to your Vercel environment variables
+// api/mark-gap-fill.js
+// Vercel serverless function — AI marking for gap fill free-text answers
+// Requires ANTHROPIC_API_KEY in Vercel environment variables
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en' } = req.body;
+  const { question, correctAnswer, studentAnswer, language = 'en' } = req.body;
 
-  if (!originalSentence || !errorWord || !studentReplacement || !correctAnswerSentence) {
+  if (!question || !correctAnswer || !studentAnswer) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
   const isSpanish = language === 'es';
+  const langLabel = isSpanish ? 'Spanish' : 'English';
 
   const prompt = isSpanish
-    ? `Estás corrigiendo un ejercicio de corrección de errores en español.
+    ? `Estás corrigiendo un ejercicio de completar huecos en español.
 
-Frase original (con un error): "${originalSentence}"
-La palabra con error es: "${errorWord}"
-El alumno la ha sustituido por: "${studentReplacement}"
-La respuesta correcta del modelo es: "${correctAnswerSentence}"
+Pregunta (con ___ para el hueco): "${question}"
+Respuesta correcta del modelo: "${correctAnswer}"
+Respuesta del alumno: "${studentAnswer}"
 
-Decide: ¿es la sustitución del alumno gramaticalmente correcta Y corrige el error de la frase original?
-Responde SÍ sólo si la palabra del alumno realmente funciona como corrección válida, aunque sea diferente a la respuesta del modelo.
-Responde NO si es gramaticalmente incorrecta, cambia el significado de manera inapropiada, o no corrige el error.
+¿Es la respuesta del alumno gramaticalmente correcta y adecuada para este contexto, aunque sea diferente a la respuesta del modelo?
+Responde SÍ sólo si funciona de verdad en el hueco — misma forma verbal, concordancia correcta, significado apropiado.
+Responde NO si es incorrecta, tiene errores gramaticales o cambia el significado.
 
 Responde con exactamente un objeto JSON y nada más:
 {"valid": true, "reason": "una frase corta en español explicando por qué funciona"}
 o
 {"valid": false, "reason": "una frase corta en español explicando por qué no funciona"}`
-    : `You are marking an English error correction exercise.
+    : `You are marking an ${langLabel} gap-fill exercise.
 
-Original sentence (contains one error): "${originalSentence}"
-The error word is: "${errorWord}"
-The student replaced it with: "${studentReplacement}"
-The model answer is: "${correctAnswerSentence}"
+Question (with ___ for the gap): "${question}"
+Model correct answer: "${correctAnswer}"
+Student's answer: "${studentAnswer}"
 
-Decide: is the student's replacement grammatically correct AND does it fix the error in the original sentence?
-Only answer YES if their word genuinely works as a valid correction, even if different from the model answer.
-Answer NO if it is grammatically wrong, changes the meaning inappropriately, or does not fix the error.
+Is the student's answer grammatically correct and appropriate for this context, even if different from the model answer?
+Only answer YES if it genuinely works in the gap — correct verb form, agreement, appropriate meaning.
+Answer NO if it is wrong, grammatically incorrect, or changes the meaning.
 
 Reply with exactly one JSON object and nothing else:
 {"valid": true, "reason": "one short sentence explaining why it works"}
@@ -75,7 +74,7 @@ or
 
     return res.status(200).json(result);
   } catch (e) {
-    console.error('mark-correction error:', e);
+    console.error('mark-gap-fill error:', e);
     return res.status(200).json({ valid: null, reason: '' });
   }
 }

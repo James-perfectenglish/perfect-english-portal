@@ -14,6 +14,9 @@ const QUESTION_MIX = {
   // Total: 20
 };
 
+// Levels where AI soft-marking is used for error correction
+const AI_MARKED_EC_LEVELS = ['B2', 'C1', 'C2'];
+
 // Inject CSS for focus fix on OOO, EC, and matching tiles
 const RP_STYLE_ID = 'rp-focus-fix';
 if (typeof document !== 'undefined' && !document.getElementById(RP_STYLE_ID)) {
@@ -50,6 +53,45 @@ const findErrorIndex = (questionWords, correctAnswer) => {
   return { index: -1, correctWord: '' };
 };
 
+// Detect language from question topic — Spanish questions have topic='spanish'
+const getQuestionLanguage = (question) => question?.topic === 'spanish' ? 'es' : 'en';
+
+// AI mark a gap fill free-text answer
+const aiMarkGapFill = async (question, correctAnswer, studentAnswer, language = 'en') => {
+  try {
+    const response = await fetch('/api/mark-gap-fill', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, correctAnswer, studentAnswer, language }),
+    });
+    if (!response.ok) return null;
+    const result = await response.json();
+    if (result.valid === null) return null;
+    return result;
+  } catch (e) {
+    console.error('AI gap fill marking error:', e);
+    return null;
+  }
+};
+
+// AI mark an error correction replacement
+const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en') => {
+  try {
+    const response = await fetch('/api/mark-correction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ originalSentence, errorWord, studentReplacement, correctAnswerSentence, language }),
+    });
+    if (!response.ok) return null;
+    const result = await response.json();
+    if (result.valid === null) return null;
+    return result;
+  } catch (e) {
+    console.error('AI correction marking error:', e);
+    return null;
+  }
+};
+
 export default function RandomPracticeExercise({ levels, levelTitle, levelSubtitle, gradient, onBack }) {
   const [stage, setStage] = useState('start');
   const [questions, setQuestions] = useState([]);
@@ -63,6 +105,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
   const [showHint, setShowHint] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
   const [sbFeedback, setSbFeedback] = useState(null);
   const [bestScore, setBestScore] = useState(null);
   const [averageScore, setAverageScore] = useState(null);
@@ -213,6 +256,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setEcCorrection('');
       setMatchingDone(false);
       setShowHint(false);
+      setIsChecking(false);
     } catch (error) {
       console.error('Error fetching questions:', error);
       alert('Failed to load questions. Please try again.');
@@ -221,7 +265,8 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     }
   };
 
-  const checkAnswer = () => {
+  // ── Gap fill + multiple choice check (async — gap fill may call AI) ──
+  const checkAnswer = async () => {
     const currentQuestion = questions[currentQuestionIndex];
     let isCorrect = false;
     let feedbackType = 'incorrect';
@@ -233,19 +278,23 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         ? currentQuestion.correct_answers.map(a => a.toLowerCase().trim())
         : [];
 
+      // 1 — Exact match
       if (correctAnswers.includes(answer)) {
         isCorrect = true;
         feedbackType = 'correct';
-      } else if (currentQuestion.informal_accepted && Array.isArray(currentQuestion.informal_accepted)) {
+      }
+
+      // 2 — Informal accepted
+      if (!isCorrect && currentQuestion.informal_accepted && Array.isArray(currentQuestion.informal_accepted)) {
         const informalAnswers = currentQuestion.informal_accepted.map(a => a.toLowerCase().trim());
         if (informalAnswers.includes(answer)) {
           isCorrect = true;
           feedbackType = 'informal';
-          if (currentQuestion.informal_feedback) {
-            explanation = `${currentQuestion.informal_feedback} ${explanation}`;
-          }
+          if (currentQuestion.informal_feedback) explanation = `${currentQuestion.informal_feedback} ${explanation}`;
         }
       }
+
+      // 3 — Acceptable alternatives (pre-defined in DB)
       if (!isCorrect && currentQuestion.acceptable_alternatives && Array.isArray(currentQuestion.acceptable_alternatives)) {
         const alternative = currentQuestion.acceptable_alternatives.find(
           alt => alt.answer && alt.answer.toLowerCase().trim() === answer
@@ -254,6 +303,25 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
           isCorrect = true;
           feedbackType = 'alternative';
           explanation = `${alternative.feedback} ${explanation}`;
+        }
+      }
+
+      // 4 — AI soft-mark (fires when all static checks fail)
+      if (!isCorrect) {
+        setIsChecking(true);
+        const lang = getQuestionLanguage(currentQuestion);
+        const aiResult = await aiMarkGapFill(
+          currentQuestion.question,
+          correctAnswers[0] || '',
+          userAnswer.trim(),
+          lang
+        );
+        setIsChecking(false);
+
+        if (aiResult?.valid) {
+          isCorrect = true;
+          feedbackType = 'soft-pass';
+          if (aiResult.reason) explanation = `${aiResult.reason} ${explanation}`;
         }
       }
 
@@ -286,7 +354,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       saveAnswer(currentQuestion, selectedOption || '', isCorrect);
     }
 
-    if (isCorrect) setScore(score + 1);
+    if (isCorrect) setScore(s => s + 1);
   };
 
   const handleOOOSelect = (option) => {
@@ -307,13 +375,14 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   };
 
   const handleECWordTap = (index) => {
-    if (feedback) return;
+    if (feedback || isChecking) return;
     setEcSelectedWordIndex(index);
     setEcCorrection('');
   };
 
-  const checkECAnswer = () => {
-    if (ecSelectedWordIndex === null || !ecCorrection.trim()) return;
+  // ── Error correction check (async — may call AI for B2/C1/C2) ──
+  const checkECAnswer = async () => {
+    if (ecSelectedWordIndex === null || !ecCorrection.trim() || isChecking) return;
     const cq = questions[currentQuestionIndex];
     const words = cq.question.trim().split(/\s+/);
     const correctAnswers = Array.isArray(cq.correct_answers)
@@ -325,20 +394,67 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     const cleanCorrection = ecCorrection.trim().replace(/[.,!?;:]+$/, '');
     correctedWords[ecSelectedWordIndex] = cleanCorrection + trailingPunct;
     const correctedSentence = correctedWords.join(' ');
-    const isCorrect = correctAnswers.some(ca => normaliseEC(correctedSentence) === normaliseEC(ca));
+    const isExactMatch = correctAnswers.some(ca => normaliseEC(correctedSentence) === normaliseEC(ca));
     const errorInfo = findErrorIndex(words, correctAnswers[0]);
-    let feedbackMessage;
-    if (isCorrect) {
-      feedbackMessage = `✅ Correct! ${cq.explanation || ''}`;
-    } else {
+
+    // ✅ Exact match
+    if (isExactMatch) {
+      setFeedback({
+        type: 'correct',
+        message: `✅ Correct! ${cq.explanation || ''}`,
+        isCorrect: true,
+        errorIndex: ecSelectedWordIndex,
+        correctWord: cleanCorrection + trailingPunct,
+      });
+      setScore(s => s + 1);
+      saveAnswer(cq, `${words[ecSelectedWordIndex]} → ${ecCorrection.trim()}`, true);
+      return;
+    }
+
+    // AI soft-mark for B2/C1/C2
+    const useAI = AI_MARKED_EC_LEVELS.includes(cq.level);
+    if (useAI) {
+      setIsChecking(true);
+      const lang = getQuestionLanguage(cq);
+      const aiResult = await aiMarkCorrection(
+        cq.question,
+        words[ecSelectedWordIndex],
+        ecCorrection.trim(),
+        correctAnswers[0],
+        lang
+      );
+      setIsChecking(false);
+
+      if (aiResult?.valid) {
+        setFeedback({
+          type: 'soft-pass',
+          message: `✅ Good — that works too! ${aiResult.reason || ''} The model answer was "${errorInfo.correctWord}". ${cq.explanation || ''}`,
+          isCorrect: true,
+          errorIndex: ecSelectedWordIndex,
+          correctWord: cleanCorrection + trailingPunct,
+        });
+        setScore(s => s + 1);
+        saveAnswer(cq, `${words[ecSelectedWordIndex]} → ${ecCorrection.trim()}`, true);
+        return;
+      }
+
+      // AI said no
       const foundRightWord = ecSelectedWordIndex === errorInfo.index;
-      feedbackMessage = foundRightWord
+      const message = foundRightWord
+        ? `❌ Good — you found the error in "${words[errorInfo.index]}", but "${ecCorrection.trim()}" doesn't quite work here. ${aiResult?.reason ? aiResult.reason + ' ' : ''}It should be "${errorInfo.correctWord}". ${cq.explanation || ''}`
+        : `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${cq.explanation || ''}`;
+      setFeedback({ type: 'incorrect', message, isCorrect: false, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
+      saveAnswer(cq, `${words[ecSelectedWordIndex]} → ${ecCorrection.trim()}`, false);
+
+    } else {
+      // A1/A2/B1 — no API
+      const foundRightWord = ecSelectedWordIndex === errorInfo.index;
+      const message = foundRightWord
         ? `❌ You found the error, but the correction should be "${errorInfo.correctWord}". ${cq.explanation || ''}`
         : `❌ The error is in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${cq.explanation || ''}`;
+      setFeedback({ type: 'incorrect', message, isCorrect: false, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
+      saveAnswer(cq, `${words[ecSelectedWordIndex]} → ${ecCorrection.trim()}`, false);
     }
-    setFeedback({ message: feedbackMessage, type: isCorrect ? 'correct' : 'incorrect', isCorrect, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
-    if (isCorrect) setScore(s => s + 1);
-    saveAnswer(cq, `${words[ecSelectedWordIndex]} → ${ecCorrection.trim()}`, isCorrect);
   };
 
   const handleSentenceBuildingResult = (isCorrect, isSoft = false, userAnswer = '') => {
@@ -401,6 +517,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setEcCorrection('');
       setMatchingDone(false);
       setShowHint(false);
+      setIsChecking(false);
     } else {
       finishExercise();
     }
@@ -449,14 +566,15 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)',
       margin: '4px 3px', borderRadius: '8px',
       fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)', fontWeight: '500',
-      cursor: feedback ? 'default' : 'pointer',
+      cursor: (feedback || isChecking) ? 'default' : 'pointer',
       transition: 'all 0.15s ease', userSelect: 'none',
       backgroundColor: 'white', border: '2px solid #e2e8f0', color: '#2d3748', outline: 'none',
     };
     if (feedback) {
       const errorIdx = feedback.errorIndex;
-      if (index === errorIdx && feedback.isCorrect) return { ...base, backgroundColor: '#f0fff4', border: '2px solid #48bb78', color: '#276749', textDecoration: 'line-through', textDecorationColor: '#c53030' };
-      if (index === errorIdx && !feedback.isCorrect) return { ...base, backgroundColor: '#fff5f5', border: '2px solid #f56565', color: '#c53030', textDecoration: 'line-through', textDecorationColor: '#c53030' };
+      const isPass = feedback.type === 'correct' || feedback.type === 'soft-pass';
+      if (index === errorIdx && isPass) return { ...base, backgroundColor: '#f0fff4', border: '2px solid #48bb78', color: '#276749', textDecoration: 'line-through', textDecorationColor: '#c53030' };
+      if (index === errorIdx && !isPass) return { ...base, backgroundColor: '#fff5f5', border: '2px solid #f56565', color: '#c53030', textDecoration: 'line-through', textDecorationColor: '#c53030' };
       if (index === ecSelectedWordIndex && ecSelectedWordIndex !== errorIdx) return { ...base, backgroundColor: '#fff5f5', border: '2px solid #f56565', color: '#c53030', opacity: 0.6 };
       return { ...base, opacity: 0.6 };
     }
@@ -473,10 +591,13 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     if (!feedback || !currentQuestion) return null;
     if (currentQuestion.type !== 'gap_fill' && currentQuestion.type !== 'multiple_choice') return null;
 
+    const isSoftPass = feedback.type === 'soft-pass';
     const isCorrect = feedback.isCorrect;
-    const borderColor = isCorrect ? '#48bb78' : '#f56565';
-    const bgColor = isCorrect ? '#f0fff4' : '#fff5f5';
-    const headerBg = isCorrect ? '#48bb78' : '#f56565';
+
+    const borderColor = isSoftPass ? '#f6ad55' : isCorrect ? '#48bb78' : '#f56565';
+    const bgColor    = isSoftPass ? '#fffbeb' : isCorrect ? '#f0fff4' : '#fff5f5';
+    const headerBg   = isSoftPass ? '#f6ad55' : isCorrect ? '#48bb78' : '#f56565';
+    const headerText = isSoftPass ? '✅ Also correct!' : isCorrect ? '✅ Correct!' : '❌ Incorrect';
 
     return (
       <div style={{
@@ -494,7 +615,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
           fontWeight: '700',
           fontSize: 'clamp(0.95rem, 3vw, 1.05rem)',
         }}>
-          {isCorrect ? '✅ Correct!' : '❌ Incorrect'}
+          {headerText}
         </div>
 
         {/* Body */}
@@ -514,7 +635,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
             </span>
           </div>
 
-          {/* Correct answer — always shown so students can confirm even when correct */}
+          {/* Correct answer — always shown */}
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'flex-start' }}>
             <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px' }}>
               Correct answer:
@@ -524,13 +645,32 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
             </span>
           </div>
 
-          {/* Divider */}
+          {/* Explanation */}
           {feedback.explanation && (
             <div style={{ borderTop: `1px solid ${borderColor}`, paddingTop: '0.75rem', color: '#4a5568', lineHeight: '1.6' }}>
               💡 {feedback.explanation}
             </div>
           )}
         </div>
+      </div>
+    );
+  };
+
+  // ── AI checking indicator (gap fill) ──
+  const renderCheckingIndicator = () => {
+    if (!isChecking || !currentQuestion) return null;
+    if (currentQuestion.type !== 'gap_fill' && currentQuestion.type !== 'error_correction') return null;
+    return (
+      <div style={{
+        marginTop: '1rem',
+        textAlign: 'center',
+        padding: '1rem',
+        color: '#553C9A',
+        fontSize: '0.95rem',
+        border: '2px dashed #EDE9FE',
+        borderRadius: '8px',
+      }}>
+        🤖 Checking your answer...
       </div>
     );
   };
@@ -653,6 +793,12 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                     {currentQuestion.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                   </div>
                 )}
+                {/* AI marker badge for EC at B2/C1/C2 */}
+                {currentQuestion.type === 'error_correction' && AI_MARKED_EC_LEVELS.includes(currentQuestion.level) && (
+                  <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>
+                    🤖 AI marked
+                  </div>
+                )}
               </div>
 
               {/* Question Text */}
@@ -681,13 +827,15 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   <input
                     type="text" value={userAnswer}
                     onChange={(e) => setUserAnswer(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && checkAnswer()}
+                    onKeyPress={(e) => e.key === 'Enter' && !isChecking && checkAnswer()}
                     placeholder="Type your answer..."
+                    disabled={isChecking}
                     style={{
                       width: '100%', padding: '1.2rem',
                       fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
                       borderRadius: '10px', border: '2px solid #e0e0e0',
                       boxSizing: 'border-box', color: '#2C3E50',
+                      opacity: isChecking ? 0.6 : 1,
                     }}
                     autoFocus
                   />
@@ -721,18 +869,14 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                     {currentQuestion.options.map((option, index) => {
                       const isCorrectOption = option === feedback.correctAnswer;
                       const wasSelected = option === feedback.studentAnswer;
-                      let bg = '#f7fafc';
-                      let border = '#e2e8f0';
-                      let color = '#a0aec0';
+                      let bg = '#f7fafc'; let border = '#e2e8f0'; let color = '#a0aec0';
                       if (isCorrectOption) { bg = '#f0fff4'; border = '#48bb78'; color = '#276749'; }
                       else if (wasSelected && !feedback.isCorrect) { bg = '#fff5f5'; border = '#f56565'; color = '#c53030'; }
                       return (
                         <div key={index} style={{
                           padding: '0.9rem 1.2rem',
                           fontSize: 'clamp(1rem, 3.5vw, 1.1rem)',
-                          backgroundColor: bg,
-                          color,
-                          border: `2px solid ${border}`,
+                          backgroundColor: bg, color, border: `2px solid ${border}`,
                           borderRadius: '10px',
                           fontWeight: isCorrectOption || wasSelected ? '600' : '400',
                           wordWrap: 'break-word',
@@ -791,9 +935,11 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 {currentQuestion.type === 'error_correction' && (
                   <div>
                     <div style={{ fontSize: '0.9rem', color: '#718096', marginBottom: '1rem', fontStyle: 'italic' }}>
-                      {!feedback
-                        ? 'Tap the word that is wrong, then type the correction below.'
-                        : feedback.isCorrect ? 'Well done!' : 'See the correction below.'}
+                      {isChecking
+                        ? '🤖 Checking your answer...'
+                        : !feedback
+                          ? 'Tap the word that is wrong, then type the correction below.'
+                          : feedback.isCorrect ? 'Well done!' : 'See the correction below.'}
                     </div>
                     <div style={{
                       backgroundColor: '#F8FBFF', padding: '1.25rem',
@@ -807,13 +953,13 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                           onClick={() => handleECWordTap(index)}
                           style={getECTileStyle(index)}
                           onMouseEnter={e => {
-                            if (!feedback && ecSelectedWordIndex !== index) {
+                            if (!feedback && !isChecking && ecSelectedWordIndex !== index) {
                               e.currentTarget.style.borderColor = '#667eea';
                               e.currentTarget.style.backgroundColor = '#f7f7ff';
                             }
                           }}
                           onMouseLeave={e => {
-                            if (!feedback && ecSelectedWordIndex !== index) {
+                            if (!feedback && !isChecking && ecSelectedWordIndex !== index) {
                               e.currentTarget.style.borderColor = '#e2e8f0';
                               e.currentTarget.style.backgroundColor = 'white';
                             }
@@ -830,7 +976,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                         </div>
                       )}
                     </div>
-                    {ecSelectedWordIndex !== null && !feedback && (
+                    {ecSelectedWordIndex !== null && !feedback && !isChecking && (
                       <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', alignItems: 'stretch' }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -853,7 +999,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                         </div>
                         <button
                           onClick={checkECAnswer}
-                          disabled={!ecCorrection.trim()}
+                          disabled={!ecCorrection.trim() || isChecking}
                           style={{
                             padding: '0 1.5rem',
                             background: ecCorrection.trim() ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#cbd5e0',
@@ -865,7 +1011,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                         >Check</button>
                       </div>
                     )}
-                    {ecSelectedWordIndex === null && !feedback && (
+                    {ecSelectedWordIndex === null && !feedback && !isChecking && (
                       <div style={{
                         textAlign: 'center', padding: '1rem', color: '#A0AEC0',
                         fontSize: '0.95rem', border: '2px dashed #E2E8F0', borderRadius: '8px',
@@ -893,11 +1039,32 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   </div>
                 )}
 
+                {/* ── AI checking indicator ── */}
+                {renderCheckingIndicator()}
+
                 {/* ── STRUCTURED FEEDBACK (gap_fill + multiple_choice) ── */}
                 {renderStructuredFeedback()}
 
-                {/* ── SIMPLE FEEDBACK (all other types) ── */}
-                {feedback && currentQuestion.type !== 'sentence_building' &&
+                {/* ── EC feedback (amber for soft-pass, red for incorrect) ── */}
+                {feedback && currentQuestion.type === 'error_correction' && (
+                  <div style={{
+                    backgroundColor:
+                      feedback.type === 'soft-pass' ? '#fffbeb' :
+                      feedback.isCorrect ? '#d4edda' : '#f8d7da',
+                    color:
+                      feedback.type === 'soft-pass' ? '#744210' :
+                      feedback.isCorrect ? '#155724' : '#721c24',
+                    padding: '1.2rem', borderRadius: '10px', marginTop: '1rem',
+                    fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6',
+                    wordWrap: 'break-word', overflowWrap: 'break-word',
+                    border: feedback.type === 'soft-pass' ? '1px solid #fbd38d' : 'none',
+                  }}>{feedback.message}</div>
+                )}
+
+                {/* ── SIMPLE FEEDBACK (OOO, SB, matching) ── */}
+                {feedback &&
+                 currentQuestion.type !== 'error_correction' &&
+                 currentQuestion.type !== 'sentence_building' &&
                  currentQuestion.type !== 'gap_fill' &&
                  currentQuestion.type !== 'multiple_choice' && (
                   <div style={{
@@ -920,6 +1087,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   <button
                     onClick={checkAnswer}
                     disabled={
+                      isChecking ||
                       (currentQuestion.type === 'gap_fill' && !userAnswer.trim()) ||
                       (currentQuestion.type === 'multiple_choice' && !selectedOption)
                     }
@@ -928,11 +1096,12 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                       backgroundColor: '#2C3E50', color: 'white', border: 'none',
                       borderRadius: '10px', cursor: 'pointer', width: '100%', fontWeight: '600',
                       opacity: (
+                        isChecking ||
                         (currentQuestion.type === 'gap_fill' && !userAnswer.trim()) ||
                         (currentQuestion.type === 'multiple_choice' && !selectedOption)
                       ) ? 0.5 : 1,
                     }}
-                  >Check Answer</button>
+                  >{isChecking ? '🤖 Checking...' : 'Check Answer'}</button>
                 )}
 
                 {feedback && (
