@@ -380,6 +380,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
           </div>
         </div>
       </div>
+      </div>
     );
   }
 
