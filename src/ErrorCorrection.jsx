@@ -276,11 +276,11 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
   if (stage === 'level-select') {
     return (
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{ background: GRADIENT, borderRadius: '12px 12px 0 0', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white' }}>
+        <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.8rem' }}>✏️ Error Correction</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Find and fix the mistake in each sentence</p>
         </div>
-        <div style={{ background: 'white', padding: '2rem', borderRadius: '0 0 12px 12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
+        <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
           <h2 style={{ color: '#2d3748', fontSize: '1.15rem', fontWeight: 600, margin: '0 0 6px', textAlign: 'center' }}>Choose your level</h2>
           <p style={{ color: '#718096', fontSize: '0.9rem', margin: '0 0 24px', textAlign: 'center' }}>Select a difficulty to start practising</p>
           <div style={{ display: 'grid', gap: '16px' }}>
@@ -326,12 +326,12 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
   // EXERCISE
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <div style={{ background: GRADIENT, borderRadius: '12px 12px 0 0', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white' }}>
+      <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.8rem' }}>✏️ Error Correction</h1>
         <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Tap the wrong word, then type the correction</p>
         {selectedLevel && <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>{selectedLevel.badgeLabel}</span>}
       </div>
-      <div style={{ background: 'white', padding: '2rem', borderRadius: '0 0 12px 12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
+      <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
         {stage === 'loading' && <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#666' }}>Loading questions...</div>}
 
         {stage === 'playing' && questions.length === 0 && (
