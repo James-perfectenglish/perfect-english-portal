@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 
 const LEVELS = [
-  { key: 'beginner',     label: 'Beginner',     sublabel: 'B1 \u2013 B2', description: 'Short, clear conversations and announcements with everyday vocabulary.', colour: '#48bb78', colourLight: '#f0fff4', dbLevels: ['A1', 'A2'], icon: '🌱' },
-  { key: 'intermediate', label: 'Intermediate', sublabel: 'B1 \u2013 B2', description: 'Longer dialogues, workplace scenarios, and natural-speed speech.',          colour: '#4299e1', colourLight: '#ebf8ff', dbLevels: ['B1', 'B2'], icon: '📘' },
-  { key: 'advanced',     label: 'Advanced',     sublabel: 'C1 \u2013 C2', description: 'Complex discussions, implied meaning, and fast-paced natural speech.',       colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '🎓' }
+  { key: 'beginner',     label: 'Beginner',     sublabel: 'B1 – B2', description: 'Short, clear conversations and announcements with everyday vocabulary.', colour: '#48bb78', colourLight: '#f0fff4', dbLevels: ['A1', 'A2'], icon: '🌱' },
+  { key: 'intermediate', label: 'Intermediate', sublabel: 'B1 – B2', description: 'Longer dialogues, workplace scenarios, and natural-speed speech.',          colour: '#4299e1', colourLight: '#ebf8ff', dbLevels: ['B1', 'B2'], icon: '📘' },
+  { key: 'advanced',     label: 'Advanced',     sublabel: 'C1 – C2', description: 'Complex discussions, implied meaning, and fast-paced natural speech.',       colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '🎓' }
 ];
 
 const SPEED_OPTIONS = [
@@ -254,7 +254,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
         )}
         {isSubmitted && (
           <div style={{ marginTop: '10px', padding: '10px', borderRadius: '6px', background: correct ? '#c6f6d5' : '#fed7d7', color: correct ? '#22543d' : '#742a2a', borderLeft: `4px solid ${correct ? '#48bb78' : '#f56565'}`, fontSize: '0.9rem', lineHeight: 1.5 }}>
-            <strong>{correct ? '✓ Correct!' : `✗ Incorrect \u2014 ${q.correct_answer}`}</strong>
+            <strong>{correct ? '✓ Correct!' : `✗ Incorrect — ${q.correct_answer}`}</strong>
             {q.explanation && <><br />{q.explanation}</>}
           </div>
         )}
@@ -402,13 +402,13 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
             <>
               {renderImage()}
               {currentExercise.intro_text && <div style={{ background: '#f7fafc', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.25rem', border: '1px solid #e2e8f0', fontSize: '1rem', color: '#2d3748', lineHeight: 1.7 }}>{currentExercise.intro_text}</div>}
-              <button onClick={() => setExerciseStage('gist')} style={{ width: '100%', padding: '1rem', fontSize: '1.05rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 600 }}>Start Listening \u2014 Exercise 1</button>
+              <button onClick={() => setExerciseStage('gist')} style={{ width: '100%', padding: '1rem', fontSize: '1.05rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 600 }}>Start Listening — Exercise 1</button>
             </>
           )}
           {exerciseStage === 'gist' && (
             <>
               {renderImage()}
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Exercise 1 \u2014 Gist</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Exercise 1 — Gist</div>
               <p style={{ color: '#718096', fontSize: '0.9rem', marginBottom: '1rem', marginTop: 0 }}>Listen and answer the question. What is the general idea?</p>
               {renderAudioPlayer('First Listen')}
               {gistQuestions.map(q => renderQuestion(q, gistAnswers, selectGistAnswer, gistSubmitted, {}))}
@@ -419,7 +419,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
           {exerciseStage === 'detail' && (
             <>
               {renderImage()}
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Exercise 2 \u2014 Detail</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Exercise 2 — Detail</div>
               <p style={{ color: '#718096', fontSize: '0.9rem', marginBottom: '1rem', marginTop: 0 }}>Listen again more carefully and answer the questions below.</p>
               {renderAudioPlayer('Second Listen')}
               {detailQuestions.map(q => renderQuestion(q, detailAnswers, selectDetailAnswer, detailSubmitted, gapInputs))}
@@ -433,11 +433,11 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
                 <div style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>{totalCorrect >= totalQuestions ? '🏆' : totalCorrect >= Math.ceil(totalQuestions * 0.7) ? '⭐' : '💪'}</div>
                 <div style={{ fontSize: '1.8rem', fontWeight: 700, color: totalCorrect >= Math.ceil(totalQuestions * 0.7) ? '#48bb78' : '#f56565' }}>{totalCorrect}/{totalQuestions}</div>
                 <p style={{ color: '#4a5568', margin: '6px 0 0', fontSize: '0.95rem' }}>
-                  {totalCorrect >= totalQuestions ? 'Perfect! Excellent listening!' : totalCorrect >= Math.ceil(totalQuestions * 0.7) ? 'Well done! Strong listening skills.' : 'Keep practising \u2014 try listening again for the details you missed.'}
+                  {totalCorrect >= totalQuestions ? 'Perfect! Excellent listening!' : totalCorrect >= Math.ceil(totalQuestions * 0.7) ? 'Well done! Strong listening skills.' : 'Keep practising — try listening again for the details you missed.'}
                 </p>
               </div>
               {renderImage()}
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Review \u2014 Listen Again</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Review — Listen Again</div>
               <p style={{ color: '#718096', fontSize: '0.9rem', marginBottom: '1rem', marginTop: 0 }}>Listen one more time and follow along with the transcript.</p>
               {renderAudioPlayer('Third Listen')}
               {currentExercise.transcript && (

@@ -32,21 +32,9 @@ const getInitials = (name) => {
 };
 
 const LEVELS = [
-  {
-    key: 'beginner', label: 'Beginner', sublabel: 'A1 – A2', badgeLabel: 'Level: A1-A2',
-    description: 'Simple sentences — basic grammar, common errors at beginner level.',
-    colour: '#48bb78', colourLight: '#f0fff4', dbLevels: ['A1', 'A2'], icon: '🌱',
-  },
-  {
-    key: 'intermediate', label: 'Intermediate', sublabel: 'B1 – B2', badgeLabel: 'Level: B1-B2',
-    description: 'Trickier sentences — tenses, prepositions, collocations.',
-    colour: '#4299e1', colourLight: '#ebf8ff', dbLevels: ['B1', 'B2'], icon: '📘',
-  },
-  {
-    key: 'advanced', label: 'Advanced', sublabel: 'C1 – C2', badgeLabel: 'Level: C1-C2',
-    description: 'Subtle errors — register, nuance, advanced grammar.',
-    colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '🎓',
-  },
+  { key: 'beginner', label: 'Beginner', sublabel: 'A1 – A2', badgeLabel: 'Level: A1-A2', description: 'Simple sentences — basic grammar, common errors at beginner level.', colour: '#48bb78', colourLight: '#f0fff4', dbLevels: ['A1', 'A2'], icon: '🌱' },
+  { key: 'intermediate', label: 'Intermediate', sublabel: 'B1 – B2', badgeLabel: 'Level: B1-B2', description: 'Trickier sentences — tenses, prepositions, collocations.', colour: '#4299e1', colourLight: '#ebf8ff', dbLevels: ['B1', 'B2'], icon: '📘' },
+  { key: 'advanced', label: 'Advanced', sublabel: 'C1 – C2', badgeLabel: 'Level: C1-C2', description: 'Subtle errors — register, nuance, advanced grammar.', colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '🎓' },
 ];
 
 const LEVEL_COLOURS = {
@@ -62,18 +50,14 @@ export default function SentenceAuction({ onBack, onComplete }) {
   const [auctions, setAuctions] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [userProfile, setUserProfile] = useState(null);
-
   const [bids, setBids] = useState({});
   const [revealedCount, setRevealedCount] = useState(0);
   const [auctionResult, setAuctionResult] = useState(null);
-
   const [budget, setBudget] = useState(STARTING_BUDGET);
   const [roundResults, setRoundResults] = useState([]);
   const [isBust, setIsBust] = useState(false);
-
   const [leaderboard, setLeaderboard] = useState([]);
   const [scoreSaved, setScoreSaved] = useState(false);
-
   const revealTimerRef = useRef(null);
 
   useEffect(() => { fetchCounts(); fetchUserProfile(); }, []);
@@ -98,24 +82,15 @@ export default function SentenceAuction({ onBack, onComplete }) {
 
   const selectLevel = (level) => {
     if ((questionCounts[level.key] || 0) === 0) return;
-    setSelectedLevel(level);
-    setStage('loading');
-    fetchAuctions(level.dbLevels);
+    setSelectedLevel(level); setStage('loading'); fetchAuctions(level.dbLevels);
   };
 
   const fetchAuctions = async (dbLevels) => {
-    const { data, error } = await supabase
-      .from('question_bank').select('*')
-      .eq('type', 'sentence_auction').in('level', dbLevels);
+    const { data, error } = await supabase.from('question_bank').select('*').eq('type', 'sentence_auction').in('level', dbLevels);
     if (error) { console.error(error); setStage('bidding'); return; }
     const shuffled = shuffleArray(data || []).slice(0, AUCTIONS_PER_ROUND);
-    setAuctions(shuffled);
-    setCurrentIdx(0);
-    setBudget(STARTING_BUDGET);
-    setRoundResults([]);
-    setIsBust(false);
-    setScoreSaved(false);
-    resetAuctionState();
+    setAuctions(shuffled); setCurrentIdx(0); setBudget(STARTING_BUDGET);
+    setRoundResults([]); setIsBust(false); setScoreSaved(false); resetAuctionState();
     setStage(shuffled.length > 0 ? 'bidding' : 'finished');
   };
 
@@ -134,18 +109,13 @@ export default function SentenceAuction({ onBack, onComplete }) {
 
   const placeBids = () => {
     if (totalBid === 0) return;
-    setStage('revealing');
-    setRevealedCount(0);
-    revealSentencesSequentially(0);
+    setStage('revealing'); setRevealedCount(0); revealSentencesSequentially(0);
   };
 
   const revealSentencesSequentially = (count) => {
     const sentences = getParsedSentences();
     if (count < sentences.length) {
-      revealTimerRef.current = setTimeout(() => {
-        setRevealedCount(count + 1);
-        revealSentencesSequentially(count + 1);
-      }, REVEAL_DELAY_MS);
+      revealTimerRef.current = setTimeout(() => { setRevealedCount(count + 1); revealSentencesSequentially(count + 1); }, REVEAL_DELAY_MS);
     } else { computeResult(); }
   };
 
@@ -161,11 +131,9 @@ export default function SentenceAuction({ onBack, onComplete }) {
     const result = { gained, lost, net };
     setAuctionResult(result);
     const newBudget = budget + net;
-    setBudget(newBudget);
-    setRoundResults(prev => [...prev, result]);
+    setBudget(newBudget); setRoundResults(prev => [...prev, result]);
     if (newBudget <= 0) setIsBust(true);
-    saveAnswer(sentences, gained, lost);
-    setStage('result');
+    saveAnswer(sentences, gained, lost); setStage('result');
   };
 
   const saveAnswer = async (sentences, gained, lost) => {
@@ -173,10 +141,7 @@ export default function SentenceAuction({ onBack, onComplete }) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const auction = auctions[currentIdx];
-      await supabase.from('student_answers').insert({
-        student_id: user.id, question_id: auction.question_number,
-        student_answer: `gained:${gained} lost:${lost}`, correct_answer: 'auction', is_correct: gained > lost,
-      });
+      await supabase.from('student_answers').insert({ student_id: user.id, question_id: auction.question_number, student_answer: `gained:${gained} lost:${lost}`, correct_answer: 'auction', is_correct: gained > lost });
     } catch (e) { console.error(e); }
   };
 
@@ -188,10 +153,7 @@ export default function SentenceAuction({ onBack, onComplete }) {
       const initials = getInitials(userProfile?.full_name);
       const studentLevel = userProfile?.level || 'A1';
       if (!isValidForLeaderboard(studentLevel, selectedLevel.key)) return;
-      await supabase.from('auction_scores').insert({
-        student_id: user.id, initials, student_level: studentLevel,
-        auction_tier: selectedLevel.key, final_budget: finalBudget, auctions_completed: auctionsCompleted,
-      });
+      await supabase.from('auction_scores').insert({ student_id: user.id, initials, student_level: studentLevel, auction_tier: selectedLevel.key, final_budget: finalBudget, auctions_completed: auctionsCompleted });
       setScoreSaved(true);
     } catch (e) { console.error(e); }
   };
@@ -201,31 +163,17 @@ export default function SentenceAuction({ onBack, onComplete }) {
       const { data } = await supabase.from('auction_scores').select('*').order('final_budget', { ascending: false }).limit(100);
       if (!data) return;
       const best = {};
-      data.forEach(row => {
-        if (!best[row.student_id] || row.final_budget > best[row.student_id].final_budget) best[row.student_id] = row;
-      });
+      data.forEach(row => { if (!best[row.student_id] || row.final_budget > best[row.student_id].final_budget) best[row.student_id] = row; });
       setLeaderboard(Object.values(best).sort((a, b) => b.final_budget - a.final_budget).slice(0, 10));
     } catch (e) { console.error(e); }
   };
 
   const nextAuction = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-    if (isBust) {
-      saveLeaderboardScore(0, roundResults.length);
-      fetchLeaderboard();
-      setStage('finished');
-      return;
-    }
+    if (isBust) { saveLeaderboardScore(0, roundResults.length); fetchLeaderboard(); setStage('finished'); return; }
     const next = currentIdx + 1;
-    if (next >= auctions.length) {
-      saveLeaderboardScore(budget, roundResults.length);
-      fetchLeaderboard();
-      setStage('finished');
-    } else {
-      setCurrentIdx(next);
-      resetAuctionState();
-      setStage('bidding');
-    }
+    if (next >= auctions.length) { saveLeaderboardScore(budget, roundResults.length); fetchLeaderboard(); setStage('finished'); }
+    else { setCurrentIdx(next); resetAuctionState(); setStage('bidding'); }
   };
 
   const restartRound = () => { window.scrollTo({ top: 0, behavior: 'instant' }); setStage('loading'); fetchAuctions(selectedLevel.dbLevels); };
@@ -254,12 +202,13 @@ export default function SentenceAuction({ onBack, onComplete }) {
   // ── LEVEL SELECT ──────────────────────────────────────────────
   if (stage === 'level-select') {
     return (
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{ background: GRADIENT, borderRadius: '12px 12px 0 0', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white' }}>
+      <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
+        <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🔨 Sentence Auction</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Bid on the sentences you think are correct — and don't waste pesetas on the wrong ones!</p>
         </div>
-        <div style={{ background: 'white', padding: '2rem', borderRadius: '0 0 12px 12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
+        <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
           <div style={{ background: '#f7f8ff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '24px', fontSize: '0.9rem', color: '#4a5568', lineHeight: 1.7 }}>
             <strong style={{ color: '#2d3748' }}>How to play:</strong> You start with <strong>1,000 pesetas</strong>. Each auction shows several sentences — some correct, some not. Bid on the ones you think are right. Correct bid → win that amount. Wrong bid → lose it. Keep going until you run out of pesetas — or questions! 🎰
           </div>
@@ -301,19 +250,22 @@ export default function SentenceAuction({ onBack, onComplete }) {
           )}
         </div>
       </div>
+      </div>
     );
   }
 
   // ── LOADING ───────────────────────────────────────────────────
   if (stage === 'loading') {
     return (
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{ background: GRADIENT, borderRadius: '12px 12px 0 0', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white' }}>
+      <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
+        <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🔨 Sentence Auction</h1>
         </div>
-        <div style={{ background: 'white', padding: '3rem 2rem', borderRadius: '0 0 12px 12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', textAlign: 'center', color: '#666' }}>
+        <div style={{ background: 'white', padding: '3rem 2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', textAlign: 'center', color: '#666' }}>
           Loading auctions...
         </div>
+      </div>
       </div>
     );
   }
@@ -326,23 +278,15 @@ export default function SentenceAuction({ onBack, onComplete }) {
     const levelColour = LEVEL_COLOURS[auctionLevel] || { bg: '#e2e8f0', text: '#4a5568' };
 
     return (
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{ background: GRADIENT, borderRadius: '12px 12px 0 0', padding: '2rem 2rem 1.5rem', textAlign: 'center', color: 'white' }}>
+      <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
+        <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2rem 2rem 1.5rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🔨 Sentence Auction</h1>
-          {selectedLevel && (
-            <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>
-              {selectedLevel.badgeLabel}
-            </span>
-          )}
+          {selectedLevel && <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>{selectedLevel.badgeLabel}</span>}
         </div>
-
-        <div style={{ background: 'white', padding: '1.5rem 2rem 2rem', borderRadius: '0 0 12px 12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
-
-          {/* Budget + progress */}
+        <div style={{ background: 'white', padding: '1.5rem 2rem 2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-            <span style={{ fontSize: '0.85rem', color: '#718096', fontWeight: 500 }}>
-              Auction {currentIdx + 1} of {auctions.length}
-            </span>
+            <span style={{ fontSize: '0.85rem', color: '#718096', fontWeight: 500 }}>Auction {currentIdx + 1} of {auctions.length}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '0.85rem', color: '#718096' }}>Budget:</span>
               <span style={{ fontSize: '1.15rem', fontWeight: 700, color: getBudgetColour() }}>{budget.toLocaleString()} pta</span>
@@ -351,32 +295,19 @@ export default function SentenceAuction({ onBack, onComplete }) {
           <div style={{ height: '5px', backgroundColor: '#e0e0e0', borderRadius: '3px', marginBottom: '20px', overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${(currentIdx / auctions.length) * 100}%`, background: GRADIENT, borderRadius: '3px', transition: 'width 0.3s ease' }} />
           </div>
-
-          {/* Bid summary */}
           {stage === 'bidding' && (
             <div style={{ background: '#f7f8ff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               <span style={{ fontSize: '0.9rem', color: '#4a5568' }}>Bids placed: <strong>{totalBid.toLocaleString()} pta</strong></span>
               <span style={{ fontSize: '0.9rem', color: '#4a5568' }}>Available: <strong style={{ color: remainingBudget === 0 ? '#f56565' : '#667eea' }}>{remainingBudget.toLocaleString()} pta</strong></span>
             </div>
           )}
-
-          {/* Theme pill in level colour */}
           {auction?.question && auction.question.trim() && (
             <div style={{ marginBottom: '16px' }}>
-              <span style={{ background: levelColour.bg, color: levelColour.text, padding: '5px 14px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600 }}>
-                {auction.question}
-              </span>
+              <span style={{ background: levelColour.bg, color: levelColour.text, padding: '5px 14px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600 }}>{auction.question}</span>
             </div>
           )}
-
-          {stage === 'bidding' && (
-            <p style={{ fontSize: '0.9rem', color: '#718096', margin: '0 0 16px', lineHeight: 1.5 }}>Which sentences are correct? Set your bids, then lock them in.</p>
-          )}
-          {stage === 'revealing' && (
-            <p style={{ fontSize: '0.9rem', color: '#667eea', fontWeight: 500, margin: '0 0 16px' }}>🔍 Revealing results...</p>
-          )}
-
-          {/* Sentences */}
+          {stage === 'bidding' && <p style={{ fontSize: '0.9rem', color: '#718096', margin: '0 0 16px', lineHeight: 1.5 }}>Which sentences are correct? Set your bids, then lock them in.</p>}
+          {stage === 'revealing' && <p style={{ fontSize: '0.9rem', color: '#667eea', fontWeight: 500, margin: '0 0 16px' }}>🔍 Revealing results...</p>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
             {sentences.map((s, idx) => {
               const bid = bids[idx] || 0;
@@ -387,32 +318,21 @@ export default function SentenceAuction({ onBack, onComplete }) {
                 if (s.correct) { cardBg = '#f0fff4'; cardBorder = '2px solid #48bb78'; cardColour = '#276749'; }
                 else { cardBg = '#fff5f5'; cardBorder = '2px solid #f56565'; cardColour = '#c53030'; }
               } else if (bid > 0) { cardBg = '#EDE9FE'; cardBorder = '2px solid #667eea'; }
-
               return (
                 <div key={idx} style={{ borderRadius: '12px', border: cardBorder, background: cardBg, padding: '1rem 1.25rem', transition: 'all 0.4s ease' }}>
                   <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', color: cardColour, fontWeight: 500, lineHeight: 1.5, marginBottom: isRevealed ? '10px' : (stage === 'bidding' ? '14px' : '0') }}>
                     {isRevealed && <span style={{ marginRight: '8px' }}>{s.correct ? '✅' : '❌'}</span>}
                     {s.sentence}
                   </div>
-                  {isRevealed && bid > 0 && (
-                    <div style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600, marginBottom: '8px', background: won ? '#c6f6d5' : '#fed7d7', color: won ? '#276749' : '#c53030' }}>
-                      {won ? `+${bid} pta` : `-${bid} pta`}
-                    </div>
-                  )}
-                  {isRevealed && s.explanation && (
-                    <div style={{ fontSize: '0.9rem', color: s.correct ? '#276749' : '#c53030', lineHeight: 1.5, opacity: 0.9 }}>{s.explanation}</div>
-                  )}
+                  {isRevealed && bid > 0 && <div style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600, marginBottom: '8px', background: won ? '#c6f6d5' : '#fed7d7', color: won ? '#276749' : '#c53030' }}>{won ? `+${bid} pta` : `-${bid} pta`}</div>}
+                  {isRevealed && s.explanation && <div style={{ fontSize: '0.9rem', color: s.correct ? '#276749' : '#c53030', lineHeight: 1.5, opacity: 0.9 }}>{s.explanation}</div>}
                   {stage === 'bidding' && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span style={{ fontSize: '0.82rem', color: '#718096', fontWeight: 500 }}>My bid:</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <button onClick={() => adjustBid(idx, -BID_INCREMENT)} disabled={bid === 0}
-                          style={{ width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #e2e8f0', background: bid === 0 ? '#f7fafc' : 'white', color: bid === 0 ? '#cbd5e0' : '#4a5568', fontSize: '1.1rem', fontWeight: 700, cursor: bid === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-                        <span style={{ minWidth: '72px', textAlign: 'center', fontWeight: 700, fontSize: '0.95rem', color: bid > 0 ? '#553C9A' : '#a0aec0' }}>
-                          {bid > 0 ? `${bid} pta` : '—'}
-                        </span>
-                        <button onClick={() => adjustBid(idx, BID_INCREMENT)} disabled={remainingBudget < BID_INCREMENT}
-                          style={{ width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #e2e8f0', background: remainingBudget < BID_INCREMENT ? '#f7fafc' : 'white', color: remainingBudget < BID_INCREMENT ? '#cbd5e0' : '#667eea', fontSize: '1.1rem', fontWeight: 700, cursor: remainingBudget < BID_INCREMENT ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                        <button onClick={() => adjustBid(idx, -BID_INCREMENT)} disabled={bid === 0} style={{ width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #e2e8f0', background: bid === 0 ? '#f7fafc' : 'white', color: bid === 0 ? '#cbd5e0' : '#4a5568', fontSize: '1.1rem', fontWeight: 700, cursor: bid === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                        <span style={{ minWidth: '72px', textAlign: 'center', fontWeight: 700, fontSize: '0.95rem', color: bid > 0 ? '#553C9A' : '#a0aec0' }}>{bid > 0 ? `${bid} pta` : '—'}</span>
+                        <button onClick={() => adjustBid(idx, BID_INCREMENT)} disabled={remainingBudget < BID_INCREMENT} style={{ width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #e2e8f0', background: remainingBudget < BID_INCREMENT ? '#f7fafc' : 'white', color: remainingBudget < BID_INCREMENT ? '#cbd5e0' : '#667eea', fontSize: '1.1rem', fontWeight: 700, cursor: remainingBudget < BID_INCREMENT ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                       </div>
                     </div>
                   )}
@@ -420,45 +340,20 @@ export default function SentenceAuction({ onBack, onComplete }) {
               );
             })}
           </div>
-
-          {stage === 'bidding' && (
-            <button onClick={placeBids} disabled={totalBid === 0}
-              style={{ width: '100%', padding: '1.1rem', fontSize: '1.1rem', background: totalBid > 0 ? GRADIENT : '#cbd5e0', color: 'white', border: 'none', borderRadius: '10px', cursor: totalBid > 0 ? 'pointer' : 'not-allowed', fontWeight: 700 }}>
-              {totalBid > 0 ? `🔨 Place ${totalBid} pta in bids` : 'Set at least one bid to continue'}
-            </button>
-          )}
-
-          {stage === 'revealing' && (
-            <div style={{ textAlign: 'center', padding: '1rem', color: '#667eea', fontWeight: 500 }}>
-              {revealedCount < sentences.length ? `Revealing ${revealedCount + 1} of ${sentences.length}...` : 'Calculating...'}
-            </div>
-          )}
-
+          {stage === 'bidding' && <button onClick={placeBids} disabled={totalBid === 0} style={{ width: '100%', padding: '1.1rem', fontSize: '1.1rem', background: totalBid > 0 ? GRADIENT : '#cbd5e0', color: 'white', border: 'none', borderRadius: '10px', cursor: totalBid > 0 ? 'pointer' : 'not-allowed', fontWeight: 700 }}>{totalBid > 0 ? `🔨 Place ${totalBid} pta in bids` : 'Set at least one bid to continue'}</button>}
+          {stage === 'revealing' && <div style={{ textAlign: 'center', padding: '1rem', color: '#667eea', fontWeight: 500 }}>{revealedCount < sentences.length ? `Revealing ${revealedCount + 1} of ${sentences.length}...` : 'Calculating...'}</div>}
           {stage === 'result' && auctionResult && (
             <div>
               <div style={{ background: auctionResult.net >= 0 ? '#f0fff4' : '#fff5f5', border: `2px solid ${auctionResult.net >= 0 ? '#48bb78' : '#f56565'}`, borderRadius: '12px', padding: '1.25rem', marginBottom: '16px', textAlign: 'center' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '6px' }}>
-                  {isBust ? '💸' : auctionResult.net > 0 ? '🤑' : auctionResult.net === 0 ? '😐' : '😬'}
-                </div>
-                {isBust ? (
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#c53030', marginBottom: '4px' }}>You're broke! Game over.</div>
-                ) : (
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: auctionResult.net >= 0 ? '#276749' : '#c53030', marginBottom: '4px' }}>
-                    {auctionResult.net >= 0 ? '+' : ''}{auctionResult.net} pta
-                  </div>
-                )}
-                <div style={{ fontSize: '0.9rem', color: '#4a5568' }}>
-                  Won: <strong style={{ color: '#276749' }}>+{auctionResult.gained} pta</strong> · Lost: <strong style={{ color: '#c53030' }}>-{auctionResult.lost} pta</strong>
-                  {!isBust && <> · Budget: <strong style={{ color: getBudgetColour() }}>{budget.toLocaleString()} pta</strong></>}
-                </div>
+                <div style={{ fontSize: '2rem', marginBottom: '6px' }}>{isBust ? '💸' : auctionResult.net > 0 ? '🤑' : auctionResult.net === 0 ? '😐' : '😬'}</div>
+                {isBust ? <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#c53030', marginBottom: '4px' }}>You're broke! Game over.</div> : <div style={{ fontSize: '1.4rem', fontWeight: 700, color: auctionResult.net >= 0 ? '#276749' : '#c53030', marginBottom: '4px' }}>{auctionResult.net >= 0 ? '+' : ''}{auctionResult.net} pta</div>}
+                <div style={{ fontSize: '0.9rem', color: '#4a5568' }}>Won: <strong style={{ color: '#276749' }}>+{auctionResult.gained} pta</strong> · Lost: <strong style={{ color: '#c53030' }}>-{auctionResult.lost} pta</strong>{!isBust && <> · Budget: <strong style={{ color: getBudgetColour() }}>{budget.toLocaleString()} pta</strong></>}</div>
               </div>
-              <button onClick={nextAuction}
-                style={{ width: '100%', padding: '1.1rem', fontSize: '1.1rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }}>
-                {isBust ? '💸 Game Over — See Leaderboard' : currentIdx + 1 >= auctions.length ? 'See Final Results' : 'Next Auction →'}
-              </button>
+              <button onClick={nextAuction} style={{ width: '100%', padding: '1.1rem', fontSize: '1.1rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }}>{isBust ? '💸 Game Over — See Leaderboard' : currentIdx + 1 >= auctions.length ? 'See Final Results' : 'Next Auction →'}</button>
             </div>
           )}
         </div>
+      </div>
       </div>
     );
   }
@@ -472,40 +367,20 @@ export default function SentenceAuction({ onBack, onComplete }) {
     const totalLost = roundResults.reduce((a, r) => a + r.lost, 0);
 
     return (
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{ background: GRADIENT, borderRadius: '12px 12px 0 0', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white' }}>
+      <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
+        <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🔨 Sentence Auction</h1>
-          {selectedLevel && (
-            <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>
-              {selectedLevel.badgeLabel}
-            </span>
-          )}
+          {selectedLevel && <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>{selectedLevel.badgeLabel}</span>}
         </div>
-
-        <div style={{ background: 'white', padding: '2rem', borderRadius: '0 0 12px 12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
+        <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
           <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '8px' }}>
-              {isBust ? '💸' : profit >= 500 ? '🏆' : profit >= 0 ? '🤑' : '😬'}
-            </div>
-            <h2 style={{ color: '#2d3748', margin: '0 0 4px' }}>
-              {isBust ? 'Bust! Better luck next time.' : profit >= 500 ? 'Outstanding!' : profit >= 0 ? 'You made a profit!' : 'Rough round!'}
-            </h2>
-            <p style={{ color: '#718096', margin: 0, fontSize: '0.9rem' }}>
-              {isBust ? `You lasted ${auctionsCompleted} auction${auctionsCompleted !== 1 ? 's' : ''} before going bust.`
-                : auctionsCompleted >= auctions.length ? 'You survived all the auctions!'
-                : `Completed ${auctionsCompleted} auctions.`}
-            </p>
-            {!validForBoard && (
-              <div style={{ marginTop: '10px', fontSize: '0.85rem', color: '#a0aec0', fontStyle: 'italic' }}>
-                👁 Practice mode — play at your level or above to appear on the leaderboard
-              </div>
-            )}
-            {validForBoard && scoreSaved && (
-              <div style={{ marginTop: '10px', fontSize: '0.85rem', color: '#667eea', fontWeight: 500 }}>🏆 Score saved to leaderboard!</div>
-            )}
+            <div style={{ fontSize: '3rem', marginBottom: '8px' }}>{isBust ? '💸' : profit >= 500 ? '🏆' : profit >= 0 ? '🤑' : '😬'}</div>
+            <h2 style={{ color: '#2d3748', margin: '0 0 4px' }}>{isBust ? 'Bust! Better luck next time.' : profit >= 500 ? 'Outstanding!' : profit >= 0 ? 'You made a profit!' : 'Rough round!'}</h2>
+            <p style={{ color: '#718096', margin: 0, fontSize: '0.9rem' }}>{isBust ? `You lasted ${auctionsCompleted} auction${auctionsCompleted !== 1 ? 's' : ''} before going bust.` : auctionsCompleted >= auctions.length ? 'You survived all the auctions!' : `Completed ${auctionsCompleted} auctions.`}</p>
+            {!validForBoard && <div style={{ marginTop: '10px', fontSize: '0.85rem', color: '#a0aec0', fontStyle: 'italic' }}>👁 Practice mode — play at your level or above to appear on the leaderboard</div>}
+            {validForBoard && scoreSaved && <div style={{ marginTop: '10px', fontSize: '0.85rem', color: '#667eea', fontWeight: 500 }}>🏆 Score saved to leaderboard!</div>}
           </div>
-
-          {/* Stats — clamp font size to prevent overflow on mobile */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '24px' }}>
             <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1rem 0.5rem', color: 'white', textAlign: 'center', overflow: 'hidden' }}>
               <div style={{ fontSize: '0.7rem', fontWeight: 600, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Final budget</div>
@@ -523,8 +398,6 @@ export default function SentenceAuction({ onBack, onComplete }) {
               <div style={{ fontSize: '0.72rem', color: '#718096', marginTop: '2px' }}>on wrong bids</div>
             </div>
           </div>
-
-          {/* Leaderboard */}
           {leaderboard.length > 0 && (
             <div style={{ marginBottom: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
@@ -538,26 +411,17 @@ export default function SentenceAuction({ onBack, onComplete }) {
                   const isCurrentUser = userProfile && entry.initials === getInitials(userProfile.full_name);
                   return (
                     <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '10px', background: isCurrentUser ? '#f7f8ff' : '#f9fafb', border: isCurrentUser ? '2px solid #667eea' : '1px solid #e2e8f0' }}>
-                      <div style={{ fontSize: i === 0 ? '1.3rem' : '1rem', fontWeight: 700, color: i === 0 ? '#d69e2e' : i === 1 ? '#718096' : i === 2 ? '#c05621' : '#a0aec0', minWidth: '28px', textAlign: 'center' }}>
-                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
-                      </div>
+                      <div style={{ fontSize: i === 0 ? '1.3rem' : '1rem', fontWeight: 700, color: i === 0 ? '#d69e2e' : i === 1 ? '#718096' : i === 2 ? '#c05621' : '#a0aec0', minWidth: '28px', textAlign: 'center' }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}</div>
                       <div style={{ fontWeight: 700, fontSize: '1rem', color: '#2d3748', minWidth: '36px' }}>{entry.initials}</div>
                       <span style={{ background: lc.bg, color: lc.text, padding: '2px 8px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, flexShrink: 0 }}>{entry.student_level}</span>
-                      {tierLevel && (
-                        <span style={{ background: tierLevel.colour + '30', color: tierLevel.colour, padding: '2px 8px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, flexShrink: 0, border: `1px solid ${tierLevel.colour}60` }}>{tierLevel.label}</span>
-                      )}
-
-                      <div style={{ marginLeft: 'auto', fontWeight: 700, fontSize: '1.05rem', color: entry.final_budget >= STARTING_BUDGET ? '#276749' : entry.final_budget > 0 ? '#c05621' : '#c53030' }}>
-                        {entry.final_budget.toLocaleString()} pta
-                      </div>
+                      {tierLevel && <span style={{ background: tierLevel.colour + '30', color: tierLevel.colour, padding: '2px 8px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, flexShrink: 0, border: `1px solid ${tierLevel.colour}60` }}>{tierLevel.label}</span>}
+                      <div style={{ marginLeft: 'auto', fontWeight: 700, fontSize: '1.05rem', color: entry.final_budget >= STARTING_BUDGET ? '#276749' : entry.final_budget > 0 ? '#c05621' : '#c53030' }}>{entry.final_budget.toLocaleString()} pta</div>
                     </div>
                   );
                 })}
               </div>
             </div>
           )}
-
-          {/* Round breakdown */}
           {roundResults.length > 0 && (
             <div style={{ marginBottom: '24px' }}>
               <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#718096', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Round by round</div>
@@ -571,13 +435,13 @@ export default function SentenceAuction({ onBack, onComplete }) {
               </div>
             </div>
           )}
-
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button onClick={restartRound} style={{ padding: '10px 24px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Try Again</button>
             <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Change Level</button>
             {onBack && <button onClick={onBack} style={{ padding: '10px 24px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', fontSize: '1rem' }}>Back to Exercises</button>}
           </div>
         </div>
+      </div>
       </div>
     );
   }
