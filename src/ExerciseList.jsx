@@ -39,7 +39,7 @@ const EXERCISE_ICONS = {
   'Essential Phrasal Verbs':    '📖',
   'Sentence Building':          '🏗️',
   'Listening Exercises':        '🎧',
-  'Dictation':                  '🎤',
+  'Dictation':                  '⌨️',
   'Borrás Flashcards':          '🚿',
   'Borrás Memory Game':         '🧩',
   'Hotel Flashcards':           '🏨',

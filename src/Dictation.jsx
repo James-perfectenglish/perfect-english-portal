@@ -370,7 +370,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
         <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🎧 Dictation</h1>
+          <h1 style={{ margin: 0, fontSize: '1.8rem' }}>⌨️ Dictation</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Listen and write what you hear</p>
         </div>
         <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
@@ -420,7 +420,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
         <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🎧 Dictation</h1>
+          <h1 style={{ margin: 0, fontSize: '1.8rem' }}>⌨️ Dictation</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Choose an exercise to start</p>
           {selectedLevel && <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>Level: {selectedLevel.sublabel}</span>}
         </div>
@@ -481,7 +481,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
         <audio ref={audioRef} src={currentExercise.audio_url} onEnded={handleAudioEnded} onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata} preload="metadata" />
 
         <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🎧 Dictation</h1>
+          <h1 style={{ margin: 0, fontSize: '1.8rem' }}>⌨️ Dictation</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.9 }}>{currentExercise.title}</p>
           {selectedLevel && <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>{selectedLevel.badgeLabel}</span>}
         </div>
