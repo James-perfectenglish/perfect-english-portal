@@ -61,10 +61,8 @@ const findErrorIndex = (questionWords, correctAnswer) => {
   return { index: -1, correctWord: '' };
 };
 
-// Detect language from question topic
 const getQuestionLanguage = (question) => question?.topic === 'spanish' ? 'es' : 'en';
 
-// Call serverless function to soft-mark a correction — all levels
 const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en') => {
   try {
     const response = await fetch('/api/mark-correction', {
@@ -175,7 +173,19 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
       return;
     }
 
-    // AI soft-mark — all levels
+    // ❌ Wrong word selected — skip AI entirely
+    if (selectedWordIndex !== errorInfo.index) {
+      setFeedback({
+        type: 'fail',
+        message: `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${q.explanation || ''}`,
+        errorIndex: errorInfo.index,
+        correctWord: errorInfo.correctWord
+      });
+      saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, false, false);
+      return;
+    }
+
+    // Right word selected but not an exact match — ask AI
     setIsChecking(true);
     const lang = getQuestionLanguage(q);
     const aiResult = await aiMarkCorrection(
@@ -200,15 +210,13 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
       return;
     }
 
-    // AI said no
-    const foundRightWord = selectedWordIndex === errorInfo.index;
-    let message;
-    if (foundRightWord) {
-      message = `❌ Good — you found the error in "${words[errorInfo.index]}", but "${correction.trim()}" doesn't quite work here. ${aiResult?.reason ? aiResult.reason + ' ' : ''}It should be "${errorInfo.correctWord}". ${q.explanation || ''}`;
-    } else {
-      message = `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${q.explanation || ''}`;
-    }
-    setFeedback({ type: 'fail', message, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
+    // ❌ Right word, wrong correction
+    setFeedback({
+      type: 'fail',
+      message: `❌ Good — you found the error in "${words[errorInfo.index]}", but "${correction.trim()}" doesn't quite work here. ${aiResult?.reason ? aiResult.reason + ' ' : ''}It should be "${errorInfo.correctWord}". ${q.explanation || ''}`,
+      errorIndex: errorInfo.index,
+      correctWord: errorInfo.correctWord
+    });
     saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, false, false);
   };
 
@@ -354,14 +362,12 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
             </div>
 
             <div style={{ border: '2px solid #e2e8f0', borderRadius: '8px', padding: '1.5rem', marginBottom: '1.5rem' }}>
-              {/* Topic, Level & AI badge */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
                 {q.level && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: q.level.startsWith('A') ? '#276749' : q.level.startsWith('B') ? '#2b6cb0' : '#c05621' }}>{q.level}</div>}
                 {q.topic && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.topic === 'punctuation' ? '#FEE2E2' : '#e8daef', color: q.topic === 'punctuation' ? '#DC2626' : '#6c3483' }}>{q.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>}
                 <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>🤖 AI marked</div>
               </div>
 
-              {/* Instruction */}
               <div style={{ fontSize: '0.9rem', color: '#718096', marginBottom: '1rem', fontStyle: 'italic' }}>
                 {isChecking
                   ? '🤖 Checking your answer...'
@@ -374,7 +380,6 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
                         : 'See the correction below.'}
               </div>
 
-              {/* Sentence with tappable word tiles */}
               <div style={{
                 backgroundColor: '#F8FBFF', padding: '1.25rem', borderRadius: '10px',
                 border: '1px solid #AED6F1', lineHeight: '2.4', marginBottom: '1.25rem',
@@ -413,14 +418,12 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
                 )}
               </div>
 
-              {/* Checking spinner */}
               {isChecking && (
                 <div style={{ textAlign: 'center', padding: '1rem', color: '#553C9A', fontSize: '0.95rem', border: '2px dashed #EDE9FE', borderRadius: '8px', marginBottom: '1rem' }}>
                   🤖 Asking the AI marker...
                 </div>
               )}
 
-              {/* Correction input */}
               {selectedWordIndex !== null && !feedback && !isChecking && (
                 <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', alignItems: 'stretch' }}>
                   <div style={{ flex: 1 }}>
@@ -456,14 +459,12 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
                 </div>
               )}
 
-              {/* No word selected prompt */}
               {selectedWordIndex === null && !feedback && !isChecking && (
                 <div style={{ textAlign: 'center', padding: '1rem', color: '#A0AEC0', fontSize: '0.95rem', border: '2px dashed #E2E8F0', borderRadius: '8px' }}>
                   👆 Tap the word you think is wrong
                 </div>
               )}
 
-              {/* Feedback — three colours */}
               {feedback && feedbackStyle && (
                 <div style={{
                   backgroundColor: feedbackStyle.bg, border: `1px solid ${feedbackStyle.border}`,
