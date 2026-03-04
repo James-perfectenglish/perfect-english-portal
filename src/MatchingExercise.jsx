@@ -57,7 +57,11 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
   useEffect(() => { fetchCounts(); }, []);
 
   const fetchCounts = async () => {
-    let query = supabase.from('question_bank').select('level').eq('type', 'matching');
+    let query = supabase
+      .from('question_bank')
+      .select('level')
+      .eq('type', 'matching')
+      .neq('topic', 'spanish');          // ← fix: exclude spanish
     if (topicFilter) query = query.eq('topic', topicFilter);
     const { data } = await query;
     if (data) {
@@ -75,7 +79,12 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
   };
 
   const fetchQuestions = async (dbLevels) => {
-    let query = supabase.from('question_bank').select('*').eq('type', 'matching').in('level', dbLevels);
+    let query = supabase
+      .from('question_bank')
+      .select('*')
+      .eq('type', 'matching')
+      .neq('topic', 'spanish')           // ← fix: exclude spanish
+      .in('level', dbLevels);
     if (topicFilter) query = query.eq('topic', topicFilter);
     const { data, error } = await query;
     if (error) { console.error('Matching fetch error:', error); setStage('playing'); return; }
@@ -187,7 +196,7 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
       <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🔗 Matching</h1>
-        <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Tap a tile on the left, then its match on the right</p>
+        <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Tap any tile, then tap its match on the other side</p>
         {selectedLevel && (
           <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>{selectedLevel.badgeLabel}</span>
         )}
