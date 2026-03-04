@@ -1001,7 +1001,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                       {isChecking
                         ? '🤖 Checking your answer...'
                         : !feedback
-                          ? 'Tap the word that is wrong, then type the correction below.'
+                          ? '👆 Tap the word that is wrong, then type the correction below.'
                           : feedback.isCorrect ? 'Well done!' : 'See the correction below.'}
                     </div>
                     <div style={{

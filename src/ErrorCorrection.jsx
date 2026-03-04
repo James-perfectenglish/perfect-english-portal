@@ -331,7 +331,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
       <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.8rem' }}>✏️ Error Correction</h1>
-        <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Tap the wrong word, then type the correction</p>
+        <p style={{ margin: '8px 0 0', opacity: 0.9 }}>👆 Tap the wrong word, then type the correction</p>
         {selectedLevel && <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>{selectedLevel.badgeLabel}</span>}
       </div>
       <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
@@ -366,7 +366,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
                 {isChecking
                   ? '🤖 Checking your answer...'
                   : !feedback
-                    ? 'Tap the word that is wrong, then type the correction below.'
+                    ? '👆 Tap the word that is wrong, then type the correction below.'
                     : feedback.type === 'pass'
                       ? 'Well done!'
                       : feedback.type === 'soft-pass'
