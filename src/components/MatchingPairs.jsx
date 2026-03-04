@@ -242,7 +242,7 @@ export default function MatchingPairs({ pairs, disabled, onResult }) {
           fontSize: '0.82rem', marginTop: '4px', padding: '0 2px',
         }}>
           <span style={{ color: selected !== null ? '#667eea' : '#a0aec0', fontWeight: selected !== null ? 500 : 400 }}>
-            {selected !== null ? '👆 Now tap its match on the other side' : 'Tap any tile to begin'}
+            {selected !== null ? '👆 Now tap its match on the other side' : '👆 Tap any tile to begin'}
           </span>
           <span style={{ color: '#cbd5e0' }}>{matched.size}/{pairsCount}</span>
         </div>
