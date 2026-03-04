@@ -519,6 +519,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
                 {currentExercise.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
               </span>
             )}
+            <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, backgroundColor: '#EDE9FE', color: '#553C9A' }}>🤖 AI marked</span>
           </div>
 
           {/* Instruction */}
