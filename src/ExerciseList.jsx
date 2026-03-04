@@ -9,6 +9,7 @@ import OfficeVocabulary from './OfficeVocabulary'
 import SpanishVocabulary from './SpanishVocabulary'
 import SentenceBuilding from './SentenceBuilding'
 import ListeningExercise from './ListeningExercise'
+import Dictation from './Dictation'
 import OddOneOut from './OddOneOut'
 import ErrorCorrection from './ErrorCorrection'
 import MatchingExercise from './MatchingExercise'
@@ -24,7 +25,7 @@ const PHRASAL_VERBS_ID   = 2
 const ACTIVE_EXERCISES = new Set([
   'Prepositions Practice', 'Business Phrasal Verbs', 'Office Vocabulary',
   'Spanish Vocabulary', 'Irregular Verbs Flashcards', 'Essential Phrasal Verbs',
-  'Sentence Building', 'Listening Exercises', 'Borrás Flashcards', 'Borrás Memory Game',
+  'Sentence Building', 'Listening Exercises', 'Dictation', 'Borrás Flashcards', 'Borrás Memory Game',
   'Hotel Flashcards', 'Hotel Memory Game', 'Odd One Out', 'Error Correction',
   'Matching', 'Sentence Auction',
 ])
@@ -38,6 +39,7 @@ const EXERCISE_ICONS = {
   'Essential Phrasal Verbs':    '📖',
   'Sentence Building':          '🏗️',
   'Listening Exercises':        '🎧',
+  'Dictation':                  '🎤',
   'Borrás Flashcards':          '🚿',
   'Borrás Memory Game':         '🧩',
   'Hotel Flashcards':           '🏨',
@@ -163,6 +165,7 @@ export default function ExerciseList({ userLevel, userTracks = [], isTeacher = f
     if (t === 'Essential Phrasal Verbs')    return <FlashcardTemplate flashcardSetId={PHRASAL_VERBS_ID} setName="phrasal-verbs" onBack={back} />
     if (t === 'Sentence Building')          return <SentenceBuilding onComplete={back} onBack={back} />
     if (t === 'Listening Exercises')        return <ListeningExercise onBack={back} userTracks={userTracks} />
+    if (t === 'Dictation')                  return <Dictation onBack={back} userTracks={userTracks} />
     if (t === 'Borrás Flashcards')          return (
       <FlashcardTemplate
         title="Borrás Flashcards" subtitle="Bathroom vocabulary in context 🚿"
