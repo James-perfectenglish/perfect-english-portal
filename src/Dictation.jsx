@@ -157,7 +157,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
     setListLoading(true);
     let query = supabase
       .from('dictation_exercises')
-      .select('id, title, level, topic, excerpt_type')
+      .select('id, title, level, topic, excerpt_type, image_url')
       .in('level', dbLevels)
       .order('created_at', { ascending: true });
     query = applyTrackFilter(query);
@@ -455,7 +455,10 @@ export default function Dictation({ onBack, userTracks = [] }) {
                   onMouseEnter={e => { e.currentTarget.style.borderColor = selectedLevel.colour; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
-                  <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: selectedLevel.colourLight, border: `1px solid ${selectedLevel.colour}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>🎧</div>
+                  {ex.image_url
+                    ? <img src={ex.image_url} alt="" style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} />
+                    : <div style={{ width: '56px', height: '56px', borderRadius: '10px', background: selectedLevel.colourLight, border: `1px solid ${selectedLevel.colour}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>⌨️</div>
+                  }
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, color: '#2d3748', fontSize: '1rem', marginBottom: '4px' }}>{ex.title}</div>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -519,9 +522,20 @@ export default function Dictation({ onBack, userTracks = [] }) {
           </div>
 
           {/* Instruction */}
-          <p style={{ color: '#718096', fontSize: '0.95rem', marginTop: 0, marginBottom: '1.25rem', fontStyle: 'italic' }}>
-            {excerptInstruction(currentExercise.excerpt_type)}
+          <p style={{ color: '#718096', fontSize: '0.95rem', marginTop: 0, marginBottom: currentExercise.sentence_template ? '0.75rem' : '1.25rem', fontStyle: 'italic' }}>
+            {currentExercise.excerpt_type === 'word'
+              ? 'Listen and type the one or two words you hear that complete the sentence.'
+              : currentExercise.excerpt_type === 'phrase'
+              ? 'Listen and type the word or short phrase you hear that completes the sentence.'
+              : 'Listen and type the complete sentence you hear.'}
           </p>
+
+          {/* Sentence template with blank */}
+          {currentExercise.sentence_template && (
+            <div style={{ background: '#F8FBFF', border: '1px solid #AED6F1', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1.25rem', fontSize: '1rem', color: '#2d3748', lineHeight: 1.8 }}>
+              {currentExercise.sentence_template}
+            </div>
+          )}
 
           {renderAudioPlayer('Listen')}
 
