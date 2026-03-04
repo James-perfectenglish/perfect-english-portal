@@ -13,52 +13,67 @@ const GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 
 export default function WordOfTheDay({ profile }) {
   const [word, setWord]               = useState(null)
-  const [submission, setSubmission]   = useState(null) // existing submission if any
+  const [submission, setSubmission]   = useState(null)
   const [sentence, setSentence]       = useState('')
   const [feedback, setFeedback]       = useState(null)
   const [isMarking, setIsMarking]     = useState(false)
   const [loading, setLoading]         = useState(true)
   const [noWord, setNoWord]           = useState(false)
 
-  const language = Array.isArray(profile?.tracks) && profile.tracks.includes('spanish') ? 'es' : 'en'
-  const bucket   = levelBucket(profile?.level)
-  const today    = new Date().toISOString().split('T')[0]
+  const isSpanish = Array.isArray(profile?.tracks) && profile.tracks.includes('spanish')
+  const bucket    = levelBucket(profile?.level)
+  const today     = new Date().toISOString().split('T')[0]
 
   useEffect(() => { fetchWord() }, [profile])
 
   const fetchWord = async () => {
     setLoading(true)
+    let wordData = null
 
-    // 1. Try today's word for this level + language
-    let { data: wordData } = await supabase
-      .from('word_of_the_day')
-      .select('*')
-      .eq('date', today)
-      .eq('level', bucket)
-      .eq('language', language)
-      .single()
+    if (isSpanish) {
+      // Spanish-track students: fetch today's Spanish word (level irrelevant)
+      const { data } = await supabase
+        .from('word_of_the_day')
+        .select('*')
+        .eq('date', today)
+        .eq('language', 'es')
+        .limit(1)
+        .single()
+      wordData = data
 
-    // 2. Fallback — same level, any language (catches null or non-en language rows)
-    if (!wordData) {
-      const { data: fallbackData } = await supabase
+    } else {
+      // 1. Today + correct level + English
+      const { data: d1 } = await supabase
         .from('word_of_the_day')
         .select('*')
         .eq('date', today)
         .eq('level', bucket)
-        .limit(1)
+        .eq('language', 'en')
         .single()
-      wordData = fallbackData
-    }
+      wordData = d1
 
-    // 3. Fallback — today's date, any level, any language
-    if (!wordData) {
-      const { data: anyLevel } = await supabase
-        .from('word_of_the_day')
-        .select('*')
-        .eq('date', today)
-        .limit(1)
-        .single()
-      wordData = anyLevel
+      // 2. Fallback — today + any level + English
+      if (!wordData) {
+        const { data: d2 } = await supabase
+          .from('word_of_the_day')
+          .select('*')
+          .eq('date', today)
+          .eq('language', 'en')
+          .limit(1)
+          .single()
+        wordData = d2
+      }
+
+      // 3. Fallback — today + any level + any language
+      if (!wordData) {
+        const { data: d3 } = await supabase
+          .from('word_of_the_day')
+          .select('*')
+          .eq('date', today)
+          .limit(1)
+          .single()
+        wordData = d3
+      }
     }
 
     // 4. Last resort — random word from question bank vocabulary
@@ -68,6 +83,7 @@ export default function WordOfTheDay({ profile }) {
         .select('question_number, question, correct_answers, explanation, level')
         .in('level', bucket === 'A1/A2' ? ['A1','A2'] : bucket === 'B1/B2' ? ['B1','B2'] : ['C1','C2'])
         .eq('type', 'multiple_choice')
+        .eq('language', 'en')
         .limit(50)
 
       if (qbWord && qbWord.length > 0) {
@@ -175,7 +191,7 @@ export default function WordOfTheDay({ profile }) {
     </div>
   )
 
-  if (noWord) return null // silently hide if nothing available
+  if (noWord) return null
 
   const alreadySubmitted = !!submission
   const feedbackToShow   = alreadySubmitted
@@ -183,6 +199,7 @@ export default function WordOfTheDay({ profile }) {
     : feedback
 
   const levelColour = bucket === 'A1/A2' ? '#48bb78' : bucket === 'B1/B2' ? '#4299e1' : '#ed8936'
+  const levelLabel  = isSpanish ? 'Español' : bucket
 
   return (
     <div style={{
@@ -207,7 +224,7 @@ export default function WordOfTheDay({ profile }) {
           <span style={{ color: 'white', fontWeight: '700', fontSize: '0.95rem' }}>Word of the Day</span>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span style={{ background: levelColour, color: 'white', padding: '2px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700' }}>{bucket}</span>
+          <span style={{ background: isSpanish ? '#e53e3e' : levelColour, color: 'white', padding: '2px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700' }}>{levelLabel}</span>
           <span style={{ background: 'rgba(255,255,255,0.2)', color: 'white', padding: '2px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600' }}>
             {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
           </span>
@@ -228,7 +245,7 @@ export default function WordOfTheDay({ profile }) {
         {/* Example sentence */}
         <div style={{
           background: '#f7fafc',
-          borderLeft: `3px solid ${levelColour}`,
+          borderLeft: `3px solid ${isSpanish ? '#e53e3e' : levelColour}`,
           borderRadius: '0 8px 8px 0',
           padding: '0.6rem 0.9rem',
           marginBottom: '1rem'
@@ -321,7 +338,7 @@ export default function WordOfTheDay({ profile }) {
           </div>
         )}
 
-        {/* Feedback just received — not yet locked (qb fallback) */}
+        {/* Feedback just received */}
         {!alreadySubmitted && feedback && (
           <div>
             <div style={{

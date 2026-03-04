@@ -41,8 +41,6 @@ function shuffleArray(arr) {
 }
 
 // ── Levenshtein distance ──
-// Returns the minimum number of single-character edits (insert, delete, substitute)
-// needed to transform string a into string b.
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
   const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
@@ -57,8 +55,6 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
-// Returns true if the student answer is a likely typo of any correct answer.
-// Rules: distance 1 always qualifies; distance 2 only if the correct answer is 6+ chars.
 function isFuzzyMatch(studentAnswer, correctAnswers) {
   for (const correct of correctAnswers) {
     const dist = levenshtein(studentAnswer, correct);
@@ -80,10 +76,8 @@ const findErrorIndex = (questionWords, correctAnswer) => {
   return { index: -1, correctWord: '' };
 };
 
-// Detect language from question topic — Spanish questions have topic='spanish'
 const getQuestionLanguage = (question) => question?.topic === 'spanish' ? 'es' : 'en';
 
-// AI mark a gap fill free-text answer
 const aiMarkGapFill = async (question, correctAnswer, studentAnswer, language = 'en') => {
   try {
     const response = await fetch('/api/mark-gap-fill', {
@@ -101,7 +95,6 @@ const aiMarkGapFill = async (question, correctAnswer, studentAnswer, language = 
   }
 };
 
-// AI mark an error correction replacement
 const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en') => {
   try {
     const response = await fetch('/api/mark-correction', {
@@ -231,7 +224,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     setLoading(true);
     try {
       const queryForType = (type) => {
-        let q = supabase.from('question_bank').select('*').eq('type', type).neq('topic', 'spanish');
+        let q = supabase.from('question_bank').select('*').eq('type', type).in('language', ['en', 'both']);
         if (levels && levels.length > 0) q = q.in('level', levels);
         return q;
       };
@@ -243,7 +236,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         queryForType('odd_one_out'),
         queryForType('error_correction'),
         (() => {
-          let q = supabase.from('question_bank').select('*').eq('type', 'matching').neq('topic', 'spanish').is('sequence_group', null);
+          let q = supabase.from('question_bank').select('*').eq('type', 'matching').in('language', ['en', 'both']).is('sequence_group', null);
           if (levels && levels.length > 0) q = q.in('level', levels);
           return q;
         })(),
@@ -267,8 +260,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         ...pick(matchRes.data, 'matching'),
       ];
 
-      // Top up to TARGET_TOTAL if some types had fewer questions than requested
-      // Fill shortfall with extra multiple_choice (most plentiful type)
       if (baseQuestions.length < TARGET_TOTAL) {
         const shortfall = TARGET_TOTAL - baseQuestions.length;
         const mcUsedIds = new Set(pickedMC.map(q => q.id));
@@ -306,7 +297,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     }
   };
 
-  // ── Gap fill + multiple choice check (async — gap fill may call AI) ──
   const checkAnswer = async () => {
     const currentQuestion = questions[currentQuestionIndex];
     let isCorrect = false;
@@ -319,13 +309,11 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         ? currentQuestion.correct_answers.map(a => a.toLowerCase().trim())
         : [];
 
-      // 1 — Exact match
       if (correctAnswers.includes(answer)) {
         isCorrect = true;
         feedbackType = 'correct';
       }
 
-      // 2 — Informal accepted
       if (!isCorrect && currentQuestion.informal_accepted && Array.isArray(currentQuestion.informal_accepted)) {
         const informalAnswers = currentQuestion.informal_accepted.map(a => a.toLowerCase().trim());
         if (informalAnswers.includes(answer)) {
@@ -335,7 +323,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         }
       }
 
-      // 3 — Acceptable alternatives (pre-defined in DB)
       if (!isCorrect && currentQuestion.acceptable_alternatives && Array.isArray(currentQuestion.acceptable_alternatives)) {
         const alternative = currentQuestion.acceptable_alternatives.find(
           alt => alt.answer && alt.answer.toLowerCase().trim() === answer
@@ -347,15 +334,11 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         }
       }
 
-      // 4 — Fuzzy match (typo detection via Levenshtein distance)
-      // Distance 1 always qualifies; distance 2 only for answers 6+ chars long.
-      // Awarded full point — just shows an amber spelling nudge.
       if (!isCorrect && isFuzzyMatch(answer, correctAnswers)) {
         isCorrect = true;
         feedbackType = 'fuzzy';
       }
 
-      // 5 — AI soft-mark (fires when all static checks fail)
       if (!isCorrect) {
         setIsChecking(true);
         const lang = getQuestionLanguage(currentQuestion);
@@ -429,7 +412,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     setEcCorrection('');
   };
 
-  // ── Error correction check (async — may call AI for B2/C1/C2) ──
   const checkECAnswer = async () => {
     if (ecSelectedWordIndex === null || !ecCorrection.trim() || isChecking) return;
     const cq = questions[currentQuestionIndex];
@@ -446,7 +428,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     const isExactMatch = correctAnswers.some(ca => normaliseEC(correctedSentence) === normaliseEC(ca));
     const errorInfo = findErrorIndex(words, correctAnswers[0]);
 
-    // ✅ Exact match
     if (isExactMatch) {
       setFeedback({
         type: 'correct',
@@ -460,50 +441,36 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       return;
     }
 
-    // AI soft-mark for all levels
-    const useAI = true;
-    if (useAI) {
-      setIsChecking(true);
-      const lang = getQuestionLanguage(cq);
-      const aiResult = await aiMarkCorrection(
-        cq.question,
-        words[ecSelectedWordIndex],
-        ecCorrection.trim(),
-        correctAnswers[0],
-        lang
-      );
-      setIsChecking(false);
+    setIsChecking(true);
+    const lang = getQuestionLanguage(cq);
+    const aiResult = await aiMarkCorrection(
+      cq.question,
+      words[ecSelectedWordIndex],
+      ecCorrection.trim(),
+      correctAnswers[0],
+      lang
+    );
+    setIsChecking(false);
 
-      if (aiResult?.valid) {
-        setFeedback({
-          type: 'soft-pass',
-          message: `✅ Good — that works too! ${aiResult.reason || ''} The model answer was "${errorInfo.correctWord}". ${cq.explanation || ''}`,
-          isCorrect: true,
-          errorIndex: ecSelectedWordIndex,
-          correctWord: cleanCorrection + trailingPunct,
-        });
-        setScore(s => s + 1);
-        saveAnswer(cq, `${words[ecSelectedWordIndex]} → ${ecCorrection.trim()}`, true);
-        return;
-      }
-
-      // AI said no
-      const foundRightWord = ecSelectedWordIndex === errorInfo.index;
-      const message = foundRightWord
-        ? `❌ Good — you found the error in "${words[errorInfo.index]}", but "${ecCorrection.trim()}" doesn't quite work here. ${aiResult?.reason ? aiResult.reason + ' ' : ''}It should be "${errorInfo.correctWord}". ${cq.explanation || ''}`
-        : `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${cq.explanation || ''}`;
-      setFeedback({ type: 'incorrect', message, isCorrect: false, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
-      saveAnswer(cq, `${words[ecSelectedWordIndex]} → ${ecCorrection.trim()}`, false);
-
-    } else {
-      // A1/A2/B1 — no API
-      const foundRightWord = ecSelectedWordIndex === errorInfo.index;
-      const message = foundRightWord
-        ? `❌ You found the error, but the correction should be "${errorInfo.correctWord}". ${cq.explanation || ''}`
-        : `❌ The error is in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${cq.explanation || ''}`;
-      setFeedback({ type: 'incorrect', message, isCorrect: false, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
-      saveAnswer(cq, `${words[ecSelectedWordIndex]} → ${ecCorrection.trim()}`, false);
+    if (aiResult?.valid) {
+      setFeedback({
+        type: 'soft-pass',
+        message: `✅ Good — that works too! ${aiResult.reason || ''} The model answer was "${errorInfo.correctWord}". ${cq.explanation || ''}`,
+        isCorrect: true,
+        errorIndex: ecSelectedWordIndex,
+        correctWord: cleanCorrection + trailingPunct,
+      });
+      setScore(s => s + 1);
+      saveAnswer(cq, `${words[ecSelectedWordIndex]} → ${ecCorrection.trim()}`, true);
+      return;
     }
+
+    const foundRightWord = ecSelectedWordIndex === errorInfo.index;
+    const message = foundRightWord
+      ? `❌ Good — you found the error in "${words[errorInfo.index]}", but "${ecCorrection.trim()}" doesn't quite work here. ${aiResult?.reason ? aiResult.reason + ' ' : ''}It should be "${errorInfo.correctWord}". ${cq.explanation || ''}`
+      : `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${cq.explanation || ''}`;
+    setFeedback({ type: 'incorrect', message, isCorrect: false, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
+    saveAnswer(cq, `${words[ecSelectedWordIndex]} → ${ecCorrection.trim()}`, false);
   };
 
   const handleSentenceBuildingResult = (isCorrect, isSoft = false, userAnswer = '') => {
@@ -635,7 +602,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     ? currentQuestion.question.trim().split(/\s+/)
     : [];
 
-  // ── Structured feedback panel for gap_fill and multiple_choice ──
   const renderStructuredFeedback = () => {
     if (!feedback || !currentQuestion) return null;
     if (currentQuestion.type !== 'gap_fill' && currentQuestion.type !== 'multiple_choice') return null;
@@ -656,59 +622,26 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
           : '❌ Incorrect';
 
     return (
-      <div style={{
-        marginTop: '1rem',
-        borderRadius: '12px',
-        border: `2px solid ${borderColor}`,
-        overflow: 'hidden',
-        fontSize: 'clamp(0.95rem, 3vw, 1.05rem)',
-      }}>
-        {/* Header */}
-        <div style={{
-          backgroundColor: headerBg,
-          color: 'white',
-          padding: '0.6rem 1rem',
-          fontWeight: '700',
-          fontSize: 'clamp(0.95rem, 3vw, 1.05rem)',
-        }}>
+      <div style={{ marginTop: '1rem', borderRadius: '12px', border: `2px solid ${borderColor}`, overflow: 'hidden', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)' }}>
+        <div style={{ backgroundColor: headerBg, color: 'white', padding: '0.6rem 1rem', fontWeight: '700', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)' }}>
           {headerText}
         </div>
-
-        {/* Body */}
         <div style={{ backgroundColor: bgColor, padding: '1rem' }}>
-
-          {/* Your answer */}
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem', alignItems: 'flex-start' }}>
-            <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px' }}>
-              Your answer:
-            </span>
-            <span style={{
-              fontWeight: '600',
-              color: isCorrect ? '#276749' : '#c53030',
-              wordBreak: 'break-word',
-            }}>
+            <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px' }}>Your answer:</span>
+            <span style={{ fontWeight: '600', color: isCorrect ? '#276749' : '#c53030', wordBreak: 'break-word' }}>
               {feedback.studentAnswer || '(no answer)'}
             </span>
           </div>
-
-          {/* Correct answer — always shown */}
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'flex-start' }}>
-            <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px' }}>
-              Correct answer:
-            </span>
-            <span style={{ fontWeight: '700', color: '#276749', wordBreak: 'break-word' }}>
-              {feedback.correctAnswer}
-            </span>
+            <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px' }}>Correct answer:</span>
+            <span style={{ fontWeight: '700', color: '#276749', wordBreak: 'break-word' }}>{feedback.correctAnswer}</span>
           </div>
-
-          {/* Fuzzy nudge message */}
           {isFuzzy && (
             <div style={{ borderTop: `1px solid ${borderColor}`, paddingTop: '0.75rem', color: '#744210', lineHeight: '1.6' }}>
               ✏️ Almost perfect — watch your spelling next time!
             </div>
           )}
-
-          {/* Explanation (non-fuzzy) */}
           {!isFuzzy && feedback.explanation && (
             <div style={{ borderTop: `1px solid ${borderColor}`, paddingTop: '0.75rem', color: '#4a5568', lineHeight: '1.6' }}>
               💡 {feedback.explanation}
@@ -719,20 +652,11 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     );
   };
 
-  // ── AI checking indicator (gap fill) ──
   const renderCheckingIndicator = () => {
     if (!isChecking || !currentQuestion) return null;
     if (currentQuestion.type !== 'gap_fill' && currentQuestion.type !== 'error_correction') return null;
     return (
-      <div style={{
-        marginTop: '1rem',
-        textAlign: 'center',
-        padding: '1rem',
-        color: '#553C9A',
-        fontSize: '0.95rem',
-        border: '2px dashed #EDE9FE',
-        borderRadius: '8px',
-      }}>
+      <div style={{ marginTop: '1rem', textAlign: 'center', padding: '1rem', color: '#553C9A', fontSize: '0.95rem', border: '2px dashed #EDE9FE', borderRadius: '8px' }}>
         🤖 Checking your answer...
       </div>
     );
@@ -744,48 +668,24 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
         {/* ── START SCREEN ── */}
         {stage === 'start' && (
-          <div style={{
-            textAlign: 'center', padding: '2rem 0', minHeight: '60vh',
-            display: 'flex', flexDirection: 'column', justifyContent: 'center',
-            width: '100%', boxSizing: 'border-box', maxWidth: '600px', margin: '0 auto',
-          }}>
+          <div style={{ textAlign: 'center', padding: '2rem 0', minHeight: '60vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', width: '100%', boxSizing: 'border-box', maxWidth: '600px', margin: '0 auto' }}>
             {levelSubtitle && (
-              <div style={{
-                display: 'inline-block', background: displayGradient, color: 'white',
-                padding: '6px 20px', borderRadius: '20px',
-                fontSize: 'clamp(0.9rem, 3vw, 1rem)', fontWeight: '600',
-                marginBottom: '1rem', alignSelf: 'center',
-              }}>{levelSubtitle}</div>
+              <div style={{ display: 'inline-block', background: displayGradient, color: 'white', padding: '6px 20px', borderRadius: '20px', fontSize: 'clamp(0.9rem, 3vw, 1rem)', fontWeight: '600', marginBottom: '1rem', alignSelf: 'center' }}>{levelSubtitle}</div>
             )}
-            <h1 style={{ fontSize: 'clamp(2rem, 8vw, 2.5rem)', color: '#2C3E50', marginBottom: '1.5rem', fontWeight: '700' }}>
-              {displayTitle}
-            </h1>
+            <h1 style={{ fontSize: 'clamp(2rem, 8vw, 2.5rem)', color: '#2C3E50', marginBottom: '1.5rem', fontWeight: '700' }}>{displayTitle}</h1>
             <p style={{ fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', color: '#2C3E50', marginBottom: '1rem', lineHeight: '1.5' }}>
               Test your English with 20 random questions!
             </p>
             <p style={{ fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', color: '#666', marginBottom: '2.5rem', lineHeight: '1.5' }}>
               A mix of multiple choice, gap fill, sentence building, odd one out, error correction, and matching. Answer all questions and see your score at the end.
             </p>
-            <button
-              onClick={startExercise}
-              disabled={loading}
-              style={{
-                padding: '1.25rem', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
-                background: displayGradient, color: 'white', border: 'none',
-                borderRadius: '12px', cursor: 'pointer',
-                width: '100%', maxWidth: '350px', margin: '0 auto',
-                fontWeight: '600', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              }}
-            >{loading ? 'Loading...' : 'Start Practice'}</button>
+            <button onClick={startExercise} disabled={loading} style={{ padding: '1.25rem', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', background: displayGradient, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', width: '100%', maxWidth: '350px', margin: '0 auto', fontWeight: '600', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+              {loading ? 'Loading...' : 'Start Practice'}
+            </button>
             {onBack && (
-              <button
-                onClick={onBack}
-                style={{
-                  marginTop: '1.5rem', padding: '0.75rem 1.5rem',
-                  fontSize: 'clamp(0.9rem, 3vw, 1rem)', backgroundColor: 'transparent',
-                  color: '#666', border: '1px solid #ddd', borderRadius: '8px',
-                  cursor: 'pointer', fontWeight: '500',
-                }}>← Choose Different Level</button>
+              <button onClick={onBack} style={{ marginTop: '1.5rem', padding: '0.75rem 1.5rem', fontSize: 'clamp(0.9rem, 3vw, 1rem)', backgroundColor: 'transparent', color: '#666', border: '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}>
+                ← Choose Different Level
+              </button>
             )}
           </div>
         )}
@@ -793,27 +693,15 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         {/* ── PLAYING SCREEN ── */}
         {stage === 'playing' && currentQuestion && (
           <div style={{ width: '100%', maxWidth: '700px', margin: '0 auto' }}>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', marginBottom: '1rem',
-              fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2C3E50', fontWeight: '500',
-            }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2C3E50', fontWeight: '500' }}>
               <div>Q {currentQuestionIndex + 1}/{questions.length}</div>
               <div>Score: {score}</div>
             </div>
             <div style={{ height: '6px', backgroundColor: '#e0e0e0', borderRadius: '3px', marginBottom: '1.5rem', overflow: 'hidden' }}>
-              <div style={{
-                height: '100%',
-                width: `${((currentQuestionIndex) / questions.length) * 100}%`,
-                background: displayGradient, borderRadius: '3px', transition: 'width 0.3s ease',
-              }} />
+              <div style={{ height: '100%', width: `${((currentQuestionIndex) / questions.length) * 100}%`, background: displayGradient, borderRadius: '3px', transition: 'width 0.3s ease' }} />
             </div>
 
-            <div style={{
-              backgroundColor: 'white',
-              padding: 'clamp(1.5rem, 5vw, 2.5rem)',
-              borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-              display: 'flex', flexDirection: 'column', gap: '1.5rem',
-            }}>
+            <div style={{ backgroundColor: 'white', padding: 'clamp(1.5rem, 5vw, 2.5rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {/* Badges */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
                 {currentQuestion.type !== 'sentence_building' && (
@@ -823,20 +711,17 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                       currentQuestion.type === 'gap_fill' ? '#fff3cd' :
                       currentQuestion.type === 'odd_one_out' ? '#E0F2FE' :
                       currentQuestion.type === 'error_correction' ? '#FEE2E2' :
-                      currentQuestion.type === 'matching' ? '#D1FAE5' :
-                      '#d4edda',
+                      currentQuestion.type === 'matching' ? '#D1FAE5' : '#d4edda',
                     color:
                       currentQuestion.type === 'gap_fill' ? '#856404' :
                       currentQuestion.type === 'odd_one_out' ? '#0369A1' :
                       currentQuestion.type === 'error_correction' ? '#DC2626' :
-                      currentQuestion.type === 'matching' ? '#065F46' :
-                      '#155724',
+                      currentQuestion.type === 'matching' ? '#065F46' : '#155724',
                   }}>
                     {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill' :
                      currentQuestion.type === 'odd_one_out' ? '🔍 Odd One Out' :
                      currentQuestion.type === 'error_correction' ? '🚨 Error Correction' :
-                     currentQuestion.type === 'matching' ? '🔗 Matching' :
-                     '📝 Multiple Choice'}
+                     currentQuestion.type === 'matching' ? '🔗 Matching' : '📝 Multiple Choice'}
                   </div>
                 )}
                 {currentQuestion.level && (
@@ -856,7 +741,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                     {currentQuestion.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                   </div>
                 )}
-                {/* AI marker badge for EC, gap fill and sentence building */}
                 {(currentQuestion.type === 'error_correction' || currentQuestion.type === 'gap_fill' || currentQuestion.type === 'sentence_building') && (
                   <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>
                     🤖 AI marked
@@ -869,23 +753,19 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                currentQuestion.type !== 'error_correction' &&
                currentQuestion.type !== 'matching' &&
                currentQuestion.question && (
-                <div style={{
-                  fontSize: 'clamp(1.15rem, 4vw, 1.4rem)', color: '#2C3E50',
-                  lineHeight: '1.6', fontWeight: '500', wordWrap: 'break-word', overflowWrap: 'break-word',
-                }}>{currentQuestion.question}</div>
+                <div style={{ fontSize: 'clamp(1.15rem, 4vw, 1.4rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                  {currentQuestion.question}
+                </div>
               )}
 
-              {/* Hint */}
               {showHint && currentQuestion.hint && (
-                <div style={{
-                  backgroundColor: '#fff3cd', padding: '0.8rem 1rem',
-                  borderRadius: '8px', border: '1px solid #ffc107',
-                  fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#856404',
-                }}>💡 <strong>Hint:</strong> {currentQuestion.hint}</div>
+                <div style={{ backgroundColor: '#fff3cd', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid #ffc107', fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#856404' }}>
+                  💡 <strong>Hint:</strong> {currentQuestion.hint}
+                </div>
               )}
 
               <div style={{ flex: 1 }}>
-                {/* ── GAP FILL ── */}
+                {/* GAP FILL */}
                 {currentQuestion.type === 'gap_fill' && !feedback && (
                   <input
                     type="text" value={userAnswer}
@@ -893,57 +773,38 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                     onKeyPress={(e) => e.key === 'Enter' && !isChecking && checkAnswer()}
                     placeholder="Type your answer..."
                     disabled={isChecking}
-                    style={{
-                      width: '100%', padding: '1.2rem',
-                      fontSize: 'clamp(1.1rem, 4vw, 1.3rem)',
-                      borderRadius: '10px', border: '2px solid #e0e0e0',
-                      boxSizing: 'border-box', color: '#2C3E50',
-                      opacity: isChecking ? 0.6 : 1,
-                    }}
+                    style={{ width: '100%', padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', borderRadius: '10px', border: '2px solid #e0e0e0', boxSizing: 'border-box', color: '#2C3E50', opacity: isChecking ? 0.6 : 1 }}
                     autoFocus
                   />
                 )}
 
-                {/* ── MULTIPLE CHOICE ── */}
+                {/* MULTIPLE CHOICE — before answer */}
                 {currentQuestion.type === 'multiple_choice' && !feedback && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     {currentQuestion.options.map((option, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setSelectedOption(option)}
-                        style={{
-                          padding: '1.2rem',
-                          fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)',
-                          textAlign: 'left',
-                          backgroundColor: selectedOption === option ? '#3498DB' : 'white',
-                          color: selectedOption === option ? 'white' : '#2C3E50',
-                          border: `2px solid ${selectedOption === option ? '#3498DB' : '#e0e0e0'}`,
-                          borderRadius: '10px', cursor: 'pointer', transition: 'all 0.2s',
-                          wordWrap: 'break-word', width: '100%', boxSizing: 'border-box', fontWeight: '500',
-                        }}
-                      >{option}</button>
+                      <button key={index} onClick={() => setSelectedOption(option)} style={{
+                        padding: '1.2rem', fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)', textAlign: 'left',
+                        backgroundColor: selectedOption === option ? '#3498DB' : 'white',
+                        color: selectedOption === option ? 'white' : '#2C3E50',
+                        border: `2px solid ${selectedOption === option ? '#3498DB' : '#e0e0e0'}`,
+                        borderRadius: '10px', cursor: 'pointer', transition: 'all 0.2s',
+                        wordWrap: 'break-word', width: '100%', boxSizing: 'border-box', fontWeight: '500',
+                      }}>{option}</button>
                     ))}
                   </div>
                 )}
 
-                {/* ── MULTIPLE CHOICE: show options greyed out after answer ── */}
+                {/* MULTIPLE CHOICE — after answer */}
                 {currentQuestion.type === 'multiple_choice' && feedback && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '0.5rem' }}>
                     {currentQuestion.options.map((option, index) => {
                       const isCorrectOption = option === feedback.correctAnswer;
                       const wasSelected = option === feedback.studentAnswer;
-                      let bg = '#f7fafc'; let border = '#e2e8f0'; let color = '#a0aec0';
+                      let bg = '#f7fafc', border = '#e2e8f0', color = '#a0aec0';
                       if (isCorrectOption) { bg = '#f0fff4'; border = '#48bb78'; color = '#276749'; }
                       else if (wasSelected && !feedback.isCorrect) { bg = '#fff5f5'; border = '#f56565'; color = '#c53030'; }
                       return (
-                        <div key={index} style={{
-                          padding: '0.9rem 1.2rem',
-                          fontSize: 'clamp(1rem, 3.5vw, 1.1rem)',
-                          backgroundColor: bg, color, border: `2px solid ${border}`,
-                          borderRadius: '10px',
-                          fontWeight: isCorrectOption || wasSelected ? '600' : '400',
-                          wordWrap: 'break-word',
-                        }}>
+                        <div key={index} style={{ padding: '0.9rem 1.2rem', fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', backgroundColor: bg, color, border: `2px solid ${border}`, borderRadius: '10px', fontWeight: isCorrectOption || wasSelected ? '600' : '400', wordWrap: 'break-word' }}>
                           {isCorrectOption ? '✓ ' : wasSelected && !feedback.isCorrect ? '✗ ' : ''}{option}
                         </div>
                       );
@@ -951,7 +812,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   </div>
                 )}
 
-                {/* ── SENTENCE BUILDING ── */}
+                {/* SENTENCE BUILDING */}
                 {currentQuestion.type === 'sentence_building' && (
                   <SentenceBuildingInput
                     key={currentQuestionIndex}
@@ -964,76 +825,40 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   />
                 )}
 
-                {/* ── ODD ONE OUT ── */}
+                {/* ODD ONE OUT */}
                 {currentQuestion.type === 'odd_one_out' && (
                   <div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '1rem' }}>
-                      {(Array.isArray(currentQuestion.options)
-                        ? currentQuestion.options
-                        : JSON.parse(currentQuestion.options || '[]')
-                      ).map((option, idx) => (
-                        <div
-                          key={idx} className="rp-ooo-option" tabIndex={-1}
+                      {(Array.isArray(currentQuestion.options) ? currentQuestion.options : JSON.parse(currentQuestion.options || '[]')).map((option, idx) => (
+                        <div key={idx} className="rp-ooo-option" tabIndex={-1}
                           onClick={() => handleOOOSelect(option)}
                           style={getOOOStyle(option)}
-                          onMouseEnter={e => {
-                            if (!feedback) {
-                              e.currentTarget.style.boxShadow = 'inset 0 0 0 2px #667eea';
-                              e.currentTarget.style.transform = 'translateY(-1px)';
-                            }
-                          }}
-                          onMouseLeave={e => {
-                            if (!feedback && oooSelected !== option) {
-                              e.currentTarget.style.boxShadow = 'inset 0 0 0 2px #e2e8f0';
-                              e.currentTarget.style.transform = 'none';
-                            }
-                          }}
+                          onMouseEnter={e => { if (!feedback) { e.currentTarget.style.boxShadow = 'inset 0 0 0 2px #667eea'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
+                          onMouseLeave={e => { if (!feedback && oooSelected !== option) { e.currentTarget.style.boxShadow = 'inset 0 0 0 2px #e2e8f0'; e.currentTarget.style.transform = 'none'; } }}
                         >{option}</div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* ── ERROR CORRECTION ── */}
+                {/* ERROR CORRECTION */}
                 {currentQuestion.type === 'error_correction' && (
                   <div>
                     <div style={{ fontSize: '0.9rem', color: '#718096', marginBottom: '1rem', fontStyle: 'italic' }}>
-                      {isChecking
-                        ? '🤖 Checking your answer...'
-                        : !feedback
-                          ? '👆 Tap the word that is wrong, then type the correction below.'
-                          : feedback.isCorrect ? 'Well done!' : 'See the correction below.'}
+                      {isChecking ? '🤖 Checking your answer...' : !feedback ? '👆 Tap the word that is wrong, then type the correction below.' : feedback.isCorrect ? 'Well done!' : 'See the correction below.'}
                     </div>
-                    <div style={{
-                      backgroundColor: '#F8FBFF', padding: '1.25rem',
-                      borderRadius: '10px', border: '1px solid #AED6F1',
-                      lineHeight: '2.4', marginBottom: '1.25rem',
-                      display: 'flex', flexWrap: 'wrap', alignItems: 'center',
-                    }}>
+                    <div style={{ backgroundColor: '#F8FBFF', padding: '1.25rem', borderRadius: '10px', border: '1px solid #AED6F1', lineHeight: '2.4', marginBottom: '1.25rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
                       {ecWords.map((word, index) => (
-                        <span
-                          key={index} className="rp-ec-tile" tabIndex={-1}
+                        <span key={index} className="rp-ec-tile" tabIndex={-1}
                           onClick={() => handleECWordTap(index)}
                           style={getECTileStyle(index)}
-                          onMouseEnter={e => {
-                            if (!feedback && !isChecking && ecSelectedWordIndex !== index) {
-                              e.currentTarget.style.borderColor = '#667eea';
-                              e.currentTarget.style.backgroundColor = '#f7f7ff';
-                            }
-                          }}
-                          onMouseLeave={e => {
-                            if (!feedback && !isChecking && ecSelectedWordIndex !== index) {
-                              e.currentTarget.style.borderColor = '#e2e8f0';
-                              e.currentTarget.style.backgroundColor = 'white';
-                            }
-                          }}
+                          onMouseEnter={e => { if (!feedback && !isChecking && ecSelectedWordIndex !== index) { e.currentTarget.style.borderColor = '#667eea'; e.currentTarget.style.backgroundColor = '#f7f7ff'; } }}
+                          onMouseLeave={e => { if (!feedback && !isChecking && ecSelectedWordIndex !== index) { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.backgroundColor = 'white'; } }}
                         >{word}</span>
                       ))}
                       {feedback && feedback.errorIndex >= 0 && (
                         <div style={{ width: '100%', marginTop: '0.75rem', fontSize: '1rem', paddingLeft: '4px' }}>
-                          <span style={{ color: '#c53030', textDecoration: 'line-through', fontWeight: 500 }}>
-                            {ecWords[feedback.errorIndex]}
-                          </span>
+                          <span style={{ color: '#c53030', textDecoration: 'line-through', fontWeight: 500 }}>{ecWords[feedback.errorIndex]}</span>
                           <span style={{ margin: '0 8px', color: '#718096' }}>→</span>
                           <span style={{ color: '#276749', fontWeight: 600 }}>{feedback.correctWord}</span>
                         </div>
@@ -1045,78 +870,47 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                           <div style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                             Your correction for "{ecWords[ecSelectedWordIndex]}":
                           </div>
-                          <input
-                            type="text" value={ecCorrection}
+                          <input type="text" value={ecCorrection}
                             onChange={(e) => setEcCorrection(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && checkECAnswer()}
                             placeholder="Type the correct word..."
                             autoFocus
-                            style={{
-                              width: '100%', padding: '0.9rem 1rem',
-                              fontSize: 'clamp(1rem, 3.5vw, 1.15rem)',
-                              borderRadius: '8px', border: '2px solid #667eea',
-                              boxSizing: 'border-box', color: '#2d3748',
-                              fontWeight: 500, backgroundColor: '#EDE9FE',
-                            }}
+                            style={{ width: '100%', padding: '0.9rem 1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', borderRadius: '8px', border: '2px solid #667eea', boxSizing: 'border-box', color: '#2d3748', fontWeight: 500, backgroundColor: '#EDE9FE' }}
                           />
                         </div>
-                        <button
-                          onClick={checkECAnswer}
-                          disabled={!ecCorrection.trim() || isChecking}
-                          style={{
-                            padding: '0 1.5rem',
-                            background: ecCorrection.trim() ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#cbd5e0',
-                            color: 'white', border: 'none', borderRadius: '8px',
-                            cursor: ecCorrection.trim() ? 'pointer' : 'not-allowed',
-                            fontWeight: 600, fontSize: '1rem',
-                            alignSelf: 'flex-end', minHeight: '48px',
-                          }}
+                        <button onClick={checkECAnswer} disabled={!ecCorrection.trim() || isChecking}
+                          style={{ padding: '0 1.5rem', background: ecCorrection.trim() ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#cbd5e0', color: 'white', border: 'none', borderRadius: '8px', cursor: ecCorrection.trim() ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '1rem', alignSelf: 'flex-end', minHeight: '48px' }}
                         >Check</button>
                       </div>
                     )}
                     {ecSelectedWordIndex === null && !feedback && !isChecking && (
-                      <div style={{
-                        textAlign: 'center', padding: '1rem', color: '#A0AEC0',
-                        fontSize: '0.95rem', border: '2px dashed #E2E8F0', borderRadius: '8px',
-                      }}>👆 Tap the word you think is wrong</div>
+                      <div style={{ textAlign: 'center', padding: '1rem', color: '#A0AEC0', fontSize: '0.95rem', border: '2px dashed #E2E8F0', borderRadius: '8px' }}>
+                        👆 Tap the word you think is wrong
+                      </div>
                     )}
                   </div>
                 )}
 
-                {/* ── MATCHING ── */}
+                {/* MATCHING */}
                 {currentQuestion.type === 'matching' && matchingPairs && (
                   <div>
                     {currentQuestion.question && currentQuestion.question.trim() && (
-                      <div style={{
-                        fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)', color: '#2C3E50',
-                        lineHeight: '1.6', fontWeight: '500', marginBottom: '1rem',
-                        wordWrap: 'break-word',
-                      }}>{currentQuestion.question}</div>
+                      <div style={{ fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500', marginBottom: '1rem', wordWrap: 'break-word' }}>
+                        {currentQuestion.question}
+                      </div>
                     )}
-                    <MatchingPairs
-                      key={currentQuestionIndex}
-                      pairs={matchingPairs}
-                      disabled={!!feedback}
-                      onResult={handleMatchingResult}
-                    />
+                    <MatchingPairs key={currentQuestionIndex} pairs={matchingPairs} disabled={!!feedback} onResult={handleMatchingResult} />
                   </div>
                 )}
 
-                {/* ── AI checking indicator ── */}
                 {renderCheckingIndicator()}
-
-                {/* ── STRUCTURED FEEDBACK (gap_fill + multiple_choice) ── */}
                 {renderStructuredFeedback()}
 
-                {/* ── EC feedback (amber for soft-pass, red for incorrect) ── */}
+                {/* EC feedback */}
                 {feedback && currentQuestion.type === 'error_correction' && (
                   <div style={{
-                    backgroundColor:
-                      feedback.type === 'soft-pass' ? '#fffbeb' :
-                      feedback.isCorrect ? '#d4edda' : '#f8d7da',
-                    color:
-                      feedback.type === 'soft-pass' ? '#744210' :
-                      feedback.isCorrect ? '#155724' : '#721c24',
+                    backgroundColor: feedback.type === 'soft-pass' ? '#fffbeb' : feedback.isCorrect ? '#d4edda' : '#f8d7da',
+                    color: feedback.type === 'soft-pass' ? '#744210' : feedback.isCorrect ? '#155724' : '#721c24',
                     padding: '1.2rem', borderRadius: '10px', marginTop: '1rem',
                     fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6',
                     wordWrap: 'break-word', overflowWrap: 'break-word',
@@ -1124,58 +918,37 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   }}>{feedback.message}</div>
                 )}
 
-                {/* ── SIMPLE FEEDBACK (OOO, SB, matching) ── */}
+                {/* Simple feedback (OOO, SB, matching) */}
                 {feedback &&
                  currentQuestion.type !== 'error_correction' &&
                  currentQuestion.type !== 'sentence_building' &&
                  currentQuestion.type !== 'gap_fill' &&
                  currentQuestion.type !== 'multiple_choice' && (
-                  <div style={{
-                    backgroundColor: feedback.isCorrect ? '#d4edda' : '#f8d7da',
-                    color: feedback.isCorrect ? '#155724' : '#721c24',
-                    padding: '1.2rem', borderRadius: '10px', marginTop: '1rem',
-                    fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6',
-                    wordWrap: 'break-word', overflowWrap: 'break-word',
-                  }}>{feedback.message}</div>
+                  <div style={{ backgroundColor: feedback.isCorrect ? '#d4edda' : '#f8d7da', color: feedback.isCorrect ? '#155724' : '#721c24', padding: '1.2rem', borderRadius: '10px', marginTop: '1rem', fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                    {feedback.message}
+                  </div>
                 )}
               </div>
 
-              {/* ── Buttons ── */}
+              {/* Buttons */}
               <div style={{ marginTop: '1.5rem' }}>
                 {!feedback &&
                  currentQuestion.type !== 'sentence_building' &&
                  currentQuestion.type !== 'odd_one_out' &&
                  currentQuestion.type !== 'error_correction' &&
                  currentQuestion.type !== 'matching' && (
-                  <button
-                    onClick={checkAnswer}
-                    disabled={
-                      isChecking ||
-                      (currentQuestion.type === 'gap_fill' && !userAnswer.trim()) ||
-                      (currentQuestion.type === 'multiple_choice' && !selectedOption)
-                    }
+                  <button onClick={checkAnswer}
+                    disabled={isChecking || (currentQuestion.type === 'gap_fill' && !userAnswer.trim()) || (currentQuestion.type === 'multiple_choice' && !selectedOption)}
                     style={{
                       padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)',
                       backgroundColor: '#2C3E50', color: 'white', border: 'none',
                       borderRadius: '10px', cursor: 'pointer', width: '100%', fontWeight: '600',
-                      opacity: (
-                        isChecking ||
-                        (currentQuestion.type === 'gap_fill' && !userAnswer.trim()) ||
-                        (currentQuestion.type === 'multiple_choice' && !selectedOption)
-                      ) ? 0.5 : 1,
+                      opacity: (isChecking || (currentQuestion.type === 'gap_fill' && !userAnswer.trim()) || (currentQuestion.type === 'multiple_choice' && !selectedOption)) ? 0.5 : 1,
                     }}
                   >{isChecking ? '🤖 Checking...' : 'Check Answer'}</button>
                 )}
-
                 {feedback && (
-                  <button
-                    onClick={nextQuestion}
-                    style={{
-                      padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)',
-                      backgroundColor: '#3498DB', color: 'white', border: 'none',
-                      borderRadius: '10px', cursor: 'pointer', width: '100%', fontWeight: '600',
-                    }}
-                  >
+                  <button onClick={nextQuestion} style={{ padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)', backgroundColor: '#3498DB', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', width: '100%', fontWeight: '600' }}>
                     {currentQuestionIndex < questions.length - 1 ? 'Next Question →' : 'Finish'}
                   </button>
                 )}
@@ -1187,34 +960,19 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         {/* ── FINISHED SCREEN ── */}
         {stage === 'finished' && (
           <div style={{ width: '100%', maxWidth: '600px', margin: '2rem auto 0' }}>
-            <div style={{
-              backgroundColor: 'white', padding: 'clamp(2rem, 6vw, 3rem)',
-              borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', textAlign: 'center',
-            }}>
-              <h1 style={{ fontSize: 'clamp(1.8rem, 6vw, 2.2rem)', color: '#2C3E50', marginBottom: '0.5rem', fontWeight: '700' }}>
-                Practice Complete!
-              </h1>
+            <div style={{ backgroundColor: 'white', padding: 'clamp(2rem, 6vw, 3rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+              <h1 style={{ fontSize: 'clamp(1.8rem, 6vw, 2.2rem)', color: '#2C3E50', marginBottom: '0.5rem', fontWeight: '700' }}>Practice Complete!</h1>
               <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', marginBottom: '1.5rem', color: '#666' }}>
-                {scorePercent >= 90 ? '🌟 Outstanding work!' :
-                 scorePercent >= 75 ? '👍 Great job!' :
-                 scorePercent >= 50 ? '👌 Good effort!' : '💪 Keep practicing!'}
+                {scorePercent >= 90 ? '🌟 Outstanding work!' : scorePercent >= 75 ? '👍 Great job!' : scorePercent >= 50 ? '👌 Good effort!' : '💪 Keep practicing!'}
               </div>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: bestScore !== null ? '1fr 1fr 1fr' : '1fr',
-                gap: '1rem', marginBottom: '2rem',
-              }}>
+              <div style={{ display: 'grid', gridTemplateColumns: bestScore !== null ? '1fr 1fr 1fr' : '1fr', gap: '1rem', marginBottom: '2rem' }}>
                 <div style={{ background: displayGradient, borderRadius: '12px', padding: '1.25rem 1rem', color: 'white' }}>
                   <div style={{ fontSize: '0.8rem', fontWeight: '600', opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.4rem' }}>This attempt</div>
                   <div style={{ fontSize: 'clamp(2rem, 8vw, 2.5rem)', fontWeight: '700', lineHeight: 1.1 }}>{score}/{questions.length}</div>
                   <div style={{ fontSize: '0.85rem', opacity: 0.85, marginTop: '0.25rem' }}>{Math.round(scorePercent)}%</div>
                 </div>
                 {bestScore !== null && (
-                  <div style={{
-                    background: score >= bestScore ? '#f0fff4' : '#f7fafc',
-                    border: score >= bestScore ? '2px solid #48bb78' : '2px solid #e2e8f0',
-                    borderRadius: '12px', padding: '1.25rem 1rem',
-                  }}>
+                  <div style={{ background: score >= bestScore ? '#f0fff4' : '#f7fafc', border: score >= bestScore ? '2px solid #48bb78' : '2px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem 1rem' }}>
                     <div style={{ fontSize: '0.8rem', fontWeight: '600', color: '#718096', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.4rem' }}>Best</div>
                     <div style={{ fontSize: 'clamp(2rem, 8vw, 2.5rem)', fontWeight: '700', color: '#2C3E50', lineHeight: 1.1 }}>{bestScore}/{questions.length}</div>
                     {score >= bestScore && score > 0 && (
@@ -1233,24 +991,13 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <button
-                  onClick={retry}
-                  style={{
-                    padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)',
-                    background: displayGradient, color: 'white', border: 'none',
-                    borderRadius: '10px', cursor: 'pointer', fontWeight: '600',
-                  }}
-                >Try Again</button>
+                <button onClick={retry} style={{ padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)', background: displayGradient, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '600' }}>
+                  Try Again
+                </button>
                 {onBack && (
-                  <button
-                    onClick={onBack}
-                    style={{
-                      padding: '1rem', fontSize: 'clamp(1rem, 3.5vw, 1.1rem)',
-                      backgroundColor: 'transparent', color: '#666',
-                      border: '1px solid #ddd', borderRadius: '10px',
-                      cursor: 'pointer', fontWeight: '500',
-                    }}
-                  >← Back to Levels</button>
+                  <button onClick={onBack} style={{ padding: '1rem', fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', backgroundColor: 'transparent', color: '#666', border: '1px solid #ddd', borderRadius: '10px', cursor: 'pointer', fontWeight: '500' }}>
+                    ← Back to Levels
+                  </button>
                 )}
               </div>
             </div>
