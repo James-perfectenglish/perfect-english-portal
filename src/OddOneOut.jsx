@@ -108,12 +108,11 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const correctAnswers = Array.isArray(question.correct_answers) ? question.correct_answers : JSON.parse(question.correct_answers || '[]');
       await supabase.from('student_answers').insert({
         student_id: user.id,
         question_id: question.question_number,
         student_answer: studentAnswer,
-        correct_answer: correctAnswers[0] || '',
+        correct_answer: question.correct_answer || '',
         is_correct: isCorrect
       });
     } catch (error) { console.error('Error saving answer:', error); }
@@ -123,8 +122,7 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
     if (feedback) return;
     setSelected(option);
     const q = questions[currentQ];
-    const correctAnswers = Array.isArray(q.correct_answers) ? q.correct_answers : JSON.parse(q.correct_answers || '[]');
-    const oddOne = correctAnswers[0] || '';
+    const oddOne = q.correct_answer || '';
     const isCorrect = option.toLowerCase().trim() === oddOne.toLowerCase().trim();
 
     if (isCorrect) {
