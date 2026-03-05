@@ -27,26 +27,17 @@ export default function SurvivalMode({ onBack }) {
     window.scrollTo(0, 0);
   }, [stage, stageTransition]);
 
-  // Save individual answer to student_answers table
   const saveAnswer = async (question, studentAnswer, isCorrect) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
-      const correctAnswers = Array.isArray(question.correct_answers)
-        ? question.correct_answers
-        : JSON.parse(question.correct_answers || '[]');
-      const correctAnswer = question.type === 'multiple_choice'
-        ? (question.correct_answer || correctAnswers[0] || '')
-        : (correctAnswers[0] || '');
-
       await supabase
         .from('student_answers')
         .insert({
           student_id: user.id,
           question_id: question.question_number,
           student_answer: studentAnswer,
-          correct_answer: correctAnswer,
+          correct_answer: question.correct_answer || '',
           is_correct: isCorrect
         });
     } catch (error) {
@@ -74,11 +65,9 @@ export default function SurvivalMode({ onBack }) {
 
     if (gapError || mcError) throw gapError || mcError;
 
-    // Reduced gap fill weighting: take fewer gap fills relative to multiple choice
     const shuffledGap = (gapFill || []).sort(() => Math.random() - 0.5);
     const shuffledMC = (mc || []).sort(() => Math.random() - 0.5);
 
-    // Take roughly 20% gap fill, 80% multiple choice
     const gapCount = Math.min(Math.ceil(stageConfig.count * 0.2), shuffledGap.length);
     const mcCount = Math.min(stageConfig.count - gapCount, shuffledMC.length);
 
@@ -93,7 +82,6 @@ export default function SurvivalMode({ onBack }) {
     window.scrollTo({ top: 0, behavior: 'instant' });
     setLoading(true);
     try {
-      // Load all questions for all stages upfront
       const beginnerQs = await fetchQuestionsForStage(0);
       const intermediateQs = await fetchQuestionsForStage(1);
       const advancedQs = await fetchQuestionsForStage(2);
@@ -149,11 +137,9 @@ export default function SurvivalMode({ onBack }) {
 
     if (currentQuestion.type === 'gap_fill') {
       const answer = userAnswer.toLowerCase().trim();
-      const correctAnswers = Array.isArray(currentQuestion.correct_answers)
-        ? currentQuestion.correct_answers.map(a => a.toLowerCase().trim())
-        : [];
+      const correctAnswer = currentQuestion.correct_answer?.toLowerCase().trim() || '';
 
-      if (correctAnswers.includes(answer)) {
+      if (correctAnswer && answer === correctAnswer) {
         isCorrect = true;
         feedbackMessage = `✅ Correct! ${currentQuestion.explanation}`;
         feedbackType = 'correct';
@@ -178,11 +164,9 @@ export default function SurvivalMode({ onBack }) {
       }
 
       if (!isCorrect) {
-        const correctAnswer = correctAnswers[0] || 'N/A';
-        feedbackMessage = `❌ Incorrect. The correct answer is: "${correctAnswer}". ${currentQuestion.explanation}`;
+        feedbackMessage = `❌ Incorrect. The correct answer is: "${correctAnswer || 'N/A'}". ${currentQuestion.explanation}`;
       }
 
-      // Track the answer
       saveAnswer(currentQuestion, userAnswer.trim(), isCorrect);
 
     } else if (currentQuestion.type === 'multiple_choice') {
@@ -194,7 +178,6 @@ export default function SurvivalMode({ onBack }) {
         feedbackMessage = `❌ Incorrect. The correct answer is: "${currentQuestion.correct_answer}". ${currentQuestion.explanation}`;
       }
 
-      // Track the answer
       saveAnswer(currentQuestion, selectedOption || '', isCorrect);
     }
 
@@ -222,13 +205,11 @@ export default function SurvivalMode({ onBack }) {
 
     const nextIndex = currentQuestionIndex + 1;
 
-    // Check if we've run out of questions
     if (nextIndex >= questions.length) {
       setStage('finished');
       return;
     }
 
-    // Check for stage transition
     const currentStageInfo = getCurrentStageConfig();
     const nextStageStart = currentStageInfo.stageStart +
       (currentStageInfo.stageIndex === STAGES.length - 1
@@ -236,7 +217,6 @@ export default function SurvivalMode({ onBack }) {
         : STAGES[currentStageInfo.stageIndex].count);
 
     if (nextIndex >= nextStageStart && currentStageInfo.stageIndex < STAGES.length - 1) {
-      // Stage transition!
       const nextStage = STAGES[currentStageInfo.stageIndex + 1];
       setHighestStage(nextStage.name);
       setStageTransition(true);
@@ -299,7 +279,6 @@ export default function SurvivalMode({ onBack }) {
               Intermediate to Advanced. You have <strong>5 lives</strong> — no restarts, no mercy!
             </p>
 
-            {/* Stage preview */}
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -399,13 +378,7 @@ export default function SurvivalMode({ onBack }) {
             maxWidth: '600px',
             margin: '0 auto'
           }}>
-            <div style={{
-              fontSize: '3rem',
-              marginBottom: '1rem',
-              animation: 'pulse 1s ease-in-out infinite'
-            }}>
-              🔥
-            </div>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔥</div>
             <h2 style={{
               fontSize: 'clamp(1.8rem, 6vw, 2.2rem)',
               color: '#2C3E50',
@@ -438,7 +411,6 @@ export default function SurvivalMode({ onBack }) {
         {/* PLAYING SCREEN */}
         {stage === 'playing' && !stageTransition && currentQuestion && (
           <div style={{ width: '100%', maxWidth: '700px', margin: '0 auto' }}>
-            {/* Info Bar */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
@@ -453,7 +425,6 @@ export default function SurvivalMode({ onBack }) {
               <div>Score: {score}</div>
             </div>
 
-            {/* Stage indicator */}
             {stageInfo && (
               <div style={{
                 display: 'flex',
@@ -463,11 +434,7 @@ export default function SurvivalMode({ onBack }) {
                 marginBottom: '1rem'
               }}>
                 {STAGES.map((s, i) => (
-                  <div key={i} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem'
-                  }}>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                     <div style={{
                       width: i === stageInfo.stageIndex ? '28px' : '20px',
                       height: i === stageInfo.stageIndex ? '28px' : '20px',
@@ -495,7 +462,6 @@ export default function SurvivalMode({ onBack }) {
               </div>
             )}
 
-            {/* Question Card */}
             <div style={{
               backgroundColor: 'white',
               padding: 'clamp(1.5rem, 5vw, 2.5rem)',
@@ -505,13 +471,7 @@ export default function SurvivalMode({ onBack }) {
               flexDirection: 'column',
               gap: '1.5rem'
             }}>
-              {/* Question Type + Level/Topic Badges */}
-              <div style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '0.5rem',
-                alignItems: 'center'
-              }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
                 <div style={{
                   padding: '4px 12px',
                   borderRadius: '20px',
@@ -552,7 +512,6 @@ export default function SurvivalMode({ onBack }) {
                 )}
               </div>
 
-              {/* Question Text */}
               <div style={{
                 fontSize: 'clamp(1.15rem, 4vw, 1.4rem)',
                 color: '#2C3E50',
@@ -564,7 +523,6 @@ export default function SurvivalMode({ onBack }) {
                 {currentQuestion.question}
               </div>
 
-              {/* Hint */}
               {showHint && currentQuestion.hint && (
                 <div style={{
                   backgroundColor: '#fff3cd',
@@ -579,7 +537,6 @@ export default function SurvivalMode({ onBack }) {
               )}
 
               <div style={{ flex: 1 }}>
-                {/* GAP FILL */}
                 {currentQuestion.type === 'gap_fill' && !feedback && (
                   <input
                     type="text"
@@ -600,7 +557,6 @@ export default function SurvivalMode({ onBack }) {
                   />
                 )}
 
-                {/* MULTIPLE CHOICE */}
                 {currentQuestion.type === 'multiple_choice' && !feedback && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     {currentQuestion.options.map((option, index) => (
@@ -629,7 +585,6 @@ export default function SurvivalMode({ onBack }) {
                   </div>
                 )}
 
-                {/* FEEDBACK */}
                 {feedback && (
                   <div style={{
                     backgroundColor: feedback.isCorrect ? '#d4edda' : '#f8d7da',
@@ -646,7 +601,6 @@ export default function SurvivalMode({ onBack }) {
                 )}
               </div>
 
-              {/* Buttons */}
               <div style={{ marginTop: '1.5rem' }}>
                 {!feedback && (
                   <button
@@ -734,7 +688,6 @@ export default function SurvivalMode({ onBack }) {
                 questions correct
               </div>
 
-              {/* Stats */}
               <div style={{
                 backgroundColor: '#f5f7fa',
                 padding: 'clamp(1.25rem, 4vw, 1.75rem)',
@@ -770,7 +723,6 @@ export default function SurvivalMode({ onBack }) {
                 </div>
               </div>
 
-              {/* Performance message */}
               <div style={{
                 fontSize: 'clamp(1.2rem, 4vw, 1.4rem)',
                 marginBottom: '2rem',
