@@ -110,12 +110,19 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     })
 
     // ── Recent answers for type breakdown + lastAnswered ──
-    const { data: answers } = await supabase
-      .from('student_answers')
-      .select('student_id, is_correct, question_id, answered_at')
-      .in('student_id', ids)
-      .order('answered_at', { ascending: false })
-      .limit(2000)
+    // Fetch per student so high-volume students can't crowd out everyone else.
+    const activeIds = ids.filter(id => (totalMap[id] || 0) > 0)
+    const answerChunks = await Promise.all(
+      activeIds.map(id =>
+        supabase
+          .from('student_answers')
+          .select('student_id, is_correct, question_id, answered_at')
+          .eq('student_id', id)
+          .order('answered_at', { ascending: false })
+          .limit(400)
+      )
+    )
+    const answers = answerChunks.flatMap(r => r.data || [])
 
     // ── Attempts — only need student_id + completed_at for lastActive; score already handled above ──
     const { data: attempts } = await supabase
