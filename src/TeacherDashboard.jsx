@@ -82,24 +82,34 @@ export default function TeacherDashboard({ profile, handleLogout }) {
 
     const ids = profiles.map(p => p.id)
 
-    // ── Answer counts ──
+    // ── Answer counts (per student, no row limit) ──
     const totalCountsPromises   = ids.map(id =>
       supabase.from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', id)
     )
     const correctCountsPromises = ids.map(id =>
       supabase.from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', id).eq('is_correct', true)
     )
-    const [totalResults, correctResults] = await Promise.all([
+
+    // ── Passed counts: score >= 14 out of 20 = 70% pass mark ──
+    // Each attempt stores a raw score (0–20). No row-limit risk — pure COUNT query per student.
+    const passedCountsPromises = ids.map(id =>
+      supabase.from('student_attempts').select('*', { count: 'exact', head: true }).eq('student_id', id).gte('score', 14)
+    )
+
+    const [totalResults, correctResults, passedResults] = await Promise.all([
       Promise.all(totalCountsPromises),
       Promise.all(correctCountsPromises),
+      Promise.all(passedCountsPromises),
     ])
-    const totalMap = {}, correctMap = {}
+
+    const totalMap = {}, correctMap = {}, passedMap = {}
     ids.forEach((id, i) => {
       totalMap[id]   = totalResults[i].count || 0
       correctMap[id] = correctResults[i].count || 0
+      passedMap[id]  = passedResults[i].count || 0
     })
 
-    // ── Recent answers for type breakdown + answered_at for lastActive ──
+    // ── Recent answers for type breakdown + lastAnswered ──
     const { data: answers } = await supabase
       .from('student_answers')
       .select('student_id, is_correct, question_id, answered_at')
@@ -107,13 +117,13 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       .order('answered_at', { ascending: false })
       .limit(2000)
 
-    // ── Attempts ──
+    // ── Attempts — only need student_id + completed_at for lastActive; score already handled above ──
     const { data: attempts } = await supabase
       .from('student_attempts')
-      .select('student_id, score, completed_at, answers')
+      .select('student_id, completed_at')
       .in('student_id', ids)
       .order('completed_at', { ascending: false })
-      .limit(1000)
+      .limit(2000)
 
     // ── Listening sessions ──
     const { data: listeningSessions } = await supabase
@@ -139,9 +149,9 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       if (questionIds.length > 0) {
         const { data: questions } = await supabase
           .from('question_bank')
-          .select('question_number, type')
-          .in('question_number', questionIds)
-        if (questions) questions.forEach(q => { typeMap[q.question_number] = q.type })
+          .select('id, type')
+          .in('id', questionIds)
+        if (questions) questions.forEach(q => { typeMap[q.id] = q.type })
       }
     }
 
@@ -150,24 +160,23 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     profiles.forEach(p => {
       studentMap[p.id] = {
         ...p,
-        totalAnswers: totalMap[p.id] || 0,
-        correctAnswers: correctMap[p.id] || 0,
+        totalAnswers:      totalMap[p.id]   || 0,
+        correctAnswers:    correctMap[p.id] || 0,
+        lessonsPassed:     passedMap[p.id]  || 0,  // ← from count query, no row-limit issue
         listeningCompleted: listenMap[p.id] || 0,
-        accuracy: 0, lessonsPassed: 0, lastActive: null,
-        lastAnswered: null, lastListened: null, lastAttempt: null,
+        accuracy: 0,
+        lastActive: null, lastAnswered: null, lastListened: null, lastAttempt: null,
         typeStats: {}, bestType: null, worstType: null,
       }
     })
 
-    // ── Track latest answered_at per student ──
+    // ── Track latest answered_at + type breakdown per student ──
     if (answers) {
       answers.forEach(a => {
         const s = studentMap[a.student_id]
         if (!s) return
-        // lastAnswered
         if (!s.lastAnswered || new Date(a.answered_at) > new Date(s.lastAnswered))
           s.lastAnswered = a.answered_at
-        // type breakdown
         const type = typeMap[a.question_id]
         if (type) {
           if (!s.typeStats[type]) s.typeStats[type] = { correct: 0, total: 0 }
@@ -187,25 +196,20 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       })
     }
 
-    // ── Track latest attempt + lessonsPassed ──
+    // ── Track latest attempt per student (for lastActive only) ──
     if (attempts) {
       attempts.forEach(a => {
         const s = studentMap[a.student_id]
         if (!s) return
         if (!s.lastAttempt || new Date(a.completed_at) > new Date(s.lastAttempt))
           s.lastAttempt = a.completed_at
-        const total = a.answers?.total_questions
-        let pct = a.score
-        if (total && total > 0) pct = Math.round((a.score / total) * 100)
-        else if (a.score <= 20) pct = Math.round((a.score / 20) * 100)
-        if (pct >= 70) s.lessonsPassed++
       })
     }
 
-    // ── Derive lastActive from all three sources ──
+    // ── Derive lastActive + accuracy + type rankings ──
     Object.values(studentMap).forEach(s => {
       s.lastActive = latestOf(s.lastAnswered, s.lastListened, s.lastAttempt)
-      s.accuracy = s.totalAnswers > 0 ? Math.round((s.correctAnswers / s.totalAnswers) * 100) : 0
+      s.accuracy   = s.totalAnswers > 0 ? Math.round((s.correctAnswers / s.totalAnswers) * 100) : 0
       const typeEntries = Object.entries(s.typeStats)
         .filter(([, d]) => d.total >= 5)
         .map(([type, d]) => ({ type, pct: Math.round((d.correct / d.total) * 100) }))
@@ -281,9 +285,14 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     if (!s.lastActive) return false
     return (new Date() - new Date(s.lastActive)) < 7 * 24 * 60 * 60 * 1000
   }).length
-  const avgAccuracy    = students.length > 0
-    ? Math.round(students.reduce((sum, s) => sum + s.accuracy, 0) / students.length) : 0
-  const totalQuestions = students.reduce((sum, s) => sum + s.totalAnswers, 0)
+
+  // Weighted class accuracy: total correct / total answered across all students.
+  // (Averaging individual percentages gives a misleading number that barely changes.)
+  const totalQAll   = students.reduce((sum, s) => sum + s.totalAnswers, 0)
+  const totalCAll   = students.reduce((sum, s) => sum + s.correctAnswers, 0)
+  const avgAccuracy = totalQAll > 0 ? Math.round((totalCAll / totalQAll) * 100) : 0
+
+  const totalQuestions = totalQAll
   const totalListening = students.reduce((sum, s) => sum + s.listeningCompleted, 0)
 
   const today = new Date().toISOString().split('T')[0]
