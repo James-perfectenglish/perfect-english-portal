@@ -125,12 +125,11 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const correctAnswers = Array.isArray(question.correct_answers) ? question.correct_answers : JSON.parse(question.correct_answers || '[]');
       await supabase.from('student_answers').insert({
         student_id: user.id,
         question_id: question.question_number,
         student_answer: studentAnswer,
-        correct_answer: correctAnswers[0] || '',
+        correct_answer: question.correct_answer || '',
         is_correct: isCorrect,
         is_soft_pass: isSoftPass
       });
@@ -148,7 +147,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
 
     const q = questions[currentQ];
     const words = q.question.trim().split(/\s+/);
-    const correctAnswers = Array.isArray(q.correct_answers) ? q.correct_answers : JSON.parse(q.correct_answers || '[]');
+    const correctAnswer = q.correct_answer || '';
 
     const originalWord = words[selectedWordIndex];
     const trailingPunct = originalWord.match(/[.,!?;:]+$/)?.[0] || '';
@@ -157,8 +156,8 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
     correctedWords[selectedWordIndex] = cleanCorrection + trailingPunct;
     const correctedSentence = correctedWords.join(' ');
 
-    const isExactMatch = correctAnswers.some(ca => normalise(correctedSentence) === normalise(ca));
-    const errorInfo = findErrorIndex(words, correctAnswers[0]);
+    const isExactMatch = normalise(correctedSentence) === normalise(correctAnswer);
+    const errorInfo = findErrorIndex(words, correctAnswer);
 
     // ✅ FULL PASS — exact match
     if (isExactMatch) {
@@ -192,7 +191,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
       q.question,
       words[selectedWordIndex],
       correction.trim(),
-      correctAnswers[0],
+      correctAnswer,
       lang
     );
     setIsChecking(false);
