@@ -149,10 +149,6 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
 
   const isAnswerCorrect = (q, userAnswer) => {
     const ua = (userAnswer || '').toLowerCase().trim();
-    if (q.type === 'gap_fill') {
-      const correct = q.correct_answers ? (Array.isArray(q.correct_answers) ? q.correct_answers : JSON.parse(q.correct_answers)) : [q.correct_answer];
-      return correct.map(a => a.toLowerCase().trim()).includes(ua);
-    }
     return ua === (q.correct_answer || '').toLowerCase().trim();
   };
 
