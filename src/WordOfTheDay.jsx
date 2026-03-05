@@ -31,7 +31,6 @@ export default function WordOfTheDay({ profile }) {
     let wordData = null
 
     if (isSpanish) {
-      // Spanish-track students: fetch today's Spanish word (level irrelevant)
       const { data } = await supabase
         .from('word_of_the_day')
         .select('*')
@@ -80,7 +79,7 @@ export default function WordOfTheDay({ profile }) {
     if (!wordData) {
       const { data: qbWord } = await supabase
         .from('question_bank')
-        .select('question_number, question, correct_answers, explanation, level')
+        .select('question_number, question, correct_answer, explanation, level')
         .in('level', bucket === 'A1/A2' ? ['A1','A2'] : bucket === 'B1/B2' ? ['B1','B2'] : ['C1','C2'])
         .eq('type', 'multiple_choice')
         .eq('language', 'en')
@@ -88,15 +87,12 @@ export default function WordOfTheDay({ profile }) {
 
       if (qbWord && qbWord.length > 0) {
         const picked = qbWord[Math.floor(Math.random() * qbWord.length)]
-        const answers = Array.isArray(picked.correct_answers)
-          ? picked.correct_answers
-          : JSON.parse(picked.correct_answers || '[]')
         wordData = {
           id: `qb_${picked.question_number}`,
           date: today,
           level: bucket,
           language: 'en',
-          word: answers[0] || '—',
+          word: picked.correct_answer || '—',
           part_of_speech: 'vocabulary',
           definition: picked.explanation || picked.question,
           example_sentence: picked.question,
@@ -154,7 +150,6 @@ export default function WordOfTheDay({ profile }) {
         message: result.feedback || (isCorrect ? 'Great sentence!' : 'Try again — read the definition carefully.')
       })
 
-      // Save to Supabase (only for real word_of_the_day entries, not qb fallbacks)
       if (word.id && !word.id?.toString().startsWith('qb_')) {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
