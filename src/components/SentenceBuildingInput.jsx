@@ -48,6 +48,7 @@ const aiMarkSentence = async (correctAnswer, studentAnswer, language = 'en') => 
  * - onAnswerReady: (hasAnswer: boolean) => void
  * - getCheckFn: (fn) => void
  * - language: 'en' | 'es'  — defaults to 'en'
+ * - allWordsUsed: boolean  — when true, hides "you won't need all the words" hint
  */
 export default function SentenceBuildingInput({
   words = [],
@@ -62,6 +63,7 @@ export default function SentenceBuildingInput({
   onAnswerReady,
   getCheckFn,
   language = 'en',
+  allWordsUsed = false,
 }) {
   const [bankWords, setBankWords] = useState([]);
   const [answerWords, setAnswerWords] = useState([]);
@@ -355,7 +357,9 @@ export default function SentenceBuildingInput({
       <div style={{ marginBottom: '1.25rem' }}>
         <div style={{ fontSize: '0.8rem', fontWeight: '600', color: '#666', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           Word bank
-          <span style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 'normal', color: '#999' }}>{' '}— you won't need all the words</span>
+          {!allWordsUsed && (
+            <span style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 'normal', color: '#999' }}>{' '}— you won't need all the words</span>
+          )}
         </div>
         <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', display: 'flex', flexWrap: 'wrap', minHeight: '50px', backgroundColor: '#fafafa' }}>
           {bankWords.map(word => {
