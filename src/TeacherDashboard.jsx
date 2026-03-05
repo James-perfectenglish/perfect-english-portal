@@ -24,8 +24,7 @@ function formatDate(dateStr) {
   const diff = Math.floor((now - d) / (1000 * 60 * 60 * 24))
   if (diff === 0) return 'Today'
   if (diff === 1) return 'Yesterday'
-  if (diff < 7) return `${diff} days ago`
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
 }
 
 function latestOf(...dates) {
@@ -35,17 +34,18 @@ function latestOf(...dates) {
 }
 
 function exportCSV(students) {
-  const headers = ['Name', 'Level', 'Questions Answered', 'Accuracy %', 'Lessons Passed', 'Listening Done', 'Best Type', 'Worst Type', 'Last Active']
+  const headers = ['Name', 'Level', 'Questions Answered', 'Accuracy %', 'Test ✅', 'Listen ✅', 'Dict ✅', 'Best Type', 'Worst Type', 'Last Active']
   const rows = students.map(s => [
     s.full_name || 'Unknown',
     s.level || '—',
     s.totalAnswers,
     s.accuracy,
-    s.lessonsPassed,
-    s.listeningCompleted || 0,
+    s.testPassed,
+    s.listenPassed,
+    s.dictPassed,
     s.bestType ? (TYPE_INFO[s.bestType]?.label || s.bestType) : '—',
     s.worstType ? (TYPE_INFO[s.worstType]?.label || s.worstType) : '—',
-    s.lastActive ? new Date(s.lastActive).toLocaleDateString('en-GB') : '—'
+    s.lastActive ? new Date(s.lastActive).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'
   ])
   const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })
@@ -93,23 +93,42 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       supabase.from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', id).eq('is_correct', true)
     )
 
-    // ── Passed counts: score >= 14 out of 20 = 70% pass mark ──
-    // Each attempt stores a raw score (0–20). No row-limit risk — pure COUNT query per student.
-    const passedCountsPromises = ids.map(id =>
+    // ── Test passes: student_attempts score >= 14/20 ──
+    const testPassedPromises = ids.map(id =>
       supabase.from('student_attempts').select('*', { count: 'exact', head: true }).eq('student_id', id).gte('score', 14)
     )
 
-    const [totalResults, correctResults, passedResults] = await Promise.all([
+    // ── Listen passes: review stage completed + detail score >= 70% (fetch rows, filter client-side) ──
+    const listenPassPromises = ids.map(id =>
+      supabase.from('listening_sessions')
+        .select('detail_correct, detail_total')
+        .eq('student_id', id)
+        .eq('stage_reached', 'review')
+    )
+
+    // ── Dictation passes: is_correct or is_soft_pass ──
+    const dictPassPromises = ids.map(id =>
+      supabase.from('dictation_sessions').select('*', { count: 'exact', head: true })
+        .eq('student_id', id)
+        .or('is_correct.eq.true,is_soft_pass.eq.true')
+    )
+
+    const [totalResults, correctResults, testPassedResults, listenPassResults, dictPassResults] = await Promise.all([
       Promise.all(totalCountsPromises),
       Promise.all(correctCountsPromises),
-      Promise.all(passedCountsPromises),
+      Promise.all(testPassedPromises),
+      Promise.all(listenPassPromises),
+      Promise.all(dictPassPromises),
     ])
 
-    const totalMap = {}, correctMap = {}, passedMap = {}
+    const totalMap = {}, correctMap = {}, testPassedMap = {}, listenPassMap = {}, dictPassMap = {}
     ids.forEach((id, i) => {
-      totalMap[id]   = totalResults[i].count || 0
-      correctMap[id] = correctResults[i].count || 0
-      passedMap[id]  = passedResults[i].count || 0
+      totalMap[id]      = totalResults[i].count || 0
+      correctMap[id]    = correctResults[i].count || 0
+      testPassedMap[id] = testPassedResults[i].count || 0
+      const listenRows  = listenPassResults[i].data || []
+      listenPassMap[id] = listenRows.filter(r => r.detail_total > 0 && r.detail_correct / r.detail_total >= 0.7).length
+      dictPassMap[id]   = dictPassResults[i].count || 0
     })
 
     // ── Recent answers for type breakdown + lastAnswered ──
@@ -143,14 +162,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       .order('completed_at', { ascending: false })
       .limit(500)
 
-    // Listening completed counts
-    const listenCountsPromises = ids.map(id =>
-      supabase.from('listening_sessions').select('*', { count: 'exact', head: true })
-        .eq('student_id', id).eq('stage_reached', 'review')
-    )
-    const listenResults = await Promise.all(listenCountsPromises)
-    const listenMap = {}
-    ids.forEach((id, i) => { listenMap[id] = listenResults[i].count || 0 })
+
 
     // ── Question type map ──
     let typeMap = {}
@@ -170,10 +182,11 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     profiles.forEach(p => {
       studentMap[p.id] = {
         ...p,
-        totalAnswers:      totalMap[p.id]   || 0,
-        correctAnswers:    correctMap[p.id] || 0,
-        lessonsPassed:     passedMap[p.id]  || 0,  // ← from count query, no row-limit issue
-        listeningCompleted: listenMap[p.id] || 0,
+        totalAnswers:   totalMap[p.id]      || 0,
+        correctAnswers: correctMap[p.id]    || 0,
+        testPassed:     testPassedMap[p.id] || 0,
+        listenPassed:   listenPassMap[p.id] || 0,
+        dictPassed:     dictPassMap[p.id]   || 0,
         accuracy: 0,
         lastActive: null, lastAnswered: null, lastListened: null, lastAttempt: null,
         typeStats: {}, bestType: null, worstType: null,
@@ -303,7 +316,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
   const avgAccuracy = totalQAll > 0 ? Math.round((totalCAll / totalQAll) * 100) : 0
 
   const totalQuestions = totalQAll
-  const totalListening = students.reduce((sum, s) => sum + s.listeningCompleted, 0)
+
 
   const today = new Date().toISOString().split('T')[0]
   const filteredSubs = wotdSubmissions.filter(s => {
@@ -366,7 +379,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
         <SummaryCard emoji="🟢" label="Active This Week"   value={activeThisWeek} />
         <SummaryCard emoji="🎯" label="Class Accuracy"     value={`${avgAccuracy}%`} />
         <SummaryCard emoji="📊" label="Questions Answered" value={totalQuestions.toLocaleString()} />
-        <SummaryCard emoji="🎧" label="Listening Sessions" value={totalListening} />
       </div>
 
       {/* PUBLIC MODE */}
@@ -415,8 +427,9 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                   ['level',              'Level'],
                   ['totalAnswers',       'Questions'],
                   ['accuracy',          'Accuracy'],
-                  ['lessonsPassed',     'Passed'],
-                  ['listeningCompleted','🎧 Listening'],
+                  ['testPassed',   'Test ✅'],
+                  ['listenPassed', 'Listen ✅'],
+                  ['dictPassed',   'Dict ✅'],
                   ['bestType',          'Best Type'],
                   ['worstType',         'Worst Type'],
                   ['lastActive',        'Last Active'],
@@ -434,7 +447,10 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                   <td style={{ padding: '0.6rem 0.75rem', fontWeight: '600', color: '#2C3E50' }}>{s.full_name || '—'}</td>
                   <td style={{ padding: '0.6rem 0.75rem' }}>
                     {s.level ? (
-                      <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: '700', background: s.level?.startsWith('A') ? '#c6f6d5' : s.level?.startsWith('B') ? '#bee3f8' : '#fbd38d', color: s.level?.startsWith('A') ? '#276749' : s.level?.startsWith('B') ? '#2a69ac' : '#744210' }}>{s.level}</span>
+                      <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: '700',
+                        background: s.level === 'Spanish' ? '#fff0f0' : s.level?.startsWith('A') ? '#c6f6d5' : s.level?.startsWith('B') ? '#bee3f8' : '#fbd38d',
+                        color:      s.level === 'Spanish' ? '#e53e3e' : s.level?.startsWith('A') ? '#276749' : s.level?.startsWith('B') ? '#2a69ac' : '#744210'
+                      }}>{s.level === 'Spanish' ? 'ES' : s.level}</span>
                     ) : '—'}
                   </td>
                   <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568' }}>{s.totalAnswers.toLocaleString()}</td>
@@ -443,8 +459,9 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                       {s.totalAnswers > 0 ? `${s.accuracy}%` : '—'}
                     </span>
                   </td>
-                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568' }}>{s.lessonsPassed}</td>
-                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568' }}>{s.listeningCompleted || '—'}</td>
+                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568', textAlign: 'center' }}>{s.testPassed || '—'}</td>
+                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568', textAlign: 'center' }}>{s.listenPassed || '—'}</td>
+                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568', textAlign: 'center' }}>{s.dictPassed || '—'}</td>
                   <td style={{ padding: '0.6rem 0.75rem', color: '#38a169', fontSize: '0.8rem' }}>
                     {s.bestType ? `${TYPE_INFO[s.bestType]?.emoji || ''} ${TYPE_INFO[s.bestType]?.label || s.bestType}` : '—'}
                   </td>
