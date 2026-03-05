@@ -149,9 +149,9 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       if (questionIds.length > 0) {
         const { data: questions } = await supabase
           .from('question_bank')
-          .select('id, type')
-          .in('id', questionIds)
-        if (questions) questions.forEach(q => { typeMap[q.id] = q.type })
+          .select('question_number, type')
+          .in('question_number', questionIds)
+        if (questions) questions.forEach(q => { typeMap[q.question_number] = q.type })
       }
     }
 
