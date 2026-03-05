@@ -201,17 +201,11 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const correctAnswers = Array.isArray(question.correct_answers)
-        ? question.correct_answers
-        : JSON.parse(question.correct_answers || '[]');
-      const correctAnswer = question.type === 'multiple_choice'
-        ? (question.correct_answer || correctAnswers[0] || '')
-        : (correctAnswers[0] || '');
       await supabase.from('student_answers').insert({
         student_id: user.id,
         question_id: question.question_number,
         student_answer: studentAnswer,
-        correct_answer: correctAnswer,
+        correct_answer: question.correct_answer || '',
         is_correct: isCorrect,
       });
     } catch (error) {
@@ -305,11 +299,10 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
     if (currentQuestion.type === 'gap_fill') {
       const answer = userAnswer.toLowerCase().trim();
-      const correctAnswers = Array.isArray(currentQuestion.correct_answers)
-        ? currentQuestion.correct_answers.map(a => a.toLowerCase().trim())
-        : [];
+      const correctAnswer = currentQuestion.correct_answer?.toLowerCase().trim() || '';
+      const correctAnswers = [correctAnswer];
 
-      if (correctAnswers.includes(answer)) {
+      if (correctAnswer && answer === correctAnswer) {
         isCorrect = true;
         feedbackType = 'correct';
       }
@@ -344,7 +337,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         const lang = getQuestionLanguage(currentQuestion);
         const aiResult = await aiMarkGapFill(
           currentQuestion.question,
-          correctAnswers[0] || '',
+          correctAnswer,
           userAnswer.trim(),
           lang
         );
@@ -361,16 +354,13 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         type: feedbackType,
         isCorrect,
         studentAnswer: userAnswer.trim(),
-        correctAnswer: correctAnswers[0] || 'N/A',
+        correctAnswer: correctAnswer || 'N/A',
         explanation,
       });
       saveAnswer(currentQuestion, userAnswer.trim(), isCorrect);
 
     } else if (currentQuestion.type === 'multiple_choice') {
-      const correctAnswers = Array.isArray(currentQuestion.correct_answers)
-        ? currentQuestion.correct_answers
-        : JSON.parse(currentQuestion.correct_answers || '[]');
-      const mcCorrect = currentQuestion.correct_answer || correctAnswers[0] || '';
+      const mcCorrect = currentQuestion.correct_answer || '';
       if (selectedOption === mcCorrect) {
         isCorrect = true;
         feedbackType = 'correct';
@@ -393,10 +383,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     if (feedback) return;
     setOooSelected(option);
     const cq = questions[currentQuestionIndex];
-    const correctAnswers = Array.isArray(cq.correct_answers)
-      ? cq.correct_answers
-      : JSON.parse(cq.correct_answers || '[]');
-    const oddOne = correctAnswers[0] || '';
+    const oddOne = cq.correct_answer || '';
     const isCorrect = option.toLowerCase().trim() === oddOne.toLowerCase().trim();
     const feedbackMessage = isCorrect
       ? `✅ Correct! "${oddOne}" is the odd one out. ${cq.explanation || ''}`
@@ -416,17 +403,15 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     if (ecSelectedWordIndex === null || !ecCorrection.trim() || isChecking) return;
     const cq = questions[currentQuestionIndex];
     const words = cq.question.trim().split(/\s+/);
-    const correctAnswers = Array.isArray(cq.correct_answers)
-      ? cq.correct_answers
-      : JSON.parse(cq.correct_answers || '[]');
+    const correctAnswer = cq.correct_answer || '';
     const correctedWords = [...words];
     const originalWord = words[ecSelectedWordIndex];
     const trailingPunct = originalWord.match(/[.,!?;:]+$/)?.[0] || '';
     const cleanCorrection = ecCorrection.trim().replace(/[.,!?;:]+$/, '');
     correctedWords[ecSelectedWordIndex] = cleanCorrection + trailingPunct;
     const correctedSentence = correctedWords.join(' ');
-    const isExactMatch = correctAnswers.some(ca => normaliseEC(correctedSentence) === normaliseEC(ca));
-    const errorInfo = findErrorIndex(words, correctAnswers[0]);
+    const isExactMatch = normaliseEC(correctedSentence) === normaliseEC(correctAnswer);
+    const errorInfo = findErrorIndex(words, correctAnswer);
 
     if (isExactMatch) {
       setFeedback({
@@ -447,7 +432,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       cq.question,
       words[ecSelectedWordIndex],
       ecCorrection.trim(),
-      correctAnswers[0],
+      correctAnswer,
       lang
     );
     setIsChecking(false);
@@ -482,10 +467,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setScore(s => s + 1);
       saveAnswer(cq, userAnswer || '(correct)', true);
     } else {
-      const correctSentences = Array.isArray(cq.correct_answers)
-        ? cq.correct_answers
-        : JSON.parse(cq.correct_answers || '[]');
-      const displaySentence = (correctSentences[0] || '').replace(/ ([.,?!;:])/g, '$1').replace(/^(\w)/, m => m.toUpperCase());
+      const displaySentence = (cq.correct_answer || '').replace(/ ([.,?!;:])/g, '$1').replace(/^(\w)/, m => m.toUpperCase());
       const msg = `❌ Not quite. The correct answer is: "${displaySentence}" — ${cq.explanation || ''}`;
       setSbFeedback({ correct: false, message: msg });
       setFeedback({ message: msg, type: 'incorrect', isCorrect: false });
@@ -507,15 +489,12 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const getSbProps = (question) => {
     if (!question) return {};
     const options = Array.isArray(question.options) ? question.options : JSON.parse(question.options || '[]');
-    const correctSentences = Array.isArray(question.correct_answers)
-      ? question.correct_answers
-      : JSON.parse(question.correct_answers || '[]');
     const hasPrompt = question.question && question.question.trim() !== '';
     return {
       words: options,
       questionType: hasPrompt ? 'translation' : 'build',
       prompt: hasPrompt ? question.question : null,
-      correctSentences,
+      correctSentences: [question.correct_answer || ''],
       explanation: question.explanation || '',
     };
   };
