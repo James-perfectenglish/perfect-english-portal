@@ -51,11 +51,11 @@ function parseJsonField(val) {
 const MODES = {
   easy: {
     label: "Easy",
-    emoji: "🟢",
-    sub: "Artist shown · 2 pts max",
-    border: "#16a34a",
-    bg: "#dcfce7",
-    text: "#15803d",
+    emoji: "🌱",
+    sub: "You can see the name of the artist, but what is the lyric and what is the name of the song?",
+    border: "#48bb78",
+    bg: "#f0fff4",
+    text: "#276749",
     lyricPts: 1,
     maxPts: 2,
     showArtist: true,
@@ -63,11 +63,11 @@ const MODES = {
   },
   medium: {
     label: "Medium",
-    emoji: "🟡",
-    sub: "No hints · 3 pts max",
-    border: "#ca8a04",
-    bg: "#fef9c3",
-    text: "#a16207",
+    emoji: "📘",
+    sub: "What is the lyric, what is the name of the song, and who sang it?",
+    border: "#4299e1",
+    bg: "#ebf8ff",
+    text: "#2b6cb0",
     lyricPts: 1,
     maxPts: 3,
     showArtist: false,
@@ -75,11 +75,11 @@ const MODES = {
   },
   hard: {
     label: "Hard",
-    emoji: "🔴",
-    sub: "Extra words · lyric worth 2 pts · 4 pts max",
-    border: "#dc2626",
-    bg: "#fee2e2",
-    text: "#b91c1c",
+    emoji: "🎓",
+    sub: "What is the lyric, what is the name of the song, and who sang it? Extra words included to make it even harder...",
+    border: "#ed8936",
+    bg: "#fffaf0",
+    text: "#c05621",
     lyricPts: 2,
     maxPts: 4,
     showArtist: false,
@@ -99,8 +99,8 @@ const S = {
   header: {
     background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
     color: "white",
-    padding: "2.5rem 1.5rem 1.5rem",
-    borderRadius: "0 0 20px 20px",
+    padding: "2.5rem 2rem 2rem",
+    borderRadius: "12px",
     marginBottom: "1.5rem",
     textAlign: "center",
   },
@@ -344,7 +344,7 @@ export default function LyricsExercise({ user }) {
     return (
       <div style={S.page}>
         <div style={S.header}>
-          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>🎵 Lyrics Mixer</h1>
+          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>🎤 Lyrics Mixer</h1>
           <p style={{ margin: "8px 0 0", opacity: 0.9 }}>Rearrange the words, then guess the song</p>
         </div>
         <div style={S.inner}>
@@ -362,8 +362,14 @@ export default function LyricsExercise({ user }) {
               onMouseEnter={e => { if (!loading) e.currentTarget.style.transform = "translateY(-1px)"; }}
               onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}
             >
-              <div style={{ fontSize: "20px", fontWeight: "700", color: "#1e293b" }}>{m.emoji} {m.label}</div>
-              <div style={{ fontSize: "14px", color: "#64748b", marginTop: "4px" }}>{m.sub}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                <span style={{ fontSize: "1.5rem" }}>{m.emoji}</span>
+                <span style={{ fontSize: "18px", fontWeight: "700", color: "#2d3748" }}>{m.label}</span>
+                <span style={{ background: m.border, color: "white", padding: "2px 10px", borderRadius: "20px", fontSize: "0.78rem", fontWeight: 600, marginLeft: "2px" }}>
+                  {key === "easy" ? "2 pts max" : key === "medium" ? "3 pts max" : "4 pts max"}
+                </span>
+              </div>
+              <div style={{ fontSize: "13px", color: "#4a5568", lineHeight: 1.5 }}>{m.sub}</div>
             </div>
           ))}
           {loading && <div style={{ textAlign: "center", color: "#64748b", padding: "16px" }}>Loading songs...</div>}
@@ -379,7 +385,7 @@ export default function LyricsExercise({ user }) {
       <div style={S.page}>
         <div style={S.header}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
-            <h1 style={{ margin: 0, fontSize: "1.8rem" }}>🎵 Lyrics Mixer</h1>
+            <h1 style={{ margin: 0, fontSize: "1.8rem" }}>🎤 Lyrics Mixer</h1>
             <div style={{ background: "rgba(255,255,255,0.2)", borderRadius: "20px", padding: "4px 12px", fontSize: "13px", whiteSpace: "nowrap" }}>
               {idx + 1} / {exercises.length}
             </div>
@@ -441,7 +447,7 @@ export default function LyricsExercise({ user }) {
     return (
       <div style={S.page}>
         <div style={S.header}>
-          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>🎵 Lyrics Mixer</h1>
+          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>🎤 Lyrics Mixer</h1>
           <div style={{ marginTop: "8px" }}><ModeBadge mode={mode} /></div>
           <div style={{ marginTop: "6px", fontSize: "13px", opacity: 0.85 }}>Round {idx + 1} / {exercises.length}</div>
         </div>
@@ -499,7 +505,7 @@ export default function LyricsExercise({ user }) {
     return (
       <div style={S.page}>
         <div style={S.header}>
-          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>🎵 Lyrics Mixer</h1>
+          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>🎤 Lyrics Mixer</h1>
           <div style={{ marginTop: "8px" }}><ModeBadge mode={mode} /></div>
           <div style={{ marginTop: "6px", fontSize: "13px", opacity: 0.85 }}>Round {idx + 1} / {exercises.length}</div>
         </div>
@@ -553,7 +559,7 @@ export default function LyricsExercise({ user }) {
     return (
       <div style={S.page}>
         <div style={S.header}>
-          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>🎵 Lyrics Mixer</h1>
+          <h1 style={{ margin: 0, fontSize: "1.8rem" }}>🎤 Lyrics Mixer</h1>
           <div style={{ marginTop: "8px" }}><ModeBadge mode={mode} /></div>
           <div style={{ marginTop: "6px", fontSize: "13px", opacity: 0.85 }}>Round {idx + 1} of {exercises.length}</div>
         </div>
