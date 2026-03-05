@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
 // Exercises
@@ -27,7 +27,7 @@ const ACTIVE_EXERCISES = new Set([
   'Spanish Vocabulary', 'Irregular Verbs Flashcards', 'Essential Phrasal Verbs',
   'Sentence Building', 'Listening Exercises', 'Dictation', 'Borrás Flashcards', 'Borrás Memory Game',
   'Hotel Flashcards', 'Hotel Memory Game', 'Odd One Out', 'Error Correction',
-  'Matching', 'Sentence Auction',
+  'Matching', 'Sentence Auction', 'Lyrics Mixer',
 ])
 
 const EXERCISE_ICONS = {
@@ -48,6 +48,7 @@ const EXERCISE_ICONS = {
   'Error Correction':           '🚨',
   'Matching':                   '🔗',
   'Sentence Auction':           '🏛️',
+  'Lyrics Mixer':               '🎤',
 }
 
 const TABS = [
@@ -82,6 +83,7 @@ export default function ExerciseList({ userLevel, userTracks = [], isTeacher = f
   const [hasNewListening, setHasNewListening] = useState(false)
 
   const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => { setActiveExercise(null) }, [location.key])
   useEffect(() => { fetchAll() }, [userTracks])
@@ -114,13 +116,11 @@ export default function ExerciseList({ userLevel, userTracks = [], isTeacher = f
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    // All listenings available to this student
     let q = supabase.from('listening_exercises').select('id')
     if (userTracks && userTracks.length > 0) q = q.overlaps('tracks', userTracks)
     const { data: available } = await q
     if (!available || available.length === 0) return
 
-    // Listenings they've completed at least once
     const { data: sessions } = await supabase
       .from('listening_sessions')
       .select('exercise_id')
@@ -144,6 +144,10 @@ export default function ExerciseList({ userLevel, userTracks = [], isTeacher = f
   const startExercise = (exercise) => {
     if (!ACTIVE_EXERCISES.has(exercise.title)) return
     recordOpen(exercise.title)
+    if (exercise.title === 'Lyrics Mixer') {
+      navigate('/lyrics')
+      return
+    }
     setActiveExercise(exercise)
   }
 
