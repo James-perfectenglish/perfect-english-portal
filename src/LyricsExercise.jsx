@@ -252,10 +252,11 @@ export default function LyricsExercise({ user }) {
     const score = (lo ? cfg.lyricPts : 0) + (so ? 1 : 0) + (bo ? 1 : 0);
     const newHistory = [...history, { exercise: ex, lyricsOk: lo, songOk: so, bandOk: bo, score, lyricPts: cfg.lyricPts }];
     setHistory(newHistory);
-    supabase.from("lyrics_sessions").insert({
+    const { error: sessionErr } = await supabase.from("lyrics_sessions").insert({
       student_id: user.id, exercise_id: ex.id, difficulty: mode,
       lyrics_correct: lo, guessed_song: so, guessed_band: bo, score,
     });
+    if (sessionErr) console.error("lyrics_sessions insert error:", sessionErr);
     setPhase("result");
   }
 
