@@ -65,8 +65,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
       setScore(s => s + 1);
       setFeedback({ correct: true, message: `✅ Correct! ${q.explanation || ''}` });
     } else {
-      const correctSentences = Array.isArray(q.correct_answers) ? q.correct_answers : JSON.parse(q.correct_answers || '[]');
-      const displaySentence = (correctSentences[0] || '').replace(/ ([.,?!;:])/g, '$1').replace(/^(\w)/, m => m.toUpperCase());
+      const displaySentence = (q.correct_answer || '').replace(/ ([.,?!;:])/g, '$1').replace(/^(\w)/, m => m.toUpperCase());
       setFeedback({ correct: false, message: `❌ Not quite. The correct answer is: "${displaySentence}" — ${q.explanation || ''}` });
     }
   };
@@ -94,9 +93,14 @@ export default function SentenceBuilding({ onBack, onComplete }) {
   const getQuestionProps = (question) => {
     if (!question) return {};
     const options = Array.isArray(question.options) ? question.options : JSON.parse(question.options || '[]');
-    const correctSentences = Array.isArray(question.correct_answers) ? question.correct_answers : JSON.parse(question.correct_answers || '[]');
     const hasPrompt = question.question && question.question.trim() !== '';
-    return { words: options, questionType: hasPrompt ? 'translation' : 'build', prompt: hasPrompt ? question.question : null, correctSentences, explanation: question.explanation || '' };
+    return {
+      words: options,
+      questionType: hasPrompt ? 'translation' : 'build',
+      prompt: hasPrompt ? question.question : null,
+      correctSentences: [question.correct_answer || ''],
+      explanation: question.explanation || ''
+    };
   };
 
   // =============================================
@@ -200,7 +204,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
             <div style={{ border: '2px solid #e2e8f0', borderRadius: '8px', padding: '1.5rem', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
                 {q.level && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: q.level.startsWith('A') ? '#276749' : q.level.startsWith('B') ? '#2b6cb0' : '#c05621' }}>{q.level}</div>}
-                {q.topic && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#e8daef', color: '#6c3483' }}>{q.topic.replace(/_/g, ' ').replace(/\w/g, c => c.toUpperCase())}</div>}
+                {q.topic && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#e8daef', color: '#6c3483' }}>{q.topic.replace(/_/g, ' ').replace(/\w/g, c => c.toUpperCase())}</div>}
               </div>
               <SentenceBuildingInput key={currentQ} {...getQuestionProps(q)} disabled={!!feedback} onResult={handleResult} feedback={feedback} showCheckButton={true} onAnswerReady={setHasAnswer} />
               {feedback && (
