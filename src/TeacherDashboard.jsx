@@ -7,6 +7,9 @@ const TYPE_INFO = {
   sentence_building: { label: 'Sentence Building', emoji: '🧩' },
   odd_one_out:       { label: 'Odd One Out',        emoji: '🔍' },
   error_correction:  { label: 'Error Correction',  emoji: '🚨' },
+  matching:          { label: 'Matching',           emoji: '🔗' },
+  sentence_auction:  { label: 'Sentence Auction',  emoji: '🔨' },
+  dictation:         { label: 'Dictation',          emoji: '🎧' },
 }
 
 function initials(name) {
