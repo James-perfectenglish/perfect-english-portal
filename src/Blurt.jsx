@@ -387,7 +387,7 @@ export default function Blurt({ user }) {
                     marginBottom: '0.2rem',
                   }}
                 >
-                  Blurt!
+                  Timed Categories
                 </div>
                 <div style={{ color: 'white', fontWeight: 700, fontSize: '1.1rem' }}>
                   {selected?.name}
@@ -867,18 +867,110 @@ export default function Blurt({ user }) {
   }
 
   // ── SELECT ─────────────────────────────────────────────────────────
+  // ── SELECT ─────────────────────────────────────────────────────────
   const general = categories.filter((c) => c.track === 'general');
   const tracked = categories.filter(
     (c) => c.track === 'hotels' || c.track === 'borras'
   );
   const fun = categories.filter((c) => c.track === 'fun');
 
-  if (!categories.length) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          backgroundColor: '#f8f9fa',
-          display: 'flex',
-          alignItems: 'center',
-          
+  const CategoryCard = ({ cat }) => (
+    <div
+      onClick={() => pickCategory(cat)}
+      style={{
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        padding: '1rem',
+        cursor: 'pointer',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+        border: '1.5px solid #e8e8f0',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.3rem',
+        transition: 'box-shadow 0.15s, border-color 0.15s',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(102,126,234,0.2)'; e.currentTarget.style.borderColor = '#667eea'; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.07)'; e.currentTarget.style.borderColor = '#e8e8f0'; }}
+    >
+      <div style={{ fontSize: '1.5rem' }}>{cat.emoji || '📂'}</div>
+      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2d3748', lineHeight: 1.3 }}>{cat.name}</div>
+      {cat.penalty_type && (
+        <div style={{ fontSize: '0.68rem', color: '#c53030', fontWeight: 600 }}>⚠️ Penalty round</div>
+      )}
+    </div>
+  );
+
+  const SectionHeading = ({ children }) => (
+    <div style={{
+      fontSize: '0.7rem', fontWeight: 700, color: '#a0aec0',
+      textTransform: 'uppercase', letterSpacing: 1,
+      padding: '0.5rem 0 0.25rem',
+    }}>
+      {children}
+    </div>
+  );
+
+  return (
+    <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh', padding: '1rem' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #667eea, #764ba2)',
+          borderRadius: '12px',
+          padding: '2.5rem 2rem 2rem',
+          marginBottom: '1rem',
+          color: 'white',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
+            <span style={{ fontSize: '2rem' }}>⏱️</span>
+            <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 700 }}>Blurt!</h1>
+          </div>
+          <p style={{ margin: 0, opacity: 0.9, fontSize: '0.95rem' }}>
+            How many can you name in 60 seconds?
+          </p>
+        </div>
+
+        {/* Category grid */}
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          padding: '1.5rem',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
+        }}>
+          {tracked.length > 0 && (
+            <>
+              <SectionHeading>⭐️ For You</SectionHeading>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+                {tracked.map(c => <CategoryCard key={c.id} cat={c} />)}
+              </div>
+            </>
+          )}
+
+          {general.length > 0 && (
+            <>
+              <SectionHeading>General English</SectionHeading>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+                {general.map(c => <CategoryCard key={c.id} cat={c} />)}
+              </div>
+            </>
+          )}
+
+          {fun.length > 0 && (
+            <>
+              <SectionHeading>Just for Fun</SectionHeading>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem' }}>
+                {fun.map(c => <CategoryCard key={c.id} cat={c} />)}
+              </div>
+            </>
+          )}
+
+          {categories.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#a0aec0' }}>
+              Loading categories...
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
