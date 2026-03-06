@@ -100,20 +100,20 @@ export default function Blurt({ user }) {
     fetchCategories(data?.tracks || []);
   }
 
-  async function fetchCategories(tracks) {
+  async function fetchCategories(userTracks) {
     const { data } = await supabase
       .from('blurt_categories')
       .select('*')
-      .order('display_order');
+      .order('sort_order');
     if (!data) return;
     setCategories(
-      data.filter(
-        (c) =>
-          c.track === 'general' ||
-          c.track === 'fun' ||
-          (c.track === 'hotels' && tracks.includes('hotels')) ||
-          (c.track === 'borras' && tracks.includes('bathroom'))
-      )
+      data.filter((c) => {
+        const catTracks = c.tracks || ['general'];
+        if (catTracks.includes('general')) return true;
+        if (catTracks.includes('hotels') && userTracks.includes('hotels')) return true;
+        if (catTracks.includes('bathroom') && userTracks.includes('bathroom')) return true;
+        return false;
+      })
     );
   }
 
@@ -868,11 +868,18 @@ export default function Blurt({ user }) {
 
   // ── SELECT ─────────────────────────────────────────────────────────
   // ── SELECT ─────────────────────────────────────────────────────────
-  const general = categories.filter((c) => c.track === 'general');
-  const tracked = categories.filter(
-    (c) => c.track === 'hotels' || c.track === 'borras'
-  );
-  const fun = categories.filter((c) => c.track === 'fun');
+  const general = categories.filter((c) => {
+    const t = c.tracks || [];
+    return t.includes('general') && !t.includes('hotels') && !t.includes('bathroom') && c.sort_order <= 10;
+  });
+  const tracked = categories.filter((c) => {
+    const t = c.tracks || [];
+    return t.includes('hotels') || t.includes('bathroom');
+  });
+  const fun = categories.filter((c) => {
+    const t = c.tracks || [];
+    return t.includes('general') && !t.includes('hotels') && !t.includes('bathroom') && c.sort_order >= 17;
+  });
 
   const CategoryCard = ({ cat }) => (
     <div
@@ -920,8 +927,9 @@ export default function Blurt({ user }) {
           padding: '2.5rem 2rem 2rem',
           marginBottom: '1rem',
           color: 'white',
+          textAlign: 'center',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
             <span style={{ fontSize: '2rem' }}>⏱️</span>
             <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 700 }}>Blurt!</h1>
           </div>
