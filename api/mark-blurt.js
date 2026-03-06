@@ -13,13 +13,14 @@ export default async function handler(req, res) {
     ? `\nPENALTY RULE: The penalty category is "${penaltyCategoryName}". If an answer clearly belongs to "${penaltyCategoryName}" rather than "${categoryName}", set penalty=true AND accepted=false. This deducts a point.`
     : '';
 
-  const prompt = `You are scoring a fast-paced vocabulary game for adult English language learners. The category is: "${categoryName}".
+  const prompt = `You are scoring a fast-paced vocabulary game for adult language learners. The category is: "${categoryName}".
 
 SCORING INSTRUCTIONS:
 ${scoringInstructions}${penaltyBlock}
 
 GENERAL RULES:
 - Be generous. Accept correct answers even if informally spelled or creatively phrased.
+- Answers may be in English or Spanish depending on the category — accept whichever language the category requires.
 - Swear words and rude answers are fine if they genuinely fit the category.
 - Duplicates (same answer submitted twice) should only be counted once — mark the second occurrence accepted=false with note="Already counted".
 - For the note field: keep it very short (max 8 words). Only add a note for: wrong answers, penalties, the James bonus, or something genuinely funny or interesting. Leave note as empty string for plain correct answers.
