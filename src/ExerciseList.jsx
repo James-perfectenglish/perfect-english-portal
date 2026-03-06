@@ -27,7 +27,7 @@ const ACTIVE_EXERCISES = new Set([
   'Spanish Vocabulary', 'Irregular Verbs Flashcards', 'Essential Phrasal Verbs',
   'Sentence Building', 'Listening Exercises', 'Dictation', 'Borrás Flashcards', 'Borrás Memory Game',
   'Hotel Flashcards', 'Hotel Memory Game', 'Odd One Out', 'Error Correction',
-  'Matching', 'Sentence Auction', 'Lyrics Mixer',
+  'Matching', 'Sentence Auction', 'Lyrics Mixer', 'Blurt!',
 ])
 
 const EXERCISE_ICONS = {
@@ -49,6 +49,7 @@ const EXERCISE_ICONS = {
   'Matching':                   '🔗',
   'Sentence Auction':           '🏛️',
   'Lyrics Mixer':               '🎤',
+  'Blurt!':                     '⏱️',
 }
 
 const TABS = [
@@ -146,6 +147,10 @@ export default function ExerciseList({ userLevel, userTracks = [], isTeacher = f
     recordOpen(exercise.title)
     if (exercise.title === 'Lyrics Mixer') {
       navigate('/lyrics')
+      return
+    }
+    if (exercise.type === 'blurt') {
+      navigate('/blurt')
       return
     }
     setActiveExercise(exercise)

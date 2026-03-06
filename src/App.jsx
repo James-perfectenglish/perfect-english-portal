@@ -9,6 +9,7 @@ import PracticePage from './components/PracticePage'
 import StudentDashboard from './StudentDashboard'
 import TeacherDashboard from './TeacherDashboard'
 import LyricsExercise from './LyricsExercise'
+import Blurt from './Blurt'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -98,6 +99,7 @@ function Dashboard({ session }) {
         <Route path="/practice"  element={<PracticePageWrapper profile={profile} />} />
         <Route path="/exercises" element={<ExercisesPage profile={profile} />} />
         <Route path="/lyrics"    element={<LyricsExercise user={session.user} />} />
+        <Route path="/blurt"     element={<Blurt user={session.user} />} />
         <Route path="/teacher"   element={profile?.is_teacher ? <TeacherDashboard profile={profile} handleLogout={handleLogout} /> : <Navigate to="/" />} />
       </Routes>
     </div>
