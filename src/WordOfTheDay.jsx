@@ -150,10 +150,11 @@ export default function WordOfTheDay({ profile }) {
 
   const fetchCommunity = async (wordId) => {
     if (!wordId || wordId?.toString().startsWith('qb_')) return
+    const today = new Date().toISOString().split('T')[0]
     const { data } = await supabase
       .from('wotd_community_sentences')
       .select('sentence, level')
-      .eq('word_id', wordId)
+      .eq('word_date', today)
 
     if (data && data.length >= 1) {
       setCommunity(shuffleArray(data).slice(0, 8))
@@ -399,7 +400,7 @@ export default function WordOfTheDay({ profile }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.85rem' }}>
             <span style={{ fontSize: '1rem' }}>💬</span>
             <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#718096', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-              What students wrote today
+              What people have written today
             </span>
             <span style={{ fontSize: '0.75rem', color: '#a0aec0', marginLeft: 'auto' }}>
               {community.length} sentence{community.length !== 1 ? 's' : ''}
