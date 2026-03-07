@@ -66,7 +66,7 @@ function getRecommendation(profile, attempts, studentTracks) {
   }
 }
 
-export default function StudentDashboard({ profile, session, handleLogout }) {
+export default function StudentDashboard({ profile, session, handleLogout, globalLang, onToggleLang, onBrowseClick, onTeacherClick }) {
   const [stats, setStats] = useState(null)
   const [attempts, setAttempts] = useState([])
   const [typeBreakdown, setTypeBreakdown] = useState({})
@@ -85,13 +85,11 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
   async function fetchDashboardData() {
     const userId = session.user.id
 
-    // ── 1. Get total answer count (no row limit problem) ──
     const { count: totalCount } = await supabase
       .from('student_answers')
       .select('*', { count: 'exact', head: true })
       .eq('student_id', userId)
 
-    // ── 2. Get correct answer count ──
     const { count: correctCount } = await supabase
       .from('student_answers')
       .select('*', { count: 'exact', head: true })
@@ -104,7 +102,6 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
       setStats({ total: 0, correct: 0, accuracy: 0 })
     }
 
-    // ── 3. Get recent answers for type breakdown + activity dates ──
     const { data: recentAnswers } = await supabase
       .from('student_answers')
       .select('is_correct, question_id, answered_at')
@@ -137,7 +134,6 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
       }
     }
 
-    // ── 4. Get attempts ──
     const { data: attemptData } = await supabase
       .from('student_attempts')
       .select('score, completed_at, answers')
@@ -152,17 +148,15 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
       }))
       setLessonsPassed(normalised.filter(a => a.scorePercent >= 70).length)
 
-      // Count distinct days from both attempts AND individual answers for accuracy
       const attemptDays = normalised.map(a => new Date(a.completed_at).toDateString())
       const answerDays = (recentAnswers || []).map(a => new Date(a.answered_at).toDateString())
       setDaysStudied(new Set([...attemptDays, ...answerDays]).size)
-      setAttempts([...normalised].reverse()) // chronological for chart
+      setAttempts([...normalised].reverse())
     } else if (recentAnswers && recentAnswers.length > 0) {
       const answerDays = recentAnswers.map(a => new Date(a.answered_at).toDateString())
       setDaysStudied(new Set(answerDays).size)
     }
 
-    // ── 5. Get completed listening sessions ──
     const { count: listenCount } = await supabase
       .from('listening_sessions')
       .select('*', { count: 'exact', head: true })
@@ -197,17 +191,23 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
           </p>
         </div>
         {profile.is_teacher && (
-          <button
-            onClick={() => navigate('/teacher')}
-            title="Teacher Dashboard"
-            style={{
-              background: 'linear-gradient(135deg, #667eea, #764ba2)',
-              border: 'none', borderRadius: '10px', width: '42px', height: '42px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '1.2rem', cursor: 'pointer', flexShrink: 0,
-              boxShadow: '0 2px 8px rgba(102,126,234,0.4)',
-            }}
-          >👨‍🏫</button>
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            {onToggleLang && (
+              <button onClick={onToggleLang} title="Toggle language" style={{ height: '34px', width: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {globalLang === 'en' ? '🇬🇧' : '🇪🇸'}
+              </button>
+            )}
+            {onBrowseClick && (
+              <button onClick={onBrowseClick} title="Browse questions" style={{ height: '34px', padding: '0 10px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, color: '#2d3748', whiteSpace: 'nowrap' }}>
+                🔍 Browse
+              </button>
+            )}
+            {onTeacherClick && (
+              <button onClick={onTeacherClick} title="Teacher Dashboard" style={{ height: '34px', width: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                👨‍🏫
+              </button>
+            )}
+          </div>
         )}
       </div>
 

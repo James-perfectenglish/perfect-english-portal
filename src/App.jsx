@@ -107,7 +107,7 @@ function Dashboard({ session }) {
 
       {/* ROUTES */}
       <Routes>
-        <Route path="/" element={<StudentDashboard profile={profile} session={session} handleLogout={handleLogout} />} />
+        <Route path="/" element={<StudentDashboard profile={profile} session={session} handleLogout={handleLogout} globalLang={globalLang} onToggleLang={isTeacher ? toggleLang : undefined} onBrowseClick={isTeacher ? () => navigate('/teacher/browse') : undefined} onTeacherClick={isTeacher ? () => navigate('/teacher') : undefined} />} />
         <Route path="/practice"       element={<PracticePageWrapper profile={profile} globalLang={globalLang} toggleLang={toggleLang} />} />
         <Route path="/exercises"      element={<ExercisesPage profile={profile} globalLang={globalLang} toggleLang={toggleLang} />} />
         <Route path="/lyrics"         element={<LyricsExercise user={session.user} />} />
