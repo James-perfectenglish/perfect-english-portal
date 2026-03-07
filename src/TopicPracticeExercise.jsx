@@ -33,6 +33,13 @@ function parseJsonb(val) {
   try { return JSON.parse(val) } catch { return [] }
 }
 
+
+function formatTitle(title) {
+  const match = title.match(/^(.*?)\s*([\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]+)$/u)
+  if (match) return match[2] + " " + match[1].trim()
+  return title
+}
+
 function renderQuestion(text) {
   const parts = text.split('_______')
   if (parts.length === 1) return <span>{text}</span>
@@ -235,7 +242,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
         <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.8rem' }}>{exercise.title}</h1>
+          <h1 style={{ margin: 0, fontSize: '1.8rem' }}>{formatTitle(exercise.title)}</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.9 }}>{exercise.description}</p>
         </div>
         <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
@@ -249,7 +256,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
               return (
                 <div key={level.key} onClick={() => available && selectLevel(level)} style={{
                   border: `2px solid ${available ? level.colour : '#e2e8f0'}`, borderRadius: '12px', padding: '1.25rem 1.5rem',
-                  cursor: available ? 'pointer' : 'default', background: isMyLevel ? level.colourLight : available ? 'white' : '#f9fafb',
+                  cursor: available ? 'pointer' : 'default', background: available ? level.colourLight : '#f9fafb',
                   opacity: available ? 1 : 0.55, transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                   display: 'flex', alignItems: 'center', gap: '1rem',
                   boxShadow: isMyLevel ? `0 0 0 2px ${level.colour}` : 'none'
@@ -290,7 +297,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
       <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
-        <h1 style={{ margin: 0, fontSize: '1.8rem' }}>{exercise.title}</h1>
+        <h1 style={{ margin: 0, fontSize: '1.8rem' }}>{formatTitle(exercise.title)}</h1>
         <p style={{ margin: '8px 0 0', opacity: 0.9 }}>{exercise.description}</p>
         {selectedLevel && <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>{selectedLevel.badgeLabel}</span>}
       </div>
