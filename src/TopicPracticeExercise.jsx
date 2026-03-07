@@ -190,13 +190,14 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     const isCorrect = normalise(q.correct_answer) === norm || alts.some(a => normalise(a) === norm)
     setFeedback({ isCorrect, correct: q.correct_answer, type: 'mc' })
     setResults(prev => [...prev, { question: q, isCorrect }])
+    if (isCorrect) setScore(s => s + 1)
   }
 
   const checkGapFill = async (q, answer) => {
     setIsChecking(true)
     const norm = normalise(answer), correctNorm = normalise(q.correct_answer)
     const alts = parseJsonb(q.acceptable_alternatives), informal = parseJsonb(q.informal_accepted)
-    const addR = (ok) => setResults(prev => [...prev, { question: q, isCorrect: ok }])
+    const addR = (ok) => { setResults(prev => [...prev, { question: q, isCorrect: ok }]); if (ok) setScore(s => s + 1) }
 
     if (norm === correctNorm) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'exact' }); addR(true); setIsChecking(false); return }
     if (alts.some(a => normalise(a) === norm)) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'alternative' }); addR(true); setIsChecking(false); return }
@@ -404,7 +405,11 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
                   : { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c' }
                 return (
                   <div style={{ backgroundColor: style.bg, border: `1px solid ${style.border}`, color: style.color, padding: '1rem 1.25rem', borderRadius: '10px', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: '1.6', marginBottom: '0.75rem' }}>
-                    {feedback.isCorrect ? `✅ Correct! (or: "${feedback.correct}")` : `❌ Not quite — the answer is "${feedback.correct}"`}
+                    {feedback.isCorrect
+                    ? normalise(feedback.correct) !== normalise(q.type === 'multiple_choice' ? (selectedOption || '') : userAnswer)
+                      ? `✅ Correct! (or: "${feedback.correct}")`
+                      : '✅ Correct!'
+                    : `❌ Not quite — the answer is "${feedback.correct}"`}
                     {feedback.isCorrect && feedback.type === 'fuzzy' && <span style={{ display: 'block', fontSize: '0.82rem', marginTop: '2px', color: '#c05621' }}>⚠️ Watch your spelling!</span>}
                     {feedback.note && feedback.type !== 'fuzzy' && <span style={{ display: 'block', fontSize: '0.82rem', marginTop: '2px' }}>{feedback.note}</span>}
                   </div>
