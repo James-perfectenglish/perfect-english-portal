@@ -167,8 +167,58 @@ function TeacherCard({ item }) {
 }
 
 // ── Student Preview ───────────────────────────────────────────────────────────
+// Fully interactive — behaves like the real exercises.
 
 function StudentPreview({ item }) {
+  const opts = useMemo(() => Array.isArray(item.options) ? item.options : [], [item._rowKey]);
+
+  // Multiple choice / Odd one out — selected index
+  const [selected, setSelected] = useState(null);
+
+  // Gap fill / Error correction — typed answer
+  const [answer, setAnswer] = useState('');
+
+  // Sentence building — bank & sentence arrays of {word, uid}
+  const shuffledBank = useMemo(() => {
+    const arr = opts.map((w, i) => ({ word: w, uid: i }));
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }, [item._rowKey]);
+  const [bank, setBank]         = useState(shuffledBank);
+  const [sentence, setSentence] = useState([]);
+
+  // Sentence auction — bids per sentence index
+  const [bids, setBids] = useState({});
+
+  // Matching — shuffled rights (stable), selected left, confirmed pairs {leftIdx: rightIdx}
+  const shuffledRights = useMemo(() => {
+    const raw = opts.map((p, i) => ({
+      content: typeof p.right === 'object' ? p.right.content : p.right,
+      origIdx: i,
+    }));
+    for (let i = raw.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [raw[i], raw[j]] = [raw[j], raw[i]];
+    }
+    return raw;
+  }, [item._rowKey]);
+  const [leftSel, setLeftSel] = useState(null);
+  const [pairs, setPairs]     = useState({}); // leftIdx → shuffledRightIdx
+
+  // Reset all state when item changes
+  useEffect(() => {
+    setSelected(null);
+    setAnswer('');
+    setBank(shuffledBank);
+    setSentence([]);
+    setBids({});
+    setLeftSel(null);
+    setPairs({});
+  }, [item._rowKey]);
+
   const grad = {
     background: 'linear-gradient(135deg, #667eea, #764ba2)',
     borderRadius: 12, padding: '1.1rem 1.25rem',
@@ -176,121 +226,257 @@ function StudentPreview({ item }) {
   };
   const inputStyle = {
     width: '100%', padding: '0.7rem', border: '2px solid #e2e8f0',
-    borderRadius: 8, fontSize: 15, boxSizing: 'border-box', background: '#f7fafc',
+    borderRadius: 8, fontSize: 15, boxSizing: 'border-box', background: 'white',
   };
 
-  if (item._source === 'listening') {
-    return (
-      <div>
-        <div style={grad}>
-          <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>🎧 Listening Exercise</div>
-          <h3 style={{ margin: 0, fontSize: 16 }}>{item.title}</h3>
-          {item.intro_text && <p style={{ margin: '6px 0 0', opacity: 0.9, fontSize: 13 }}>{item.intro_text}</p>}
-        </div>
-        {item.audio_url && <audio controls src={item.audio_url} style={{ width: '100%', marginBottom: 10 }} />}
-        <p style={{ color: '#718096', fontStyle: 'italic', fontSize: 13 }}>Questions reveal after the student plays the audio.</p>
+  // ── Listening ───────────────────────────────────────────────────────────────
+  if (item._source === 'listening') return (
+    <div>
+      <div style={grad}>
+        <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>🎧 Listening Exercise</div>
+        <h3 style={{ margin: 0, fontSize: 16 }}>{item.title}</h3>
+        {item.intro_text && <p style={{ margin: '6px 0 0', opacity: 0.9, fontSize: 13 }}>{item.intro_text}</p>}
       </div>
-    );
-  }
+      {item.audio_url && <audio controls src={item.audio_url} style={{ width: '100%', marginBottom: 10 }} />}
+      <p style={{ color: '#718096', fontStyle: 'italic', fontSize: 13 }}>Questions reveal after the student plays the audio.</p>
+    </div>
+  );
 
-  if (item._source === 'dictation') {
-    return (
-      <div>
-        <div style={grad}>
-          <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>🎙️ Dictation</div>
-          <h3 style={{ margin: 0, fontSize: 16 }}>{item.title}</h3>
-        </div>
-        {item.audio_url && <audio controls src={item.audio_url} style={{ width: '100%', marginBottom: 10 }} />}
-        {item.sentence_template && (
-          <div style={{ textAlign: 'center', fontSize: 17, fontWeight: 500, padding: '0.9rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 10 }}>
-            {item.sentence_template}
-          </div>
-        )}
-        <input placeholder="Student types answer here…" style={inputStyle} />
-        {item.hint && <p style={{ color: '#718096', fontSize: 13, marginTop: 6 }}>💡 {item.hint}</p>}
+  // ── Dictation ───────────────────────────────────────────────────────────────
+  if (item._source === 'dictation') return (
+    <div>
+      <div style={grad}>
+        <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>🎙️ Dictation</div>
+        <h3 style={{ margin: 0, fontSize: 16 }}>{item.title}</h3>
       </div>
-    );
-  }
+      {item.audio_url && <audio controls src={item.audio_url} style={{ width: '100%', marginBottom: 10 }} />}
+      {item.sentence_template && (
+        <div style={{ textAlign: 'center', fontSize: 17, fontWeight: 500, padding: '0.9rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 10 }}>
+          {item.sentence_template}
+        </div>
+      )}
+      <input
+        value={answer} onChange={e => setAnswer(e.target.value)}
+        placeholder="Type what you hear…"
+        style={inputStyle}
+      />
+      {item.hint && <p style={{ color: '#718096', fontSize: 13, marginTop: 6 }}>💡 {item.hint}</p>}
+    </div>
+  );
 
-  const { type, question, options } = item;
-  const opts = Array.isArray(options) ? options : [];
+  const { type, question } = item;
 
+  // ── Multiple choice ─────────────────────────────────────────────────────────
   if (type === 'multiple_choice') return (
     <div>
       <div style={grad}><p style={{ margin: 0, fontSize: 15 }}>{question}</p></div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        {opts.map((opt, i) => (
-          <div key={i} style={{ background: 'white', border: '2px solid #e2e8f0', borderRadius: 8, padding: '0.7rem', textAlign: 'center', fontSize: 14 }}>{opt}</div>
-        ))}
+        {opts.map((opt, i) => {
+          const isSel = selected === i;
+          return (
+            <div key={i} onClick={() => setSelected(isSel ? null : i)} style={{
+              background: isSel ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'white',
+              border: `2px solid ${isSel ? '#667eea' : '#e2e8f0'}`,
+              borderRadius: 8, padding: '0.7rem', textAlign: 'center',
+              fontSize: 14, cursor: 'pointer', color: isSel ? 'white' : '#2d3748',
+              fontWeight: isSel ? 600 : 400,
+            }}>{opt}</div>
+          );
+        })}
       </div>
     </div>
   );
 
+  // ── Gap fill ────────────────────────────────────────────────────────────────
   if (type === 'gap_fill') return (
     <div>
       <div style={grad}><p style={{ margin: 0, fontSize: 15 }}>{question}</p></div>
-      <input readOnly placeholder="Type your answer…" style={inputStyle} />
+      <input
+        value={answer} onChange={e => setAnswer(e.target.value)}
+        placeholder="Type your answer…"
+        style={inputStyle}
+      />
     </div>
   );
 
+  // ── Sentence building ───────────────────────────────────────────────────────
   if (type === 'sentence_building') {
-    const shuffled = [...opts].sort(() => Math.random() - 0.5);
+    const moveToSentence = (uid) => {
+      const word = bank.find(w => w.uid === uid);
+      if (!word) return;
+      setBank(prev => prev.filter(w => w.uid !== uid));
+      setSentence(prev => [...prev, word]);
+    };
+    const moveToBank = (uid) => {
+      const word = sentence.find(w => w.uid === uid);
+      if (!word) return;
+      setSentence(prev => prev.filter(w => w.uid !== uid));
+      setBank(prev => [...prev, word]);
+    };
+    const reset = () => { setBank(shuffledBank); setSentence([]); };
+
     return (
       <div>
-        <div style={grad}><p style={{ margin: 0, fontSize: 13, opacity: 0.9 }}>Put the words in the correct order 👆</p></div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 10 }}>
-          {shuffled.map((w, i) => (
-            <div key={i} style={{ background: '#667eea', color: 'white', borderRadius: 6, padding: '5px 13px', fontSize: 14 }}>{w}</div>
+        <div style={grad}><p style={{ margin: 0, fontSize: 13, opacity: 0.9 }}>Put the words in the correct order — tap a word to use it 👆</p></div>
+
+        {/* Answer area */}
+        <div style={{ minHeight: 50, border: '2px dashed #667eea', borderRadius: 8, padding: '8px 10px', marginBottom: 10, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+          {sentence.length === 0
+            ? <span style={{ color: '#a0aec0', fontSize: 13 }}>Your sentence appears here…</span>
+            : sentence.map(w => (
+              <div key={w.uid} onClick={() => moveToBank(w.uid)} style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', borderRadius: 6, padding: '5px 13px', fontSize: 14, cursor: 'pointer' }}>
+                {w.word}
+              </div>
+            ))
+          }
+        </div>
+
+        {/* Word bank */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 8 }}>
+          {bank.map(w => (
+            <div key={w.uid} onClick={() => moveToSentence(w.uid)} style={{ background: 'white', border: '2px solid #667eea', color: '#667eea', borderRadius: 6, padding: '5px 13px', fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>
+              {w.word}
+            </div>
           ))}
         </div>
-        <div style={{ minHeight: 44, border: '2px dashed #e2e8f0', borderRadius: 8, padding: '0.5rem', color: '#a0aec0', fontSize: 13 }}>Your sentence appears here</div>
+
+        {sentence.length > 0 && (
+          <button onClick={reset} style={{ fontSize: 12, color: '#a0aec0', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>↺ Reset</button>
+        )}
       </div>
     );
   }
 
+  // ── Error correction ────────────────────────────────────────────────────────
   if (type === 'error_correction') return (
     <div>
       <div style={grad}>
         <p style={{ margin: '0 0 5px', fontSize: 12, opacity: 0.8 }}>Find and correct the error:</p>
         <p style={{ margin: 0, fontSize: 15, fontWeight: 500 }}>{question}</p>
       </div>
-      <input readOnly placeholder="Type the corrected sentence…" style={inputStyle} />
+      <input
+        value={answer} onChange={e => setAnswer(e.target.value)}
+        placeholder="Type the corrected sentence…"
+        style={inputStyle}
+      />
     </div>
   );
 
+  // ── Odd one out ─────────────────────────────────────────────────────────────
   if (type === 'odd_one_out') return (
     <div>
       <div style={grad}><p style={{ margin: 0, fontSize: 15 }}>{question} 👆</p></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-        {opts.map((opt, i) => (
-          <div key={i} style={{ background: 'white', border: '2px solid #e2e8f0', borderRadius: 8, padding: '0.9rem', textAlign: 'center', fontWeight: 500, fontSize: 14 }}>{opt}</div>
-        ))}
+        {opts.map((opt, i) => {
+          const isSel = selected === i;
+          return (
+            <div key={i} onClick={() => setSelected(isSel ? null : i)} style={{
+              background: isSel ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'white',
+              border: `2px solid ${isSel ? '#667eea' : '#e2e8f0'}`,
+              borderRadius: 8, padding: '0.9rem', textAlign: 'center',
+              fontWeight: isSel ? 700 : 500, fontSize: 14, cursor: 'pointer',
+              color: isSel ? 'white' : '#2d3748',
+            }}>{opt}</div>
+          );
+        })}
       </div>
     </div>
   );
 
-  if (type === 'sentence_auction') return (
-    <div>
-      <div style={grad}><p style={{ margin: 0, fontSize: 15 }}>Which sentences are correct? Bid on them! 🏷️</p></div>
-      {opts.map((s, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7, background: 'white', border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.7rem' }}>
-          <span style={{ flex: 1, fontSize: 14 }}>{s}</span>
-          <input readOnly placeholder="£" style={{ width: 54, padding: '4px 6px', border: '1px solid #e2e8f0', borderRadius: 6, textAlign: 'center', background: '#f7fafc' }} />
-        </div>
-      ))}
-    </div>
-  );
-
-  if (type === 'matching') {
-    const lefts  = opts.map(p => typeof p.left  === 'object' ? p.left.content  : p.left);
-    const rights = opts.map(p => typeof p.right === 'object' ? p.right.content : p.right).sort(() => Math.random() - 0.5);
+  // ── Sentence auction ────────────────────────────────────────────────────────
+  if (type === 'sentence_auction') {
+    const total = Object.values(bids).reduce((sum, v) => sum + (parseInt(v) || 0), 0);
+    const budget = 1000;
     return (
       <div>
-        <div style={grad}><p style={{ margin: 0, fontSize: 15 }}>Match the items 👆</p></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <div>{lefts.map((l, i) => <div key={i} style={{ background: '#667eea', color: 'white', borderRadius: 8, padding: '0.65rem', marginBottom: 7, textAlign: 'center', fontSize: 14 }}>{l}</div>)}</div>
-          <div>{rights.map((r, i) => <div key={i} style={{ background: 'white', border: '2px solid #e2e8f0', borderRadius: 8, padding: '0.65rem', marginBottom: 7, textAlign: 'center', fontSize: 14 }}>{r}</div>)}</div>
+        <div style={grad}>
+          <p style={{ margin: '0 0 4px', fontSize: 15 }}>Which sentences are correct? Bid on them! 🏷️</p>
+          <p style={{ margin: 0, fontSize: 12, opacity: 0.85 }}>Budget: £{budget - total} remaining</p>
         </div>
+        {opts.map((s, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7, background: 'white', border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.7rem' }}>
+            <span style={{ flex: 1, fontSize: 14 }}>{s}</span>
+            <input
+              type="number" min="0" max={budget}
+              value={bids[i] || ''}
+              onChange={e => setBids(prev => ({ ...prev, [i]: e.target.value }))}
+              placeholder="£"
+              style={{ width: 64, padding: '4px 6px', border: '1px solid #e2e8f0', borderRadius: 6, textAlign: 'center' }}
+            />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // ── Matching ────────────────────────────────────────────────────────────────
+  if (type === 'matching') {
+    const lefts = opts.map(p => typeof p.left === 'object' ? p.left.content : p.left);
+
+    const handleLeftClick = (li) => {
+      setLeftSel(prev => prev === li ? null : li);
+    };
+    const handleRightClick = (ri) => {
+      if (leftSel === null) return;
+      // Toggle off if already paired to this right
+      const existing = pairs[leftSel];
+      if (existing === ri) {
+        setPairs(prev => { const n = { ...prev }; delete n[leftSel]; return n; });
+        setLeftSel(null);
+        return;
+      }
+      setPairs(prev => ({ ...prev, [leftSel]: ri }));
+      setLeftSel(null);
+    };
+    const pairedLefts  = new Set(Object.keys(pairs).map(Number));
+    const pairedRights = new Set(Object.values(pairs));
+
+    return (
+      <div>
+        <div style={grad}>
+          <p style={{ margin: 0, fontSize: 15 }}>Match the items 👆</p>
+          {leftSel !== null && <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.85 }}>Now tap a match on the right →</p>}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {/* Left column */}
+          <div>
+            {lefts.map((l, li) => {
+              const isPaired = pairedLefts.has(li);
+              const isActive = leftSel === li;
+              return (
+                <div key={li} onClick={() => handleLeftClick(li)} style={{
+                  borderRadius: 8, padding: '0.65rem', marginBottom: 7,
+                  textAlign: 'center', fontSize: 14, cursor: 'pointer',
+                  background: isActive ? '#764ba2' : isPaired ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#667eea',
+                  color: 'white',
+                  outline: isActive ? '3px solid #fbd38d' : 'none',
+                  fontWeight: isPaired ? 600 : 400,
+                }}>{l}</div>
+              );
+            })}
+          </div>
+          {/* Right column */}
+          <div>
+            {shuffledRights.map((r, ri) => {
+              const isPaired = pairedRights.has(ri);
+              const isTarget = leftSel !== null;
+              return (
+                <div key={ri} onClick={() => handleRightClick(ri)} style={{
+                  borderRadius: 8, padding: '0.65rem', marginBottom: 7,
+                  textAlign: 'center', fontSize: 14,
+                  cursor: isTarget ? 'pointer' : isPaired ? 'pointer' : 'default',
+                  background: isPaired ? '#f0fff4' : 'white',
+                  border: `2px solid ${isPaired ? '#48bb78' : isTarget ? '#667eea' : '#e2e8f0'}`,
+                  color: isPaired ? '#276749' : '#2d3748',
+                  fontWeight: isPaired ? 600 : 400,
+                }}>{r.content}</div>
+              );
+            })}
+          </div>
+        </div>
+        {Object.keys(pairs).length > 0 && (
+          <button onClick={() => { setPairs({}); setLeftSel(null); }} style={{ fontSize: 12, color: '#a0aec0', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 4 }}>↺ Reset</button>
+        )}
       </div>
     );
   }
@@ -331,7 +517,7 @@ function FocusMode({ items, index, onChangeIndex, previewMode, setPreviewMode, o
       {/* Content */}
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '2rem 1rem' }}>
         <div style={{ width: '100%', maxWidth: 700, background: 'white', borderRadius: 16, padding: '2rem', boxShadow: '0 4px 32px rgba(0,0,0,0.10)' }}>
-          {previewMode === 'teacher' ? <TeacherCard item={item} /> : <StudentPreview item={item} />}
+          {previewMode === 'teacher' ? <TeacherCard item={item} /> : <StudentPreview key={item._rowKey} item={item} />}
         </div>
       </div>
     </div>
@@ -779,7 +965,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
         </div>
       </div>
       <div style={{ padding: '1.1rem', maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
-        {previewMode === 'teacher' ? <TeacherCard item={previewItem} /> : <StudentPreview item={previewItem} />}
+        {previewMode === 'teacher' ? <TeacherCard item={previewItem} /> : <StudentPreview key={previewItem._rowKey} item={previewItem} />}
       </div>
     </div>
   );
