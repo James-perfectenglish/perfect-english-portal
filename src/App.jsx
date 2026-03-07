@@ -41,52 +41,6 @@ function App() {
   )
 }
 
-// ── Teacher toolbar (header buttons, all pages) ───────────────────────────────
-
-function TeacherToolbar({ globalLang, toggleLang }) {
-  const btnStyle = {
-    height: '34px',
-    borderRadius: '8px',
-    background: '#f0f0f5',
-    border: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: '#4a5568',
-  }
-  return (
-    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginLeft: '1rem' }}>
-      {/* Language toggle */}
-      <button
-        onClick={toggleLang}
-        title={globalLang === 'en' ? 'Switch to Spanish mode' : 'Switch to English mode'}
-        style={{ ...btnStyle, width: '34px', fontSize: '1.1rem' }}
-      >
-        {globalLang === 'en' ? '🇬🇧' : '🇪🇸'}
-      </button>
-
-      {/* Browse */}
-      <Link
-        to="/teacher/browse"
-        style={{ ...btnStyle, padding: '0 10px', textDecoration: 'none', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}
-      >
-        🔍 Browse
-      </Link>
-
-      {/* Teacher dashboard */}
-      <Link
-        to="/teacher"
-        style={{ ...btnStyle, width: '34px', fontSize: '1rem', textDecoration: 'none' }}
-      >
-        👨‍🏫
-      </Link>
-    </div>
-  )
-}
-
-// ── Dashboard (authenticated shell) ──────────────────────────────────────────
-
 function Dashboard({ session }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -132,61 +86,75 @@ function Dashboard({ session }) {
 
   return (
     <div>
-      {/* HEADER */}
+      {/* HEADER — nav only, no teacher buttons here */}
       <header style={{ background: 'white', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', position: 'sticky', top: 0, zIndex: 1000, width: '100%' }}>
-        <div style={{ width: '100%', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
+        <div style={{ width: '100%', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
           <a href="https://perfect-english.org" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
             <h1 style={{ fontSize: 'clamp(1.2rem, 4vw, 1.8rem)', fontWeight: '700', margin: 0 }}>
               <span style={{ color: '#2C3E50' }}>Perfect</span>
               <span style={{ color: '#3498DB' }}> English</span>
             </h1>
           </a>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <nav>
-              <ul style={{ listStyle: 'none', display: 'flex', gap: 'clamp(0.5rem, 3vw, 2rem)', margin: 0, padding: 0, alignItems: 'center' }}>
-                <li><Link to="/"          style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Home</Link></li>
-                <li><Link to="/practice"  style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Test</Link></li>
-                <li><Link to="/exercises" style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Exercises</Link></li>
-              </ul>
-            </nav>
-            {/* Teacher-only toolbar — visible on all pages */}
-            {isTeacher && (
-              <TeacherToolbar globalLang={globalLang} toggleLang={toggleLang} />
-            )}
-          </div>
+          <nav>
+            <ul style={{ listStyle: 'none', display: 'flex', gap: 'clamp(0.5rem, 3vw, 2rem)', margin: 0, padding: 0, alignItems: 'center' }}>
+              <li><Link to="/"          style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Home</Link></li>
+              <li><Link to="/practice"  style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Test</Link></li>
+              <li><Link to="/exercises" style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Exercises</Link></li>
+            </ul>
+          </nav>
         </div>
       </header>
 
       {/* ROUTES */}
       <Routes>
-        <Route path="/"                element={<StudentDashboard profile={profile} session={session} handleLogout={handleLogout} />} />
-        <Route path="/practice"        element={<PracticePageWrapper profile={profile} />} />
-        <Route path="/exercises"       element={<ExercisesPage profile={profile} globalLang={globalLang} toggleLang={toggleLang} />} />
-        <Route path="/lyrics"          element={<LyricsExercise user={session.user} />} />
-        <Route path="/blurt"           element={<Blurt user={session.user} />} />
-        <Route path="/teacher"         element={isTeacher ? <TeacherDashboard profile={profile} handleLogout={handleLogout} /> : <Navigate to="/" />} />
-        <Route path="/teacher/browse"  element={isTeacher ? <TeacherBrowse user={session.user} globalLang={globalLang} /> : <Navigate to="/" />} />
+        <Route path="/"               element={
+          <StudentDashboard
+            profile={profile}
+            session={session}
+            handleLogout={handleLogout}
+            isTeacher={isTeacher}
+            globalLang={globalLang}
+            onToggleLang={isTeacher ? toggleLang : undefined}
+            onBrowseClick={isTeacher ? undefined : undefined}
+          />
+        } />
+        <Route path="/practice"       element={<PracticePageWrapper profile={profile} globalLang={globalLang} toggleLang={toggleLang} />} />
+        <Route path="/exercises"      element={<ExercisesPage profile={profile} globalLang={globalLang} toggleLang={toggleLang} />} />
+        <Route path="/lyrics"         element={<LyricsExercise user={session.user} />} />
+        <Route path="/blurt"          element={<Blurt user={session.user} />} />
+        <Route path="/teacher"        element={isTeacher ? <TeacherDashboard profile={profile} handleLogout={handleLogout} /> : <Navigate to="/" />} />
+        <Route path="/teacher/browse" element={isTeacher ? <TeacherBrowse user={session.user} globalLang={globalLang} /> : <Navigate to="/" />} />
       </Routes>
     </div>
   )
 }
 
 function ExercisesPage({ profile, globalLang, toggleLang }) {
+  const navigate = useNavigate()
+  const isTeacher = profile?.is_teacher || false
   return (
     <ExerciseList
       userLevel={profile.level}
       userTracks={profile.tracks || []}
-      isTeacher={profile?.is_teacher || false}
+      isTeacher={isTeacher}
+      onTeacherClick={isTeacher ? () => navigate('/teacher') : undefined}
+      onBrowseClick={isTeacher ? () => navigate('/teacher/browse') : undefined}
+      globalLang={globalLang}
+      onToggleLang={isTeacher ? toggleLang : undefined}
     />
   )
 }
 
-function PracticePageWrapper({ profile }) {
+function PracticePageWrapper({ profile, globalLang, toggleLang }) {
   const navigate = useNavigate()
+  const isTeacher = profile?.is_teacher || false
   return (
     <PracticePage
-      isTeacher={profile?.is_teacher || false}
-      onTeacherClick={() => navigate('/teacher')}
+      isTeacher={isTeacher}
+      onTeacherClick={isTeacher ? () => navigate('/teacher') : undefined}
+      onBrowseClick={isTeacher ? () => navigate('/teacher/browse') : undefined}
+      globalLang={globalLang}
+      onToggleLang={isTeacher ? toggleLang : undefined}
     />
   )
 }
