@@ -426,9 +426,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
               )}
             </div>
 
-            <div style={{ textAlign: 'center', fontSize: '0.8rem', color: '#a0aec0' }}>
-              {score} correct so far · need {passMark} to pass
-            </div>
+
           </>
         )}
 
