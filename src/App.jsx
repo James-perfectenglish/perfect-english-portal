@@ -83,6 +83,7 @@ function Dashboard({ session }) {
   }
 
   const isTeacher = profile?.is_teacher || false
+  const navigate = useNavigate()
 
   return (
     <div>

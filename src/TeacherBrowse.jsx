@@ -9,7 +9,7 @@ const TYPE_INFO = {
   gap_fill:          { emoji: '✏️',  label: 'Gap Fill' },
   multiple_choice:   { emoji: '🔘',  label: 'Multiple Choice' },
   sentence_building: { emoji: '🔧',  label: 'Sentence Building' },
-  odd_one_out:       { emoji: '🦆',  label: 'Odd One Out' },
+  odd_one_out:       { emoji: '🔍',  label: 'Odd One Out' },
   error_correction:  { emoji: '🔴',  label: 'Error Correction' },
   matching:          { emoji: '🔗',  label: 'Matching' },
   sentence_auction:  { emoji: '🏷️', label: 'Sentence Auction' },
