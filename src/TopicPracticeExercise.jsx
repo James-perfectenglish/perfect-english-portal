@@ -1,6 +1,15 @@
 import { useState, useRef } from 'react'
 import { supabase } from './supabaseClient'
 
+function shuffleArray(arr) {
+  const shuffled = [...arr]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
+}
+
 function levenshtein(a, b) {
   const m = a.length, n = b.length
   const dp = Array.from({ length: m + 1 }, (_, i) =>
@@ -13,17 +22,11 @@ function levenshtein(a, b) {
         : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
   return dp[m][n]
 }
+
 function normalise(str) {
   return (str || '').toLowerCase().trim().replace(/[''`]/g, "'").replace(/\s+/g, ' ')
 }
-function fisherYates(arr) {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
+
 function parseJsonb(val) {
   if (!val) return []
   if (Array.isArray(val)) return val
@@ -47,7 +50,6 @@ function renderQuestion(text) {
   )
 }
 
-// ── EXACT same LEVELS definition as SentenceBuilding.jsx ─────────────────────
 const LEVELS = [
   {
     key: 'beginner', label: 'Beginner', sublabel: 'A1 – A2',
@@ -69,6 +71,8 @@ const LEVELS = [
   },
 ]
 
+const GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+
 function getSuggestedLevel(userLevel) {
   const l = (userLevel || 'B1').toUpperCase()
   if (l.startsWith('A') || l === 'SPANISH') return 'beginner'
@@ -81,9 +85,10 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   const [selectedLevel, setSelectedLevel] = useState(null)
   const [questionCounts, setQuestionCounts] = useState({})
   const [questions, setQuestions]       = useState([])
-  const [current, setCurrent]           = useState(0)
+  const [currentQ, setCurrentQ]         = useState(0)
+  const [score, setScore]               = useState(0)
+  const [selectedOption, setSelectedOption] = useState(null)
   const [userAnswer, setUserAnswer]     = useState('')
-  const [selectedOption, setSelected]   = useState(null)
   const [feedback, setFeedback]         = useState(null)
   const [isChecking, setIsChecking]     = useState(false)
   const [results, setResults]           = useState([])
@@ -94,25 +99,17 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   const totalTarget = 10
   const suggested   = getSuggestedLevel(userLevel)
 
-  // Fetch counts on first render via useEffect-equivalent: we call it once on mount
-  // (handled inline since this component re-mounts fresh each time)
   useState(() => { fetchCounts() }, [])
 
   async function fetchCounts() {
-    if (exercise.topic === 'spanish') {
-      const { data } = await supabase.from('question_bank').select('level').eq('topic', exercise.topic).eq('language', 'es')
-      if (data) {
-        const counts = {}
-        LEVELS.forEach(lv => { counts[lv.key] = data.filter(q => lv.dbLevels.includes(q.level)).length })
-        setQuestionCounts(counts)
-      }
-    } else {
-      const { data } = await supabase.from('question_bank').select('level').eq('topic', exercise.topic).in('language', ['en', 'both'])
-      if (data) {
-        const counts = {}
-        LEVELS.forEach(lv => { counts[lv.key] = data.filter(q => lv.dbLevels.includes(q.level)).length })
-        setQuestionCounts(counts)
-      }
+    let query = supabase.from('question_bank').select('level').eq('topic', exercise.topic).is('sequence_group', null)
+    if (exercise.topic === 'spanish') query = query.eq('language', 'es')
+    else query = query.in('language', ['en', 'both'])
+    const { data } = await query
+    if (data) {
+      const counts = {}
+      LEVELS.forEach(lv => { counts[lv.key] = data.filter(q => lv.dbLevels.includes(q.level)).length })
+      setQuestionCounts(counts)
     }
   }
 
@@ -124,10 +121,8 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   }
 
   async function fetchQuestions(level) {
-    setCurrent(0); setResults([]); setFeedback(null)
-    setUserAnswer(''); setSelected(null); setSessionSaved(false)
-
-    const levelGroup = level.group
+    setCurrentQ(0); setScore(0); setResults([]); setFeedback(null)
+    setUserAnswer(''); setSelectedOption(null); setSessionSaved(false)
 
     let query = supabase.from('question_bank').select('*').eq('topic', exercise.topic).in('level', level.dbLevels).is('sequence_group', null)
     if (exercise.topic === 'spanish') query = query.eq('language', 'es')
@@ -136,27 +131,28 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
 
     if (error || !data || data.length === 0) { setStage('playing'); setQuestions([]); return }
 
+    const g = level.group
     let selected = []
-    if (levelGroup === 'A') {
-      const mc = fisherYates(data.filter(q => q.type === 'multiple_choice'))
+    if (g === 'A') {
+      const mc = shuffleArray(data.filter(q => q.type === 'multiple_choice'))
       selected = mc.slice(0, totalTarget)
-      if (selected.length < totalTarget) selected = [...selected, ...fisherYates(data.filter(q => !selected.includes(q)))].slice(0, totalTarget)
-    } else if (levelGroup === 'C') {
-      const gf = fisherYates(data.filter(q => q.type === 'gap_fill'))
+      if (selected.length < totalTarget) selected = [...selected, ...shuffleArray(data.filter(q => !selected.includes(q)))].slice(0, totalTarget)
+    } else if (g === 'C') {
+      const gf = shuffleArray(data.filter(q => q.type === 'gap_fill'))
       selected = gf.slice(0, totalTarget)
-      if (selected.length < totalTarget) selected = [...selected, ...fisherYates(data.filter(q => !selected.includes(q)))].slice(0, totalTarget)
+      if (selected.length < totalTarget) selected = [...selected, ...shuffleArray(data.filter(q => !selected.includes(q)))].slice(0, totalTarget)
     } else {
-      const mc = fisherYates(data.filter(q => q.type === 'multiple_choice'))
-      const gf = fisherYates(data.filter(q => q.type === 'gap_fill'))
+      const mc = shuffleArray(data.filter(q => q.type === 'multiple_choice'))
+      const gf = shuffleArray(data.filter(q => q.type === 'gap_fill'))
       let mcSlice = mc.slice(0, 5), gfSlice = gf.slice(0, 5)
       if (mcSlice.length + gfSlice.length < totalTarget) {
         const used = new Set([...mcSlice, ...gfSlice])
-        mcSlice = [...mcSlice, ...fisherYates(data.filter(q => !used.has(q))).slice(0, totalTarget - mcSlice.length - gfSlice.length)]
+        mcSlice = [...mcSlice, ...shuffleArray(data.filter(q => !used.has(q))).slice(0, totalTarget - mcSlice.length - gfSlice.length)]
       }
-      selected = fisherYates([...mcSlice, ...gfSlice])
+      selected = shuffleArray([...mcSlice, ...gfSlice])
     }
 
-    const prepared = selected.map(q => q.type === 'multiple_choice' ? { ...q, shuffledOptions: fisherYates(parseJsonb(q.options)) } : q)
+    const prepared = selected.map(q => q.type === 'multiple_choice' ? { ...q, shuffledOptions: shuffleArray(parseJsonb(q.options)) } : q)
     setQuestions(prepared)
     setStage('playing')
     setTimeout(() => inputRef.current?.focus(), 100)
@@ -164,9 +160,9 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
 
   const backToLevelSelect = () => {
     window.scrollTo({ top: 0, behavior: 'instant' })
-    setSelectedLevel(null); setQuestions([]); setCurrent(0); setResults([])
-    setFeedback(null); setUserAnswer(''); setSelected(null); setStage('level-select')
-    fetchCounts()
+    setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0)
+    setFeedback(null); setUserAnswer(''); setSelectedOption(null)
+    setStage('level-select'); fetchCounts()
   }
 
   const restartExercise = () => {
@@ -174,9 +170,8 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     setStage('loading'); fetchQuestions(selectedLevel)
   }
 
-  // ── Answer checking ─────────────────────────────────────────────────────────
   const checkAnswer = async () => {
-    const q = questions[current]
+    const q = questions[currentQ]
     if (!q || isChecking) return
     if (q.type === 'multiple_choice') { if (!selectedOption) return; checkMC(q, selectedOption) }
     else { if (!userAnswer.trim()) return; await checkGapFill(q, userAnswer.trim()) }
@@ -215,7 +210,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
 
   const nextQuestion = async () => {
     window.scrollTo({ top: 0, behavior: 'instant' })
-    if (current + 1 >= questions.length) {
+    if (currentQ + 1 >= questions.length) {
       if (!sessionSaved) {
         setSessionSaved(true)
         const { data: { user } } = await supabase.auth.getUser()
@@ -226,25 +221,20 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
       }
       setStage('finished'); return
     }
-    setCurrent(c => c + 1); setFeedback(null); setUserAnswer(''); setSelected(null)
+    setCurrentQ(c => c + 1); setFeedback(null); setUserAnswer(''); setSelectedOption(null)
     setTimeout(() => inputRef.current?.focus(), 100)
   }
 
   const handleKeyDown = (e) => { if (e.key === 'Enter') { if (feedback) nextQuestion(); else checkAnswer() } }
 
-  const q           = questions[current]
-  const score       = results.filter(r => r.isCorrect).length
-  const progressPct = questions.length > 0 ? (current / questions.length) * 100 : 0
-  const optLabels   = ['A', 'B', 'C', 'D']
+  const q = questions[currentQ]
 
-  // ============================================================
-  // LEVEL SELECT — copied exactly from SentenceBuilding.jsx
-  // ============================================================
+  // ── LEVEL SELECT — copied exactly from ErrorCorrection.jsx ───────────────────
   if (stage === 'level-select') {
     return (
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
-        <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', position: 'relative', marginBottom: '1.5rem' }}>
+        <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.8rem' }}>{exercise.title}</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.9 }}>{exercise.description}</p>
         </div>
@@ -257,8 +247,13 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
               const available = count > 0
               const isMyLevel = level.key === suggested
               return (
-                <div key={level.key} onClick={() => available && selectLevel(level)}
-                  style={{ border: `2px solid ${available ? level.colour : '#e2e8f0'}`, borderRadius: '12px', padding: '1.25rem 1.5rem', cursor: available ? 'pointer' : 'default', background: isMyLevel ? level.colourLight : available ? 'white' : '#f9fafb', opacity: available ? 1 : 0.55, transition: 'transform 0.15s ease, box-shadow 0.15s ease', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: isMyLevel ? `0 0 0 2px ${level.colour}` : 'none' }}
+                <div key={level.key} onClick={() => available && selectLevel(level)} style={{
+                  border: `2px solid ${available ? level.colour : '#e2e8f0'}`, borderRadius: '12px', padding: '1.25rem 1.5rem',
+                  cursor: available ? 'pointer' : 'default', background: isMyLevel ? level.colourLight : available ? 'white' : '#f9fafb',
+                  opacity: available ? 1 : 0.55, transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                  display: 'flex', alignItems: 'center', gap: '1rem',
+                  boxShadow: isMyLevel ? `0 0 0 2px ${level.colour}` : 'none'
+                }}
                   onMouseEnter={e => { if (available) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 4px 16px ${level.colour}30` } }}
                   onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = isMyLevel ? `0 0 0 2px ${level.colour}` : 'none' }}
                 >
@@ -290,13 +285,11 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     )
   }
 
-  // ============================================================
-  // EXERCISE SCREEN (loading / playing / finished)
-  // ============================================================
+  // ── EXERCISE — copied exactly from ErrorCorrection.jsx ───────────────────────
   return (
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
-      <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', position: 'relative' }}>
+      <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.8rem' }}>{exercise.title}</h1>
         <p style={{ margin: '8px 0 0', opacity: 0.9 }}>{exercise.description}</p>
         {selectedLevel && <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>{selectedLevel.badgeLabel}</span>}
@@ -304,75 +297,70 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
 
       <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
 
-        {/* Loading */}
         {stage === 'loading' && <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#666' }}>Loading questions...</div>}
 
-        {/* No questions */}
         {stage === 'playing' && questions.length === 0 && (
           <div style={{ textAlign: 'center', padding: '2rem' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🚧</div>
-            <h2 style={{ color: '#2d3748', marginBottom: '0.5rem' }}>Coming Soon!</h2>
-            <p style={{ color: '#666' }}>Questions for this level are being added.</p>
-            <button onClick={backToLevelSelect} style={{ marginTop: '1rem', padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>← Choose Another Level</button>
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📝</div>
+            <h2 style={{ color: '#2C3E50', marginBottom: '0.5rem' }}>Coming Soon!</h2>
+            <p style={{ color: '#666' }}>Questions for this level are being added. Check back soon!</p>
+            <button onClick={backToLevelSelect} style={{ marginTop: '1rem', padding: '0.75rem 1.5rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>← Choose Another Level</button>
           </div>
         )}
 
-        {/* Question */}
         {stage === 'playing' && q && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', background: '#f7fafc', padding: '12px 16px', borderRadius: '8px', marginBottom: '24px', fontSize: '0.9rem', color: '#4a5568', fontWeight: 500 }}>
-              <span>Progress: {current + 1}/{questions.length}</span>
+              <span>Progress: {currentQ + 1}/{questions.length}</span>
               <span>Score: {score}/{questions.length}</span>
             </div>
 
             <div style={{ border: '2px solid #e2e8f0', borderRadius: '8px', padding: '1.5rem', marginBottom: '1.5rem' }}>
-              {/* Level/type badges */}
+              {/* badges */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
-                {q.level && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600, backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: q.level.startsWith('A') ? '#276749' : q.level.startsWith('B') ? '#2b6cb0' : '#c05621' }}>{q.level}</div>}
-                <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600, background: q.type === 'multiple_choice' ? '#ebf8ff' : '#faf5ff', color: q.type === 'multiple_choice' ? '#2b6cb0' : '#6b46c1' }}>
+                {q.level && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: q.level.startsWith('A') ? '#276749' : q.level.startsWith('B') ? '#2b6cb0' : '#c05621' }}>{q.level}</div>}
+                <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.type === 'multiple_choice' ? '#ebf8ff' : '#faf5ff', color: q.type === 'multiple_choice' ? '#2b6cb0' : '#6b46c1' }}>
                   {q.type === 'multiple_choice' ? '📝 Multiple Choice' : '✏️ Gap Fill'}
                 </div>
               </div>
 
-              {/* Question text */}
+              {/* question text */}
               <div style={{ fontSize: 'clamp(1rem, 2.5vw, 1.15rem)', color: '#2d3748', lineHeight: 1.6, marginBottom: '1.25rem', fontWeight: 500 }}>
                 {renderQuestion(q.question)}
               </div>
 
-              {/* Gap fill hint */}
-              {q.type === 'gap_fill' && !feedback && (
-                <p style={{ fontSize: '0.78rem', color: '#a0aec0', marginBottom: '0.75rem' }}>👆 Type your answer and press Enter</p>
-              )}
-
-              {/* MC options - before answer */}
+              {/* MC options */}
               {q.type === 'multiple_choice' && !feedback && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1rem' }}>
                   {(q.shuffledOptions || parseJsonb(q.options)).map((opt, i) => {
                     const isSel = selectedOption === opt
                     return (
-                      <button key={i} onClick={() => setSelected(opt)} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '10px', cursor: 'pointer', textAlign: 'left', border: `2px solid ${isSel ? '#667eea' : '#e2e8f0'}`, background: isSel ? '#f0f0ff' : 'white', fontSize: '0.95rem', color: '#2d3748', transition: 'all 0.15s', fontWeight: isSel ? 600 : 400 }}>
-                        <span style={{ width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isSel ? '#667eea' : '#f0f0f5', color: isSel ? 'white' : '#718096', fontWeight: 700, fontSize: '0.8rem' }}>{optLabels[i]}</span>
-                        {opt}
-                      </button>
+                      <div key={i} onClick={() => setSelectedOption(opt)} style={{
+                        padding: '12px 16px', borderRadius: '8px', cursor: 'pointer',
+                        border: `2px solid ${isSel ? '#667eea' : '#e2e8f0'}`,
+                        background: isSel ? '#EDE9FE' : 'white',
+                        fontSize: '0.95rem', color: isSel ? '#553C9A' : '#2d3748',
+                        fontWeight: isSel ? 600 : 400, transition: 'all 0.15s ease'
+                      }}
+                        onMouseEnter={e => { if (!isSel) { e.currentTarget.style.borderColor = '#667eea'; e.currentTarget.style.background = '#f7f7ff' } }}
+                        onMouseLeave={e => { if (!isSel) { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = 'white' } }}
+                      >{opt}</div>
                     )
                   })}
                 </div>
               )}
 
-              {/* MC options - after answer */}
+              {/* MC options post-feedback */}
               {q.type === 'multiple_choice' && feedback && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1rem' }}>
                   {(q.shuffledOptions || parseJsonb(q.options)).map((opt, i) => {
                     const isOk  = normalise(opt) === normalise(q.correct_answer) || parseJsonb(q.acceptable_alternatives).some(a => normalise(a) === normalise(opt))
                     const wasSel = selectedOption === opt
                     let bg = 'white', border = '#e2e8f0', color = '#2d3748'
                     if (isOk) { bg = '#f0fff4'; border = '#48bb78'; color = '#276749' }
-                    else if (wasSel) { bg = '#fff5f5'; border = '#fc8181'; color = '#9b2c2c' }
+                    else if (wasSel) { bg = '#fff5f5'; border = '#f56565'; color = '#c53030' }
                     return (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '10px', border: `2px solid ${border}`, background: bg, fontSize: '0.95rem', color }}>
-                        <span style={{ width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isOk ? '#48bb78' : wasSel ? '#fc8181' : '#f0f0f5', color: (isOk || wasSel) ? 'white' : '#718096', fontWeight: 700, fontSize: '0.8rem' }}>
-                          {isOk ? '✓' : wasSel ? '✗' : optLabels[i]}
-                        </span>
+                      <div key={i} style={{ padding: '12px 16px', borderRadius: '8px', border: `2px solid ${border}`, background: bg, fontSize: '0.95rem', color, fontWeight: isOk || wasSel ? 600 : 400 }}>
                         {opt}
                       </div>
                     )
@@ -381,34 +369,53 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
               )}
 
               {/* Gap fill input */}
-              {q.type === 'gap_fill' && (
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <input ref={inputRef} type="text" value={userAnswer} onChange={e => setUserAnswer(e.target.value)} onKeyDown={handleKeyDown} disabled={!!feedback || isChecking} placeholder="Type your answer here..."
-                    style={{ width: '100%', padding: '14px 16px', fontSize: '1rem', borderRadius: '10px', border: `2px solid ${feedback ? (feedback.isCorrect ? '#48bb78' : '#fc8181') : '#e2e8f0'}`, outline: 'none', boxSizing: 'border-box', background: feedback ? (feedback.isCorrect ? '#f0fff4' : '#fff5f5') : 'white', color: '#2d3748' }}
-                  />
+              {q.type === 'gap_fill' && !feedback && !isChecking && (
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', alignItems: 'stretch' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Your answer:</div>
+                    <input ref={inputRef} type="text" value={userAnswer} onChange={e => setUserAnswer(e.target.value)} onKeyDown={handleKeyDown}
+                      placeholder="Type the missing word(s)..." autoFocus
+                      style={{ width: '100%', padding: '0.9rem 1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', borderRadius: '8px', border: '2px solid #667eea', boxSizing: 'border-box', color: '#2d3748', fontWeight: 500, backgroundColor: '#EDE9FE' }}
+                    />
+                  </div>
+                  <button onClick={checkAnswer} disabled={!userAnswer.trim()}
+                    style={{ padding: '0 1.5rem', background: userAnswer.trim() ? GRADIENT : '#cbd5e0', color: 'white', border: 'none', borderRadius: '8px', cursor: userAnswer.trim() ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '1rem', alignSelf: 'flex-end', minHeight: '48px' }}>
+                    Check
+                  </button>
+                </div>
+              )}
+
+              {isChecking && (
+                <div style={{ textAlign: 'center', padding: '1rem', color: '#553C9A', fontSize: '0.95rem', border: '2px dashed #EDE9FE', borderRadius: '8px', marginBottom: '1rem' }}>
+                  🤖 Checking your answer...
                 </div>
               )}
 
               {/* Feedback */}
-              {feedback && (
-                <div style={{ padding: '12px 16px', borderRadius: '10px', marginBottom: '1rem', background: feedback.isCorrect ? '#f0fff4' : '#fff5f5', border: `1px solid ${feedback.isCorrect ? '#c6f6d5' : '#fed7d7'}` }}>
-                  <div style={{ fontWeight: 700, color: feedback.isCorrect ? '#276749' : '#9b2c2c', fontSize: '0.95rem', marginBottom: '2px' }}>
+              {feedback && (() => {
+                const style = feedback.isCorrect
+                  ? { bg: '#f0fff4', border: '#c6f6d5', color: '#276749' }
+                  : { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c' }
+                return (
+                  <div style={{ backgroundColor: style.bg, border: `1px solid ${style.border}`, color: style.color, padding: '1rem 1.25rem', borderRadius: '10px', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: '1.6', marginBottom: '0.75rem' }}>
                     {feedback.isCorrect ? '✅ Correct!' : `❌ Not quite — the answer is "${feedback.correct}"`}
+                    {feedback.isCorrect && feedback.type === 'fuzzy' && <span style={{ display: 'block', fontSize: '0.82rem', marginTop: '2px', color: '#c05621' }}>⚠️ Watch your spelling!</span>}
+                    {feedback.note && feedback.type !== 'fuzzy' && <span style={{ display: 'block', fontSize: '0.82rem', marginTop: '2px' }}>{feedback.note}</span>}
                   </div>
-                  {feedback.isCorrect && feedback.type === 'fuzzy' && <div style={{ color: '#c05621', fontSize: '0.82rem' }}>⚠️ Watch your spelling!</div>}
-                  {feedback.note && feedback.type !== 'fuzzy' && <div style={{ color: '#4a5568', fontSize: '0.82rem', marginTop: '2px' }}>{feedback.note}</div>}
-                </div>
+                )
+              })()}
+
+              {/* Check button for MC */}
+              {q.type === 'multiple_choice' && !feedback && (
+                <button onClick={checkAnswer} disabled={!selectedOption}
+                  style={{ width: '100%', padding: '1rem', fontSize: '1rem', background: selectedOption ? GRADIENT : '#cbd5e0', color: 'white', border: 'none', borderRadius: '10px', cursor: selectedOption ? 'pointer' : 'not-allowed', fontWeight: 600 }}>
+                  Check Answer
+                </button>
               )}
 
-              {/* Check / Next button */}
-              {!feedback ? (
-                <button onClick={checkAnswer} disabled={isChecking || (q.type === 'multiple_choice' ? !selectedOption : !userAnswer.trim())}
-                  style={{ width: '100%', padding: '1rem', marginTop: '0.25rem', fontSize: '1rem', background: (q.type === 'multiple_choice' ? !selectedOption : !userAnswer.trim()) || isChecking ? '#e2e8f0' : 'linear-gradient(135deg, #667eea, #764ba2)', color: (q.type === 'multiple_choice' ? !selectedOption : !userAnswer.trim()) || isChecking ? '#a0aec0' : 'white', border: 'none', borderRadius: '10px', cursor: (q.type === 'multiple_choice' ? !selectedOption : !userAnswer.trim()) || isChecking ? 'not-allowed' : 'pointer', fontWeight: 600, transition: 'all 0.15s' }}>
-                  {isChecking ? '⏳ Checking...' : 'Check Answer'}
-                </button>
-              ) : (
-                <button onClick={nextQuestion} style={{ width: '100%', padding: '1rem', marginTop: '0.75rem', fontSize: '1rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 600 }}>
-                  {current + 1 >= questions.length ? 'See Results' : 'Next Question →'}
+              {feedback && (
+                <button onClick={nextQuestion} style={{ width: '100%', padding: '1rem', marginTop: '0.5rem', fontSize: '1rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '600' }}>
+                  {currentQ + 1 >= questions.length ? 'See Results' : 'Next Question →'}
                 </button>
               )}
             </div>
@@ -419,7 +426,6 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
           </>
         )}
 
-        {/* Finished */}
         {stage === 'finished' && (() => {
           const finalScore = results.filter(r => r.isCorrect).length
           const finalPass  = finalScore >= passMark
@@ -427,25 +433,8 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
             <div style={{ background: '#f7fafc', border: '2px solid #e2e8f0', borderRadius: '8px', padding: '2rem', textAlign: 'center', marginTop: '1rem' }}>
               <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>{finalScore >= 9 ? '🏆' : finalScore >= 7 ? '⭐' : finalScore >= 5 ? '👍' : '💪'}</div>
               <h2 style={{ color: '#2d3748', margin: '0 0 12px' }}>Exercise Complete!</h2>
-              <div style={{ fontSize: '3rem', fontWeight: 700, color: finalPass ? '#48bb78' : finalScore >= 5 ? '#ed8936' : '#f56565', margin: '12px 0' }}>{finalScore}/{questions.length}</div>
+              <div style={{ fontSize: '3rem', fontWeight: 700, margin: '12px 0', color: finalPass ? '#48bb78' : finalScore >= 5 ? '#ed8936' : '#f56565' }}>{finalScore}/{questions.length}</div>
               <p style={{ color: '#4a5568' }}>{finalScore >= 9 ? 'Outstanding! Excellent work.' : finalPass ? 'Great work! You passed.' : finalScore >= 5 ? 'Good effort. Keep practising to improve.' : 'Keep going — practice makes perfect!'}</p>
-
-              {/* Review */}
-              <div style={{ textAlign: 'left', borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem', margin: '1.25rem 0' }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#718096', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.75rem' }}>Review</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {results.map((r, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', borderRadius: '8px', background: r.isCorrect ? '#f0fff4' : '#fff5f5', border: `1px solid ${r.isCorrect ? '#c6f6d5' : '#fed7d7'}`, fontSize: '0.84rem' }}>
-                      <span style={{ flexShrink: 0 }}>{r.isCorrect ? '✅' : '❌'}</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ color: '#4a5568', lineHeight: 1.4 }}>{r.question.question}</div>
-                        {!r.isCorrect && <div style={{ color: '#38a169', marginTop: '3px', fontWeight: 600 }}>Answer: {r.question.correct_answer}</div>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               <div style={{ marginTop: '20px', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button onClick={restartExercise} style={{ padding: '10px 24px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Try Again</button>
                 <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Change Level</button>
