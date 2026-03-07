@@ -927,7 +927,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       <div style={{ borderTop: '1px solid #f0f0f0', margin: '2px 0 14px' }} />
 
       <FilterSection label="Source">
-        {[['all', '🗂️ All'], ['question_bank', '❓ Questions'], ['listening', '🎧 Listening'], ['dictation', '🎙️ Dictation']].map(([val, lbl]) => (
+        {[['all', '🗂️ All'], ['question_bank', '❓ Questions'], ['listening', '🎧 Listening'], ['dictation', '⌨️ Dictation']].map(([val, lbl]) => (
           <button key={val} onClick={() => setFilter('source', val)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '5px 8px', borderRadius: 6, border: 'none', background: filters.source === val ? '#667eea' : 'transparent', color: filters.source === val ? 'white' : '#4a5568', cursor: 'pointer', marginBottom: 1, fontSize: 13 }}>{lbl}</button>
         ))}
       </FilterSection>
