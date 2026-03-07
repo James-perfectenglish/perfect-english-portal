@@ -10,6 +10,7 @@ import StudentDashboard from './StudentDashboard'
 import TeacherDashboard from './TeacherDashboard'
 import LyricsExercise from './LyricsExercise'
 import Blurt from './Blurt'
+import TeacherBrowse from './TeacherBrowse'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -43,6 +44,9 @@ function App() {
 function Dashboard({ session }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [globalLang, setGlobalLang] = useState(
+    () => localStorage.getItem('pep_teach_lang') || 'en'
+  )
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -56,6 +60,12 @@ function Dashboard({ session }) {
   }, [session])
 
   const handleLogout = async () => { await supabase.auth.signOut() }
+
+  const toggleLang = () => {
+    const next = globalLang === 'en' ? 'es' : 'en'
+    setGlobalLang(next)
+    localStorage.setItem('pep_teach_lang', next)
+  }
 
   if (loading) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading...</div>
 
@@ -72,6 +82,8 @@ function Dashboard({ session }) {
     )
   }
 
+  const isTeacher = profile?.is_teacher || false
+
   return (
     <div>
       {/* HEADER */}
@@ -84,10 +96,22 @@ function Dashboard({ session }) {
             </h1>
           </a>
           <nav>
-            <ul style={{ listStyle: 'none', display: 'flex', gap: 'clamp(0.5rem, 3vw, 2rem)', margin: 0, padding: 0 }}>
+            <ul style={{ listStyle: 'none', display: 'flex', gap: 'clamp(0.5rem, 3vw, 2rem)', margin: 0, padding: 0, alignItems: 'center' }}>
               <li><Link to="/"          style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Home</Link></li>
               <li><Link to="/practice"  style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Test</Link></li>
               <li><Link to="/exercises" style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Exercises</Link></li>
+              {isTeacher && (
+                <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <button
+                    onClick={toggleLang}
+                    title={globalLang === 'en' ? 'Switch to Spanish mode' : 'Switch to English mode'}
+                    style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}
+                  >
+                    {globalLang === 'en' ? '🇬🇧' : '🇪🇸'}
+                  </button>
+                  <TeacherBrowseLink />
+                </li>
+              )}
             </ul>
           </nav>
         </div>
@@ -95,14 +119,27 @@ function Dashboard({ session }) {
 
       {/* ROUTES */}
       <Routes>
-        <Route path="/"          element={<StudentDashboard profile={profile} session={session} handleLogout={handleLogout} />} />
-        <Route path="/practice"  element={<PracticePageWrapper profile={profile} />} />
-        <Route path="/exercises" element={<ExercisesPage profile={profile} />} />
-        <Route path="/lyrics"    element={<LyricsExercise user={session.user} />} />
-        <Route path="/blurt"     element={<Blurt user={session.user} />} />
-        <Route path="/teacher"   element={profile?.is_teacher ? <TeacherDashboard profile={profile} handleLogout={handleLogout} /> : <Navigate to="/" />} />
+        <Route path="/"                element={<StudentDashboard profile={profile} session={session} handleLogout={handleLogout} />} />
+        <Route path="/practice"        element={<PracticePageWrapper profile={profile} />} />
+        <Route path="/exercises"       element={<ExercisesPage profile={profile} />} />
+        <Route path="/lyrics"          element={<LyricsExercise user={session.user} />} />
+        <Route path="/blurt"           element={<Blurt user={session.user} />} />
+        <Route path="/teacher"         element={isTeacher ? <TeacherDashboard profile={profile} handleLogout={handleLogout} /> : <Navigate to="/" />} />
+        <Route path="/teacher/browse"  element={isTeacher ? <TeacherBrowse user={session.user} globalLang={globalLang} /> : <Navigate to="/" />} />
       </Routes>
     </div>
+  )
+}
+
+function TeacherBrowseLink() {
+  const navigate = useNavigate()
+  return (
+    <button
+      onClick={() => navigate('/teacher/browse')}
+      style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 10px', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)', cursor: 'pointer' }}
+    >
+      Browse
+    </button>
   )
 }
 
