@@ -554,43 +554,42 @@ function InteractiveQuestion({ item: q }) {
 
         {/* SENTENCE AUCTION */}
         {q.type === 'sentence_auction' && (() => {
-          const correctAnswer = (q.correct_answer || '').toLowerCase().trim();
-          const handleAuctionPick = (pick) => {
-            if (feedback) return;
-            const isCorrect = pick === correctAnswer;
-            setFeedback({
-              type: isCorrect ? 'correct' : 'incorrect',
-              isCorrect,
-              studentAnswer: pick,
-              correctAnswer,
-              message: isCorrect
-                ? `✅ Correct — this sentence is ${correctAnswer}. ${q.explanation || ''}`
-                : `❌ This sentence is actually ${correctAnswer}. ${q.explanation || ''}`,
-            });
-          };
-          const btnBase = { padding: '1.1rem 2rem', fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)', fontWeight: '700', border: 'none', borderRadius: '10px', cursor: feedback ? 'default' : 'pointer', transition: 'all 0.15s', flex: 1 };
-          const getAuctionBtnStyle = (val) => {
-            if (!feedback) return { ...btnBase, backgroundColor: val === 'correct' ? '#d4edda' : '#f8d7da', color: val === 'correct' ? '#155724' : '#721c24' };
-            const isThisCorrect = val === correctAnswer;
-            const wasChosen = val === feedback.studentAnswer;
-            if (isThisCorrect) return { ...btnBase, backgroundColor: '#48bb78', color: 'white', boxShadow: '0 2px 8px rgba(72,187,120,0.4)' };
-            if (wasChosen && !feedback.isCorrect) return { ...btnBase, backgroundColor: '#f56565', color: 'white' };
-            return { ...btnBase, backgroundColor: '#e2e8f0', color: '#a0aec0' };
-          };
+          const sentences = Array.isArray(q.options) ? q.options : (() => { try { return JSON.parse(q.options || '[]'); } catch { return []; } })();
+          const revealed = !!feedback;
           return (
             <div>
-              <div style={{ backgroundColor: '#FFFBEB', border: '2px solid #F6AD55', borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem', fontSize: 'clamp(1.1rem, 3.5vw, 1.3rem)', color: '#2C3E50', lineHeight: '1.7', fontWeight: '500', textAlign: 'center', fontStyle: 'italic' }}>
-                "{q.question}"
-              </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={() => handleAuctionPick('correct')} style={getAuctionBtnStyle('correct')}>✅ Correct</button>
-                <button onClick={() => handleAuctionPick('incorrect')} style={getAuctionBtnStyle('incorrect')}>❌ Incorrect</button>
-              </div>
-              {feedback && (
-                <div style={{ marginTop: '1rem', padding: '1rem 1.25rem', borderRadius: '10px', backgroundColor: feedback.isCorrect ? '#f0fff4' : '#fff5f5', border: `2px solid ${feedback.isCorrect ? '#48bb78' : '#f56565'}`, fontSize: 'clamp(1rem, 3vw, 1.1rem)', color: feedback.isCorrect ? '#276749' : '#c53030', lineHeight: '1.6', fontWeight: '500' }}>
-                  {feedback.message}
+              {q.question && q.question.trim() && (
+                <div style={{ backgroundColor: '#FFFBEB', border: '2px solid #F6AD55', borderRadius: '10px', padding: '0.9rem 1.25rem', marginBottom: '1.25rem', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', color: '#6B4C00', lineHeight: '1.6', fontWeight: '500', fontStyle: 'italic' }}>
+                  🏷️ {q.question}
                 </div>
               )}
+              <p style={{ fontSize: '0.88rem', color: '#718096', margin: '0 0 1rem', fontStyle: 'italic' }}>
+                {revealed ? 'Answers revealed — green = correct, red = incorrect.' : 'Which sentences are correct? Tap "Reveal Answers" when ready.'}
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.25rem' }}>
+                {sentences.map((s, idx) => {
+                  const bg     = !revealed ? 'white'    : s.correct ? '#f0fff4' : '#fff5f5';
+                  const border = !revealed ? '#e2e8f0' : s.correct ? '#48bb78' : '#f56565';
+                  const colour = !revealed ? '#2d3748'  : s.correct ? '#276749' : '#c53030';
+                  return (
+                    <div key={idx} style={{ borderRadius: '10px', border: `2px solid ${border}`, background: bg, padding: '0.9rem 1.1rem', transition: 'all 0.3s' }}>
+                      <div style={{ fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', color: colour, fontWeight: '500', lineHeight: '1.55', marginBottom: revealed && s.explanation ? '0.5rem' : 0 }}>
+                        {revealed && <span style={{ marginRight: '7px' }}>{s.correct ? '✅' : '❌'}</span>}
+                        {s.sentence}
+                      </div>
+                      {revealed && s.explanation && (
+                        <div style={{ fontSize: '0.875rem', color: s.correct ? '#2f855a' : '#9b2c2c', lineHeight: '1.5', opacity: 0.9 }}>
+                          {s.explanation}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {!revealed
+                ? <button onClick={() => setFeedback({ type: 'revealed' })} style={{ width: '100%', padding: '0.9rem', fontSize: '1rem', fontWeight: '700', background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer' }}>🔍 Reveal Answers</button>
+                : null
+              }
             </div>
           );
         })()}

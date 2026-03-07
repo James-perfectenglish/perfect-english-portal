@@ -113,7 +113,7 @@ function Dashboard({ session }) {
         <Route path="/exercises"      element={<ExercisesPage profile={profile} globalLang={globalLang} toggleLang={toggleLang} />} />
         <Route path="/lyrics"         element={<LyricsExercise user={session.user} />} />
         <Route path="/blurt"          element={<Blurt user={session.user} />} />
-        <Route path="/teacher"        element={isTeacher ? <TeacherDashboard profile={profile} handleLogout={handleLogout} /> : <Navigate to="/" />} />
+        <Route path="/teacher"        element={isTeacher ? <TeacherDashboard profile={profile} handleLogout={handleLogout} globalLang={globalLang} onToggleLang={toggleLang} onBrowseClick={() => navigate('/teacher/browse')} onHomeClick={() => navigate('/')} /> : <Navigate to="/" />} />
         <Route path="/teacher/browse" element={isTeacher ? <TeacherBrowse user={session.user} globalLang={globalLang} /> : <Navigate to="/" />} />
       </Routes>
     </div>
