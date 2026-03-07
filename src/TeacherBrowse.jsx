@@ -1,5 +1,7 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { supabase } from './supabaseClient';
+import SentenceBuildingInput from './SentenceBuildingInput';
+import MatchingPairs from './MatchingPairs';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -196,503 +198,470 @@ function TeacherCard({ item }) {
 
 // ── Interactive Question (Student view with real marking) ─────────────────────
 
-function InteractiveQuestion({ item }) {
-  const opts = useMemo(() => Array.isArray(item.options) ? item.options : [], [item._rowKey]);
+// ── Focus-ring fix for OOO + EC tiles (mirrors RandomPracticeExercise) ────────
 
-  // Shared state
-  const [markState, setMarkState] = useState('idle'); // idle | checking | correct | soft | incorrect
-  const [feedback,  setFeedback]  = useState(null);
+const TB_STYLE_ID = 'tb-focus-fix';
+if (typeof document !== 'undefined' && !document.getElementById(TB_STYLE_ID)) {
+  const _s = document.createElement('style');
+  _s.id = TB_STYLE_ID;
+  _s.textContent = `
+    .tb-ooo-option, .tb-ooo-option:focus, .tb-ooo-option:focus-visible,
+    .tb-ec-tile, .tb-ec-tile:focus, .tb-ec-tile:focus-visible {
+      outline: none !important;
+      -webkit-tap-highlight-color: transparent !important;
+    }
+  `;
+  document.head.appendChild(_s);
+}
 
-  // Type-specific state
-  const [selected,  setSelected]  = useState(null);   // MC, odd_one_out
-  const [answer,    setAnswer]    = useState('');      // gap_fill, error_correction, dictation
-  const [bids,      setBids]      = useState({});      // sentence_auction
+// ── Module-level helpers (mirrors RandomPracticeExercise) ─────────────────────
 
-  // Sentence building
-  const initBank = useMemo(() => shuffle(opts.map((w, i) => ({ word: w, uid: i }))), [item._rowKey]);
-  const [bank,     setBank]     = useState(initBank);
-  const [sentence, setSentence] = useState([]);
+const _isFuzzy = (studentAnswer, correctAnswers) => {
+  for (const correct of correctAnswers) {
+    const dist = levenshtein(studentAnswer, correct);
+    if (dist === 1) return true;
+    if (dist === 2 && correct.length >= 6) return true;
+  }
+  return false;
+};
+const _normaliseEC         = (s) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+const _normaliseDictation  = (s) => s.toLowerCase().trim().replace(/[.,!?;:'"]/g, '').replace(/\s+/g, ' ');
+const _findErrorIndex      = (words, correctAnswer) => {
+  const cw = correctAnswer.trim().split(/\s+/);
+  for (let i = 0; i < Math.max(words.length, cw.length); i++) {
+    if (!words[i] || !cw[i] || words[i].toLowerCase() !== cw[i].toLowerCase())
+      return { index: i, correctWord: cw[i] || '(missing)' };
+  }
+  return { index: -1, correctWord: '' };
+};
+const _qLang = (q) => q?.topic === 'spanish' ? 'es' : 'en';
+const _getSbProps = (q) => {
+  if (!q) return {};
+  const options = Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]');
+  const hasPrompt = q.question && q.question.trim() !== '';
+  return { words: options, questionType: hasPrompt ? 'translation' : 'build', prompt: hasPrompt ? q.question : null, correctSentences: [q.correct_answer || ''], explanation: q.explanation || '' };
+};
 
-  // Matching
-  const initRights = useMemo(() => shuffle(opts.map((p, i) => ({ content: typeof p.right === 'object' ? p.right.content : p.right, origIdx: i }))), [item._rowKey]);
-  const [leftSel,  setLeftSel]  = useState(null);
-  const [pairs,    setPairs]    = useState({});
-
-  // Reset everything when item changes
-  useEffect(() => {
-    setMarkState('idle'); setFeedback(null);
-    setSelected(null); setAnswer('');
-    setBids({});
-    setBank(initBank); setSentence([]);
-    setLeftSel(null); setPairs({});
-  }, [item._rowKey]);
-
-  const grad = { background: 'linear-gradient(135deg, #667eea, #764ba2)', borderRadius: 12, padding: '1.1rem 1.25rem', color: 'white', marginBottom: 12 };
-  const inputStyle = { width: '100%', padding: '0.7rem', border: '2px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box', background: 'white' };
-
-  // Badge strip shown to students — matches pill style used across the app
-  const Q_LEVEL_COLORS = { A1:'#38a169',A2:'#2f855a',B1:'#3182ce',B2:'#2b6cb0',C1:'#dd6b20',C2:'#c05621' };
-  const Q_TYPE_LABELS  = { gap_fill:'Gap Fill',multiple_choice:'Multiple Choice',sentence_building:'Sentence Building',odd_one_out:'Odd One Out',error_correction:'Error Correction',matching:'Matching',sentence_auction:'Sentence Auction' };
-  const fmtTopic = (t) => t ? t.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase()) : '';
-  const Badges = () => item._source === 'question_bank' ? (
-    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
-      {item.level && (
-        <span style={{ background: Q_LEVEL_COLORS[item.level] || '#718096', color: 'white', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
-          {item.level}
-        </span>
-      )}
-      {item.type && (
-        <span style={{ background: 'rgba(255,255,255,0.25)', color: 'white', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
-          {Q_TYPE_LABELS[item.type] || item.type}
-        </span>
-      )}
-      {item.topic && (
-        <span style={{ background: 'rgba(255,255,255,0.15)', color: 'white', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>
-          {fmtTopic(item.topic)}
-        </span>
-      )}
-    </div>
-  ) : null;
-
-  const checkBtn = (onClick, disabled) => (
-    <button
-      onClick={onClick} disabled={disabled || markState === 'checking'}
-      style={{ marginTop: 10, padding: '9px 22px', background: disabled ? '#e2e8f0' : 'linear-gradient(135deg, #667eea, #764ba2)', color: disabled ? '#a0aec0' : 'white', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: disabled ? 'default' : 'pointer' }}
-    >
-      {markState === 'checking' ? 'Checking…' : 'Check ✓'}
-    </button>
-  );
+function InteractiveQuestion({ item: q }) {
+  const [feedback,           setFeedback]           = useState(null);
+  const [isChecking,         setIsChecking]          = useState(false);
+  const [userAnswer,         setUserAnswer]          = useState('');
+  const [selectedOption,     setSelectedOption]      = useState(null);
+  const [oooSelected,        setOooSelected]         = useState(null);
+  const [ecSelectedWordIndex,setEcSelectedWordIndex] = useState(null);
+  const [ecCorrection,       setEcCorrection]        = useState('');
+  const [sbFeedback,         setSbFeedback]          = useState(null);
+  const [matchingDone,       setMatchingDone]        = useState(false);
+  const [audioPlayed,        setAudioPlayed]         = useState(false);
+  const audioRef = useRef(null);
 
   const reset = () => {
-    setMarkState('idle'); setFeedback(null);
-    setSelected(null); setAnswer('');
-    setBids({});
-    setBank(initBank); setSentence([]);
-    setLeftSel(null); setPairs({});
+    setFeedback(null); setUserAnswer(''); setSelectedOption(null);
+    setOooSelected(null); setEcSelectedWordIndex(null); setEcCorrection('');
+    setSbFeedback(null); setMatchingDone(false); setAudioPlayed(false); setIsChecking(false);
   };
 
-  // ── Marking helpers ───────────────────────────────────────────────────────
-
-  const callApi = async (endpoint, body) => {
-    const res = await fetch(`/api/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    return res.json();
+  // ── Mark: gap fill (verbatim logic from RPE) ──
+  const checkAnswer = async () => {
+    let isCorrect = false, feedbackType = 'incorrect', explanation = q.explanation || '';
+    if (q.type === 'gap_fill') {
+      const answer = userAnswer.toLowerCase().trim();
+      const correctAnswer = q.correct_answer?.toLowerCase().trim() || '';
+      const correctAnswers = [correctAnswer];
+      if (correctAnswer && answer === correctAnswer) { isCorrect = true; feedbackType = 'correct'; }
+      if (!isCorrect && q.informal_accepted && Array.isArray(q.informal_accepted)) {
+        const inf = q.informal_accepted.map(a => a.toLowerCase().trim());
+        if (inf.includes(answer)) { isCorrect = true; feedbackType = 'informal'; if (q.informal_feedback) explanation = q.informal_feedback + ' ' + explanation; }
+      }
+      if (!isCorrect && q.acceptable_alternatives && Array.isArray(q.acceptable_alternatives)) {
+        const alt = q.acceptable_alternatives.find(a => a.answer && a.answer.toLowerCase().trim() === answer);
+        if (alt) { isCorrect = true; feedbackType = 'alternative'; explanation = alt.feedback + ' ' + explanation; }
+      }
+      if (!isCorrect && _isFuzzy(answer, correctAnswers)) { isCorrect = true; feedbackType = 'fuzzy'; }
+      if (!isCorrect) {
+        setIsChecking(true);
+        try {
+          const res  = await fetch('/api/mark-gap-fill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q.question, correctAnswer, studentAnswer: userAnswer.trim(), language: _qLang(q) }) });
+          const data = await res.json();
+          if (data?.valid) { isCorrect = true; feedbackType = 'soft-pass'; if (data.reason) explanation = data.reason + ' ' + explanation; }
+        } catch(e) {}
+        setIsChecking(false);
+      }
+      setFeedback({ type: feedbackType, isCorrect, studentAnswer: userAnswer.trim(), correctAnswer: correctAnswer || 'N/A', explanation });
+    } else if (q.type === 'multiple_choice') {
+      const mcCorrect = q.correct_answer || '';
+      isCorrect = selectedOption === mcCorrect;
+      setFeedback({ type: isCorrect ? 'correct' : 'incorrect', isCorrect, studentAnswer: selectedOption || '', correctAnswer: mcCorrect, explanation });
+    }
   };
 
-  const markDirect = (isCorrect, msg = null) => {
-    setMarkState(isCorrect ? 'correct' : 'incorrect');
-    setFeedback(msg);
+  // ── Mark: dictation ──
+  const checkDictationAnswer = async () => {
+    if (!userAnswer.trim() || isChecking) return;
+    const answer = userAnswer.trim(), correct = q.correct_answer || '';
+    let isCorrect = false, feedbackType = 'incorrect', feedbackMsg = '';
+    if (answer.toLowerCase() === correct.toLowerCase()) { isCorrect = true; feedbackType = 'correct'; }
+    if (!isCorrect && _normaliseDictation(answer) === _normaliseDictation(correct)) { isCorrect = true; feedbackType = 'correct'; }
+    if (!isCorrect && _isFuzzy(_normaliseDictation(answer), [_normaliseDictation(correct)])) { isCorrect = true; feedbackType = 'fuzzy'; }
+    if (!isCorrect) {
+      setIsChecking(true);
+      try {
+        const res  = await fetch('/api/mark-dictation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ correctAnswer: correct, studentAnswer: answer }) });
+        const data = await res.json();
+        if (data?.accepted) { isCorrect = true; feedbackType = 'soft-pass'; }
+      } catch(e) {}
+      setIsChecking(false);
+    }
+    if (feedbackType === 'correct')    feedbackMsg = `✅ Correct!`;
+    else if (feedbackType === 'fuzzy') feedbackMsg = `✅ Correct — watch your spelling! The answer was: "${correct}"`;
+    else if (feedbackType === 'soft-pass') feedbackMsg = `✅ Close enough! The model answer was: "${correct}"`;
+    else                               feedbackMsg = `❌ The answer was: "${correct}"`;
+    setFeedback({ type: feedbackType, isCorrect, message: feedbackMsg, studentAnswer: answer, correctAnswer: correct });
   };
 
-  // ── Listening / Dictation ─────────────────────────────────────────────────
+  // ── Mark: OOO ──
+  const handleOOOSelect = (option) => {
+    if (feedback) return;
+    setOooSelected(option);
+    const oddOne = q.correct_answer || '';
+    const isCorrect = option.toLowerCase().trim() === oddOne.toLowerCase().trim();
+    setFeedback({ message: isCorrect ? `✅ Correct! "${oddOne}" is the odd one out. ${q.explanation || ''}` : `❌ Not quite. "${oddOne}" is the odd one out. ${q.explanation || ''}`, type: isCorrect ? 'correct' : 'incorrect', isCorrect, oddOne });
+  };
 
-  if (item._source === 'listening') return (
-    <div>
-      <div style={grad}>
-        <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>🎧 Listening Exercise</div>
-        <h3 style={{ margin: 0, fontSize: 16 }}>{item.title}</h3>
-        {item.intro_text && <p style={{ margin: '6px 0 0', opacity: 0.9, fontSize: 13 }}>{item.intro_text}</p>}
+  // ── Mark: EC ──
+  const handleECWordTap = (index) => { if (feedback || isChecking) return; setEcSelectedWordIndex(index); setEcCorrection(''); };
+  const checkECAnswer = async () => {
+    if (ecSelectedWordIndex === null || !ecCorrection.trim() || isChecking) return;
+    const words = q.question.trim().split(/\s+/);
+    const correctAnswer = q.correct_answer || '';
+    const correctedWords = [...words];
+    const originalWord = words[ecSelectedWordIndex];
+    const trailingPunct = originalWord.match(/[.,!?;:]+$/)?.[0] || '';
+    const cleanCorrection = ecCorrection.trim().replace(/[.,!?;:]+$/, '');
+    correctedWords[ecSelectedWordIndex] = cleanCorrection + trailingPunct;
+    const correctedSentence = correctedWords.join(' ');
+    const isExactMatch = _normaliseEC(correctedSentence) === _normaliseEC(correctAnswer);
+    const errorInfo = _findErrorIndex(words, correctAnswer);
+    if (isExactMatch) {
+      setFeedback({ type: 'correct', message: `✅ Correct! ${q.explanation || ''}`, isCorrect: true, errorIndex: ecSelectedWordIndex, correctWord: cleanCorrection + trailingPunct });
+      return;
+    }
+    setIsChecking(true);
+    let aiResult = null;
+    try {
+      const res = await fetch('/api/mark-correction', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ originalSentence: q.question, errorWord: words[ecSelectedWordIndex], studentReplacement: ecCorrection.trim(), correctAnswerSentence: correctAnswer, language: _qLang(q) }) });
+      aiResult = await res.json();
+    } catch(e) {}
+    setIsChecking(false);
+    if (aiResult?.valid) {
+      setFeedback({ type: 'soft-pass', message: `✅ Good — that works too! ${aiResult.reason || ''} The model answer was "${errorInfo.correctWord}". ${q.explanation || ''}`, isCorrect: true, errorIndex: ecSelectedWordIndex, correctWord: cleanCorrection + trailingPunct });
+      return;
+    }
+    const foundRightWord = ecSelectedWordIndex === errorInfo.index;
+    setFeedback({ type: 'incorrect', message: foundRightWord ? `❌ Good — you found the error in "${words[errorInfo.index]}", but "${ecCorrection.trim()}" doesn't quite work here. ${aiResult?.reason ? aiResult.reason + ' ' : ''}It should be "${errorInfo.correctWord}". ${q.explanation || ''}` : `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${q.explanation || ''}`, isCorrect: false, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
+  };
+
+  // ── Mark: sentence building ──
+  const handleSentenceBuildingResult = (isCorrect, isSoft = false, userAns = '') => {
+    if (isCorrect) {
+      const msg = `✅ Correct! ${q.explanation || ''}`;
+      setSbFeedback({ correct: true, message: msg });
+      setFeedback({ message: msg, type: 'correct', isCorrect: true });
+    } else {
+      const displaySentence = (q.correct_answer || '').replace(/ ([.,?!;:])/g, '$1').replace(/^(\w)/, m => m.toUpperCase());
+      const msg = `❌ Not quite. The correct answer is: "${displaySentence}" — ${q.explanation || ''}`;
+      setSbFeedback({ correct: false, message: msg });
+      setFeedback({ message: msg, type: 'incorrect', isCorrect: false });
+    }
+  };
+
+  // ── Mark: matching ──
+  const handleMatchingResult = (isCorrect, wrongAttempts) => {
+    setMatchingDone(true);
+    const msg = isCorrect ? `✅ Perfect matching! ${q.explanation || ''}` : `👍 All matched! You had ${wrongAttempts} wrong attempt${wrongAttempts !== 1 ? 's' : ''}. ${q.explanation || ''}`;
+    setFeedback({ message: msg, type: isCorrect ? 'correct' : 'incorrect', isCorrect });
+  };
+
+  // ── Styles (verbatim from RPE) ──
+  const getOOOStyle = (option) => {
+    const base = { padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)', borderRadius: '8px', border: 'none', boxShadow: 'inset 0 0 0 2px #e2e8f0', cursor: feedback ? 'default' : 'pointer', fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)', fontWeight: '500', textAlign: 'center', transition: 'all 0.2s ease', backgroundColor: 'white', color: '#2d3748', minHeight: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none', outline: 'none' };
+    if (!feedback) {
+      if (oooSelected === option) return { ...base, boxShadow: 'inset 0 0 0 2px #667eea', backgroundColor: '#EDE9FE', color: '#553C9A' };
+      return base;
+    }
+    const oddOne = feedback.oddOne || '';
+    const isOdd = option.toLowerCase().trim() === oddOne.toLowerCase().trim();
+    const wasSelected = oooSelected === option;
+    if (isOdd) return { ...base, boxShadow: 'inset 0 0 0 2px #48bb78, 0 0 0 3px rgba(72, 187, 120, 0.3)', backgroundColor: '#f0fff4', color: '#276749' };
+    if (wasSelected && !feedback.isCorrect) return { ...base, boxShadow: 'inset 0 0 0 2px #f56565', backgroundColor: '#fff5f5', color: '#c53030' };
+    return { ...base, opacity: 0.5 };
+  };
+
+  const getECTileStyle = (index) => {
+    const base = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)', margin: '4px 3px', borderRadius: '8px', fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)', fontWeight: '500', cursor: (feedback || isChecking) ? 'default' : 'pointer', transition: 'all 0.15s ease', userSelect: 'none', backgroundColor: 'white', border: '2px solid #e2e8f0', color: '#2d3748', outline: 'none' };
+    if (feedback) {
+      const errorIdx = feedback.errorIndex;
+      const isPass = feedback.type === 'correct' || feedback.type === 'soft-pass';
+      if (index === errorIdx && isPass)  return { ...base, backgroundColor: '#f0fff4', border: '2px solid #48bb78', color: '#276749', textDecoration: 'line-through', textDecorationColor: '#c53030' };
+      if (index === errorIdx && !isPass) return { ...base, backgroundColor: '#fff5f5', border: '2px solid #f56565', color: '#c53030', textDecoration: 'line-through', textDecorationColor: '#c53030' };
+      if (index === ecSelectedWordIndex && ecSelectedWordIndex !== errorIdx) return { ...base, backgroundColor: '#fff5f5', border: '2px solid #f56565', color: '#c53030', opacity: 0.6 };
+      return { ...base, opacity: 0.6 };
+    }
+    if (index === ecSelectedWordIndex) return { ...base, backgroundColor: '#EDE9FE', border: '2px solid #667eea', color: '#553C9A' };
+    return base;
+  };
+
+  // ── Derived ──
+  const ecWords       = q.type === 'error_correction' ? q.question.trim().split(/\s+/) : [];
+  const matchingPairs = q.type === 'matching' ? (Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]')) : null;
+
+  // ── Structured feedback (gap fill + MC) — verbatim from RPE ──
+  const renderStructuredFeedback = () => {
+    if (!feedback || (q.type !== 'gap_fill' && q.type !== 'multiple_choice')) return null;
+    const isFuzzy = feedback.type === 'fuzzy', isSoftPass = feedback.type === 'soft-pass', isCorrect = feedback.isCorrect;
+    const borderColor = (isFuzzy || isSoftPass) ? '#f6ad55' : isCorrect ? '#48bb78' : '#f56565';
+    const bgColor     = (isFuzzy || isSoftPass) ? '#fffbeb' : isCorrect ? '#f0fff4' : '#fff5f5';
+    const headerBg    = (isFuzzy || isSoftPass) ? '#f6ad55' : isCorrect ? '#48bb78' : '#f56565';
+    const headerText  = isFuzzy ? '✅ Correct — but watch your spelling!' : isSoftPass ? '✅ Also correct!' : isCorrect ? '✅ Correct!' : '❌ Incorrect';
+    return (
+      <div style={{ marginTop: '1rem', borderRadius: '12px', border: `2px solid ${borderColor}`, overflow: 'hidden', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)' }}>
+        <div style={{ backgroundColor: headerBg, color: 'white', padding: '0.6rem 1rem', fontWeight: '700', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)' }}>{headerText}</div>
+        <div style={{ backgroundColor: bgColor, padding: '1rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem', alignItems: 'flex-start' }}>
+            <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px' }}>Your answer:</span>
+            <span style={{ fontWeight: '600', color: isCorrect ? '#276749' : '#c53030', wordBreak: 'break-word' }}>{feedback.studentAnswer || '(no answer)'}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'flex-start' }}>
+            <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px' }}>Correct answer:</span>
+            <span style={{ fontWeight: '700', color: '#276749', wordBreak: 'break-word' }}>{feedback.correctAnswer}</span>
+          </div>
+          {isFuzzy && <div style={{ borderTop: `1px solid ${borderColor}`, paddingTop: '0.75rem', color: '#744210', lineHeight: '1.6' }}>✏️ Almost perfect — watch your spelling next time!</div>}
+          {!isFuzzy && feedback.explanation && <div style={{ borderTop: `1px solid ${borderColor}`, paddingTop: '0.75rem', color: '#4a5568', lineHeight: '1.6' }}>💡 {feedback.explanation}</div>}
+        </div>
       </div>
-      {item.audio_url && <audio controls src={item.audio_url} style={{ width: '100%', marginBottom: 10 }} />}
-      <p style={{ color: '#718096', fontStyle: 'italic', fontSize: 13 }}>Questions reveal after the student plays the audio.</p>
+    );
+  };
+
+  // ── Render ──
+  return (
+    <div style={{ backgroundColor: 'white', padding: 'clamp(1.5rem, 5vw, 2.5rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+      {/* Badges — verbatim from RPE */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+        {q.type !== 'sentence_building' && (
+          <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
+            backgroundColor: q.type === 'gap_fill' ? '#fff3cd' : q.type === 'odd_one_out' ? '#E0F2FE' : q.type === 'error_correction' ? '#FEE2E2' : q.type === 'matching' ? '#D1FAE5' : q.type === 'dictation' ? '#EDE9FE' : '#d4edda',
+            color: q.type === 'gap_fill' ? '#856404' : q.type === 'odd_one_out' ? '#0369A1' : q.type === 'error_correction' ? '#DC2626' : q.type === 'matching' ? '#065F46' : q.type === 'dictation' ? '#553C9A' : '#155724',
+          }}>
+            {q.type === 'gap_fill' ? '✏️ Gap Fill' : q.type === 'odd_one_out' ? '🔍 Odd One Out' : q.type === 'error_correction' ? '🚨 Error Correction' : q.type === 'matching' ? '🔗 Matching' : q.type === 'dictation' ? '⌨️ Dictation' : '📝 Multiple Choice'}
+          </div>
+        )}
+        {q.level && (
+          <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
+            backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8',
+            color: q.level.startsWith('A') ? '#48bb78' : q.level.startsWith('B') ? '#4299e1' : '#ed8936',
+          }}>{q.level}</div>
+        )}
+        {q.topic && q.type !== 'dictation' && (
+          <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
+            backgroundColor: q.topic === 'question_forms' ? '#FEE2E2' : q.topic === 'punctuation' ? '#FEE2E2' : '#f0f0f0',
+            color: q.topic === 'question_forms' ? '#DC2626' : q.topic === 'punctuation' ? '#DC2626' : '#555',
+          }}>
+            {q.topic === 'question_forms' ? '❓ ' : ''}{q.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+          </div>
+        )}
+        {(q.type === 'error_correction' || q.type === 'gap_fill' || q.type === 'sentence_building' || q.type === 'dictation') && (
+          <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>🤖 AI marked</div>
+        )}
+      </div>
+
+      {/* Question text — same condition as RPE */}
+      {q.type !== 'sentence_building' && q.type !== 'error_correction' && q.type !== 'matching' && q.type !== 'dictation' && q.question && (
+        <div style={{ fontSize: 'clamp(1.15rem, 4vw, 1.4rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+          {q.question}
+        </div>
+      )}
+
+      <div style={{ flex: 1 }}>
+
+        {/* GAP FILL */}
+        {q.type === 'gap_fill' && !feedback && (
+          <input type="text" value={userAnswer} onChange={e => setUserAnswer(e.target.value)}
+            onKeyPress={e => e.key === 'Enter' && !isChecking && checkAnswer()}
+            placeholder="Type your answer..." disabled={isChecking} autoFocus
+            style={{ width: '100%', padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', borderRadius: '10px', border: '2px solid #e0e0e0', boxSizing: 'border-box', color: '#2C3E50', opacity: isChecking ? 0.6 : 1 }} />
+        )}
+
+        {/* MULTIPLE CHOICE — before */}
+        {q.type === 'multiple_choice' && !feedback && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {q.options.map((option, index) => (
+              <button key={index} onClick={() => setSelectedOption(option)}
+                style={{ padding: '1.2rem', fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)', textAlign: 'left', backgroundColor: selectedOption === option ? '#3498DB' : 'white', color: selectedOption === option ? 'white' : '#2C3E50', border: `2px solid ${selectedOption === option ? '#3498DB' : '#e0e0e0'}`, borderRadius: '10px', cursor: 'pointer', transition: 'all 0.2s', wordWrap: 'break-word', width: '100%', boxSizing: 'border-box', fontWeight: '500' }}
+              >{option}</button>
+            ))}
+          </div>
+        )}
+
+        {/* MULTIPLE CHOICE — after */}
+        {q.type === 'multiple_choice' && feedback && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '0.5rem' }}>
+            {q.options.map((option, index) => {
+              const isCorrectOption = option === feedback.correctAnswer;
+              const wasSelected     = option === feedback.studentAnswer;
+              let bg = '#f7fafc', border = '#e2e8f0', color = '#a0aec0';
+              if (isCorrectOption)                        { bg = '#f0fff4'; border = '#48bb78'; color = '#276749'; }
+              else if (wasSelected && !feedback.isCorrect){ bg = '#fff5f5'; border = '#f56565'; color = '#c53030'; }
+              return (
+                <div key={index} style={{ padding: '0.9rem 1.2rem', fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', backgroundColor: bg, color, border: `2px solid ${border}`, borderRadius: '10px', fontWeight: isCorrectOption || wasSelected ? '600' : '400', wordWrap: 'break-word' }}>
+                  {isCorrectOption ? '✓ ' : wasSelected && !feedback.isCorrect ? '✗ ' : ''}{option}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* SENTENCE BUILDING */}
+        {q.type === 'sentence_building' && (
+          <SentenceBuildingInput key={q.id} {..._getSbProps(q)} disabled={!!feedback} onResult={handleSentenceBuildingResult} feedback={sbFeedback} showCheckButton={true} onAnswerReady={() => {}} />
+        )}
+
+        {/* ODD ONE OUT */}
+        {q.type === 'odd_one_out' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '1rem' }}>
+            {(Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]')).map((option, idx) => (
+              <div key={idx} className="tb-ooo-option" tabIndex={-1} onClick={() => handleOOOSelect(option)} style={getOOOStyle(option)}
+                onMouseEnter={e => { if (!feedback) { e.currentTarget.style.boxShadow = 'inset 0 0 0 2px #667eea'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
+                onMouseLeave={e => { if (!feedback && oooSelected !== option) { e.currentTarget.style.boxShadow = 'inset 0 0 0 2px #e2e8f0'; e.currentTarget.style.transform = 'none'; } }}
+              >{option}</div>
+            ))}
+          </div>
+        )}
+
+        {/* ERROR CORRECTION */}
+        {q.type === 'error_correction' && (
+          <div>
+            <div style={{ fontSize: '0.9rem', color: '#718096', marginBottom: '1rem', fontStyle: 'italic' }}>
+              {isChecking ? '🤖 Checking your answer...' : !feedback ? '👆 Tap the word that is wrong, then type the correction below.' : feedback.isCorrect ? 'Well done!' : 'See the correction below.'}
+            </div>
+            <div style={{ backgroundColor: '#F8FBFF', padding: '1.25rem', borderRadius: '10px', border: '1px solid #AED6F1', lineHeight: '2.4', marginBottom: '1.25rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
+              {ecWords.map((word, index) => (
+                <span key={index} className="tb-ec-tile" tabIndex={-1} onClick={() => handleECWordTap(index)} style={getECTileStyle(index)}
+                  onMouseEnter={e => { if (!feedback && !isChecking && ecSelectedWordIndex !== index) { e.currentTarget.style.borderColor = '#667eea'; e.currentTarget.style.backgroundColor = '#f7f7ff'; } }}
+                  onMouseLeave={e => { if (!feedback && !isChecking && ecSelectedWordIndex !== index) { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.backgroundColor = 'white'; } }}
+                >{word}</span>
+              ))}
+              {feedback && feedback.errorIndex >= 0 && (
+                <div style={{ width: '100%', marginTop: '0.75rem', fontSize: '1rem', paddingLeft: '4px' }}>
+                  <span style={{ color: '#c53030', textDecoration: 'line-through', fontWeight: 500 }}>{ecWords[feedback.errorIndex]}</span>
+                  <span style={{ margin: '0 8px', color: '#718096' }}>→</span>
+                  <span style={{ color: '#276749', fontWeight: 600 }}>{feedback.correctWord}</span>
+                </div>
+              )}
+            </div>
+            {ecSelectedWordIndex !== null && !feedback && !isChecking && (
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', alignItems: 'stretch' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Your correction for "{ecWords[ecSelectedWordIndex]}":</div>
+                  <input type="text" value={ecCorrection} onChange={e => setEcCorrection(e.target.value)}
+                    onKeyPress={e => e.key === 'Enter' && checkECAnswer()}
+                    placeholder="Type the correct word..." autoFocus
+                    style={{ width: '100%', padding: '0.9rem 1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', borderRadius: '8px', border: '2px solid #667eea', boxSizing: 'border-box', color: '#2d3748', fontWeight: 500, backgroundColor: '#EDE9FE' }} />
+                </div>
+                <button onClick={checkECAnswer} disabled={!ecCorrection.trim() || isChecking}
+                  style={{ padding: '0 1.5rem', background: ecCorrection.trim() ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#cbd5e0', color: 'white', border: 'none', borderRadius: '8px', cursor: ecCorrection.trim() ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '1rem', alignSelf: 'flex-end', minHeight: '48px' }}>Check</button>
+              </div>
+            )}
+            {ecSelectedWordIndex === null && !feedback && !isChecking && (
+              <div style={{ textAlign: 'center', padding: '1rem', color: '#A0AEC0', fontSize: '0.95rem', border: '2px dashed #E2E8F0', borderRadius: '8px' }}>👆 Tap the word you think is wrong</div>
+            )}
+          </div>
+        )}
+
+        {/* MATCHING */}
+        {q.type === 'matching' && matchingPairs && (
+          <div>
+            {q.question && q.question.trim() && (
+              <div style={{ fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500', marginBottom: '1rem', wordWrap: 'break-word' }}>
+                {q.question}
+              </div>
+            )}
+            <MatchingPairs key={q.id} pairs={matchingPairs} disabled={!!feedback} onResult={handleMatchingResult} />
+          </div>
+        )}
+
+        {/* DICTATION */}
+        {q.type === 'dictation' && (
+          <div>
+            <audio ref={audioRef} src={q.audio_url} style={{ display: 'none' }} />
+            <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+              <button onClick={() => { if (audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.play(); setAudioPlayed(true); } }}
+                style={{ padding: '0.9rem 2rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', fontWeight: '600', boxShadow: '0 2px 8px rgba(102,126,234,0.35)' }}>
+                🔊 {audioPlayed ? 'Play Again' : 'Play Audio'}
+              </button>
+              {!audioPlayed && <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#a0aec0' }}>👆 Tap to hear the audio</div>}
+            </div>
+            {q.sentence_template && !feedback && (
+              <div style={{ backgroundColor: '#EBF8FF', border: '2px solid #90CDF4', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500' }}>
+                {q.sentence_template}
+              </div>
+            )}
+            {!feedback && (
+              <input type="text" value={userAnswer} onChange={e => setUserAnswer(e.target.value)}
+                onKeyPress={e => e.key === 'Enter' && !isChecking && userAnswer.trim() && checkDictationAnswer()}
+                placeholder={q.excerpt_type === 'sentence' ? 'Type the full sentence you heard...' : 'Type the word or phrase you heard...'}
+                disabled={isChecking}
+                style={{ width: '100%', padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', borderRadius: '10px', border: '2px solid #e0e0e0', boxSizing: 'border-box', color: '#2C3E50', opacity: isChecking ? 0.6 : 1 }} />
+            )}
+            {feedback && (
+              <div style={{ backgroundColor: feedback.isCorrect ? (feedback.type === 'fuzzy' || feedback.type === 'soft-pass' ? '#fffbeb' : '#f0fff4') : '#fff5f5', border: `2px solid ${feedback.isCorrect ? (feedback.type === 'fuzzy' || feedback.type === 'soft-pass' ? '#f6ad55' : '#48bb78') : '#f56565'}`, borderRadius: '10px', padding: '1rem', marginTop: '0.5rem', fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6', color: feedback.isCorrect ? (feedback.type === 'fuzzy' || feedback.type === 'soft-pass' ? '#744210' : '#276749') : '#c53030', fontWeight: '500' }}>
+                {feedback.message}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* AI checking indicator */}
+        {isChecking && ['gap_fill', 'error_correction', 'dictation'].includes(q.type) && (
+          <div style={{ marginTop: '1rem', textAlign: 'center', padding: '1rem', color: '#553C9A', fontSize: '0.95rem', border: '2px dashed #EDE9FE', borderRadius: '8px' }}>🤖 Checking your answer...</div>
+        )}
+
+        {renderStructuredFeedback()}
+
+        {/* EC feedback */}
+        {feedback && q.type === 'error_correction' && (
+          <div style={{ backgroundColor: feedback.type === 'soft-pass' ? '#fffbeb' : feedback.isCorrect ? '#d4edda' : '#f8d7da', color: feedback.type === 'soft-pass' ? '#744210' : feedback.isCorrect ? '#155724' : '#721c24', padding: '1.2rem', borderRadius: '10px', marginTop: '1rem', fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6', wordWrap: 'break-word', overflowWrap: 'break-word', border: feedback.type === 'soft-pass' ? '1px solid #fbd38d' : 'none' }}>
+            {feedback.message}
+          </div>
+        )}
+
+        {/* Simple feedback: OOO, matching */}
+        {feedback && !['error_correction', 'sentence_building', 'gap_fill', 'multiple_choice', 'dictation'].includes(q.type) && (
+          <div style={{ backgroundColor: feedback.isCorrect ? '#d4edda' : '#f8d7da', color: feedback.isCorrect ? '#155724' : '#721c24', padding: '1.2rem', borderRadius: '10px', marginTop: '1rem', fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+            {feedback.message}
+          </div>
+        )}
+      </div>
+
+      {/* Buttons */}
+      <div style={{ marginTop: '1.5rem' }}>
+        {!feedback && !['sentence_building', 'odd_one_out', 'error_correction', 'matching'].includes(q.type) && (
+          <button
+            onClick={q.type === 'dictation' ? checkDictationAnswer : checkAnswer}
+            disabled={isChecking || (!userAnswer.trim() && q.type !== 'multiple_choice') || (q.type === 'multiple_choice' && !selectedOption)}
+            style={{ padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)', backgroundColor: '#2C3E50', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', width: '100%', fontWeight: '600', opacity: (isChecking || (!userAnswer.trim() && q.type !== 'multiple_choice') || (q.type === 'multiple_choice' && !selectedOption)) ? 0.5 : 1 }}>
+            {isChecking ? '🤖 Checking...' : 'Check Answer'}
+          </button>
+        )}
+        {feedback && (
+          <button onClick={reset}
+            style={{ padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)', backgroundColor: '#718096', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', width: '100%', fontWeight: '600' }}>
+            ↺ Try again
+          </button>
+        )}
+      </div>
     </div>
   );
-
-  if (item._source === 'dictation') {
-    const markDictation = async () => {
-      if (!answer.trim()) return;
-      setMarkState('checking');
-      const correct = item.answer || '';
-      const norm = s => s.toLowerCase().trim().replace(/[.,!?;:'"]/g, '');
-      if (norm(answer) === norm(correct)) { setMarkState('correct'); setFeedback(null); return; }
-      const dist = levenshtein(norm(answer), norm(correct));
-      if (dist <= 1 || (dist <= 2 && correct.length >= 6)) { setMarkState('soft'); setFeedback('Watch your spelling!'); return; }
-      try {
-        const data = await callApi('mark-dictation', { answer: correct, studentAnswer: answer });
-        setMarkState(data.correct ? 'correct' : data.softPass ? 'soft' : 'incorrect');
-        setFeedback(data.feedback || null);
-      } catch {
-        setMarkState(norm(answer).includes(norm(correct).split(' ')[0]) ? 'soft' : 'incorrect');
-      }
-    };
-    return (
-      <div>
-        <div style={grad}>
-          <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>🎙️ Dictation</div>
-          <h3 style={{ margin: 0, fontSize: 16 }}>{item.title}</h3>
-        </div>
-        {item.audio_url && <audio controls src={item.audio_url} style={{ width: '100%', marginBottom: 10 }} />}
-        {item.sentence_template && (
-          <div style={{ textAlign: 'center', fontSize: 17, fontWeight: 500, padding: '0.9rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 10 }}>
-            {item.sentence_template}
-          </div>
-        )}
-        <input value={answer} onChange={e => setAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && markDictation()} placeholder="Type what you hear…" style={inputStyle} disabled={markState !== 'idle'} />
-        {item.hint && <p style={{ color: '#718096', fontSize: 13, marginTop: 6 }}>💡 {item.hint}</p>}
-        {markState === 'idle' && checkBtn(markDictation, !answer.trim())}
-        <ResultBanner state={markState} feedback={feedback} correctAnswer={item.answer} onReset={reset} />
-      </div>
-    );
-  }
-
-  const { type, question } = item;
-
-  // ── Multiple choice ───────────────────────────────────────────────────────
-
-  if (type === 'multiple_choice') {
-    const markMC = () => {
-      if (selected === null) return;
-      markDirect(opts[selected] === item.correct_answer);
-    };
-    return (
-      <div>
-        <div style={grad}><Badges /><p style={{ margin: 0, fontSize: 15 }}>{question}</p></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          {opts.map((opt, i) => {
-            const isSel = selected === i;
-            const isCorrect = markState !== 'idle' && opt === item.correct_answer;
-            const isWrong   = markState === 'incorrect' && isSel;
-            return (
-              <div key={i} onClick={() => markState === 'idle' && setSelected(isSel ? null : i)} style={{
-                background: isCorrect ? '#f0fff4' : isWrong ? '#fff5f5' : isSel ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'white',
-                border: `2px solid ${isCorrect ? '#48bb78' : isWrong ? '#fc8181' : isSel ? '#667eea' : '#e2e8f0'}`,
-                borderRadius: 8, padding: '0.7rem', textAlign: 'center', fontSize: 14,
-                cursor: markState === 'idle' ? 'pointer' : 'default',
-                color: isCorrect ? '#276749' : isSel && !isCorrect && !isWrong ? 'white' : '#2d3748',
-                fontWeight: isCorrect || isSel ? 600 : 400,
-              }}>
-                {isCorrect ? '✅ ' : isWrong ? '❌ ' : ''}{opt}
-              </div>
-            );
-          })}
-        </div>
-        {markState === 'idle' && checkBtn(markMC, selected === null)}
-        {markState !== 'idle' && markState !== 'checking' && (
-          <button onClick={reset} style={{ marginTop: 10, fontSize: 12, color: '#667eea', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↺ Try again</button>
-        )}
-      </div>
-    );
-  }
-
-  // ── Gap fill ──────────────────────────────────────────────────────────────
-
-  if (type === 'gap_fill') {
-    const markGapFill = async () => {
-      if (!answer.trim()) return;
-      setMarkState('checking');
-      const correct = item.correct_answer || '';
-      const norm = s => s.toLowerCase().trim();
-      // Exact
-      if (norm(answer) === norm(correct)) { setMarkState('correct'); return; }
-      // Informal
-      const informal = Array.isArray(item.informal_accepted) ? item.informal_accepted : [];
-      if (informal.some(i => norm(i) === norm(answer))) { setMarkState('correct'); return; }
-      // Alternatives
-      const alts = Array.isArray(item.acceptable_alternatives) ? item.acceptable_alternatives : [];
-      if (alts.some(a => norm(a) === norm(answer))) { setMarkState('correct'); return; }
-      // Fuzzy
-      const dist = levenshtein(norm(answer), norm(correct));
-      if (dist === 1) { setMarkState('soft'); setFeedback('Watch your spelling!'); return; }
-      if (dist === 2 && correct.length >= 6) { setMarkState('soft'); setFeedback('Watch your spelling!'); return; }
-      // AI
-      try {
-        const data = await callApi('mark-gap-fill', {
-          question, correctAnswer: correct, studentAnswer: answer,
-          informalAccepted: informal, acceptableAlternatives: alts,
-          informalFeedback: item.informal_feedback,
-        });
-        setMarkState(data.correct ? 'correct' : data.softPass ? 'soft' : 'incorrect');
-        setFeedback(data.feedback || null);
-      } catch {
-        setMarkState('incorrect'); setFeedback(null);
-      }
-    };
-    return (
-      <div>
-        <div style={grad}><Badges /><p style={{ margin: 0, fontSize: 15 }}>{question}</p></div>
-        <input value={answer} onChange={e => setAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && markGapFill()} placeholder="Type your answer…" style={inputStyle} disabled={markState !== 'idle'} />
-        {markState === 'idle' && checkBtn(markGapFill, !answer.trim())}
-        <ResultBanner state={markState} feedback={feedback} correctAnswer={item.correct_answer} onReset={reset} />
-      </div>
-    );
-  }
-
-  // ── Error correction ──────────────────────────────────────────────────────
-
-  if (type === 'error_correction') {
-    const markCorrection = async () => {
-      if (!answer.trim()) return;
-      setMarkState('checking');
-      const norm = s => s.toLowerCase().trim().replace(/[.,!?]/g, '');
-      if (norm(answer) === norm(item.correct_answer || '')) { setMarkState('correct'); return; }
-      try {
-        const data = await callApi('mark-correction', { question, correctAnswer: item.correct_answer, studentAnswer: answer });
-        setMarkState(data.correct ? 'correct' : data.softPass ? 'soft' : 'incorrect');
-        setFeedback(data.feedback || null);
-      } catch {
-        setMarkState('incorrect'); setFeedback(null);
-      }
-    };
-    return (
-      <div>
-        <div style={grad}>
-          <p style={{ margin: '0 0 5px', fontSize: 12, opacity: 0.8 }}>Find and correct the error:</p>
-          <Badges /><p style={{ margin: 0, fontSize: 15, fontWeight: 500 }}>{question}</p>
-        </div>
-        <input value={answer} onChange={e => setAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && markCorrection()} placeholder="Type the corrected sentence…" style={inputStyle} disabled={markState !== 'idle'} />
-        {markState === 'idle' && checkBtn(markCorrection, !answer.trim())}
-        <ResultBanner state={markState} feedback={feedback} correctAnswer={item.correct_answer} onReset={reset} />
-      </div>
-    );
-  }
-
-  // ── Sentence building ─────────────────────────────────────────────────────
-
-  if (type === 'sentence_building') {
-    const moveToSentence = (uid) => { if (markState !== 'idle') return; const w = bank.find(x => x.uid === uid); if (!w) return; setBank(p => p.filter(x => x.uid !== uid)); setSentence(p => [...p, w]); };
-    const moveToBank     = (uid) => { if (markState !== 'idle') return; const w = sentence.find(x => x.uid === uid); if (!w) return; setSentence(p => p.filter(x => x.uid !== uid)); setBank(p => [...p, w]); };
-
-    const markBuilding = async () => {
-      if (!sentence.length) return;
-      setMarkState('checking');
-      const studentAnswer = sentence.map(w => w.word).join(' ');
-      const correct = item.correct_answer || '';
-      const norm = s => s.toLowerCase().trim().replace(/[.,!?]/g, '');
-      if (norm(studentAnswer) === norm(correct)) { setMarkState('correct'); return; }
-      try {
-        const data = await callApi('mark-word-order', { correctAnswer: correct, studentAnswer });
-        setMarkState(data.correct ? 'correct' : data.softPass ? 'soft' : 'incorrect');
-        setFeedback(data.feedback || null);
-      } catch {
-        setMarkState('incorrect'); setFeedback(null);
-      }
-    };
-
-    return (
-      <div>
-        <div style={grad}>
-          <Badges />
-          {item.question && <p style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 500, opacity: 0.95, lineHeight: 1.5 }}>{item.question}</p>}
-          <p style={{ margin: 0, fontSize: 12, opacity: 0.8 }}>Put the words in the correct order 👆</p>
-        </div>
-        <div style={{ minHeight: 50, border: `2px dashed ${markState === 'correct' || markState === 'soft' ? '#48bb78' : markState === 'incorrect' ? '#fc8181' : '#667eea'}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-          {sentence.length === 0
-            ? <span style={{ color: '#a0aec0', fontSize: 13 }}>Tap a word below to add it…</span>
-            : sentence.map(w => (
-              <div key={w.uid} onClick={() => moveToBank(w.uid)} style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', borderRadius: 6, padding: '5px 13px', fontSize: 14, cursor: markState === 'idle' ? 'pointer' : 'default' }}>
-                {w.word}
-              </div>
-            ))
-          }
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 8 }}>
-          {bank.map(w => (
-            <div key={w.uid} onClick={() => moveToSentence(w.uid)} style={{ background: 'white', border: '2px solid #667eea', color: '#667eea', borderRadius: 6, padding: '5px 13px', fontSize: 14, cursor: markState === 'idle' ? 'pointer' : 'default', fontWeight: 600 }}>
-              {w.word}
-            </div>
-          ))}
-        </div>
-        {markState === 'idle' && checkBtn(markBuilding, sentence.length === 0)}
-        <ResultBanner state={markState} feedback={feedback} correctAnswer={item.correct_answer} onReset={reset} />
-      </div>
-    );
-  }
-
-  // ── Odd one out ───────────────────────────────────────────────────────────
-
-  if (type === 'odd_one_out') {
-    const markOdd = () => {
-      if (selected === null) return;
-      markDirect(opts[selected] === item.correct_answer);
-    };
-    return (
-      <div>
-        <div style={grad}><Badges /><p style={{ margin: 0, fontSize: 15 }}>{question} 👆</p></div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-          {opts.map((opt, i) => {
-            const isSel = selected === i;
-            const isCorrect = markState !== 'idle' && opt === item.correct_answer;
-            const isWrong   = markState === 'incorrect' && isSel;
-            return (
-              <div key={i} onClick={() => markState === 'idle' && setSelected(isSel ? null : i)} style={{
-                background: isCorrect ? '#f0fff4' : isWrong ? '#fff5f5' : isSel ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'white',
-                border: `2px solid ${isCorrect ? '#48bb78' : isWrong ? '#fc8181' : isSel ? '#667eea' : '#e2e8f0'}`,
-                borderRadius: 8, padding: '0.9rem', textAlign: 'center',
-                fontWeight: isSel || isCorrect ? 700 : 500, fontSize: 14,
-                cursor: markState === 'idle' ? 'pointer' : 'default',
-                color: isCorrect ? '#276749' : isSel && !isCorrect && !isWrong ? 'white' : '#2d3748',
-              }}>
-                {isCorrect ? '✅ ' : isWrong ? '❌ ' : ''}{opt}
-              </div>
-            );
-          })}
-        </div>
-        {markState === 'idle' && checkBtn(markOdd, selected === null)}
-        {markState !== 'idle' && markState !== 'checking' && (
-          <button onClick={reset} style={{ marginTop: 10, fontSize: 12, color: '#667eea', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↺ Try again</button>
-        )}
-      </div>
-    );
-  }
-
-  // ── Sentence auction ──────────────────────────────────────────────────────
-
-  if (type === 'sentence_auction') {
-    // correct_answer is '["match_all_correct"]' style or a JSON array of correct sentences
-    // We treat options that are "correct" based on correct_answer field
-    // The auction format: correct_answer stores which sentences are correct as JSON array of indices or sentences
-    let correctSentences = new Set();
-    try {
-      const parsed = JSON.parse(item.correct_answer);
-      if (Array.isArray(parsed)) {
-        parsed.forEach(v => {
-          if (typeof v === 'number') correctSentences.add(v);
-          else opts.forEach((opt, i) => { if (opt === v) correctSentences.add(i); });
-        });
-      }
-    } catch {
-      // correct_answer might be a plain sentence string
-      opts.forEach((opt, i) => { if (opt === item.correct_answer) correctSentences.add(i); });
-    }
-
-    const total = Object.values(bids).reduce((sum, v) => sum + (parseInt(v) || 0), 0);
-    const budget = 1000;
-    const hasAnyBid = Object.values(bids).some(v => parseInt(v) > 0);
-
-    const markAuction = () => {
-      // Score: you get bid back for correct sentences, lose bid for wrong ones
-      let score = 0, maxScore = 0;
-      opts.forEach((_, i) => {
-        const bid = parseInt(bids[i]) || 0;
-        if (bid > 0) {
-          maxScore += bid;
-          if (correctSentences.has(i)) score += bid; else score -= bid;
-        }
-      });
-      const won = score > 0;
-      setMarkState(won ? 'correct' : 'incorrect');
-      setFeedback(`Score: ${score > 0 ? '+' : ''}${score} points`);
-    };
-
-    return (
-      <div>
-        <div style={grad}>
-          <><Badges /><p style={{ margin: '0 0 4px', fontSize: 15 }}>Which sentences are correct? Bid on them! 🏷️</p></>
-          <p style={{ margin: 0, fontSize: 12, opacity: 0.85 }}>Budget: £{budget - total} remaining</p>
-        </div>
-        {opts.map((s, i) => {
-          const isRevealed = markState !== 'idle' && markState !== 'checking';
-          const isCorrect  = correctSentences.has(i);
-          const bid        = parseInt(bids[i]) || 0;
-          return (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7, background: isRevealed ? (isCorrect ? '#f0fff4' : '#fff5f5') : 'white', border: `1px solid ${isRevealed ? (isCorrect ? '#48bb78' : '#fc8181') : '#e2e8f0'}`, borderRadius: 8, padding: '0.7rem' }}>
-              <span style={{ flex: 1, fontSize: 14 }}>{isRevealed && (isCorrect ? '✅ ' : '❌ ')}{s}</span>
-              <input
-                type="number" min="0" max={budget}
-                value={bids[i] || ''}
-                onChange={e => markState === 'idle' && setBids(prev => ({ ...prev, [i]: e.target.value }))}
-                placeholder="£"
-                disabled={markState !== 'idle'}
-                style={{ width: 64, padding: '4px 6px', border: '1px solid #e2e8f0', borderRadius: 6, textAlign: 'center' }}
-              />
-            </div>
-          );
-        })}
-        {markState === 'idle' && checkBtn(markAuction, !hasAnyBid)}
-        {markState !== 'idle' && markState !== 'checking' && (
-          <>
-            {feedback && <div style={{ marginTop: 10, fontWeight: 700, color: markState === 'correct' ? '#276749' : '#c53030', fontSize: 15 }}>{markState === 'correct' ? '✅' : '❌'} {feedback}</div>}
-            <button onClick={reset} style={{ marginTop: 8, fontSize: 12, color: '#667eea', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↺ Try again</button>
-          </>
-        )}
-      </div>
-    );
-  }
-
-  // ── Matching ──────────────────────────────────────────────────────────────
-
-  if (type === 'matching') {
-    const lefts = opts.map(p => typeof p.left === 'object' ? p.left.content : p.left);
-
-    const handleLeftClick  = (li) => { if (markState !== 'idle') return; setLeftSel(prev => prev === li ? null : li); };
-    const handleRightClick = (ri) => {
-      if (markState !== 'idle' || leftSel === null) return;
-      if (pairs[leftSel] === ri) { setPairs(prev => { const n = { ...prev }; delete n[leftSel]; return n; }); setLeftSel(null); return; }
-      setPairs(prev => ({ ...prev, [leftSel]: ri }));
-      setLeftSel(null);
-    };
-
-    const markMatching = () => {
-      const allCorrect = opts.every((_, li) => {
-        const pairedRightIdx = pairs[li];
-        if (pairedRightIdx === undefined) return false;
-        return initRights[pairedRightIdx].origIdx === li;
-      });
-      markDirect(allCorrect, allCorrect ? null : 'Some pairs are wrong — check the highlighted ones.');
-    };
-
-    const pairedLefts  = new Set(Object.keys(pairs).map(Number));
-    const pairedRights = new Set(Object.values(pairs));
-    const allPaired    = pairedLefts.size === opts.length;
-
-    return (
-      <div>
-        <div style={grad}>
-          <><Badges /><p style={{ margin: 0, fontSize: 15 }}>Match the items 👆</p></>
-          {leftSel !== null && <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.85 }}>Now tap the matching item on the right →</p>}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <div>
-            {lefts.map((l, li) => {
-              const isPaired  = pairedLefts.has(li);
-              const isActive  = leftSel === li;
-              const isRevealed = markState !== 'idle' && markState !== 'checking';
-              const isCorrectPair = isRevealed && isPaired && initRights[pairs[li]]?.origIdx === li;
-              const isWrongPair   = isRevealed && isPaired && !isCorrectPair;
-              return (
-                <div key={li} onClick={() => handleLeftClick(li)} style={{
-                  borderRadius: 8, padding: '0.65rem', marginBottom: 7, textAlign: 'center', fontSize: 14,
-                  cursor: markState === 'idle' ? 'pointer' : 'default',
-                  background: isCorrectPair ? '#f0fff4' : isWrongPair ? '#fff5f5' : isActive ? '#4c3f9f' : 'linear-gradient(135deg, #667eea, #764ba2)',
-                  color: isCorrectPair ? '#276749' : isWrongPair ? '#c53030' : 'white',
-                  border: `2px solid ${isCorrectPair ? '#48bb78' : isWrongPair ? '#fc8181' : isActive ? '#fbd38d' : 'transparent'}`,
-                  fontWeight: isPaired ? 600 : 400,
-                }}>{l}</div>
-              );
-            })}
-          </div>
-          <div>
-            {initRights.map((r, ri) => {
-              const isPaired   = pairedRights.has(ri);
-              const isTarget   = leftSel !== null && markState === 'idle';
-              const isRevealed = markState !== 'idle' && markState !== 'checking';
-              const pairedLeft = Object.entries(pairs).find(([, v]) => v === ri)?.[0];
-              const isCorrectPair = isRevealed && pairedLeft !== undefined && initRights[ri].origIdx === parseInt(pairedLeft);
-              const isWrongPair   = isRevealed && pairedLeft !== undefined && !isCorrectPair;
-              return (
-                <div key={ri} onClick={() => handleRightClick(ri)} style={{
-                  borderRadius: 8, padding: '0.65rem', marginBottom: 7, textAlign: 'center', fontSize: 14,
-                  cursor: isTarget ? 'pointer' : 'default',
-                  background: isCorrectPair ? '#f0fff4' : isWrongPair ? '#fff5f5' : isPaired ? '#edf2ff' : 'white',
-                  border: `2px solid ${isCorrectPair ? '#48bb78' : isWrongPair ? '#fc8181' : isPaired ? '#667eea' : isTarget ? '#667eea' : '#e2e8f0'}`,
-                  color: isCorrectPair ? '#276749' : isWrongPair ? '#c53030' : '#2d3748',
-                  fontWeight: isPaired ? 600 : 400,
-                }}>{r.content}</div>
-              );
-            })}
-          </div>
-        </div>
-        {markState === 'idle' && checkBtn(markMatching, !allPaired)}
-        {markState !== 'idle' && markState !== 'checking' && (
-          <>
-            {feedback && <div style={{ marginTop: 8, fontSize: 13, color: markState === 'correct' ? '#276749' : '#c53030' }}>{markState === 'correct' ? '✅ ' : '❌ '}{feedback}</div>}
-            <button onClick={reset} style={{ marginTop: 8, fontSize: 12, color: '#667eea', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↺ Try again</button>
-          </>
-        )}
-      </div>
-    );
-  }
-
-  return <div style={grad}><Badges /><p style={{ margin: 0, fontSize: 15 }}>{question}</p></div>;
 }
 
 // ── Focus Mode ────────────────────────────────────────────────────────────────
