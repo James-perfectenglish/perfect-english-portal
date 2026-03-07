@@ -26,7 +26,7 @@ const LEVEL_COLORS = {
 const SOURCE_META = {
   question_bank: { emoji: '❓', color: '#667eea' },
   listening:     { emoji: '🎧', color: '#9f7aea' },
-  dictation:     { emoji: '🎙️', color: '#48bb78' },
+  dictation:     { emoji: '⌨️', color: '#48bb78' },
 };
 
 const NEW_COUNT = 50;
@@ -137,7 +137,7 @@ function TeacherCard({ item }) {
     return (
       <div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 12 }}>
-          <Badge color="#48bb78">🎙️ Dictation</Badge>
+          <Badge color="#48bb78">⌨️ Dictation</Badge>
           <LevelBadge level={item.level} />
           {item.topic && <Badge color="#718096">{item.topic}</Badge>}
           {item.excerpt_type && <Badge color="#9f7aea">{item.excerpt_type}</Badge>}
