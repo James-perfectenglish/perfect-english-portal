@@ -36,7 +36,25 @@ const LEVEL_CONFIG = [
   }
 ];
 
-export default function PracticePage({ isTeacher = false, onTeacherClick }) {
+const BTN = {
+  height: '34px',
+  borderRadius: '8px',
+  background: '#f0f0f5',
+  border: 'none',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: '#4a5568',
+};
+
+export default function PracticePage({
+  isTeacher = false,
+  onTeacherClick,
+  onBrowseClick,
+  globalLang,
+  onToggleLang,
+}) {
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [survivalMode, setSurvivalMode] = useState(false);
   const location = useLocation();
@@ -72,7 +90,7 @@ export default function PracticePage({ isTeacher = false, onTeacherClick }) {
     }}>
       <div style={{ maxWidth: '700px', margin: '0 auto', textAlign: 'center' }}>
 
-        {/* Heading row with optional teacher button */}
+        {/* Heading row with teacher toolbar */}
         <div style={{ position: 'relative', marginBottom: '0.5rem' }}>
           <h1 style={{
             fontSize: 'clamp(1.8rem, 6vw, 2.5rem)',
@@ -82,30 +100,46 @@ export default function PracticePage({ isTeacher = false, onTeacherClick }) {
           }}>
             Test Yourself
           </h1>
-          {isTeacher && onTeacherClick && (
-            <button
-              onClick={onTeacherClick}
-              title="Teacher Dashboard"
-              style={{
-                position: 'absolute',
-                top: '50%',
-                right: 0,
-                transform: 'translateY(-50%)',
-                background: 'linear-gradient(135deg, #667eea, #764ba2)',
-                border: 'none',
-                borderRadius: '10px',
-                width: '42px',
-                height: '42px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.2rem',
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(102,126,234,0.4)',
-              }}
-            >
-              👨‍🏫
-            </button>
+
+          {/* Teacher toolbar — right-aligned, all #f0f0f5 */}
+          {isTeacher && (
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              right: 0,
+              transform: 'translateY(-50%)',
+              display: 'flex',
+              gap: '6px',
+              alignItems: 'center',
+            }}>
+              {onToggleLang && (
+                <button
+                  onClick={onToggleLang}
+                  title={globalLang === 'en' ? 'Switch to Spanish mode' : 'Switch to English mode'}
+                  style={{ ...BTN, width: '34px', fontSize: '1.1rem' }}
+                >
+                  {globalLang === 'en' ? '🇬🇧' : '🇪🇸'}
+                </button>
+              )}
+              {onBrowseClick && (
+                <button
+                  onClick={onBrowseClick}
+                  title="Question browser"
+                  style={{ ...BTN, padding: '0 10px', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}
+                >
+                  🔍 Browse
+                </button>
+              )}
+              {onTeacherClick && (
+                <button
+                  onClick={onTeacherClick}
+                  title="Teacher dashboard"
+                  style={{ ...BTN, width: '34px', fontSize: '1rem' }}
+                >
+                  👨‍🏫
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -145,7 +179,6 @@ export default function PracticePage({ isTeacher = false, onTeacherClick }) {
                 boxSizing: 'border-box'
               }}
             >
-              {/* Icon */}
               <div style={{
                 background: level.gradient,
                 borderRadius: '12px',
@@ -160,7 +193,6 @@ export default function PracticePage({ isTeacher = false, onTeacherClick }) {
                 {level.emoji}
               </div>
 
-              {/* Text content */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
                   display: 'flex',
@@ -169,44 +201,24 @@ export default function PracticePage({ isTeacher = false, onTeacherClick }) {
                   flexWrap: 'wrap',
                   marginBottom: '0.3rem'
                 }}>
-                  <span style={{
-                    fontSize: 'clamp(1.15rem, 4vw, 1.35rem)',
-                    fontWeight: '700',
-                    color: '#2C3E50'
-                  }}>
+                  <span style={{ fontSize: 'clamp(1.15rem, 4vw, 1.35rem)', fontWeight: '700', color: '#2C3E50' }}>
                     {level.title}
                   </span>
-                  <span style={{
-                    fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)',
-                    color: '#888',
-                    fontWeight: '500'
-                  }}>
+                  <span style={{ fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)', color: '#888', fontWeight: '500' }}>
                     {level.subtitle}
                   </span>
                 </div>
-                <p style={{
-                  fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)',
-                  color: '#666',
-                  margin: 0,
-                  lineHeight: '1.4'
-                }}>
+                <p style={{ fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)', color: '#666', margin: 0, lineHeight: '1.4' }}>
                   {level.description}
                 </p>
               </div>
 
-              {/* Arrow */}
-              <div style={{
-                fontSize: '1.5rem',
-                color: '#ccc',
-                flexShrink: 0
-              }}>
-                →
-              </div>
+              <div style={{ fontSize: '1.5rem', color: '#ccc', flexShrink: 0 }}>→</div>
             </button>
           ))}
         </div>
 
-        {/* Survival Mode Card — dark themed with orange accents */}
+        {/* Survival Mode Card */}
         <div style={{ marginTop: '0.5rem' }}>
           <button
             onClick={() => setSurvivalMode(true)}
@@ -226,7 +238,6 @@ export default function PracticePage({ isTeacher = false, onTeacherClick }) {
               boxSizing: 'border-box'
             }}
           >
-            {/* Icon */}
             <div style={{
               background: 'linear-gradient(135deg, #ed8936, #e74c3c)',
               borderRadius: '12px',
@@ -241,7 +252,6 @@ export default function PracticePage({ isTeacher = false, onTeacherClick }) {
               ⚔️
             </div>
 
-            {/* Text content */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
                 display: 'flex',
@@ -250,11 +260,7 @@ export default function PracticePage({ isTeacher = false, onTeacherClick }) {
                 flexWrap: 'wrap',
                 marginBottom: '0.3rem'
               }}>
-                <span style={{
-                  fontSize: 'clamp(1.15rem, 4vw, 1.35rem)',
-                  fontWeight: '700',
-                  color: 'white'
-                }}>
+                <span style={{ fontSize: 'clamp(1.15rem, 4vw, 1.35rem)', fontWeight: '700', color: 'white' }}>
                   Survival Mode
                 </span>
                 <span style={{
@@ -270,24 +276,12 @@ export default function PracticePage({ isTeacher = false, onTeacherClick }) {
                   Challenge
                 </span>
               </div>
-              <p style={{
-                fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)',
-                color: '#adb5bd',
-                margin: 0,
-                lineHeight: '1.4'
-              }}>
+              <p style={{ fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)', color: '#adb5bd', margin: 0, lineHeight: '1.4' }}>
                 5 lives. Start at Beginner, level up through Intermediate to Advanced. How far can you go?
               </p>
             </div>
 
-            {/* Arrow */}
-            <div style={{
-              fontSize: '1.5rem',
-              color: '#ed8936',
-              flexShrink: 0
-            }}>
-              →
-            </div>
+            <div style={{ fontSize: '1.5rem', color: '#ed8936', flexShrink: 0 }}>→</div>
           </button>
         </div>
       </div>

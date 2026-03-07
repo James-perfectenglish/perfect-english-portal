@@ -229,6 +229,31 @@ function InteractiveQuestion({ item }) {
 
   const grad = { background: 'linear-gradient(135deg, #667eea, #764ba2)', borderRadius: 12, padding: '1.1rem 1.25rem', color: 'white', marginBottom: 12 };
   const inputStyle = { width: '100%', padding: '0.7rem', border: '2px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box', background: 'white' };
+
+  // Badge strip shown to students — level + type, just like in the app
+  const LEVEL_COLORS = { A1:'#38a169',A2:'#2f855a',B1:'#3182ce',B2:'#2b6cb0',C1:'#dd6b20',C2:'#c05621' };
+  const TYPE_LABELS  = { gap_fill:'Gap Fill',multiple_choice:'Multiple Choice',sentence_building:'Sentence Building',odd_one_out:'Odd One Out',error_correction:'Error Correction',matching:'Matching',sentence_auction:'Sentence Auction' };
+  const TYPE_EMOJI   = { gap_fill:'✏️',multiple_choice:'🔘',sentence_building:'🔧',odd_one_out:'🦆',error_correction:'🔴',matching:'🔗',sentence_auction:'🏷️' };
+  const Badges = () => item._source === 'question_bank' ? (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+      {item.level && (
+        <span style={{ background: LEVEL_COLORS[item.level] || '#718096', color: 'white', borderRadius: 6, padding: '2px 9px', fontSize: 11, fontWeight: 700 }}>
+          {item.level}
+        </span>
+      )}
+      {item.type && (
+        <span style={{ background: 'rgba(255,255,255,0.25)', color: 'white', borderRadius: 6, padding: '2px 9px', fontSize: 11, fontWeight: 700 }}>
+          {TYPE_EMOJI[item.type]} {TYPE_LABELS[item.type] || item.type}
+        </span>
+      )}
+      {item.topic && (
+        <span style={{ background: 'rgba(255,255,255,0.15)', color: 'white', borderRadius: 6, padding: '2px 9px', fontSize: 11 }}>
+          {item.topic}
+        </span>
+      )}
+    </div>
+  ) : null;
+
   const checkBtn = (onClick, disabled) => (
     <button
       onClick={onClick} disabled={disabled || markState === 'checking'}
@@ -320,7 +345,7 @@ function InteractiveQuestion({ item }) {
     };
     return (
       <div>
-        <div style={grad}><p style={{ margin: 0, fontSize: 15 }}>{question}</p></div>
+        <div style={grad}><Badges /><p style={{ margin: 0, fontSize: 15 }}>{question}</p></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {opts.map((opt, i) => {
             const isSel = selected === i;
@@ -383,7 +408,7 @@ function InteractiveQuestion({ item }) {
     };
     return (
       <div>
-        <div style={grad}><p style={{ margin: 0, fontSize: 15 }}>{question}</p></div>
+        <div style={grad}><Badges /><p style={{ margin: 0, fontSize: 15 }}>{question}</p></div>
         <input value={answer} onChange={e => setAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && markGapFill()} placeholder="Type your answer…" style={inputStyle} disabled={markState !== 'idle'} />
         {markState === 'idle' && checkBtn(markGapFill, !answer.trim())}
         <ResultBanner state={markState} feedback={feedback} correctAnswer={item.correct_answer} onReset={reset} />
@@ -411,7 +436,7 @@ function InteractiveQuestion({ item }) {
       <div>
         <div style={grad}>
           <p style={{ margin: '0 0 5px', fontSize: 12, opacity: 0.8 }}>Find and correct the error:</p>
-          <p style={{ margin: 0, fontSize: 15, fontWeight: 500 }}>{question}</p>
+          <Badges /><p style={{ margin: 0, fontSize: 15, fontWeight: 500 }}>{question}</p>
         </div>
         <input value={answer} onChange={e => setAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && markCorrection()} placeholder="Type the corrected sentence…" style={inputStyle} disabled={markState !== 'idle'} />
         {markState === 'idle' && checkBtn(markCorrection, !answer.trim())}
@@ -444,7 +469,7 @@ function InteractiveQuestion({ item }) {
 
     return (
       <div>
-        <div style={grad}><p style={{ margin: 0, fontSize: 13, opacity: 0.9 }}>Put the words in the correct order 👆</p></div>
+        <div style={grad}><Badges /><p style={{ margin: 0, fontSize: 13, opacity: 0.9 }}>Put the words in the correct order 👆</p></div>
         <div style={{ minHeight: 50, border: `2px dashed ${markState === 'correct' || markState === 'soft' ? '#48bb78' : markState === 'incorrect' ? '#fc8181' : '#667eea'}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
           {sentence.length === 0
             ? <span style={{ color: '#a0aec0', fontSize: 13 }}>Tap a word below to add it…</span>
@@ -477,7 +502,7 @@ function InteractiveQuestion({ item }) {
     };
     return (
       <div>
-        <div style={grad}><p style={{ margin: 0, fontSize: 15 }}>{question} 👆</p></div>
+        <div style={grad}><Badges /><p style={{ margin: 0, fontSize: 15 }}>{question} 👆</p></div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
           {opts.map((opt, i) => {
             const isSel = selected === i;
@@ -547,7 +572,7 @@ function InteractiveQuestion({ item }) {
     return (
       <div>
         <div style={grad}>
-          <p style={{ margin: '0 0 4px', fontSize: 15 }}>Which sentences are correct? Bid on them! 🏷️</p>
+          <><Badges /><p style={{ margin: '0 0 4px', fontSize: 15 }}>Which sentences are correct? Bid on them! 🏷️</p></>
           <p style={{ margin: 0, fontSize: 12, opacity: 0.85 }}>Budget: £{budget - total} remaining</p>
         </div>
         {opts.map((s, i) => {
@@ -608,7 +633,7 @@ function InteractiveQuestion({ item }) {
     return (
       <div>
         <div style={grad}>
-          <p style={{ margin: 0, fontSize: 15 }}>Match the items 👆</p>
+          <><Badges /><p style={{ margin: 0, fontSize: 15 }}>Match the items 👆</p></>
           {leftSel !== null && <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.85 }}>Now tap the matching item on the right →</p>}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -663,7 +688,7 @@ function InteractiveQuestion({ item }) {
     );
   }
 
-  return <div style={grad}><p style={{ margin: 0, fontSize: 15 }}>{question}</p></div>;
+  return <div style={grad}><Badges /><p style={{ margin: 0, fontSize: 15 }}>{question}</p></div>;
 }
 
 // ── Focus Mode ────────────────────────────────────────────────────────────────

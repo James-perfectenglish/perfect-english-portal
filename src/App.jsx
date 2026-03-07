@@ -107,17 +107,7 @@ function Dashboard({ session }) {
 
       {/* ROUTES */}
       <Routes>
-        <Route path="/"               element={
-          <StudentDashboard
-            profile={profile}
-            session={session}
-            handleLogout={handleLogout}
-            isTeacher={isTeacher}
-            globalLang={globalLang}
-            onToggleLang={isTeacher ? toggleLang : undefined}
-            onBrowseClick={isTeacher ? undefined : undefined}
-          />
-        } />
+        <Route path="/" element={<StudentDashboard profile={profile} session={session} handleLogout={handleLogout} />} />
         <Route path="/practice"       element={<PracticePageWrapper profile={profile} globalLang={globalLang} toggleLang={toggleLang} />} />
         <Route path="/exercises"      element={<ExercisesPage profile={profile} globalLang={globalLang} toggleLang={toggleLang} />} />
         <Route path="/lyrics"         element={<LyricsExercise user={session.user} />} />
