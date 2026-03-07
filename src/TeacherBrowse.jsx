@@ -230,25 +230,25 @@ function InteractiveQuestion({ item }) {
   const grad = { background: 'linear-gradient(135deg, #667eea, #764ba2)', borderRadius: 12, padding: '1.1rem 1.25rem', color: 'white', marginBottom: 12 };
   const inputStyle = { width: '100%', padding: '0.7rem', border: '2px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box', background: 'white' };
 
-  // Badge strip shown to students — level + type, just like in the app
-  const LEVEL_COLORS = { A1:'#38a169',A2:'#2f855a',B1:'#3182ce',B2:'#2b6cb0',C1:'#dd6b20',C2:'#c05621' };
-  const TYPE_LABELS  = { gap_fill:'Gap Fill',multiple_choice:'Multiple Choice',sentence_building:'Sentence Building',odd_one_out:'Odd One Out',error_correction:'Error Correction',matching:'Matching',sentence_auction:'Sentence Auction' };
-  const TYPE_EMOJI   = { gap_fill:'✏️',multiple_choice:'🔘',sentence_building:'🔧',odd_one_out:'🦆',error_correction:'🔴',matching:'🔗',sentence_auction:'🏷️' };
+  // Badge strip shown to students — matches pill style used across the app
+  const Q_LEVEL_COLORS = { A1:'#38a169',A2:'#2f855a',B1:'#3182ce',B2:'#2b6cb0',C1:'#dd6b20',C2:'#c05621' };
+  const Q_TYPE_LABELS  = { gap_fill:'Gap Fill',multiple_choice:'Multiple Choice',sentence_building:'Sentence Building',odd_one_out:'Odd One Out',error_correction:'Error Correction',matching:'Matching',sentence_auction:'Sentence Auction' };
+  const fmtTopic = (t) => t ? t.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase()) : '';
   const Badges = () => item._source === 'question_bank' ? (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
       {item.level && (
-        <span style={{ background: LEVEL_COLORS[item.level] || '#718096', color: 'white', borderRadius: 6, padding: '2px 9px', fontSize: 11, fontWeight: 700 }}>
+        <span style={{ background: Q_LEVEL_COLORS[item.level] || '#718096', color: 'white', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
           {item.level}
         </span>
       )}
       {item.type && (
-        <span style={{ background: 'rgba(255,255,255,0.25)', color: 'white', borderRadius: 6, padding: '2px 9px', fontSize: 11, fontWeight: 700 }}>
-          {TYPE_EMOJI[item.type]} {TYPE_LABELS[item.type] || item.type}
+        <span style={{ background: 'rgba(255,255,255,0.25)', color: 'white', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+          {Q_TYPE_LABELS[item.type] || item.type}
         </span>
       )}
       {item.topic && (
-        <span style={{ background: 'rgba(255,255,255,0.15)', color: 'white', borderRadius: 6, padding: '2px 9px', fontSize: 11 }}>
-          {item.topic}
+        <span style={{ background: 'rgba(255,255,255,0.15)', color: 'white', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>
+          {fmtTopic(item.topic)}
         </span>
       )}
     </div>
@@ -469,7 +469,11 @@ function InteractiveQuestion({ item }) {
 
     return (
       <div>
-        <div style={grad}><Badges /><p style={{ margin: 0, fontSize: 13, opacity: 0.9 }}>Put the words in the correct order 👆</p></div>
+        <div style={grad}>
+          <Badges />
+          {item.question && <p style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 500, opacity: 0.95, lineHeight: 1.5 }}>{item.question}</p>}
+          <p style={{ margin: 0, fontSize: 12, opacity: 0.8 }}>Put the words in the correct order 👆</p>
+        </div>
         <div style={{ minHeight: 50, border: `2px dashed ${markState === 'correct' || markState === 'soft' ? '#48bb78' : markState === 'incorrect' ? '#fc8181' : '#667eea'}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
           {sentence.length === 0
             ? <span style={{ color: '#a0aec0', fontSize: 13 }}>Tap a word below to add it…</span>
@@ -734,7 +738,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
   const [hasSearched,  setHasSearched]  = useState(false);
   const [selected,     setSelected]     = useState(new Set());
   const [previewItem,  setPreviewItem]  = useState(null);
-  const [previewMode,  setPreviewMode]  = useState('teacher');
+  const [previewMode,  setPreviewMode]  = useState('student');
   const [focusMode,    setFocusMode]    = useState(false);
   const [focusIndex,   setFocusIndex]   = useState(0);
   const [sets,          setSets]          = useState(loadSets);
@@ -971,7 +975,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
         const title    = item._source === 'question_bank' ? (item.question || '').slice(0, 110) : (item.title || '');
         const sub      = item._source === 'question_bank' ? `Q${item.question_number} · ${TYPE_INFO[item.type]?.label || item.type}` : (item.description || item.answer || '').slice(0, 70);
         return (
-          <div key={item._rowKey} onClick={() => setPreviewItem(isActive ? null : item)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 11px', background: isActive ? '#f0f4ff' : 'white', border: `1px solid ${isActive ? '#667eea' : '#e2e8f0'}`, borderRadius: 10, marginBottom: 5, cursor: 'pointer' }}>
+          <div key={item._rowKey} onClick={() => enterFocus(idx)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 11px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 5, cursor: 'pointer' }}>
             <div onClick={e => { e.stopPropagation(); toggleSelect(item._rowKey); }} style={{ flexShrink: 0, width: 18, height: 18, border: `2px solid ${isSel ? '#667eea' : '#cbd5e0'}`, borderRadius: 4, background: isSel ? '#667eea' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 11 }}>
               {isSel && '✓'}
             </div>
