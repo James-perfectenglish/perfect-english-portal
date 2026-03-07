@@ -47,6 +47,7 @@ function Dashboard({ session }) {
   const [globalLang, setGlobalLang] = useState(
     () => localStorage.getItem('pep_teach_lang') || 'en'
   )
+  const navigate = useNavigate()
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -83,7 +84,6 @@ function Dashboard({ session }) {
   }
 
   const isTeacher = profile?.is_teacher || false
-  const navigate = useNavigate()
 
   return (
     <div>
