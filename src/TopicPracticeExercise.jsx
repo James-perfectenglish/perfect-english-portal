@@ -49,7 +49,7 @@ function renderQuestion(text) {
         <span key={i}>
           {part}
           {i < parts.length - 1 && (
-            <span style={{ display: 'inline-block', width: '80px', borderBottom: '2px solid #667eea', margin: '0 4px', verticalAlign: 'bottom' }} />
+            <span style={{ display: 'inline-block', width: '80px', borderBottom: '2px solid #a0aec0', margin: '0 4px', verticalAlign: 'bottom' }} />
           )}
         </span>
       ))}
@@ -252,24 +252,22 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
             {LEVELS.map(level => {
               const count = questionCounts[level.key] || 0
               const available = count > 0
-              const isMyLevel = level.key === suggested
               return (
                 <div key={level.key} onClick={() => available && selectLevel(level)} style={{
                   border: `2px solid ${available ? level.colour : '#e2e8f0'}`, borderRadius: '12px', padding: '1.25rem 1.5rem',
                   cursor: available ? 'pointer' : 'default', background: available ? level.colourLight : '#f9fafb',
                   opacity: available ? 1 : 0.55, transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                   display: 'flex', alignItems: 'center', gap: '1rem',
-                  boxShadow: isMyLevel ? `0 0 0 2px ${level.colour}` : 'none'
+                  
                 }}
                   onMouseEnter={e => { if (available) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 4px 16px ${level.colour}30` } }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = isMyLevel ? `0 0 0 2px ${level.colour}` : 'none' }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}
                 >
                   <div style={{ fontSize: '2rem', flexShrink: 0 }}>{level.icon}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#2d3748' }}>{level.label}</span>
                       <span style={{ background: available ? level.colour : '#a0aec0', color: 'white', padding: '2px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600 }}>{level.sublabel}</span>
-                      {isMyLevel && <span style={{ background: level.colour, color: 'white', padding: '2px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 700 }}>My level</span>}
                     </div>
                     <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: '#4a5568', lineHeight: 1.4 }}>{level.description}</p>
                     <span style={{ display: 'inline-block', marginTop: '6px', fontSize: '0.8rem', color: available ? '#4a5568' : '#a0aec0', fontWeight: 500 }}>
