@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { supabase } from './supabaseClient';
-import SentenceBuildingInput from './SentenceBuildingInput';
-import MatchingPairs from './MatchingPairs';
+import SentenceBuildingInput from './components/SentenceBuildingInput';
+import MatchingPairs from './components/MatchingPairs';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
