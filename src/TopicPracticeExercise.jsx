@@ -327,6 +327,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
                 <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.type === 'multiple_choice' ? '#ebf8ff' : '#faf5ff', color: q.type === 'multiple_choice' ? '#2b6cb0' : '#6b46c1' }}>
                   {q.type === 'multiple_choice' ? '📝 Multiple Choice' : '✏️ Gap Fill'}
                 </div>
+                {q.type === 'gap_fill' && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>🤖 AI marked</div>}
               </div>
 
               {/* question text */}
