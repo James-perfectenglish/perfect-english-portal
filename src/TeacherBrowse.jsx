@@ -12,7 +12,7 @@ const TYPE_INFO = {
   odd_one_out:       { emoji: '🔍',  label: 'Odd One Out' },
   error_correction:  { emoji: '🔴',  label: 'Error Correction' },
   matching:          { emoji: '🔗',  label: 'Matching' },
-  sentence_auction:  { emoji: '🏷️', label: 'Sentence Auction' },
+  sentence_auction:  { emoji: '🔨', label: 'Sentence Auction' },
 };
 
 const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
@@ -253,12 +253,14 @@ function InteractiveQuestion({ item: q }) {
   const [sbFeedback,         setSbFeedback]          = useState(null);
   const [matchingDone,       setMatchingDone]        = useState(false);
   const [audioPlayed,        setAudioPlayed]         = useState(false);
+  const [auctionPicks,       setAuctionPicks]        = useState({});  // idx → true/false
   const audioRef = useRef(null);
 
   const reset = () => {
     setFeedback(null); setUserAnswer(''); setSelectedOption(null);
     setOooSelected(null); setEcSelectedWordIndex(null); setEcCorrection('');
     setSbFeedback(null); setMatchingDone(false); setAudioPlayed(false); setIsChecking(false);
+    setAuctionPicks({});
   };
 
   // ── Mark: gap fill (verbatim logic from RPE) ──
@@ -556,6 +558,10 @@ function InteractiveQuestion({ item: q }) {
         {q.type === 'sentence_auction' && (() => {
           const sentences = Array.isArray(q.options) ? q.options : (() => { try { return JSON.parse(q.options || '[]'); } catch { return []; } })();
           const revealed = !!feedback;
+          const togglePick = (idx, val) => {
+            if (revealed) return;
+            setAuctionPicks(prev => ({ ...prev, [idx]: prev[idx] === val ? undefined : val }));
+          };
           return (
             <div>
               {q.question && q.question.trim() && (
@@ -564,22 +570,46 @@ function InteractiveQuestion({ item: q }) {
                 </div>
               )}
               <p style={{ fontSize: '0.88rem', color: '#718096', margin: '0 0 1rem', fontStyle: 'italic' }}>
-                {revealed ? 'Answers revealed — green = correct, red = incorrect.' : 'Which sentences are correct? Tap "Reveal Answers" when ready.'}
+                {revealed ? 'Answers revealed — green = correct, red = incorrect.' : 'Mark each sentence ✅ or ❌ before revealing.'}
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.25rem' }}>
                 {sentences.map((s, idx) => {
-                  const bg     = !revealed ? 'white'    : s.correct ? '#f0fff4' : '#fff5f5';
-                  const border = !revealed ? '#e2e8f0' : s.correct ? '#48bb78' : '#f56565';
-                  const colour = !revealed ? '#2d3748'  : s.correct ? '#276749' : '#c53030';
+                  const pick = auctionPicks[idx]; // true=correct, false=incorrect, undefined=no pick
+                  const bg     = !revealed ? (pick === true ? '#f0fff4' : pick === false ? '#fff5f5' : 'white') : s.correct ? '#f0fff4' : '#fff5f5';
+                  const border = !revealed ? (pick === true ? '#48bb78' : pick === false ? '#f56565' : '#e2e8f0') : s.correct ? '#48bb78' : '#f56565';
+                  const colour = !revealed ? '#2d3748' : s.correct ? '#276749' : '#c53030';
+                  // After reveal: did the user get this one right?
+                  const pickedRight = revealed && pick !== undefined && pick === s.correct;
+                  const pickedWrong = revealed && pick !== undefined && pick !== s.correct;
                   return (
-                    <div key={idx} style={{ borderRadius: '10px', border: `2px solid ${border}`, background: bg, padding: '0.9rem 1.1rem', transition: 'all 0.3s' }}>
-                      <div style={{ fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', color: colour, fontWeight: '500', lineHeight: '1.55', marginBottom: revealed && s.explanation ? '0.5rem' : 0 }}>
-                        {revealed && <span style={{ marginRight: '7px' }}>{s.correct ? '✅' : '❌'}</span>}
-                        {s.sentence}
+                    <div key={idx} style={{ borderRadius: '10px', border: `2px solid ${border}`, background: bg, padding: '0.9rem 1.1rem', transition: 'all 0.3s', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      {/* Sentence text + explanation */}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', color: colour, fontWeight: '500', lineHeight: '1.55', marginBottom: revealed && s.explanation ? '0.5rem' : 0 }}>
+                          {revealed && <span style={{ marginRight: '7px' }}>{s.correct ? '✅' : '❌'}</span>}
+                          {s.sentence}
+                          {revealed && pickedRight && <span style={{ marginLeft: '8px', fontSize: '0.78rem', fontWeight: '700', color: '#276749', background: '#c6f6d5', padding: '2px 7px', borderRadius: '20px' }}>👍 right call</span>}
+                          {revealed && pickedWrong && <span style={{ marginLeft: '8px', fontSize: '0.78rem', fontWeight: '700', color: '#9b2c2c', background: '#fed7d7', padding: '2px 7px', borderRadius: '20px' }}>😬 wrong call</span>}
+                        </div>
+                        {revealed && s.explanation && (
+                          <div style={{ fontSize: '0.875rem', color: s.correct ? '#2f855a' : '#9b2c2c', lineHeight: '1.5', opacity: 0.9 }}>
+                            {s.explanation}
+                          </div>
+                        )}
                       </div>
-                      {revealed && s.explanation && (
-                        <div style={{ fontSize: '0.875rem', color: s.correct ? '#2f855a' : '#9b2c2c', lineHeight: '1.5', opacity: 0.9 }}>
-                          {s.explanation}
+                      {/* ✅ / ❌ pick buttons — hidden after reveal */}
+                      {!revealed && (
+                        <div style={{ display: 'flex', gap: '5px', flexShrink: 0, alignSelf: 'center' }}>
+                          <button
+                            onClick={() => togglePick(idx, true)}
+                            title="Correct"
+                            style={{ width: '36px', height: '36px', borderRadius: '8px', border: `2px solid ${pick === true ? '#48bb78' : '#e2e8f0'}`, background: pick === true ? '#48bb78' : 'white', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
+                          >✅</button>
+                          <button
+                            onClick={() => togglePick(idx, false)}
+                            title="Incorrect"
+                            style={{ width: '36px', height: '36px', borderRadius: '8px', border: `2px solid ${pick === false ? '#f56565' : '#e2e8f0'}`, background: pick === false ? '#f56565' : 'white', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
+                          >❌</button>
                         </div>
                       )}
                     </div>
@@ -587,7 +617,7 @@ function InteractiveQuestion({ item: q }) {
                 })}
               </div>
               {!revealed
-                ? <button onClick={() => setFeedback({ type: 'revealed' })} style={{ width: '100%', padding: '0.9rem', fontSize: '1rem', fontWeight: '700', background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer' }}>🔍 Reveal Answers</button>
+                ? <button onClick={() => setFeedback({ type: 'revealed' })} style={{ width: '100%', padding: '0.9rem', fontSize: '1rem', fontWeight: '700', background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer' }}>🔨 Reveal Answers</button>
                 : null
               }
             </div>
