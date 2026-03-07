@@ -6,16 +6,16 @@ import MatchingPairs from './MatchingPairs';
 // ── Question mix per round (easy to tweak!) ──
 const QUESTION_MIX = {
   gap_fill: 3,
-  multiple_choice: 6,
+  multiple_choice: 5,
   sentence_building: 3,
   odd_one_out: 3,
   error_correction: 3,
   matching: 2,
+  dictation: 1,
   // Total: 20
 };
 
 // AI soft-marking is used for error correction at all levels
-
 // Inject CSS for focus fix on OOO, EC, and matching tiles
 const RP_STYLE_ID = 'rp-focus-fix';
 if (typeof document !== 'undefined' && !document.getElementById(RP_STYLE_ID)) {
@@ -47,9 +47,7 @@ function levenshtein(a, b) {
   for (let j = 0; j <= n; j++) dp[0][j] = j;
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1]
-        ? dp[i - 1][j - 1]
-        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
     }
   }
   return dp[m][n];
@@ -65,6 +63,7 @@ function isFuzzyMatch(studentAnswer, correctAnswers) {
 }
 
 const normaliseEC = (s) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+const normaliseDictation = (s) => s.toLowerCase().trim().replace(/[.,!?;:'"]/g, '').replace(/\s+/g, ' ');
 
 const findErrorIndex = (questionWords, correctAnswer) => {
   const correctWords = correctAnswer.trim().split(/\s+/);
@@ -81,35 +80,39 @@ const getQuestionLanguage = (question) => question?.topic === 'spanish' ? 'es' :
 const aiMarkGapFill = async (question, correctAnswer, studentAnswer, language = 'en') => {
   try {
     const response = await fetch('/api/mark-gap-fill', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question, correctAnswer, studentAnswer, language }),
     });
     if (!response.ok) return null;
     const result = await response.json();
     if (result.valid === null) return null;
     return result;
-  } catch (e) {
-    console.error('AI gap fill marking error:', e);
-    return null;
-  }
+  } catch (e) { console.error('AI gap fill marking error:', e); return null; }
 };
 
 const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en') => {
   try {
     const response = await fetch('/api/mark-correction', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ originalSentence, errorWord, studentReplacement, correctAnswerSentence, language }),
     });
     if (!response.ok) return null;
     const result = await response.json();
     if (result.valid === null) return null;
     return result;
-  } catch (e) {
-    console.error('AI correction marking error:', e);
-    return null;
-  }
+  } catch (e) { console.error('AI correction marking error:', e); return null; }
+};
+
+const aiMarkDictation = async (correctAnswer, studentAnswer) => {
+  try {
+    const response = await fetch('/api/mark-dictation', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ correctAnswer, studentAnswer }),
+    });
+    if (!response.ok) return null;
+    const result = await response.json();
+    return result;
+  } catch (e) { console.error('AI dictation marking error:', e); return null; }
 };
 
 export default function RandomPracticeExercise({ levels, levelTitle, levelSubtitle, gradient, onBack }) {
@@ -122,22 +125,19 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const [score, setScore] = useState(0);
   const scoreRef = useRef(0);
   useEffect(() => { scoreRef.current = score; }, [score]);
-
   const [showHint, setShowHint] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [sbFeedback, setSbFeedback] = useState(null);
   const [bestScore, setBestScore] = useState(null);
   const [averageScore, setAverageScore] = useState(null);
-
   const allScoresRef = useRef([]);
-
   const [oooSelected, setOooSelected] = useState(null);
-
   const [ecSelectedWordIndex, setEcSelectedWordIndex] = useState(null);
   const [ecCorrection, setEcCorrection] = useState('');
-
   const [matchingDone, setMatchingDone] = useState(false);
+  const audioRef = useRef(null);
+  const [audioPlayed, setAudioPlayed] = useState(false);
 
   useEffect(() => { window.scrollTo(0, 0); }, [stage]);
 
@@ -163,9 +163,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         .filter(a => a.answers && a.answers.practice_type === 'random_practice' && a.answers.levels === levelKey)
         .map(a => a.score);
       if (scores.length > 0) allScoresRef.current = scores;
-    } catch (error) {
-      console.error('Error loading score history:', error);
-    }
+    } catch (error) { console.error('Error loading score history:', error); }
   };
 
   const finishExercise = () => {
@@ -183,18 +181,10 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       await supabase.from('student_attempts').insert({
-        student_id: user.id,
-        exercise_id: null,
-        score: currentScore,
-        answers: {
-          practice_type: 'random_practice',
-          levels: getLevelKey(),
-          total_questions: questions.length,
-        },
+        student_id: user.id, exercise_id: null, score: currentScore,
+        answers: { practice_type: 'random_practice', levels: getLevelKey(), total_questions: questions.length },
       });
-    } catch (error) {
-      console.error('Error saving attempt:', error);
-    }
+    } catch (error) { console.error('Error saving attempt:', error); }
   };
 
   const saveAnswer = async (question, studentAnswer, isCorrect) => {
@@ -208,9 +198,21 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         correct_answer: question.correct_answer || '',
         is_correct: isCorrect,
       });
-    } catch (error) {
-      console.error('Error saving answer:', error);
-    }
+    } catch (error) { console.error('Error saving answer:', error); }
+  };
+
+  const saveDictationAnswer = async (exerciseId, studentAnswer, isCorrect, isSoftPass) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from('dictation_sessions').insert({
+        student_id: user.id,
+        exercise_id: exerciseId,
+        student_answer: studentAnswer,
+        is_correct: isCorrect,
+        is_soft_pass: isSoftPass,
+      });
+    } catch (error) { console.error('Error saving dictation answer:', error); }
   };
 
   const startExercise = async () => {
@@ -223,7 +225,13 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         return q;
       };
 
-      const [gfRes, mcRes, sbRes, oooRes, ecRes, matchRes] = await Promise.all([
+      const fetchDictation = () => {
+        let q = supabase.from('dictation_exercises').select('*').eq('language', 'en');
+        if (levels && levels.length > 0) q = q.in('level', levels);
+        return q;
+      };
+
+      const [gfRes, mcRes, sbRes, oooRes, ecRes, matchRes, dictRes] = await Promise.all([
         queryForType('gap_fill'),
         queryForType('multiple_choice'),
         queryForType('sentence_building'),
@@ -234,6 +242,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
           if (levels && levels.length > 0) q = q.in('level', levels);
           return q;
         })(),
+        fetchDictation(),
       ]);
 
       if (gfRes.error || mcRes.error || sbRes.error || oooRes.error || ecRes.error || matchRes.error) {
@@ -242,8 +251,19 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
       const pick = (data, type) => shuffleArray(data || []).slice(0, QUESTION_MIX[type] || 0);
 
-      const TARGET_TOTAL = Object.values(QUESTION_MIX).reduce((a, b) => a + b, 0); // 20
+      // Wrap dictation exercises as question-shaped objects
+      const pickDictation = (data) => {
+        return shuffleArray(data || []).slice(0, QUESTION_MIX.dictation || 0).map(ex => ({
+          ...ex,
+          type: 'dictation',
+          question: ex.hint || '',
+          correct_answer: ex.answer,
+          question_number: null,
+          _dictation_exercise_id: ex.id,
+        }));
+      };
 
+      const TARGET_TOTAL = Object.values(QUESTION_MIX).reduce((a, b) => a + b, 0); // 20
       const pickedMC = pick(mcRes.data, 'multiple_choice');
       let baseQuestions = [
         ...pick(gfRes.data, 'gap_fill'),
@@ -252,6 +272,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         ...pick(oooRes.data, 'odd_one_out'),
         ...pick(ecRes.data, 'error_correction'),
         ...pick(matchRes.data, 'matching'),
+        ...pickDictation(dictRes.data || []),
       ];
 
       if (baseQuestions.length < TARGET_TOTAL) {
@@ -262,7 +283,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       }
 
       const allQuestions = shuffleArray(baseQuestions);
-
       if (allQuestions.length === 0) {
         alert('No questions available for this level yet. Check back soon!');
         setLoading(false);
@@ -283,6 +303,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setMatchingDone(false);
       setShowHint(false);
       setIsChecking(false);
+      setAudioPlayed(false);
     } catch (error) {
       console.error('Error fetching questions:', error);
       alert('Failed to load questions. Please try again.');
@@ -301,81 +322,82 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       const answer = userAnswer.toLowerCase().trim();
       const correctAnswer = currentQuestion.correct_answer?.toLowerCase().trim() || '';
       const correctAnswers = [correctAnswer];
-
-      if (correctAnswer && answer === correctAnswer) {
-        isCorrect = true;
-        feedbackType = 'correct';
-      }
-
+      if (correctAnswer && answer === correctAnswer) { isCorrect = true; feedbackType = 'correct'; }
       if (!isCorrect && currentQuestion.informal_accepted && Array.isArray(currentQuestion.informal_accepted)) {
         const informalAnswers = currentQuestion.informal_accepted.map(a => a.toLowerCase().trim());
         if (informalAnswers.includes(answer)) {
-          isCorrect = true;
-          feedbackType = 'informal';
+          isCorrect = true; feedbackType = 'informal';
           if (currentQuestion.informal_feedback) explanation = `${currentQuestion.informal_feedback} ${explanation}`;
         }
       }
-
       if (!isCorrect && currentQuestion.acceptable_alternatives && Array.isArray(currentQuestion.acceptable_alternatives)) {
-        const alternative = currentQuestion.acceptable_alternatives.find(
-          alt => alt.answer && alt.answer.toLowerCase().trim() === answer
-        );
-        if (alternative) {
-          isCorrect = true;
-          feedbackType = 'alternative';
-          explanation = `${alternative.feedback} ${explanation}`;
-        }
+        const alternative = currentQuestion.acceptable_alternatives.find(alt => alt.answer && alt.answer.toLowerCase().trim() === answer);
+        if (alternative) { isCorrect = true; feedbackType = 'alternative'; explanation = `${alternative.feedback} ${explanation}`; }
       }
-
-      if (!isCorrect && isFuzzyMatch(answer, correctAnswers)) {
-        isCorrect = true;
-        feedbackType = 'fuzzy';
-      }
-
+      if (!isCorrect && isFuzzyMatch(answer, correctAnswers)) { isCorrect = true; feedbackType = 'fuzzy'; }
       if (!isCorrect) {
         setIsChecking(true);
         const lang = getQuestionLanguage(currentQuestion);
-        const aiResult = await aiMarkGapFill(
-          currentQuestion.question,
-          correctAnswer,
-          userAnswer.trim(),
-          lang
-        );
+        const aiResult = await aiMarkGapFill(currentQuestion.question, correctAnswer, userAnswer.trim(), lang);
         setIsChecking(false);
-
-        if (aiResult?.valid) {
-          isCorrect = true;
-          feedbackType = 'soft-pass';
-          if (aiResult.reason) explanation = `${aiResult.reason} ${explanation}`;
-        }
+        if (aiResult?.valid) { isCorrect = true; feedbackType = 'soft-pass'; if (aiResult.reason) explanation = `${aiResult.reason} ${explanation}`; }
       }
-
-      setFeedback({
-        type: feedbackType,
-        isCorrect,
-        studentAnswer: userAnswer.trim(),
-        correctAnswer: correctAnswer || 'N/A',
-        explanation,
-      });
+      setFeedback({ type: feedbackType, isCorrect, studentAnswer: userAnswer.trim(), correctAnswer: correctAnswer || 'N/A', explanation });
       saveAnswer(currentQuestion, userAnswer.trim(), isCorrect);
-
     } else if (currentQuestion.type === 'multiple_choice') {
       const mcCorrect = currentQuestion.correct_answer || '';
-      if (selectedOption === mcCorrect) {
-        isCorrect = true;
-        feedbackType = 'correct';
-      }
-
-      setFeedback({
-        type: feedbackType,
-        isCorrect,
-        studentAnswer: selectedOption || '',
-        correctAnswer: mcCorrect,
-        explanation,
-      });
+      if (selectedOption === mcCorrect) { isCorrect = true; feedbackType = 'correct'; }
+      setFeedback({ type: feedbackType, isCorrect, studentAnswer: selectedOption || '', correctAnswer: mcCorrect, explanation });
       saveAnswer(currentQuestion, selectedOption || '', isCorrect);
     }
 
+    if (isCorrect) setScore(s => s + 1);
+  };
+
+  const checkDictationAnswer = async () => {
+    const cq = questions[currentQuestionIndex];
+    if (!userAnswer.trim() || isChecking) return;
+    const answer = userAnswer.trim();
+    const correct = cq.correct_answer || '';
+    let isCorrect = false;
+    let isSoftPass = false;
+    let feedbackType = 'incorrect';
+    let feedbackMsg = '';
+
+    // 1. Exact match
+    if (answer.toLowerCase() === correct.toLowerCase()) {
+      isCorrect = true; feedbackType = 'correct';
+    }
+    // 2. Normalised match (ignore punctuation/caps)
+    if (!isCorrect && normaliseDictation(answer) === normaliseDictation(correct)) {
+      isCorrect = true; feedbackType = 'correct';
+    }
+    // 3. Fuzzy match
+    if (!isCorrect && isFuzzyMatch(normaliseDictation(answer), [normaliseDictation(correct)])) {
+      isCorrect = true; feedbackType = 'fuzzy';
+    }
+    // 4. AI marking
+    if (!isCorrect) {
+      setIsChecking(true);
+      const aiResult = await aiMarkDictation(correct, answer);
+      setIsChecking(false);
+      if (aiResult?.accepted) {
+        isCorrect = true; isSoftPass = true; feedbackType = 'soft-pass';
+      }
+    }
+
+    if (feedbackType === 'correct') {
+      feedbackMsg = `✅ Correct!`;
+    } else if (feedbackType === 'fuzzy') {
+      feedbackMsg = `✅ Correct — watch your spelling! The answer was: "${correct}"`;
+    } else if (feedbackType === 'soft-pass') {
+      feedbackMsg = `✅ Close enough! The model answer was: "${correct}"`;
+    } else {
+      feedbackMsg = `❌ The answer was: "${correct}"`;
+    }
+
+    setFeedback({ type: feedbackType, isCorrect, message: feedbackMsg, studentAnswer: answer, correctAnswer: correct });
+    saveDictationAnswer(cq._dictation_exercise_id, answer, isCorrect, isSoftPass);
     if (isCorrect) setScore(s => s + 1);
   };
 
@@ -414,13 +436,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     const errorInfo = findErrorIndex(words, correctAnswer);
 
     if (isExactMatch) {
-      setFeedback({
-        type: 'correct',
-        message: `✅ Correct! ${cq.explanation || ''}`,
-        isCorrect: true,
-        errorIndex: ecSelectedWordIndex,
-        correctWord: cleanCorrection + trailingPunct,
-      });
+      setFeedback({ type: 'correct', message: `✅ Correct! ${cq.explanation || ''}`, isCorrect: true, errorIndex: ecSelectedWordIndex, correctWord: cleanCorrection + trailingPunct });
       setScore(s => s + 1);
       saveAnswer(cq, `${words[ecSelectedWordIndex]} → ${ecCorrection.trim()}`, true);
       return;
@@ -428,23 +444,11 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
     setIsChecking(true);
     const lang = getQuestionLanguage(cq);
-    const aiResult = await aiMarkCorrection(
-      cq.question,
-      words[ecSelectedWordIndex],
-      ecCorrection.trim(),
-      correctAnswer,
-      lang
-    );
+    const aiResult = await aiMarkCorrection(cq.question, words[ecSelectedWordIndex], ecCorrection.trim(), correctAnswer, lang);
     setIsChecking(false);
 
     if (aiResult?.valid) {
-      setFeedback({
-        type: 'soft-pass',
-        message: `✅ Good — that works too! ${aiResult.reason || ''} The model answer was "${errorInfo.correctWord}". ${cq.explanation || ''}`,
-        isCorrect: true,
-        errorIndex: ecSelectedWordIndex,
-        correctWord: cleanCorrection + trailingPunct,
-      });
+      setFeedback({ type: 'soft-pass', message: `✅ Good — that works too! ${aiResult.reason || ''} The model answer was "${errorInfo.correctWord}". ${cq.explanation || ''}`, isCorrect: true, errorIndex: ecSelectedWordIndex, correctWord: cleanCorrection + trailingPunct });
       setScore(s => s + 1);
       saveAnswer(cq, `${words[ecSelectedWordIndex]} → ${ecCorrection.trim()}`, true);
       return;
@@ -513,6 +517,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setMatchingDone(false);
       setShowHint(false);
       setIsChecking(false);
+      setAudioPlayed(false);
     } else {
       finishExercise();
     }
@@ -524,25 +529,12 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const displayTitle = levelTitle ? `${levelTitle} Practice` : 'Random Practice';
   const displayGradient = gradient || 'linear-gradient(135deg, #3498DB, #667eea)';
   const scorePercent = questions.length > 0 ? (score / questions.length) * 100 : 0;
-
   const matchingPairs = currentQuestion?.type === 'matching'
-    ? (Array.isArray(currentQuestion.options)
-      ? currentQuestion.options
-      : JSON.parse(currentQuestion.options || '[]'))
+    ? (Array.isArray(currentQuestion.options) ? currentQuestion.options : JSON.parse(currentQuestion.options || '[]'))
     : null;
 
   const getOOOStyle = (option) => {
-    const base = {
-      padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)',
-      borderRadius: '8px', border: 'none',
-      boxShadow: 'inset 0 0 0 2px #e2e8f0',
-      cursor: feedback ? 'default' : 'pointer',
-      fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)', fontWeight: '500',
-      textAlign: 'center', transition: 'all 0.2s ease',
-      backgroundColor: 'white', color: '#2d3748',
-      minHeight: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      userSelect: 'none', outline: 'none',
-    };
+    const base = { padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)', borderRadius: '8px', border: 'none', boxShadow: 'inset 0 0 0 2px #e2e8f0', cursor: feedback ? 'default' : 'pointer', fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)', fontWeight: '500', textAlign: 'center', transition: 'all 0.2s ease', backgroundColor: 'white', color: '#2d3748', minHeight: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none', outline: 'none' };
     if (!feedback) {
       if (oooSelected === option) return { ...base, boxShadow: 'inset 0 0 0 2px #667eea', backgroundColor: '#EDE9FE', color: '#553C9A' };
       return base;
@@ -556,15 +548,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   };
 
   const getECTileStyle = (index) => {
-    const base = {
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)',
-      margin: '4px 3px', borderRadius: '8px',
-      fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)', fontWeight: '500',
-      cursor: (feedback || isChecking) ? 'default' : 'pointer',
-      transition: 'all 0.15s ease', userSelect: 'none',
-      backgroundColor: 'white', border: '2px solid #e2e8f0', color: '#2d3748', outline: 'none',
-    };
+    const base = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)', margin: '4px 3px', borderRadius: '8px', fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)', fontWeight: '500', cursor: (feedback || isChecking) ? 'default' : 'pointer', transition: 'all 0.15s ease', userSelect: 'none', backgroundColor: 'white', border: '2px solid #e2e8f0', color: '#2d3748', outline: 'none' };
     if (feedback) {
       const errorIdx = feedback.errorIndex;
       const isPass = feedback.type === 'correct' || feedback.type === 'soft-pass';
@@ -584,33 +568,20 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const renderStructuredFeedback = () => {
     if (!feedback || !currentQuestion) return null;
     if (currentQuestion.type !== 'gap_fill' && currentQuestion.type !== 'multiple_choice') return null;
-
-    const isFuzzy    = feedback.type === 'fuzzy';
+    const isFuzzy = feedback.type === 'fuzzy';
     const isSoftPass = feedback.type === 'soft-pass';
-    const isCorrect  = feedback.isCorrect;
-
+    const isCorrect = feedback.isCorrect;
     const borderColor = (isFuzzy || isSoftPass) ? '#f6ad55' : isCorrect ? '#48bb78' : '#f56565';
-    const bgColor     = (isFuzzy || isSoftPass) ? '#fffbeb' : isCorrect ? '#f0fff4' : '#fff5f5';
-    const headerBg    = (isFuzzy || isSoftPass) ? '#f6ad55' : isCorrect ? '#48bb78' : '#f56565';
-    const headerText  = isFuzzy
-      ? '✅ Correct — but watch your spelling!'
-      : isSoftPass
-        ? '✅ Also correct!'
-        : isCorrect
-          ? '✅ Correct!'
-          : '❌ Incorrect';
-
+    const bgColor = (isFuzzy || isSoftPass) ? '#fffbeb' : isCorrect ? '#f0fff4' : '#fff5f5';
+    const headerBg = (isFuzzy || isSoftPass) ? '#f6ad55' : isCorrect ? '#48bb78' : '#f56565';
+    const headerText = isFuzzy ? '✅ Correct — but watch your spelling!' : isSoftPass ? '✅ Also correct!' : isCorrect ? '✅ Correct!' : '❌ Incorrect';
     return (
       <div style={{ marginTop: '1rem', borderRadius: '12px', border: `2px solid ${borderColor}`, overflow: 'hidden', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)' }}>
-        <div style={{ backgroundColor: headerBg, color: 'white', padding: '0.6rem 1rem', fontWeight: '700', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)' }}>
-          {headerText}
-        </div>
+        <div style={{ backgroundColor: headerBg, color: 'white', padding: '0.6rem 1rem', fontWeight: '700', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)' }}>{headerText}</div>
         <div style={{ backgroundColor: bgColor, padding: '1rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem', alignItems: 'flex-start' }}>
             <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px' }}>Your answer:</span>
-            <span style={{ fontWeight: '600', color: isCorrect ? '#276749' : '#c53030', wordBreak: 'break-word' }}>
-              {feedback.studentAnswer || '(no answer)'}
-            </span>
+            <span style={{ fontWeight: '600', color: isCorrect ? '#276749' : '#c53030', wordBreak: 'break-word' }}>{feedback.studentAnswer || '(no answer)'}</span>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'flex-start' }}>
             <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px' }}>Correct answer:</span>
@@ -633,7 +604,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
   const renderCheckingIndicator = () => {
     if (!isChecking || !currentQuestion) return null;
-    if (currentQuestion.type !== 'gap_fill' && currentQuestion.type !== 'error_correction') return null;
+    if (!['gap_fill', 'error_correction', 'dictation'].includes(currentQuestion.type)) return null;
     return (
       <div style={{ marginTop: '1rem', textAlign: 'center', padding: '1rem', color: '#553C9A', fontSize: '0.95rem', border: '2px dashed #EDE9FE', borderRadius: '8px' }}>
         🤖 Checking your answer...
@@ -656,7 +627,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
               Test your English with 20 random questions!
             </p>
             <p style={{ fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', color: '#666', marginBottom: '2.5rem', lineHeight: '1.5' }}>
-              A mix of multiple choice, gap fill, sentence building, odd one out, error correction, and matching. Answer all questions and see your score at the end.
+              A mix of multiple choice, gap fill, sentence building, odd one out, error correction, matching, and dictation. Answer all questions and see your score at the end.
             </p>
             <button onClick={startExercise} disabled={loading} style={{ padding: '1.25rem', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', background: displayGradient, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', width: '100%', maxWidth: '350px', margin: '0 auto', fontWeight: '600', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
               {loading ? 'Loading...' : 'Start Practice'}
@@ -681,38 +652,30 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
             </div>
 
             <div style={{ backgroundColor: 'white', padding: 'clamp(1.5rem, 5vw, 2.5rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
               {/* Badges */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
                 {currentQuestion.type !== 'sentence_building' && (
-                  <div style={{
-                    padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
-                    backgroundColor:
-                      currentQuestion.type === 'gap_fill' ? '#fff3cd' :
-                      currentQuestion.type === 'odd_one_out' ? '#E0F2FE' :
-                      currentQuestion.type === 'error_correction' ? '#FEE2E2' :
-                      currentQuestion.type === 'matching' ? '#D1FAE5' : '#d4edda',
-                    color:
-                      currentQuestion.type === 'gap_fill' ? '#856404' :
-                      currentQuestion.type === 'odd_one_out' ? '#0369A1' :
-                      currentQuestion.type === 'error_correction' ? '#DC2626' :
-                      currentQuestion.type === 'matching' ? '#065F46' : '#155724',
+                  <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
+                    backgroundColor: currentQuestion.type === 'gap_fill' ? '#fff3cd' : currentQuestion.type === 'odd_one_out' ? '#E0F2FE' : currentQuestion.type === 'error_correction' ? '#FEE2E2' : currentQuestion.type === 'matching' ? '#D1FAE5' : currentQuestion.type === 'dictation' ? '#EDE9FE' : '#d4edda',
+                    color: currentQuestion.type === 'gap_fill' ? '#856404' : currentQuestion.type === 'odd_one_out' ? '#0369A1' : currentQuestion.type === 'error_correction' ? '#DC2626' : currentQuestion.type === 'matching' ? '#065F46' : currentQuestion.type === 'dictation' ? '#553C9A' : '#155724',
                   }}>
-                    {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill' :
-                     currentQuestion.type === 'odd_one_out' ? '🔍 Odd One Out' :
-                     currentQuestion.type === 'error_correction' ? '🚨 Error Correction' :
-                     currentQuestion.type === 'matching' ? '🔗 Matching' : '📝 Multiple Choice'}
+                    {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill'
+                      : currentQuestion.type === 'odd_one_out' ? '🔍 Odd One Out'
+                      : currentQuestion.type === 'error_correction' ? '🚨 Error Correction'
+                      : currentQuestion.type === 'matching' ? '🔗 Matching'
+                      : currentQuestion.type === 'dictation' ? '⌨️ Dictation'
+                      : '📝 Multiple Choice'}
                   </div>
                 )}
                 {currentQuestion.level && (
-                  <div style={{
-                    padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
+                  <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
                     backgroundColor: currentQuestion.level.startsWith('A') ? '#c6f6d5' : currentQuestion.level.startsWith('B') ? '#bee3f8' : '#feebc8',
                     color: currentQuestion.level.startsWith('A') ? '#48bb78' : currentQuestion.level.startsWith('B') ? '#4299e1' : '#ed8936',
                   }}>{currentQuestion.level}</div>
                 )}
-                {currentQuestion.topic && (
-                  <div style={{
-                    padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
+                {currentQuestion.topic && currentQuestion.type !== 'dictation' && (
+                  <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
                     backgroundColor: currentQuestion.topic === 'question_forms' ? '#FEE2E2' : currentQuestion.topic === 'punctuation' ? '#FEE2E2' : '#f0f0f0',
                     color: currentQuestion.topic === 'question_forms' ? '#DC2626' : currentQuestion.topic === 'punctuation' ? '#DC2626' : '#555',
                   }}>
@@ -720,55 +683,44 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                     {currentQuestion.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                   </div>
                 )}
-                {(currentQuestion.type === 'error_correction' || currentQuestion.type === 'gap_fill' || currentQuestion.type === 'sentence_building') && (
+                {(currentQuestion.type === 'error_correction' || currentQuestion.type === 'gap_fill' || currentQuestion.type === 'sentence_building' || currentQuestion.type === 'dictation') && (
                   <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>
                     🤖 AI marked
                   </div>
                 )}
               </div>
 
-              {/* Question Text */}
-              {currentQuestion.type !== 'sentence_building' &&
-               currentQuestion.type !== 'error_correction' &&
-               currentQuestion.type !== 'matching' &&
-               currentQuestion.question && (
+              {/* Question Text (not shown for SB, EC, matching, dictation header) */}
+              {currentQuestion.type !== 'sentence_building' && currentQuestion.type !== 'error_correction' && currentQuestion.type !== 'matching' && currentQuestion.type !== 'dictation' && currentQuestion.question && (
                 <div style={{ fontSize: 'clamp(1.15rem, 4vw, 1.4rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
                   {currentQuestion.question}
                 </div>
               )}
 
-              {showHint && currentQuestion.hint && (
+              {showHint && currentQuestion.hint && currentQuestion.type !== 'dictation' && (
                 <div style={{ backgroundColor: '#fff3cd', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid #ffc107', fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#856404' }}>
                   💡 <strong>Hint:</strong> {currentQuestion.hint}
                 </div>
               )}
 
               <div style={{ flex: 1 }}>
+
                 {/* GAP FILL */}
                 {currentQuestion.type === 'gap_fill' && !feedback && (
-                  <input
-                    type="text" value={userAnswer}
-                    onChange={(e) => setUserAnswer(e.target.value)}
+                  <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && !isChecking && checkAnswer()}
-                    placeholder="Type your answer..."
-                    disabled={isChecking}
+                    placeholder="Type your answer..." disabled={isChecking}
                     style={{ width: '100%', padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', borderRadius: '10px', border: '2px solid #e0e0e0', boxSizing: 'border-box', color: '#2C3E50', opacity: isChecking ? 0.6 : 1 }}
-                    autoFocus
-                  />
+                    autoFocus />
                 )}
 
                 {/* MULTIPLE CHOICE — before answer */}
                 {currentQuestion.type === 'multiple_choice' && !feedback && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     {currentQuestion.options.map((option, index) => (
-                      <button key={index} onClick={() => setSelectedOption(option)} style={{
-                        padding: '1.2rem', fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)', textAlign: 'left',
-                        backgroundColor: selectedOption === option ? '#3498DB' : 'white',
-                        color: selectedOption === option ? 'white' : '#2C3E50',
-                        border: `2px solid ${selectedOption === option ? '#3498DB' : '#e0e0e0'}`,
-                        borderRadius: '10px', cursor: 'pointer', transition: 'all 0.2s',
-                        wordWrap: 'break-word', width: '100%', boxSizing: 'border-box', fontWeight: '500',
-                      }}>{option}</button>
+                      <button key={index} onClick={() => setSelectedOption(option)}
+                        style={{ padding: '1.2rem', fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)', textAlign: 'left', backgroundColor: selectedOption === option ? '#3498DB' : 'white', color: selectedOption === option ? 'white' : '#2C3E50', border: `2px solid ${selectedOption === option ? '#3498DB' : '#e0e0e0'}`, borderRadius: '10px', cursor: 'pointer', transition: 'all 0.2s', wordWrap: 'break-word', width: '100%', boxSizing: 'border-box', fontWeight: '500' }}
+                      >{option}</button>
                     ))}
                   </div>
                 )}
@@ -793,15 +745,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
                 {/* SENTENCE BUILDING */}
                 {currentQuestion.type === 'sentence_building' && (
-                  <SentenceBuildingInput
-                    key={currentQuestionIndex}
-                    {...getSbProps(currentQuestion)}
-                    disabled={!!feedback}
-                    onResult={handleSentenceBuildingResult}
-                    feedback={sbFeedback}
-                    showCheckButton={true}
-                    onAnswerReady={() => {}}
-                  />
+                  <SentenceBuildingInput key={currentQuestionIndex} {...getSbProps(currentQuestion)} disabled={!!feedback} onResult={handleSentenceBuildingResult} feedback={sbFeedback} showCheckButton={true} onAnswerReady={() => {}} />
                 )}
 
                 {/* ODD ONE OUT */}
@@ -809,9 +753,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   <div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '1rem' }}>
                       {(Array.isArray(currentQuestion.options) ? currentQuestion.options : JSON.parse(currentQuestion.options || '[]')).map((option, idx) => (
-                        <div key={idx} className="rp-ooo-option" tabIndex={-1}
-                          onClick={() => handleOOOSelect(option)}
-                          style={getOOOStyle(option)}
+                        <div key={idx} className="rp-ooo-option" tabIndex={-1} onClick={() => handleOOOSelect(option)} style={getOOOStyle(option)}
                           onMouseEnter={e => { if (!feedback) { e.currentTarget.style.boxShadow = 'inset 0 0 0 2px #667eea'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
                           onMouseLeave={e => { if (!feedback && oooSelected !== option) { e.currentTarget.style.boxShadow = 'inset 0 0 0 2px #e2e8f0'; e.currentTarget.style.transform = 'none'; } }}
                         >{option}</div>
@@ -828,9 +770,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                     </div>
                     <div style={{ backgroundColor: '#F8FBFF', padding: '1.25rem', borderRadius: '10px', border: '1px solid #AED6F1', lineHeight: '2.4', marginBottom: '1.25rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
                       {ecWords.map((word, index) => (
-                        <span key={index} className="rp-ec-tile" tabIndex={-1}
-                          onClick={() => handleECWordTap(index)}
-                          style={getECTileStyle(index)}
+                        <span key={index} className="rp-ec-tile" tabIndex={-1} onClick={() => handleECWordTap(index)} style={getECTileStyle(index)}
                           onMouseEnter={e => { if (!feedback && !isChecking && ecSelectedWordIndex !== index) { e.currentTarget.style.borderColor = '#667eea'; e.currentTarget.style.backgroundColor = '#f7f7ff'; } }}
                           onMouseLeave={e => { if (!feedback && !isChecking && ecSelectedWordIndex !== index) { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.backgroundColor = 'white'; } }}
                         >{word}</span>
@@ -849,17 +789,13 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                           <div style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                             Your correction for "{ecWords[ecSelectedWordIndex]}":
                           </div>
-                          <input type="text" value={ecCorrection}
-                            onChange={(e) => setEcCorrection(e.target.value)}
+                          <input type="text" value={ecCorrection} onChange={(e) => setEcCorrection(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && checkECAnswer()}
-                            placeholder="Type the correct word..."
-                            autoFocus
-                            style={{ width: '100%', padding: '0.9rem 1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', borderRadius: '8px', border: '2px solid #667eea', boxSizing: 'border-box', color: '#2d3748', fontWeight: 500, backgroundColor: '#EDE9FE' }}
-                          />
+                            placeholder="Type the correct word..." autoFocus
+                            style={{ width: '100%', padding: '0.9rem 1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', borderRadius: '8px', border: '2px solid #667eea', boxSizing: 'border-box', color: '#2d3748', fontWeight: 500, backgroundColor: '#EDE9FE' }} />
                         </div>
                         <button onClick={checkECAnswer} disabled={!ecCorrection.trim() || isChecking}
-                          style={{ padding: '0 1.5rem', background: ecCorrection.trim() ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#cbd5e0', color: 'white', border: 'none', borderRadius: '8px', cursor: ecCorrection.trim() ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '1rem', alignSelf: 'flex-end', minHeight: '48px' }}
-                        >Check</button>
+                          style={{ padding: '0 1.5rem', background: ecCorrection.trim() ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#cbd5e0', color: 'white', border: 'none', borderRadius: '8px', cursor: ecCorrection.trim() ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '1rem', alignSelf: 'flex-end', minHeight: '48px' }}>Check</button>
                       </div>
                     )}
                     {ecSelectedWordIndex === null && !feedback && !isChecking && (
@@ -882,27 +818,70 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   </div>
                 )}
 
+                {/* DICTATION */}
+                {currentQuestion.type === 'dictation' && (
+                  <div>
+                    <audio ref={audioRef} src={currentQuestion.audio_url} style={{ display: 'none' }} />
+                    <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+                      <button
+                        onClick={() => {
+                          if (audioRef.current) {
+                            audioRef.current.currentTime = 0;
+                            audioRef.current.play();
+                            setAudioPlayed(true);
+                          }
+                        }}
+                        style={{ padding: '0.9rem 2rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', fontWeight: '600', boxShadow: '0 2px 8px rgba(102,126,234,0.35)' }}
+                      >
+                        🔊 {audioPlayed ? 'Play Again' : 'Play Audio'}
+                      </button>
+                      {!audioPlayed && (
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#a0aec0' }}>👆 Tap to hear the audio</div>
+                      )}
+                    </div>
+
+                    {currentQuestion.sentence_template && !feedback && (
+                      <div style={{ backgroundColor: '#EBF8FF', border: '2px solid #90CDF4', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500' }}>
+                        {currentQuestion.sentence_template}
+                      </div>
+                    )}
+
+                    {!feedback && (
+                      <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && !isChecking && userAnswer.trim() && checkDictationAnswer()}
+                        placeholder={currentQuestion.excerpt_type === 'sentence' ? 'Type the full sentence you heard...' : 'Type the word or phrase you heard...'}
+                        disabled={isChecking}
+                        style={{ width: '100%', padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', borderRadius: '10px', border: '2px solid #e0e0e0', boxSizing: 'border-box', color: '#2C3E50', opacity: isChecking ? 0.6 : 1 }}
+                      />
+                    )}
+
+                    {feedback && (
+                      <div style={{
+                        backgroundColor: feedback.isCorrect ? (feedback.type === 'fuzzy' || feedback.type === 'soft-pass' ? '#fffbeb' : '#f0fff4') : '#fff5f5',
+                        border: `2px solid ${feedback.isCorrect ? (feedback.type === 'fuzzy' || feedback.type === 'soft-pass' ? '#f6ad55' : '#48bb78') : '#f56565'}`,
+                        borderRadius: '10px', padding: '1rem', marginTop: '0.5rem',
+                        fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6',
+                        color: feedback.isCorrect ? (feedback.type === 'fuzzy' || feedback.type === 'soft-pass' ? '#744210' : '#276749') : '#c53030',
+                        fontWeight: '500',
+                      }}>
+                        {feedback.message}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {renderCheckingIndicator()}
                 {renderStructuredFeedback()}
 
                 {/* EC feedback */}
                 {feedback && currentQuestion.type === 'error_correction' && (
-                  <div style={{
-                    backgroundColor: feedback.type === 'soft-pass' ? '#fffbeb' : feedback.isCorrect ? '#d4edda' : '#f8d7da',
-                    color: feedback.type === 'soft-pass' ? '#744210' : feedback.isCorrect ? '#155724' : '#721c24',
-                    padding: '1.2rem', borderRadius: '10px', marginTop: '1rem',
-                    fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6',
-                    wordWrap: 'break-word', overflowWrap: 'break-word',
-                    border: feedback.type === 'soft-pass' ? '1px solid #fbd38d' : 'none',
-                  }}>{feedback.message}</div>
+                  <div style={{ backgroundColor: feedback.type === 'soft-pass' ? '#fffbeb' : feedback.isCorrect ? '#d4edda' : '#f8d7da', color: feedback.type === 'soft-pass' ? '#744210' : feedback.isCorrect ? '#155724' : '#721c24', padding: '1.2rem', borderRadius: '10px', marginTop: '1rem', fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6', wordWrap: 'break-word', overflowWrap: 'break-word', border: feedback.type === 'soft-pass' ? '1px solid #fbd38d' : 'none' }}>
+                    {feedback.message}
+                  </div>
                 )}
 
                 {/* Simple feedback (OOO, SB, matching) */}
-                {feedback &&
-                 currentQuestion.type !== 'error_correction' &&
-                 currentQuestion.type !== 'sentence_building' &&
-                 currentQuestion.type !== 'gap_fill' &&
-                 currentQuestion.type !== 'multiple_choice' && (
+                {feedback && !['error_correction', 'sentence_building', 'gap_fill', 'multiple_choice', 'dictation'].includes(currentQuestion.type) && (
                   <div style={{ backgroundColor: feedback.isCorrect ? '#d4edda' : '#f8d7da', color: feedback.isCorrect ? '#155724' : '#721c24', padding: '1.2rem', borderRadius: '10px', marginTop: '1rem', fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
                     {feedback.message}
                   </div>
@@ -911,19 +890,11 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
               {/* Buttons */}
               <div style={{ marginTop: '1.5rem' }}>
-                {!feedback &&
-                 currentQuestion.type !== 'sentence_building' &&
-                 currentQuestion.type !== 'odd_one_out' &&
-                 currentQuestion.type !== 'error_correction' &&
-                 currentQuestion.type !== 'matching' && (
-                  <button onClick={checkAnswer}
-                    disabled={isChecking || (currentQuestion.type === 'gap_fill' && !userAnswer.trim()) || (currentQuestion.type === 'multiple_choice' && !selectedOption)}
-                    style={{
-                      padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)',
-                      backgroundColor: '#2C3E50', color: 'white', border: 'none',
-                      borderRadius: '10px', cursor: 'pointer', width: '100%', fontWeight: '600',
-                      opacity: (isChecking || (currentQuestion.type === 'gap_fill' && !userAnswer.trim()) || (currentQuestion.type === 'multiple_choice' && !selectedOption)) ? 0.5 : 1,
-                    }}
+                {!feedback && !['sentence_building', 'odd_one_out', 'error_correction', 'matching'].includes(currentQuestion.type) && (
+                  <button
+                    onClick={currentQuestion.type === 'dictation' ? checkDictationAnswer : checkAnswer}
+                    disabled={isChecking || !userAnswer.trim() && currentQuestion.type !== 'multiple_choice' || currentQuestion.type === 'multiple_choice' && !selectedOption}
+                    style={{ padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)', backgroundColor: '#2C3E50', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', width: '100%', fontWeight: '600', opacity: (isChecking || (!userAnswer.trim() && currentQuestion.type !== 'multiple_choice') || (currentQuestion.type === 'multiple_choice' && !selectedOption)) ? 0.5 : 1 }}
                   >{isChecking ? '🤖 Checking...' : 'Check Answer'}</button>
                 )}
                 {feedback && (

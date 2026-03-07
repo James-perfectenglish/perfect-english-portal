@@ -4,20 +4,23 @@ import { supabase } from './supabaseClient'
 import WordOfTheDay from './WordOfTheDay'
 
 const TRACK_CONFIG = {
-  general:  { label: 'General English',      emoji: '📚', description: 'Mixed vocabulary, grammar and skills across all areas',        color: '#667eea', topicFilter: null },
-  business: { label: 'Business English',     emoji: '💼', description: 'Professional communication and workplace vocabulary',           color: '#ed8936', topicFilter: 'business' },
-  hotels:   { label: 'Hotel English',        emoji: '🏨', description: 'Vocabulary and phrases for the hospitality industry',           color: '#48bb78', topicFilter: 'hotels' },
-  bathroom: { label: 'Bathroom & Interiors', emoji: '🚿', description: 'Product vocabulary for the Borrás showroom',                    color: '#4299e1', topicFilter: 'borras' },
-  exam:     { label: 'Exam Preparation',     emoji: '🎓', description: 'Targeted practice for English language exams',                  color: '#9f7aea', topicFilter: 'exam' },
-  spanish:  { label: 'Spanish Practice',     emoji: '🇪🇸', description: 'English practice with Spanish — ideal for A2 towards B1',     color: '#e53e3e', topicFilter: 'spanish' },
+  general: { label: 'General English', emoji: '📚', description: 'Mixed vocabulary, grammar and skills across all areas', color: '#667eea', topicFilter: null },
+  business: { label: 'Business English', emoji: '💼', description: 'Professional communication and workplace vocabulary', color: '#ed8936', topicFilter: 'business' },
+  hotels: { label: 'Hotel English', emoji: '🏨', description: 'Vocabulary and phrases for the hospitality industry', color: '#48bb78', topicFilter: 'hotels' },
+  bathroom: { label: 'Bathroom & Interiors', emoji: '🚿', description: 'Product vocabulary for the Borrás showroom', color: '#4299e1', topicFilter: 'borras' },
+  exam: { label: 'Exam Preparation', emoji: '🎓', description: 'Targeted practice for English language exams', color: '#9f7aea', topicFilter: 'exam' },
+  spanish: { label: 'Spanish Practice', emoji: '🇪🇸', description: 'English practice with Spanish — ideal for A2 towards B1', color: '#e53e3e', topicFilter: 'spanish' },
 }
 
 const TYPE_INFO = {
-  gap_fill:          { label: 'Gap Fill',          emoji: '✏️' },
-  multiple_choice:   { label: 'Multiple Choice',   emoji: '📝' },
-  sentence_building: { label: 'Sentence Building', emoji: '🧩' },
-  odd_one_out:       { label: 'Odd One Out',        emoji: '🔍' },
-  error_correction:  { label: 'Error Correction',  emoji: '🚨' },
+  gap_fill:         { label: 'Gap Fill',          emoji: '✏️' },
+  multiple_choice:  { label: 'Multiple Choice',    emoji: '📝' },
+  sentence_building:{ label: 'Sentence Building',  emoji: '🧩' },
+  odd_one_out:      { label: 'Odd One Out',         emoji: '🔍' },
+  error_correction: { label: 'Error Correction',   emoji: '🚨' },
+  matching:         { label: 'Matching',            emoji: '🔗' },
+  sentence_auction: { label: 'Sentence Auction',   emoji: '🔨' },
+  dictation:        { label: 'Dictation',           emoji: '⌨️' },
 }
 
 function toPercent(score, answers) {
@@ -30,7 +33,7 @@ function toPercent(score, answers) {
 
 function getRecommendation(profile, attempts, studentTracks) {
   if (studentTracks.length > 0) {
-    const key   = studentTracks[0]
+    const key = studentTracks[0]
     const track = TRACK_CONFIG[key]
     if (track) {
       return {
@@ -64,18 +67,18 @@ function getRecommendation(profile, attempts, studentTracks) {
 }
 
 export default function StudentDashboard({ profile, session, handleLogout }) {
-  const [stats, setStats]                 = useState(null)
-  const [attempts, setAttempts]           = useState([])
+  const [stats, setStats] = useState(null)
+  const [attempts, setAttempts] = useState([])
   const [typeBreakdown, setTypeBreakdown] = useState({})
-  const [lessonsPassed, setLessonsPassed]       = useState(0)
-  const [daysStudied, setDaysStudied]           = useState(0)
+  const [lessonsPassed, setLessonsPassed] = useState(0)
+  const [daysStudied, setDaysStudied] = useState(0)
   const [listeningCompleted, setListeningCompleted] = useState(0)
-  const [loading, setLoading]                   = useState(true)
+  const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
   const firstName = profile.full_name?.split(' ')[0] || 'there'
-  const hour      = new Date().getHours()
-  const greeting  = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
   useEffect(() => { fetchDashboardData() }, [session])
 
@@ -96,11 +99,7 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
       .eq('is_correct', true)
 
     if (totalCount > 0) {
-      setStats({
-        total: totalCount,
-        correct: correctCount,
-        accuracy: Math.round((correctCount / totalCount) * 100)
-      })
+      setStats({ total: totalCount, correct: correctCount, accuracy: Math.round((correctCount / totalCount) * 100) })
     } else {
       setStats({ total: 0, correct: 0, accuracy: 0 })
     }
@@ -124,6 +123,7 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         if (questions) {
           const typeMap = {}
           questions.forEach(q => { typeMap[q.question_number] = q.type })
+
           const byType = {}
           recentAnswers.forEach(a => {
             const type = typeMap[a.question_id]
@@ -151,13 +151,13 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         scorePercent: toPercent(a.score, a.answers)
       }))
       setLessonsPassed(normalised.filter(a => a.scorePercent >= 70).length)
+
       // Count distinct days from both attempts AND individual answers for accuracy
       const attemptDays = normalised.map(a => new Date(a.completed_at).toDateString())
-      const answerDays  = (recentAnswers || []).map(a => new Date(a.answered_at).toDateString())
+      const answerDays = (recentAnswers || []).map(a => new Date(a.answered_at).toDateString())
       setDaysStudied(new Set([...attemptDays, ...answerDays]).size)
       setAttempts([...normalised].reverse()) // chronological for chart
     } else if (recentAnswers && recentAnswers.length > 0) {
-      // Has answered questions but no completed attempts yet
       const answerDays = recentAnswers.map(a => new Date(a.answered_at).toDateString())
       setDaysStudied(new Set(answerDays).size)
     }
@@ -170,13 +170,12 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
       .eq('stage_reached', 'review')
 
     setListeningCompleted(listenCount || 0)
-
     setLoading(false)
   }
 
-  const studentTracks  = Array.isArray(profile.tracks) ? profile.tracks : []
-  const hasData        = stats && stats.total > 0
-  const hasAttempts    = attempts.length > 0
+  const studentTracks = Array.isArray(profile.tracks) ? profile.tracks : []
+  const hasData = stats && stats.total > 0
+  const hasAttempts = attempts.length > 0
   const recommendation = getRecommendation(profile, attempts, studentTracks)
 
   if (loading) {
@@ -185,7 +184,6 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: '1.25rem 1rem 4rem' }}>
-
       {/* GREETING */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', gap: '1rem' }}>
         <div>
@@ -204,21 +202,12 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
             title="Teacher Dashboard"
             style={{
               background: 'linear-gradient(135deg, #667eea, #764ba2)',
-              border: 'none',
-              borderRadius: '10px',
-              width: '42px',
-              height: '42px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1.2rem',
-              cursor: 'pointer',
-              flexShrink: 0,
+              border: 'none', borderRadius: '10px', width: '42px', height: '42px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '1.2rem', cursor: 'pointer', flexShrink: 0,
               boxShadow: '0 2px 8px rgba(102,126,234,0.4)',
             }}
-          >
-            👨‍🏫
-          </button>
+          >👨‍🏫</button>
         )}
       </div>
 
@@ -226,11 +215,11 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
 
       {/* STAT CARDS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
-        <StatCard emoji="📊" label="Questions Answered" value={hasData     ? stats.total.toLocaleString() : '—'} />
-        <StatCard emoji="🎯" label="Overall Accuracy"   value={hasData     ? `${stats.accuracy}%`          : '—'} />
-        <StatCard emoji="🏆" label="Lessons Passed"     value={hasAttempts ? lessonsPassed                  : '—'} />
-        <StatCard emoji="🎧" label="Listening Done"     value={listeningCompleted > 0 ? listeningCompleted  : '—'} />
-        <StatCard emoji="📅" label="Days Studied"       value={hasAttempts ? daysStudied                    : '—'} />
+        <StatCard emoji="📊" label="Questions Answered" value={hasData ? stats.total.toLocaleString() : '—'} />
+        <StatCard emoji="🎯" label="Overall Accuracy"   value={hasData ? `${stats.accuracy}%` : '—'} />
+        <StatCard emoji="🏆" label="Lessons Passed"     value={hasAttempts ? lessonsPassed : '—'} />
+        <StatCard emoji="🎧" label="Listening Done"     value={listeningCompleted > 0 ? listeningCompleted : '—'} />
+        <StatCard emoji="📅" label="Days Studied"       value={hasAttempts ? daysStudied : '—'} />
       </div>
 
       {/* SCORE TREND */}
@@ -247,8 +236,8 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
             {Object.entries(typeBreakdown)
               .sort((a, b) => (b[1].correct / b[1].total) - (a[1].correct / a[1].total))
               .map(([type, data]) => {
-                const pct  = Math.round((data.correct / data.total) * 100)
-                const info = TYPE_INFO[type] || { label: type, emoji: '❓' }
+                const pct = Math.round((data.correct / data.total) * 100)
+                const info = TYPE_INFO[type] || { label: type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), emoji: '📋' }
                 return <TypeBar key={type} info={info} pct={pct} total={data.total} />
               })}
           </div>
@@ -288,9 +277,10 @@ export default function StudentDashboard({ profile, session, handleLogout }) {
         <div style={{ fontSize: '0.875rem', color: '#718096' }}>
           Your level: <strong style={{ color: '#667eea' }}>{profile.level || 'Not assigned yet'}</strong>
         </div>
-        <button onClick={handleLogout} style={{ padding: '0.5rem 1.25rem', backgroundColor: '#f44336', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500' }}>
-          Logout
-        </button>
+        <button
+          onClick={handleLogout}
+          style={{ padding: '0.5rem 1.25rem', backgroundColor: '#f44336', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500' }}
+        >Logout</button>
       </div>
     </div>
   )
@@ -344,8 +334,8 @@ function ScoreTrendChart({ attempts }) {
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '90px', padding: '0 2px' }}>
         {recent.map((a, i) => {
-          const pct   = a.scorePercent ?? 0
-          const barH  = Math.max(4, (pct / 100) * 90)
+          const pct = a.scorePercent ?? 0
+          const barH = Math.max(4, (pct / 100) * 90)
           const color = pct >= 70 ? '#48bb78' : pct >= 50 ? '#ed8936' : '#fc8181'
           return <div key={i} title={`Session ${i + 1}: ${pct}%`} style={{ flex: 1, height: `${barH}px`, backgroundColor: color, borderRadius: '4px 4px 0 0', minWidth: '8px' }} />
         })}
