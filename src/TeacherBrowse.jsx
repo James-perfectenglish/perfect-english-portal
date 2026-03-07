@@ -502,7 +502,7 @@ function InteractiveQuestion({ item: q }) {
       </div>
 
       {/* Question text — same condition as RPE */}
-      {q.type !== 'sentence_building' && q.type !== 'error_correction' && q.type !== 'matching' && q.type !== 'dictation' && q.question && (
+      {q.type !== 'sentence_building' && q.type !== 'error_correction' && q.type !== 'matching' && q.type !== 'dictation' && q.type !== 'sentence_auction' && q.question && (
         <div style={{ fontSize: 'clamp(1.15rem, 4vw, 1.4rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
           {q.question}
         </div>
@@ -551,6 +551,49 @@ function InteractiveQuestion({ item: q }) {
         {q.type === 'sentence_building' && (
           <SentenceBuildingInput key={q.id} {..._getSbProps(q)} disabled={!!feedback} onResult={handleSentenceBuildingResult} feedback={sbFeedback} showCheckButton={true} onAnswerReady={() => {}} />
         )}
+
+        {/* SENTENCE AUCTION */}
+        {q.type === 'sentence_auction' && (() => {
+          const correctAnswer = (q.correct_answer || '').toLowerCase().trim();
+          const handleAuctionPick = (pick) => {
+            if (feedback) return;
+            const isCorrect = pick === correctAnswer;
+            setFeedback({
+              type: isCorrect ? 'correct' : 'incorrect',
+              isCorrect,
+              studentAnswer: pick,
+              correctAnswer,
+              message: isCorrect
+                ? `✅ Correct — this sentence is ${correctAnswer}. ${q.explanation || ''}`
+                : `❌ This sentence is actually ${correctAnswer}. ${q.explanation || ''}`,
+            });
+          };
+          const btnBase = { padding: '1.1rem 2rem', fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)', fontWeight: '700', border: 'none', borderRadius: '10px', cursor: feedback ? 'default' : 'pointer', transition: 'all 0.15s', flex: 1 };
+          const getAuctionBtnStyle = (val) => {
+            if (!feedback) return { ...btnBase, backgroundColor: val === 'correct' ? '#d4edda' : '#f8d7da', color: val === 'correct' ? '#155724' : '#721c24' };
+            const isThisCorrect = val === correctAnswer;
+            const wasChosen = val === feedback.studentAnswer;
+            if (isThisCorrect) return { ...btnBase, backgroundColor: '#48bb78', color: 'white', boxShadow: '0 2px 8px rgba(72,187,120,0.4)' };
+            if (wasChosen && !feedback.isCorrect) return { ...btnBase, backgroundColor: '#f56565', color: 'white' };
+            return { ...btnBase, backgroundColor: '#e2e8f0', color: '#a0aec0' };
+          };
+          return (
+            <div>
+              <div style={{ backgroundColor: '#FFFBEB', border: '2px solid #F6AD55', borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem', fontSize: 'clamp(1.1rem, 3.5vw, 1.3rem)', color: '#2C3E50', lineHeight: '1.7', fontWeight: '500', textAlign: 'center', fontStyle: 'italic' }}>
+                "{q.question}"
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button onClick={() => handleAuctionPick('correct')} style={getAuctionBtnStyle('correct')}>✅ Correct</button>
+                <button onClick={() => handleAuctionPick('incorrect')} style={getAuctionBtnStyle('incorrect')}>❌ Incorrect</button>
+              </div>
+              {feedback && (
+                <div style={{ marginTop: '1rem', padding: '1rem 1.25rem', borderRadius: '10px', backgroundColor: feedback.isCorrect ? '#f0fff4' : '#fff5f5', border: `2px solid ${feedback.isCorrect ? '#48bb78' : '#f56565'}`, fontSize: 'clamp(1rem, 3vw, 1.1rem)', color: feedback.isCorrect ? '#276749' : '#c53030', lineHeight: '1.6', fontWeight: '500' }}>
+                  {feedback.message}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ODD ONE OUT */}
         {q.type === 'odd_one_out' && (
@@ -662,7 +705,7 @@ function InteractiveQuestion({ item: q }) {
         )}
 
         {/* Simple feedback: OOO, matching */}
-        {feedback && !['error_correction', 'sentence_building', 'gap_fill', 'multiple_choice', 'dictation'].includes(q.type) && (
+        {feedback && !['error_correction', 'sentence_building', 'gap_fill', 'multiple_choice', 'dictation', 'sentence_auction'].includes(q.type) && (
           <div style={{ backgroundColor: feedback.isCorrect ? '#d4edda' : '#f8d7da', color: feedback.isCorrect ? '#155724' : '#721c24', padding: '1.2rem', borderRadius: '10px', marginTop: '1rem', fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
             {feedback.message}
           </div>
@@ -671,7 +714,7 @@ function InteractiveQuestion({ item: q }) {
 
       {/* Buttons */}
       <div style={{ marginTop: '1.5rem' }}>
-        {!feedback && !['sentence_building', 'odd_one_out', 'error_correction', 'matching'].includes(q.type) && (
+        {!feedback && !['sentence_building', 'odd_one_out', 'error_correction', 'matching', 'sentence_auction'].includes(q.type) && (
           <button
             onClick={q.type === 'dictation' ? checkDictationAnswer : checkAnswer}
             disabled={isChecking || (!userAnswer.trim() && q.type !== 'multiple_choice') || (q.type === 'multiple_choice' && !selectedOption)}
