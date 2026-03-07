@@ -14,7 +14,6 @@ export default async function handler(req, res) {
   }
 
   const isSpanish = language === 'es';
-  const langLabel = isSpanish ? 'Spanish' : 'English';
 
   const prompt = isSpanish
     ? `Estás corrigiendo un ejercicio de completar huecos en español.
@@ -31,15 +30,20 @@ Responde con exactamente un objeto JSON y nada más:
 {"valid": true, "reason": "una frase corta en español explicando por qué funciona"}
 o
 {"valid": false, "reason": "una frase corta en español explicando por qué no funciona"}`
-    : `You are marking an ${langLabel} gap-fill exercise.
+    : `You are marking an English gap-fill exercise. There may be more than one correct answer.
 
-Question (with ___ for the gap): "${question}"
-Model correct answer: "${correctAnswer}"
+Sentence (with ___ for the gap): "${question}"
+Model answer: "${correctAnswer}"
 Student's answer: "${studentAnswer}"
 
-Is the student's answer grammatically correct and appropriate for this context, even if different from the model answer?
-Only answer YES if it genuinely works in the gap — correct verb form, agreement, appropriate meaning.
-Answer NO if it is wrong, grammatically incorrect, or changes the meaning.
+Your job: decide whether the student's answer is ALSO correct — not whether it matches the model answer.
+Mark it valid if it:
+- is grammatically correct in the gap
+- makes sense in the sentence
+- fits the register (e.g. if the sentence is formal/business, the answer should be too)
+
+Mark it invalid only if it is grammatically wrong, makes no sense, or is the wrong register.
+Do NOT penalise the student simply for using a different word or phrase from the model answer.
 
 Reply with exactly one JSON object and nothing else:
 {"valid": true, "reason": "one short sentence explaining why it works"}
