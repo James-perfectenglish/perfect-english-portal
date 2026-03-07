@@ -357,37 +357,6 @@ export default function ExerciseList({
         </div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0, marginTop: '2px' }}>
 
-          {/* Teacher-only: language toggle + browse */}
-          {isTeacher && onToggleLang && (
-            <button
-              onClick={onToggleLang}
-              title={globalLang === 'en' ? 'Switch to Spanish mode' : 'Switch to English mode'}
-              style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              {globalLang === 'en' ? '🇬🇧' : '🇪🇸'}
-            </button>
-          )}
-
-          {isTeacher && onBrowseClick && (
-            <button
-              onClick={onBrowseClick}
-              title="Question browser"
-              style={{ height: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, color: '#4a5568', padding: '0 10px', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
-            >
-              🔍 Browse
-            </button>
-          )}
-
-          {isTeacher && (
-            <button
-              onClick={onTeacherClick}
-              title="Teacher dashboard"
-              style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              👨‍🏫
-            </button>
-          )}
-
           <button
             onClick={() => setIsListView(v => !v)}
             style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#f0f0f5', borderRadius: '8px', padding: '5px 9px', cursor: 'pointer', border: 'none', fontSize: '0.72rem', fontWeight: 600, color: '#4a5568', whiteSpace: 'nowrap' }}
