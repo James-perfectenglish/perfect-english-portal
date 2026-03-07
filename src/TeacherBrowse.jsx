@@ -442,6 +442,32 @@ function InteractiveQuestion({ item: q }) {
     );
   };
 
+  // ── Listening exercise: audio-only focus view ──
+  if (q._source === 'listening') {
+    return (
+      <div style={{ backgroundColor: 'white', padding: 'clamp(1.5rem, 5vw, 2.5rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>🎧 Listening</div>
+          {q.level && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: q.level.startsWith('A') ? '#48bb78' : q.level.startsWith('B') ? '#4299e1' : '#ed8936' }}>{q.level}</div>}
+        </div>
+        {q.title && <div style={{ fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', color: '#2C3E50', fontWeight: '700' }}>{q.title}</div>}
+        {q.intro_text && <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', color: '#4a5568', lineHeight: '1.6' }}>{q.intro_text}</div>}
+        {q.description && !q.intro_text && <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', color: '#4a5568', lineHeight: '1.6' }}>{q.description}</div>}
+        {q.audio_url && (
+          <div>
+            <audio controls src={q.audio_url} style={{ width: '100%', borderRadius: '8px' }} />
+          </div>
+        )}
+        {q.transcript && (
+          <details style={{ backgroundColor: '#f8f9fa', borderRadius: '10px', padding: '1rem' }}>
+            <summary style={{ cursor: 'pointer', fontWeight: '600', color: '#553C9A', fontSize: '0.9rem', marginBottom: '0.5rem' }}>📄 Transcript</summary>
+            <div style={{ fontSize: '0.95rem', color: '#4a5568', lineHeight: '1.8', marginTop: '0.75rem', whiteSpace: 'pre-wrap' }}>{q.transcript}</div>
+          </details>
+        )}
+      </div>
+    );
+  }
+
   // ── Render ──
   return (
     <div style={{ backgroundColor: 'white', padding: 'clamp(1.5rem, 5vw, 2.5rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -757,7 +783,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       if (f.levels.length) q = q.in('level', f.levels);
       if (f.topic) q = q.ilike('topic', `%${f.topic}%`);
       const { data } = await q.limit(100);
-      if (data) data.forEach(r => all.push({ ...r, _source: 'dictation', _rowKey: `di_${r.id}` }));
+      if (data) data.forEach(r => all.push({ ...r, _source: 'dictation', _rowKey: `di_${r.id}`, type: 'dictation', correct_answer: r.answer }));
     }
     setResults(all); setLoading(false);
   }, [filters, maxQNumber]);
@@ -770,7 +796,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
     const diIds = set.items.filter(i => i.source === 'dictation').map(i => i.id);
     if (qbIds.length) { const { data } = await supabase.from('question_bank').select('*').in('id', qbIds); if (data) data.forEach(r => all.push({ ...r, _source: 'question_bank', _rowKey: `qb_${r.id}` })); }
     if (liIds.length) { const { data } = await supabase.from('listening_exercises').select('*').in('id', liIds); if (data) data.forEach(r => all.push({ ...r, _source: 'listening', _rowKey: `li_${r.id}` })); }
-    if (diIds.length) { const { data } = await supabase.from('dictation_exercises').select('*').in('id', diIds); if (data) data.forEach(r => all.push({ ...r, _source: 'dictation', _rowKey: `di_${r.id}` })); }
+    if (diIds.length) { const { data } = await supabase.from('dictation_exercises').select('*').in('id', diIds); if (data) data.forEach(r => all.push({ ...r, _source: 'dictation', _rowKey: `di_${r.id}`, type: 'dictation', correct_answer: r.answer })); }
     const orderMap = {}; set.items.forEach((item, idx) => { orderMap[item.id] = idx; });
     all.sort((a, b) => (orderMap[a.id] ?? 99) - (orderMap[b.id] ?? 99));
     setResults(all); setLoading(false);
