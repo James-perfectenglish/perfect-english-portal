@@ -34,7 +34,7 @@ function latestOf(...dates) {
 }
 
 function exportCSV(students) {
-  const headers = ['Name', 'Level', 'Questions Answered', 'Accuracy %', 'Test ✅', 'Listen ✅', 'Dict ✅', 'Best Type', 'Worst Type', 'Last Active']
+  const headers = ['Name', 'Level', 'Questions Answered', 'Accuracy %', 'Test ✅', 'Listen ✅', 'Dict ✅', 'Topic ✅', 'Best Type', 'Worst Type', 'Last Active']
   const rows = students.map(s => [
     s.full_name || 'Unknown',
     s.level || '—',
@@ -43,6 +43,7 @@ function exportCSV(students) {
     s.testPassed,
     s.listenPassed,
     s.dictPassed,
+    s.topicPassed,
     s.bestType ? (TYPE_INFO[s.bestType]?.label || s.bestType) : '—',
     s.worstType ? (TYPE_INFO[s.worstType]?.label || s.worstType) : '—',
     s.lastActive ? new Date(s.lastActive).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'
@@ -105,16 +106,23 @@ export default function TeacherDashboard({ profile, handleLogout, globalLang, on
         .eq('student_id', id)
         .or('is_correct.eq.true,is_soft_pass.eq.true')
     )
+    // NEW: topic_sessions pass counts
+    const topicPassPromises = ids.map(id =>
+      supabase.from('topic_sessions').select('*', { count: 'exact', head: true })
+        .eq('student_id', id)
+        .eq('passed', true)
+    )
 
-    const [totalResults, correctResults, testPassedResults, listenPassResults, dictPassResults] = await Promise.all([
+    const [totalResults, correctResults, testPassedResults, listenPassResults, dictPassResults, topicPassResults] = await Promise.all([
       Promise.all(totalCountsPromises),
       Promise.all(correctCountsPromises),
       Promise.all(testPassedPromises),
       Promise.all(listenPassPromises),
       Promise.all(dictPassPromises),
+      Promise.all(topicPassPromises),
     ])
 
-    const totalMap = {}, correctMap = {}, testPassedMap = {}, listenPassMap = {}, dictPassMap = {}
+    const totalMap = {}, correctMap = {}, testPassedMap = {}, listenPassMap = {}, dictPassMap = {}, topicPassMap = {}
     ids.forEach((id, i) => {
       totalMap[id]      = totalResults[i].count || 0
       correctMap[id]    = correctResults[i].count || 0
@@ -122,6 +130,7 @@ export default function TeacherDashboard({ profile, handleLogout, globalLang, on
       const listenRows  = listenPassResults[i].data || []
       listenPassMap[id] = listenRows.filter(r => r.detail_total > 0 && r.detail_correct / r.detail_total >= 0.7).length
       dictPassMap[id]   = dictPassResults[i].count || 0
+      topicPassMap[id]  = topicPassResults[i].count || 0
     })
 
     const activeIds = ids.filter(id => (totalMap[id] || 0) > 0)
@@ -172,6 +181,7 @@ export default function TeacherDashboard({ profile, handleLogout, globalLang, on
         testPassed:     testPassedMap[p.id] || 0,
         listenPassed:   listenPassMap[p.id] || 0,
         dictPassed:     dictPassMap[p.id]   || 0,
+        topicPassed:    topicPassMap[p.id]  || 0,
         accuracy: 0,
         lastActive: null, lastAnswered: null, lastListened: null, lastAttempt: null,
         typeStats: {}, bestType: null, worstType: null,
@@ -310,7 +320,6 @@ export default function TeacherDashboard({ profile, handleLogout, globalLang, on
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Teacher nav toolbar */}
           {onToggleLang && (
             <button onClick={onToggleLang} title="Toggle language" style={{ height: '34px', width: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {globalLang === 'en' ? '🇬🇧' : '🇪🇸'}
@@ -404,6 +413,7 @@ export default function TeacherDashboard({ profile, handleLogout, globalLang, on
                   ['testPassed',   'Test ✅'],
                   ['listenPassed', 'Listen ✅'],
                   ['dictPassed',   'Dict ✅'],
+                  ['topicPassed',  'Topic ✅'],
                   ['bestType',     'Best Type'],
                   ['worstType',    'Worst Type'],
                   ['lastActive',   'Last Active'],
@@ -436,6 +446,7 @@ export default function TeacherDashboard({ profile, handleLogout, globalLang, on
                   <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568', textAlign: 'center' }}>{s.testPassed || '—'}</td>
                   <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568', textAlign: 'center' }}>{s.listenPassed || '—'}</td>
                   <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568', textAlign: 'center' }}>{s.dictPassed || '—'}</td>
+                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568', textAlign: 'center' }}>{s.topicPassed || '—'}</td>
                   <td style={{ padding: '0.6rem 0.75rem', color: '#38a169', fontSize: '0.8rem' }}>
                     {s.bestType ? `${TYPE_INFO[s.bestType]?.emoji || ''} ${TYPE_INFO[s.bestType]?.label || s.bestType}` : '—'}
                   </td>

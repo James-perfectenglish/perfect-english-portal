@@ -3,10 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
 // Exercises
-import Prepositions from './Prepositions'
-import PhrasalVerbs from './PhrasalVerbs'
-import OfficeVocabulary from './OfficeVocabulary'
-import SpanishVocabulary from './SpanishVocabulary'
+import TopicPracticeExercise from './TopicPracticeExercise'
 import SentenceBuilding from './SentenceBuilding'
 import ListeningExercise from './ListeningExercise'
 import Dictation from './Dictation'
@@ -23,33 +20,41 @@ const IRREGULAR_VERBS_ID = 1
 const PHRASAL_VERBS_ID   = 2
 
 const ACTIVE_EXERCISES = new Set([
-  'Prepositions Practice', 'Business Phrasal Verbs', 'Office Vocabulary',
-  'Spanish Vocabulary', 'Irregular Verbs Flashcards', 'Essential Phrasal Verbs',
-  'Sentence Building', 'Listening Exercises', 'Dictation', 'Borrás Flashcards', 'Borrás Memory Game',
-  'Hotel Flashcards', 'Hotel Memory Game', 'Odd One Out', 'Error Correction',
+  'Prepositions 📄', 'Business Phrasal Verbs 💼', 'Phrasal Verbs 📚',
+  'Business Vocabulary 🗂️', 'Spanish Vocabulary 🇪🇸',
+  'Hotel Vocabulary 🏨', 'Bathroom Vocabulary 🛁', 'Vocabulary 📒',
+  'Irregular Verbs Flashcards', 'Essential Phrasal Verbs',
+  'Sentence Building', 'Listening Exercises', 'Dictation',
+  'Borrás Flashcards', 'Borrás Memory Game',
+  'Hotel Flashcards', 'Hotel Memory Game',
+  'Odd One Out', 'Error Correction',
   'Matching', 'Sentence Auction', 'Lyrics Mixer', 'Blurt!',
 ])
 
 const EXERCISE_ICONS = {
-  'Prepositions Practice':      '📐',
-  'Business Phrasal Verbs':     '💼',
-  'Office Vocabulary':          '🖥️',
-  'Spanish Vocabulary':         '🇪🇸',
-  'Irregular Verbs Flashcards': '📚',
-  'Essential Phrasal Verbs':    '📖',
-  'Sentence Building':          '🏗️',
-  'Listening Exercises':        '🎧',
-  'Dictation':                  '⌨️',
-  'Borrás Flashcards':          '🚿',
-  'Borrás Memory Game':         '🧩',
-  'Hotel Flashcards':           '🏨',
-  'Hotel Memory Game':          '🎮',
-  'Odd One Out':                '🔍',
-  'Error Correction':           '🚨',
-  'Matching':                   '🔗',
-  'Sentence Auction':           '🏛️',
-  'Lyrics Mixer':               '🎤',
-  'Blurt!':                     '⏱️',
+  'Prepositions 📄':              '📄',
+  'Business Phrasal Verbs 💼':    '💼',
+  'Phrasal Verbs 📚':             '📚',
+  'Business Vocabulary 🗂️':      '🗂️',
+  'Spanish Vocabulary 🇪🇸':       '🇪🇸',
+  'Hotel Vocabulary 🏨':          '🏨',
+  'Bathroom Vocabulary 🛁':       '🛁',
+  'Vocabulary 📒':                '📒',
+  'Irregular Verbs Flashcards':   '📚',
+  'Essential Phrasal Verbs':      '📖',
+  'Sentence Building':            '🏗️',
+  'Listening Exercises':          '🎧',
+  'Dictation':                    '⌨️',
+  'Borrás Flashcards':            '🚿',
+  'Borrás Memory Game':           '🧩',
+  'Hotel Flashcards':             '🏩',
+  'Hotel Memory Game':            '🎮',
+  'Odd One Out':                  '🔍',
+  'Error Correction':             '🚨',
+  'Matching':                     '🔗',
+  'Sentence Auction':             '🏛️',
+  'Lyrics Mixer':                 '🎤',
+  'Blurt!':                       '⏱️',
 }
 
 const TABS = [
@@ -168,10 +173,19 @@ export default function ExerciseList({
   // ── Exercise routing ──────────────────────────────────────────────────────
   if (activeExercise) {
     const t = activeExercise.title
-    if (t === 'Prepositions Practice')      return <Prepositions onComplete={back} onBack={back} />
-    if (t === 'Business Phrasal Verbs')     return <PhrasalVerbs onComplete={back} onBack={back} />
-    if (t === 'Office Vocabulary')          return <OfficeVocabulary onComplete={back} onBack={back} />
-    if (t === 'Spanish Vocabulary')         return <SpanishVocabulary onComplete={back} onBack={back} />
+
+    // All topic_practice exercises use the same reusable component
+    if (activeExercise.type === 'topic_practice') {
+      return (
+        <TopicPracticeExercise
+          exercise={activeExercise}
+          userLevel={userLevel}
+          onBack={back}
+          onComplete={back}
+        />
+      )
+    }
+
     if (t === 'Irregular Verbs Flashcards') return <FlashcardTemplate flashcardSetId={IRREGULAR_VERBS_ID} setName="irregular-verbs" onBack={back} />
     if (t === 'Essential Phrasal Verbs')    return <FlashcardTemplate flashcardSetId={PHRASAL_VERBS_ID} setName="phrasal-verbs" onBack={back} />
     if (t === 'Sentence Building')          return <SentenceBuilding onComplete={back} onBack={back} />
@@ -193,14 +207,14 @@ export default function ExerciseList({
     )
     if (t === 'Hotel Flashcards') return (
       <FlashcardTemplate
-        title="Hotel Flashcards" subtitle="Essential hotel vocabulary in context 🏨"
+        title="Hotel Flashcards" subtitle="Essential hotel vocabulary in context 🏩"
         levelBadge="Level: A2" setName="hotel"
         cards={HOTEL_CARDS} hasRounds={true} showMemoryGame={true} onBack={back}
       />
     )
     if (t === 'Hotel Memory Game') return (
       <MemoryGame
-        title="Hotel Memory Game" subtitle="Match the English word to its Spanish translation 🏨"
+        title="Hotel Memory Game" subtitle="Match the English word to its Spanish translation 🏩"
         levelBadge="Level: A2" cards={HOTEL_CARDS}
         gameName="hotel" cardBackImage="/og-image.png" onBack={back}
       />
