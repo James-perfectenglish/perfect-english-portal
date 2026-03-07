@@ -30,20 +30,21 @@ Responde con exactamente un objeto JSON y nada más:
 {"valid": true, "reason": "una frase corta en español explicando por qué funciona"}
 o
 {"valid": false, "reason": "una frase corta en español explicando por qué no funciona"}`
-    : `You are marking an English gap-fill exercise. There may be more than one correct answer.
+    : `You are marking an English gap-fill exercise. There are often multiple correct answers.
 
 Sentence (with ___ for the gap): "${question}"
 Model answer: "${correctAnswer}"
 Student's answer: "${studentAnswer}"
 
-Your job: decide whether the student's answer is ALSO correct — not whether it matches the model answer.
-Mark it valid if it:
-- is grammatically correct in the gap
-- makes sense in the sentence
-- fits the register (e.g. if the sentence is formal/business, the answer should be too)
+Decide whether the student's answer works in the gap. Be GENEROUS — mark it valid if:
+- it is grammatically correct
+- it makes sense in the sentence (even if the meaning is slightly different from the model answer)
+- it fits the register (formal/business sentences need formal answers, but synonyms and near-synonyms are fine)
 
-Mark it invalid only if it is grammatically wrong, makes no sense, or is the wrong register.
-Do NOT penalise the student simply for using a different word or phrase from the model answer.
+Examples of what to accept: if the model answer is "going over", also accept "looking at", "reviewing", "looking over", "going through", "checking", "examining" etc.
+
+Mark it invalid ONLY if it is clearly grammatically wrong, makes no sense at all, or is obviously the wrong register (e.g. slang in a formal sentence).
+Do NOT reject an answer just because it is not the same as the model answer.
 
 Reply with exactly one JSON object and nothing else:
 {"valid": true, "reason": "one short sentence explaining why it works"}
