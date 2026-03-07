@@ -22,13 +22,16 @@ Definición: "${definition}"
 Frase del estudiante: "${studentSentence}"
 
 El estudiante debe escribir una frase en ESPAÑOL usando esta palabra de forma que demuestre que entiende su significado.
+
 Evalúa: ¿La frase está en español? ¿Es gramaticalmente correcta? ¿Usa la palabra de forma apropiada y coherente con la definición?
+
 Sé alentador pero honesto. Los errores menores de puntuación están bien — céntrate en el uso correcto de la palabra.
 
 Responde SOLO con un objeto JSON:
 {"valid": true, "feedback": "una frase corta de felicitación explicando por qué funciona bien"}
 o
 {"valid": false, "feedback": "una frase corta explicando el problema y cómo mejorarla"}`
+
     : `You are an English teacher marking a student's Word of the Day exercise.
 
 Word: "${word}" (${partOfSpeech})
@@ -36,8 +39,12 @@ Definition: "${definition}"
 Student's sentence: "${studentSentence}"
 
 The student must write a sentence that correctly uses this word in a way that demonstrates they understand its meaning.
+
 Assess: Is the sentence grammatically correct? Does it use the word appropriately and in a way consistent with the definition?
+
 Be encouraging but honest. Minor punctuation issues are fine — focus on correct usage of the word.
+
+Important: Accept creative, humorous, or playful sentences as valid, provided the word is used correctly. A funny or provocative sentence that demonstrates genuine understanding of the word's meaning should be marked as correct. Only reject a sentence if it genuinely misunderstands or misuses the word.
 
 Reply ONLY with a JSON object:
 {"valid": true, "feedback": "one short encouraging sentence explaining why it works well"}
@@ -68,7 +75,6 @@ or
     const text = data.content?.find(b => b.type === 'text')?.text || '';
     const clean = text.replace(/```json|```/g, '').trim();
     const result = JSON.parse(clean);
-
     return res.status(200).json(result);
 
   } catch (e) {
