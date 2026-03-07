@@ -208,8 +208,8 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     try {
       const res = await fetch('/api/mark-gap-fill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q.question, correctAnswer: q.correct_answer, studentAnswer: answer, acceptableAlternatives: alts, informalAccepted: informal }) })
       const data = await res.json()
-      setFeedback({ isCorrect: data.correct, correct: q.correct_answer, type: 'ai', note: data.feedback })
-      addR(data.correct)
+      setFeedback({ isCorrect: data.valid, correct: q.correct_answer, type: 'ai', note: data.reason })
+      addR(data.valid)
     } catch {
       setFeedback({ isCorrect: false, correct: q.correct_answer, type: 'fail' }); addR(false)
     }
