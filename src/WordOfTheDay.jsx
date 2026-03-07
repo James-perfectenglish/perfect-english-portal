@@ -11,18 +11,48 @@ const levelBucket = (profileLevel) => {
 
 const GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 
+const levelColourMap = {
+  A1: '#48bb78', A2: '#48bb78',
+  'A1/A2': '#48bb78',
+  B1: '#4299e1', B2: '#4299e1',
+  'B1/B2': '#4299e1',
+  C1: '#ed8936', C2: '#ed8936',
+  'C1/C2': '#ed8936',
+}
+
+function getLevelColour(level) {
+  return levelColourMap[level] || '#718096'
+}
+
+function getLevelLabel(level) {
+  if (!level) return '?'
+  // Normalise slash format to display format
+  if (level.includes('/')) return level
+  return level
+}
+
+function shuffleArray(arr) {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
 export default function WordOfTheDay({ profile }) {
-  const [word, setWord]               = useState(null)
-  const [submission, setSubmission]   = useState(null)
-  const [sentence, setSentence]       = useState('')
-  const [feedback, setFeedback]       = useState(null)
-  const [isMarking, setIsMarking]     = useState(false)
-  const [loading, setLoading]         = useState(true)
-  const [noWord, setNoWord]           = useState(false)
+  const [word, setWord] = useState(null)
+  const [submission, setSubmission] = useState(null)
+  const [sentence, setSentence] = useState('')
+  const [feedback, setFeedback] = useState(null)
+  const [isMarking, setIsMarking] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [noWord, setNoWord] = useState(false)
+  const [community, setCommunity] = useState([])
 
   const isSpanish = Array.isArray(profile?.tracks) && profile.tracks.includes('spanish')
-  const bucket    = levelBucket(profile?.level)
-  const today     = new Date().toISOString().split('T')[0]
+  const bucket = levelBucket(profile?.level)
+  const today = new Date().toISOString().split('T')[0]
 
   useEffect(() => { fetchWord() }, [profile])
 
@@ -39,7 +69,6 @@ export default function WordOfTheDay({ profile }) {
         .limit(1)
         .single()
       wordData = data
-
     } else {
       // 1. Today + correct level + English
       const { data: d1 } = await supabase
@@ -80,7 +109,7 @@ export default function WordOfTheDay({ profile }) {
       const { data: qbWord } = await supabase
         .from('question_bank')
         .select('question_number, question, correct_answer, explanation, level')
-        .in('level', bucket === 'A1/A2' ? ['A1','A2'] : bucket === 'B1/B2' ? ['B1','B2'] : ['C1','C2'])
+        .in('level', bucket === 'A1/A2' ? ['A1', 'A2'] : bucket === 'B1/B2' ? ['B1', 'B2'] : ['C1', 'C2'])
         .eq('type', 'multiple_choice')
         .eq('language', 'en')
         .limit(50)
@@ -89,9 +118,7 @@ export default function WordOfTheDay({ profile }) {
         const picked = qbWord[Math.floor(Math.random() * qbWord.length)]
         wordData = {
           id: `qb_${picked.question_number}`,
-          date: today,
-          level: bucket,
-          language: 'en',
+          date: today, level: bucket, language: 'en',
           word: picked.correct_answer || '—',
           part_of_speech: 'vocabulary',
           definition: picked.explanation || picked.question,
@@ -117,18 +144,30 @@ export default function WordOfTheDay({ profile }) {
           .eq('student_id', user.id)
           .eq('word_id', wordData.id)
           .single()
-
-        if (existing) setSubmission(existing)
+        if (existing) {
+          setSubmission(existing)
+          fetchCommunity(wordData.id)
+        }
       }
     }
 
     setLoading(false)
   }
 
+  const fetchCommunity = async (wordId) => {
+    if (!wordId || wordId?.toString().startsWith('qb_')) return
+    const { data } = await supabase
+      .from('wotd_community_sentences')
+      .select('sentence, level')
+      .eq('word_id', wordId)
+    if (data && data.length > 1) {
+      setCommunity(shuffleArray(data).slice(0, 8))
+    }
+  }
+
   const submitSentence = async () => {
     if (!sentence.trim() || isMarking || !word) return
     setIsMarking(true)
-
     try {
       const response = await fetch('/api/mark-sentence', {
         method: 'POST',
@@ -141,10 +180,8 @@ export default function WordOfTheDay({ profile }) {
           language: word.language
         })
       })
-
       const result = response.ok ? await response.json() : { valid: null, feedback: '' }
       const isCorrect = result.valid === true
-
       setFeedback({
         valid: result.valid,
         message: result.feedback || (isCorrect ? 'Great sentence!' : 'Try again — read the definition carefully.')
@@ -156,29 +193,29 @@ export default function WordOfTheDay({ profile }) {
           const { data: saved } = await supabase
             .from('word_of_the_day_submissions')
             .insert({
-              student_id:  user.id,
-              word_id:     word.id,
-              sentence:    sentence.trim(),
-              is_correct:  isCorrect,
+              student_id: user.id,
+              word_id: word.id,
+              sentence: sentence.trim(),
+              is_correct: isCorrect,
               is_soft_pass: false,
               ai_feedback: result.feedback
             })
             .select()
             .single()
-
-          if (saved) setSubmission(saved)
+          if (saved) {
+            setSubmission(saved)
+            fetchCommunity(word.id)
+          }
         }
       }
-
     } catch (e) {
       console.error('submitSentence error:', e)
       setFeedback({ valid: null, message: 'Could not check your sentence right now — try again in a moment.' })
     }
-
     setIsMarking(false)
   }
 
-  // ── Render ──────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────
 
   if (loading) return (
     <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '1rem', textAlign: 'center', color: '#718096', fontSize: '0.9rem' }}>
@@ -189,37 +226,21 @@ export default function WordOfTheDay({ profile }) {
   if (noWord) return null
 
   const alreadySubmitted = !!submission
-  const feedbackToShow   = alreadySubmitted
-    ? { valid: submission.is_correct, message: submission.ai_feedback }
-    : feedback
-
-  const levelColour = bucket === 'A1/A2' ? '#48bb78' : bucket === 'B1/B2' ? '#4299e1' : '#ed8936'
-  const levelLabel  = isSpanish ? 'Español' : bucket
+  const feedbackToShow = alreadySubmitted ? { valid: submission.is_correct, message: submission.ai_feedback } : feedback
+  const levelColour = isSpanish ? '#e53e3e' : getLevelColour(bucket)
+  const levelLabel = isSpanish ? 'Español' : bucket
 
   return (
-    <div style={{
-      background: 'white',
-      borderRadius: '16px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      marginBottom: '1rem',
-      overflow: 'hidden'
-    }}>
+    <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '1rem', overflow: 'hidden' }}>
+
       {/* Header bar */}
-      <div style={{
-        background: GRADIENT,
-        padding: '0.85rem 1.25rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '0.5rem'
-      }}>
+      <div style={{ background: GRADIENT, padding: '0.85rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <span style={{ fontSize: '1.2rem' }}>📖</span>
           <span style={{ color: 'white', fontWeight: '700', fontSize: '0.95rem' }}>Word of the Day</span>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span style={{ background: isSpanish ? '#e53e3e' : levelColour, color: 'white', padding: '2px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700' }}>{levelLabel}</span>
+          <span style={{ background: levelColour, color: 'white', padding: '2px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700' }}>{levelLabel}</span>
           <span style={{ background: 'rgba(255,255,255,0.2)', color: 'white', padding: '2px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600' }}>
             {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
           </span>
@@ -232,19 +253,12 @@ export default function WordOfTheDay({ profile }) {
           <span style={{ fontSize: 'clamp(1.6rem, 4vw, 2rem)', fontWeight: '800', color: '#2C3E50' }}>{word.word}</span>
           <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontStyle: 'italic', fontWeight: '500' }}>{word.part_of_speech}</span>
         </div>
-
         <p style={{ fontSize: '0.92rem', color: '#4a5568', margin: '0 0 0.75rem', lineHeight: '1.5' }}>
           {word.definition}
         </p>
 
         {/* Example sentence */}
-        <div style={{
-          background: '#f7fafc',
-          borderLeft: `3px solid ${isSpanish ? '#e53e3e' : levelColour}`,
-          borderRadius: '0 8px 8px 0',
-          padding: '0.6rem 0.9rem',
-          marginBottom: '1rem'
-        }}>
+        <div style={{ background: '#f7fafc', borderLeft: `3px solid ${levelColour}`, borderRadius: '0 8px 8px 0', padding: '0.6rem 0.9rem', marginBottom: '1rem' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Example</span>
           <p style={{ margin: '0.15rem 0 0', fontSize: '0.88rem', color: '#4a5568', fontStyle: 'italic', lineHeight: '1.5' }}>"{word.example_sentence}"</p>
         </div>
@@ -253,26 +267,11 @@ export default function WordOfTheDay({ profile }) {
         {alreadySubmitted && (
           <div>
             <div style={{ fontSize: '0.78rem', fontWeight: '600', color: '#718096', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '0.4rem' }}>Your sentence</div>
-            <div style={{
-              background: '#f7fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              padding: '0.75rem 1rem',
-              fontSize: '0.92rem',
-              color: '#2d3748',
-              marginBottom: '0.75rem',
-              fontStyle: 'italic'
-            }}>"{submission.sentence}"</div>
+            <div style={{ background: '#f7fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem 1rem', fontSize: '0.92rem', color: '#2d3748', marginBottom: '0.75rem', fontStyle: 'italic' }}>
+              "{submission.sentence}"
+            </div>
             {feedbackToShow && (
-              <div style={{
-                background: feedbackToShow.valid ? '#f0fff4' : '#fff5f5',
-                border: `1px solid ${feedbackToShow.valid ? '#c6f6d5' : '#fed7d7'}`,
-                color: feedbackToShow.valid ? '#276749' : '#9b2c2c',
-                borderRadius: '8px',
-                padding: '0.75rem 1rem',
-                fontSize: '0.88rem',
-                lineHeight: '1.5'
-              }}>
+              <div style={{ background: feedbackToShow.valid ? '#f0fff4' : '#fff5f5', border: `1px solid ${feedbackToShow.valid ? '#c6f6d5' : '#fed7d7'}`, color: feedbackToShow.valid ? '#276749' : '#9b2c2c', borderRadius: '8px', padding: '0.75rem 1rem', fontSize: '0.88rem', lineHeight: '1.5' }}>
                 {feedbackToShow.valid ? '✅ ' : '❌ '}{feedbackToShow.message}
               </div>
             )}
@@ -296,33 +295,14 @@ export default function WordOfTheDay({ profile }) {
                 onKeyPress={e => e.key === 'Enter' && submitSentence()}
                 placeholder={`Write a sentence using "${word.word}"...`}
                 disabled={isMarking}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem 1rem',
-                  fontSize: '0.92rem',
-                  borderRadius: '8px',
-                  border: '2px solid #e2e8f0',
-                  outline: 'none',
-                  color: '#2d3748',
-                  transition: 'border-color 0.15s'
-                }}
+                style={{ flex: 1, padding: '0.75rem 1rem', fontSize: '0.92rem', borderRadius: '8px', border: '2px solid #e2e8f0', outline: 'none', color: '#2d3748', transition: 'border-color 0.15s' }}
                 onFocus={e => e.target.style.borderColor = '#667eea'}
                 onBlur={e => e.target.style.borderColor = '#e2e8f0'}
               />
               <button
                 onClick={submitSentence}
                 disabled={!sentence.trim() || isMarking}
-                style={{
-                  padding: '0 1.25rem',
-                  background: sentence.trim() && !isMarking ? GRADIENT : '#cbd5e0',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: sentence.trim() && !isMarking ? 'pointer' : 'not-allowed',
-                  fontWeight: '600',
-                  fontSize: '0.9rem',
-                  whiteSpace: 'nowrap'
-                }}
+                style={{ padding: '0 1.25rem', background: sentence.trim() && !isMarking ? GRADIENT : '#cbd5e0', color: 'white', border: 'none', borderRadius: '8px', cursor: sentence.trim() && !isMarking ? 'pointer' : 'not-allowed', fontWeight: '600', fontSize: '0.9rem', whiteSpace: 'nowrap' }}
               >
                 {isMarking ? '🤖...' : 'Submit →'}
               </button>
@@ -336,16 +316,7 @@ export default function WordOfTheDay({ profile }) {
         {/* Feedback just received */}
         {!alreadySubmitted && feedback && (
           <div>
-            <div style={{
-              background: feedback.valid ? '#f0fff4' : '#fff5f5',
-              border: `1px solid ${feedback.valid ? '#c6f6d5' : '#fed7d7'}`,
-              color: feedback.valid ? '#276749' : '#9b2c2c',
-              borderRadius: '8px',
-              padding: '0.75rem 1rem',
-              fontSize: '0.88rem',
-              lineHeight: '1.5',
-              marginBottom: '0.5rem'
-            }}>
+            <div style={{ background: feedback.valid ? '#f0fff4' : '#fff5f5', border: `1px solid ${feedback.valid ? '#c6f6d5' : '#fed7d7'}`, color: feedback.valid ? '#276749' : '#9b2c2c', borderRadius: '8px', padding: '0.75rem 1rem', fontSize: '0.88rem', lineHeight: '1.5', marginBottom: '0.5rem' }}>
               {feedback.valid ? '✅ ' : '❌ '}{feedback.message}
             </div>
             {!feedback.valid && (
@@ -362,6 +333,46 @@ export default function WordOfTheDay({ profile }) {
           </div>
         )}
       </div>
+
+      {/* ── Community sentences ── */}
+      {community.length > 0 && (alreadySubmitted || (feedback && feedback.valid)) && (
+        <div style={{ borderTop: '1px solid #f0f0f0', padding: '1rem 1.25rem 1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.85rem' }}>
+            <span style={{ fontSize: '1rem' }}>💬</span>
+            <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#718096', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+              What students wrote today
+            </span>
+            <span style={{ fontSize: '0.75rem', color: '#a0aec0', marginLeft: 'auto' }}>
+              {community.length} sentence{community.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+            {community.map((item, i) => {
+              const col = getLevelColour(item.level)
+              const lbl = getLevelLabel(item.level)
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem' }}>
+                  <span style={{
+                    flexShrink: 0,
+                    background: col,
+                    color: 'white',
+                    padding: '2px 8px',
+                    borderRadius: '20px',
+                    fontSize: '0.68rem',
+                    fontWeight: '700',
+                    marginTop: '2px',
+                    lineHeight: '1.6',
+                  }}>{lbl}</span>
+                  <span style={{ fontSize: '0.88rem', color: '#4a5568', lineHeight: '1.5', fontStyle: 'italic' }}>
+                    "{item.sentence}"
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
