@@ -100,18 +100,6 @@ function Dashboard({ session }) {
               <li><Link to="/"          style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Home</Link></li>
               <li><Link to="/practice"  style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Test</Link></li>
               <li><Link to="/exercises" style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Exercises</Link></li>
-              {isTeacher && (
-                <li style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <button
-                    onClick={toggleLang}
-                    title={globalLang === 'en' ? 'Switch to Spanish mode' : 'Switch to English mode'}
-                    style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}
-                  >
-                    {globalLang === 'en' ? '🇬🇧' : '🇪🇸'}
-                  </button>
-                  <TeacherBrowseLink />
-                </li>
-              )}
             </ul>
           </nav>
         </div>
@@ -121,7 +109,7 @@ function Dashboard({ session }) {
       <Routes>
         <Route path="/"                element={<StudentDashboard profile={profile} session={session} handleLogout={handleLogout} />} />
         <Route path="/practice"        element={<PracticePageWrapper profile={profile} />} />
-        <Route path="/exercises"       element={<ExercisesPage profile={profile} />} />
+        <Route path="/exercises"       element={<ExercisesPage profile={profile} globalLang={globalLang} toggleLang={toggleLang} />} />
         <Route path="/lyrics"          element={<LyricsExercise user={session.user} />} />
         <Route path="/blurt"           element={<Blurt user={session.user} />} />
         <Route path="/teacher"         element={isTeacher ? <TeacherDashboard profile={profile} handleLogout={handleLogout} /> : <Navigate to="/" />} />
@@ -131,26 +119,18 @@ function Dashboard({ session }) {
   )
 }
 
-function TeacherBrowseLink() {
+function ExercisesPage({ profile, globalLang, toggleLang }) {
   const navigate = useNavigate()
-  return (
-    <button
-      onClick={() => navigate('/teacher/browse')}
-      style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 10px', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)', cursor: 'pointer' }}
-    >
-      Browse
-    </button>
-  )
-}
-
-function ExercisesPage({ profile }) {
-  const navigate = useNavigate()
+  const isTeacher = profile?.is_teacher || false
   return (
     <ExerciseList
       userLevel={profile.level}
       userTracks={profile.tracks || []}
-      isTeacher={profile.is_teacher || false}
+      isTeacher={isTeacher}
       onTeacherClick={() => navigate('/teacher')}
+      onBrowseClick={isTeacher ? () => navigate('/teacher/browse') : undefined}
+      globalLang={globalLang}
+      onToggleLang={isTeacher ? toggleLang : undefined}
     />
   )
 }

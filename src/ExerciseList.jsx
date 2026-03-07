@@ -74,7 +74,15 @@ function isForYouFn(exercise, userTracks) {
   return exTracks.some(t => SPECIFIC_TRACKS.includes(t) && userTracks.includes(t))
 }
 
-export default function ExerciseList({ userLevel, userTracks = [], isTeacher = false, onTeacherClick }) {
+export default function ExerciseList({
+  userLevel,
+  userTracks = [],
+  isTeacher = false,
+  onTeacherClick,
+  onBrowseClick,
+  globalLang,
+  onToggleLang,
+}) {
   const [exercises, setExercises]             = useState([])
   const [loading, setLoading]                 = useState(true)
   const [activeTab, setActiveTab]             = useState('learn')
@@ -145,14 +153,8 @@ export default function ExerciseList({ userLevel, userTracks = [], isTeacher = f
   const startExercise = (exercise) => {
     if (!ACTIVE_EXERCISES.has(exercise.title)) return
     recordOpen(exercise.title)
-    if (exercise.title === 'Lyrics Mixer') {
-      navigate('/lyrics')
-      return
-    }
-    if (exercise.type === 'blurt') {
-      navigate('/blurt')
-      return
-    }
+    if (exercise.title === 'Lyrics Mixer') { navigate('/lyrics'); return }
+    if (exercise.type === 'blurt') { navigate('/blurt'); return }
     setActiveExercise(exercise)
   }
 
@@ -175,7 +177,7 @@ export default function ExerciseList({ userLevel, userTracks = [], isTeacher = f
     if (t === 'Sentence Building')          return <SentenceBuilding onComplete={back} onBack={back} />
     if (t === 'Listening Exercises')        return <ListeningExercise onBack={back} userTracks={userTracks} />
     if (t === 'Dictation')                  return <Dictation onBack={back} userTracks={userTracks} />
-    if (t === 'Borrás Flashcards')          return (
+    if (t === 'Borrás Flashcards') return (
       <FlashcardTemplate
         title="Borrás Flashcards" subtitle="Bathroom vocabulary in context 🚿"
         levelBadge="Level: A1–B1" setName="borras"
@@ -223,9 +225,9 @@ export default function ExerciseList({ userLevel, userTracks = [], isTeacher = f
   const LevelBadge = ({ level }) => {
     const key = level?.[0] || 'B'
     const styles = {
-      A:   { background: '#f0fff4', color: '#276749' },
-      B:   { background: '#ebf8ff', color: '#2b6cb0' },
-      C:   { background: '#fffaf0', color: '#c05621' },
+      A: { background: '#f0fff4', color: '#276749' },
+      B: { background: '#ebf8ff', color: '#2b6cb0' },
+      C: { background: '#fffaf0', color: '#c05621' },
     }
     const s = styles[key] || styles.B
     return (
@@ -354,6 +356,28 @@ export default function ExerciseList({ userLevel, userTracks = [], isTeacher = f
           <div style={{ fontSize: '0.78rem', color: '#718096', marginTop: '2px' }}>⭐️ For You exercises appear first</div>
         </div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0, marginTop: '2px' }}>
+
+          {/* Teacher-only: language toggle + browse */}
+          {isTeacher && onToggleLang && (
+            <button
+              onClick={onToggleLang}
+              title={globalLang === 'en' ? 'Switch to Spanish mode' : 'Switch to English mode'}
+              style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              {globalLang === 'en' ? '🇬🇧' : '🇪🇸'}
+            </button>
+          )}
+
+          {isTeacher && onBrowseClick && (
+            <button
+              onClick={onBrowseClick}
+              title="Question browser"
+              style={{ height: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, color: '#4a5568', padding: '0 10px', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
+            >
+              🔍 Browse
+            </button>
+          )}
+
           {isTeacher && (
             <button
               onClick={onTeacherClick}
@@ -363,6 +387,7 @@ export default function ExerciseList({ userLevel, userTracks = [], isTeacher = f
               👨‍🏫
             </button>
           )}
+
           <button
             onClick={() => setIsListView(v => !v)}
             style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#f0f0f5', borderRadius: '8px', padding: '5px 9px', cursor: 'pointer', border: 'none', fontSize: '0.72rem', fontWeight: 600, color: '#4a5568', whiteSpace: 'nowrap' }}
