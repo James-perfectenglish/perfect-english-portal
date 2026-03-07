@@ -798,7 +798,7 @@ function FocusMode({ items, index, onChangeIndex, previewMode, setPreviewMode, o
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function TeacherBrowse({ user, globalLang = 'en' }) {
-  const [filters, setFilters] = useState({ source: 'all', levels: [], types: [], topic: '', lang: globalLang, qFrom: '', qTo: '', newOnly: false });
+  const [filters, setFilters] = useState({ source: 'all', levels: [], types: [], topic: '', lang: 'en', qFrom: '', qTo: '', newOnly: false });
   const [maxQNumber,   setMaxQNumber]   = useState(null);
   const [results,      setResults]      = useState([]);
   const [loading,      setLoading]      = useState(false);
@@ -981,7 +981,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       <button onClick={() => search()} disabled={loading} style={{ width: '100%', padding: '9px', background: '#667eea', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
         {loading ? '…' : '🔍 Search'}
       </button>
-      <button onClick={() => { setFilters({ source: 'all', levels: [], types: [], topic: '', lang: globalLang, qFrom: '', qTo: '', newOnly: false }); setResults([]); setHasSearched(false); setActiveSet(null); setSelected(new Set()); }} style={{ width: '100%', padding: '7px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, cursor: 'pointer', marginTop: 5 }}>
+      <button onClick={() => { setFilters({ source: 'all', levels: [], types: [], topic: '', lang: 'en', qFrom: '', qTo: '', newOnly: false }); setResults([]); setHasSearched(false); setActiveSet(null); setSelected(new Set()); }} style={{ width: '100%', padding: '7px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, cursor: 'pointer', marginTop: 5 }}>
         Clear all
       </button>
     </div>
