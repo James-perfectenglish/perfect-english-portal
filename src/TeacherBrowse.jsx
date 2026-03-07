@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -206,7 +206,7 @@ function StudentPreview({ item }) {
             {item.sentence_template}
           </div>
         )}
-        <input readOnly placeholder="Student types answer here…" style={inputStyle} />
+        <input placeholder="Student types answer here…" style={inputStyle} />
         {item.hint && <p style={{ color: '#718096', fontSize: 13, marginTop: 6 }}>💡 {item.hint}</p>}
       </div>
     );
@@ -260,7 +260,7 @@ function StudentPreview({ item }) {
 
   if (type === 'odd_one_out') return (
     <div>
-      <div style={grad}><p style={{ margin: 0, fontSize: 15 }}>Which one doesn't belong? 👆</p></div>
+      <div style={grad}><p style={{ margin: 0, fontSize: 15 }}>{question} 👆</p></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
         {opts.map((opt, i) => (
           <div key={i} style={{ background: 'white', border: '2px solid #e2e8f0', borderRadius: 8, padding: '0.9rem', textAlign: 'center', fontWeight: 500, fontSize: 14 }}>{opt}</div>
@@ -309,7 +309,7 @@ function FocusMode({ items, index, onChangeIndex, previewMode, setPreviewMode, o
       {/* Toolbar */}
       <div style={{ background: 'white', borderBottom: '1px solid #e2e8f0', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
         <div style={{ display: 'flex', background: '#f7fafc', borderRadius: 7, padding: 3, gap: 2 }}>
-          {[['teacher', '👩‍🏫 Teacher'], ['student', '👤 Student']].map(([mode, label]) => (
+          {[['teacher', '👨‍🏫 Teacher'], ['student', '👤 Student']].map(([mode, label]) => (
             <button key={mode} onClick={() => setPreviewMode(mode)} style={{ padding: '5px 14px', borderRadius: 5, border: 'none', background: previewMode === mode ? '#667eea' : 'transparent', color: previewMode === mode ? 'white' : '#718096', cursor: 'pointer', fontSize: 13, fontWeight: previewMode === mode ? 700 : 400 }}>
               {label}
             </button>
@@ -763,7 +763,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
     <div style={{ width: 380, flexShrink: 0, background: 'white', borderRadius: 12, boxShadow: '0 4px 24px rgba(0,0,0,0.11)', alignSelf: 'flex-start', position: 'sticky', top: 12, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid #e2e8f0' }}>
         <div style={{ display: 'flex', background: '#f7fafc', borderRadius: 7, padding: 3, gap: 2 }}>
-          {[['teacher', '👩‍🏫 Teacher'], ['student', '👤 Student']].map(([mode, label]) => (
+          {[['teacher', '👨‍🏫 Teacher'], ['student', '👤 Student']].map(([mode, label]) => (
             <button key={mode} onClick={() => setPreviewMode(mode)} style={{ padding: '4px 12px', borderRadius: 5, border: 'none', background: previewMode === mode ? '#667eea' : 'transparent', color: previewMode === mode ? 'white' : '#718096', cursor: 'pointer', fontSize: 12, fontWeight: previewMode === mode ? 700 : 400 }}>
               {label}
             </button>

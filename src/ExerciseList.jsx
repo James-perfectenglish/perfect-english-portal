@@ -382,7 +382,7 @@ export default function ExerciseList({
             <button
               onClick={onTeacherClick}
               title="Teacher dashboard"
-              style={{ width: '34px', height: '34px', borderRadius: '8px', background: 'linear-gradient(135deg, #667eea, #764ba2)', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(102,126,234,0.4)' }}
+              style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
               👨‍🏫
             </button>
