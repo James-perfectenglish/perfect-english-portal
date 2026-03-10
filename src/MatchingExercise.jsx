@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import MatchingPairs from './components/MatchingPairs';
+import { LevelBadge, TopicBadge } from './components/BadgePill';
 
 function shuffleArray(arr) {
   const s = [...arr];
@@ -61,7 +62,7 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
       .from('question_bank')
       .select('level')
       .eq('type', 'matching')
-      .neq('topic', 'spanish');          // ← fix: exclude spanish
+      .neq('topic', 'spanish');
     if (topicFilter) query = query.eq('topic', topicFilter);
     const { data } = await query;
     if (data) {
@@ -83,7 +84,7 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
       .from('question_bank')
       .select('*')
       .eq('type', 'matching')
-      .neq('topic', 'spanish')           // ← fix: exclude spanish
+      .neq('topic', 'spanish')
       .in('level', dbLevels);
     if (topicFilter) query = query.eq('topic', topicFilter);
     const { data, error } = await query;
@@ -198,7 +199,7 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
         <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🔗 Matching</h1>
         <p style={{ margin: '8px 0 0', opacity: 0.9 }}>👆 Tap any tile, then tap its match on the other side</p>
         {selectedLevel && (
-          <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>{selectedLevel.badgeLabel}</span>
+          <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px', border: `2px solid ${selectedLevel.colour}cc` }}>{selectedLevel.badgeLabel}</span>
         )}
       </div>
 
@@ -224,8 +225,8 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
               </div>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '16px' }}>
-              {q.level && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: q.level.startsWith('A') ? '#276749' : q.level.startsWith('B') ? '#2b6cb0' : '#c05621' }}>{q.level}</div>}
-              {q.topic && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#e8daef', color: '#6c3483' }}>{q.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>}
+              <LevelBadge level={q.level} />
+              <TopicBadge topic={q.topic} />
             </div>
             {q.question && q.question.trim() && (
               <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', color: '#2d3748', fontWeight: 500, marginBottom: '20px', lineHeight: 1.5 }}>{q.question}</div>
