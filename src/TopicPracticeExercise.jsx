@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { supabase } from './supabaseClient'
+import { LevelBadge, TypeBadge, AiMarkedBadge, TagBadges } from './BadgePill'
 
 function shuffleArray(arr) {
   const shuffled = [...arr]
@@ -324,14 +325,10 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
             <div style={{ border: '2px solid #e2e8f0', borderRadius: '8px', padding: '1.5rem', marginBottom: '1.5rem' }}>
               {/* badges */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
-                {q.level && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: q.level.startsWith('A') ? '#276749' : q.level.startsWith('B') ? '#2b6cb0' : '#c05621' }}>{q.level}</div>}
-                <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.type === 'multiple_choice' ? '#ebf8ff' : '#faf5ff', color: q.type === 'multiple_choice' ? '#2b6cb0' : '#6b46c1' }}>
-                  {q.type === 'multiple_choice' ? '📝 Multiple Choice' : '✏️ Gap Fill'}
-                </div>
-                {q.type === 'gap_fill' && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>🤖 AI marked</div>}
-                {q.tags && q.tags.map(tag => (
-                  <div key={tag} style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#FFF5F7', color: '#97266D', border: '1px solid #FED7E2' }}>{tag}</div>
-                ))}
+                <LevelBadge level={q.level} />
+                <TypeBadge type={q.type} />
+                {q.type === 'gap_fill' && <AiMarkedBadge />}
+                <TagBadges tags={q.tags} />
               </div>
 
               {/* question text */}

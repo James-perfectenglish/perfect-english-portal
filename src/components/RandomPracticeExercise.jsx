@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import SentenceBuildingInput from './SentenceBuildingInput';
 import MatchingPairs from './MatchingPairs';
+import { LevelBadge, TypeBadge, AiMarkedBadge, TopicBadge } from './BadgePill';
 
 // ── Question mix per round (easy to tweak!) ──
 const QUESTION_MIX = {
@@ -251,7 +252,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
       const pick = (data, type) => shuffleArray(data || []).slice(0, QUESTION_MIX[type] || 0);
 
-      // Wrap dictation exercises as question-shaped objects
       const pickDictation = (data) => {
         return shuffleArray(data || []).slice(0, QUESTION_MIX.dictation || 0).map(ex => ({
           ...ex,
@@ -364,19 +364,15 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     let feedbackType = 'incorrect';
     let feedbackMsg = '';
 
-    // 1. Exact match
     if (answer.toLowerCase() === correct.toLowerCase()) {
       isCorrect = true; feedbackType = 'correct';
     }
-    // 2. Normalised match (ignore punctuation/caps)
     if (!isCorrect && normaliseDictation(answer) === normaliseDictation(correct)) {
       isCorrect = true; feedbackType = 'correct';
     }
-    // 3. Fuzzy match
     if (!isCorrect && isFuzzyMatch(normaliseDictation(answer), [normaliseDictation(correct)])) {
       isCorrect = true; feedbackType = 'fuzzy';
     }
-    // 4. AI marking
     if (!isCorrect) {
       setIsChecking(true);
       const aiResult = await aiMarkDictation(correct, answer);
@@ -653,44 +649,15 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
             <div style={{ backgroundColor: 'white', padding: 'clamp(1.5rem, 5vw, 2.5rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-              {/* Badges */}
+              {/* ── Badges (via BadgePill) ── */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
-                {currentQuestion.type !== 'sentence_building' && (
-                  <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
-                    backgroundColor: currentQuestion.type === 'gap_fill' ? '#fff3cd' : currentQuestion.type === 'odd_one_out' ? '#E0F2FE' : currentQuestion.type === 'error_correction' ? '#FEE2E2' : currentQuestion.type === 'matching' ? '#D1FAE5' : currentQuestion.type === 'dictation' ? '#EDE9FE' : '#d4edda',
-                    color: currentQuestion.type === 'gap_fill' ? '#856404' : currentQuestion.type === 'odd_one_out' ? '#0369A1' : currentQuestion.type === 'error_correction' ? '#DC2626' : currentQuestion.type === 'matching' ? '#065F46' : currentQuestion.type === 'dictation' ? '#553C9A' : '#155724',
-                  }}>
-                    {currentQuestion.type === 'gap_fill' ? '✏️ Gap Fill'
-                      : currentQuestion.type === 'odd_one_out' ? '🔍 Odd One Out'
-                      : currentQuestion.type === 'error_correction' ? '🚨 Error Correction'
-                      : currentQuestion.type === 'matching' ? '🔗 Matching'
-                      : currentQuestion.type === 'dictation' ? '⌨️ Dictation'
-                      : '📝 Multiple Choice'}
-                  </div>
-                )}
-                {currentQuestion.level && (
-                  <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
-                    backgroundColor: currentQuestion.level.startsWith('A') ? '#c6f6d5' : currentQuestion.level.startsWith('B') ? '#bee3f8' : '#feebc8',
-                    color: currentQuestion.level.startsWith('A') ? '#48bb78' : currentQuestion.level.startsWith('B') ? '#4299e1' : '#ed8936',
-                  }}>{currentQuestion.level}</div>
-                )}
-                {currentQuestion.topic && currentQuestion.type !== 'dictation' && (
-                  <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
-                    backgroundColor: currentQuestion.topic === 'question_forms' ? '#FEE2E2' : currentQuestion.topic === 'punctuation' ? '#FEE2E2' : '#f0f0f0',
-                    color: currentQuestion.topic === 'question_forms' ? '#DC2626' : currentQuestion.topic === 'punctuation' ? '#DC2626' : '#555',
-                  }}>
-                    {currentQuestion.topic === 'question_forms' ? '❓ ' : ''}
-                    {currentQuestion.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                  </div>
-                )}
-                {(currentQuestion.type === 'error_correction' || currentQuestion.type === 'gap_fill' || currentQuestion.type === 'sentence_building' || currentQuestion.type === 'dictation') && (
-                  <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>
-                    🤖 AI marked
-                  </div>
-                )}
+                <TypeBadge type={currentQuestion.type} />
+                <LevelBadge level={currentQuestion.level} />
+                {currentQuestion.type !== 'dictation' && <TopicBadge topic={currentQuestion.topic} />}
+                {['error_correction', 'gap_fill', 'sentence_building', 'dictation'].includes(currentQuestion.type) && <AiMarkedBadge />}
               </div>
 
-              {/* Question Text (not shown for SB, EC, matching, dictation header) */}
+              {/* Question Text */}
               {currentQuestion.type !== 'sentence_building' && currentQuestion.type !== 'error_correction' && currentQuestion.type !== 'matching' && currentQuestion.type !== 'dictation' && currentQuestion.question && (
                 <div style={{ fontSize: 'clamp(1.15rem, 4vw, 1.4rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
                   {currentQuestion.question}

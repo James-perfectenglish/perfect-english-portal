@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
+import { LevelBadge, TopicBadge, AiMarkedBadge, ExcerptBadge } from './components/BadgePill';
 
 const LEVELS = [
   {
@@ -56,10 +57,8 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
-// Strip punctuation and lowercase for comparison
 const normalise = (s) => s.toLowerCase().trim().replace(/[.,!?;:'"()]/g, '').replace(/\s+/g, ' ');
 
-// Check if the only difference is capitalisation or punctuation
 const capsOrPunctOnly = (student, correct) => {
   const normStudent = normalise(student);
   const normCorrect = normalise(correct);
@@ -69,16 +68,13 @@ const capsOrPunctOnly = (student, correct) => {
   return { caps: hasCaps, punct: hasPunct };
 };
 
-// Fuzzy check on normalised answer (word-level for phrases/sentences)
 function isFuzzyMatch(studentNorm, correctNorm) {
-  // For single short answers, use full string distance
   if (correctNorm.split(' ').length <= 2) {
     const dist = levenshtein(studentNorm, correctNorm);
     if (dist === 1) return true;
     if (dist === 2 && correctNorm.length >= 6) return true;
     return false;
   }
-  // For phrases/sentences, check word-level: allow 1 misspelled word
   const sWords = studentNorm.split(' ');
   const cWords = correctNorm.split(' ');
   if (Math.abs(sWords.length - cWords.length) > 1) return false;
@@ -100,12 +96,6 @@ function isFuzzyMatch(studentNorm, correctNorm) {
 const formatTime = (s) => {
   const m = Math.floor(s / 60);
   return `${m}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
-};
-
-const excerptInstruction = (type) => {
-  if (type === 'word')     return 'Listen and type the word or words you hear.';
-  if (type === 'phrase')   return 'Listen and type the phrase or clause you hear.';
-  return 'Listen and type the complete sentence you hear.';
 };
 
 export default function Dictation({ onBack, userTracks = [] }) {
@@ -194,7 +184,6 @@ export default function Dictation({ onBack, userTracks = [] }) {
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
-  // ── Image ──
   const renderImage = () => {
     if (!currentExercise?.image_url) return null;
     return (
@@ -208,7 +197,6 @@ export default function Dictation({ onBack, userTracks = [] }) {
     );
   };
 
-  // ── Audio controls ──
   const togglePlay = () => {
     if (!audioRef.current) return;
     if (isPlaying) {
@@ -239,7 +227,6 @@ export default function Dictation({ onBack, userTracks = [] }) {
   const handleTimeUpdate    = () => { if (audioRef.current) setCurrentTime(audioRef.current.currentTime); };
   const handleLoadedMetadata = () => { if (audioRef.current) setDuration(audioRef.current.duration); };
 
-  // ── Scoring ──
   const checkAnswer = async () => {
     if (!userAnswer.trim() || isChecking || !currentExercise) return;
 
@@ -251,12 +238,10 @@ export default function Dictation({ onBack, userTracks = [] }) {
     let resultType = 'incorrect';
     let nudge = null;
 
-    // 1 — Exact match (case-sensitive)
     if (student === correct) {
       resultType = 'correct';
     }
 
-    // 2 — Normalised exact match (caps/punct differ)
     if (resultType === 'incorrect' && normStudent === normCorrect) {
       resultType = 'correct';
       const { caps, punct } = capsOrPunctOnly(student, correct);
@@ -266,12 +251,10 @@ export default function Dictation({ onBack, userTracks = [] }) {
         : `💡 Almost perfect — watch your punctuation next time.`;
     }
 
-    // 3 — Fuzzy match (spelling slip)
     if (resultType === 'incorrect' && isFuzzyMatch(normStudent, normCorrect)) {
       resultType = 'fuzzy';
     }
 
-    // 4 — AI soft-mark
     if (resultType === 'incorrect') {
       setIsChecking(true);
       try {
@@ -342,7 +325,6 @@ export default function Dictation({ onBack, userTracks = [] }) {
     if (audioRef.current) audioRef.current.pause();
   };
 
-  // ── Audio player (identical to ListeningExercise) ──
   const renderAudioPlayer = (stageLabel) => {
     const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
     return (
@@ -378,7 +360,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
     );
   };
 
-  // ── LEVEL SELECT ─────────────────────────────────────────────────────────────
+  // ── LEVEL SELECT ──────────────────────────────────────────────────────────────
   if (stage === 'level-select') {
     return (
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
@@ -427,9 +409,8 @@ export default function Dictation({ onBack, userTracks = [] }) {
     );
   }
 
-  // ── EXERCISE LIST ─────────────────────────────────────────────────────────────
+  // ── EXERCISE LIST ──────────────────────────────────────────────────────────────
   if (stage === 'exercise-list') {
-    const excerptLabel = { word: 'Word', phrase: 'Phrase', sentence: 'Sentence' };
     return (
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
@@ -461,10 +442,11 @@ export default function Dictation({ onBack, userTracks = [] }) {
                   }
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, color: '#2d3748', fontSize: '1rem', marginBottom: '4px' }}>{ex.title}</div>
+                    {/* ── Exercise list badges (use BadgePill) ── */}
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, backgroundColor: ex.level?.startsWith('A') ? '#c6f6d5' : ex.level?.startsWith('B') ? '#bee3f8' : '#feebc8', color: ex.level?.startsWith('A') ? '#276749' : ex.level?.startsWith('B') ? '#2b6cb0' : '#c05621' }}>{ex.level}</span>
-                      {ex.excerpt_type && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, backgroundColor: '#EDE9FE', color: '#553C9A' }}>{excerptLabel[ex.excerpt_type] || ex.excerpt_type}</span>}
-                      {ex.topic && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, backgroundColor: '#f0f0f0', color: '#555' }}>{ex.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>}
+                      <LevelBadge level={ex.level} />
+                      <ExcerptBadge excerptType={ex.excerpt_type} />
+                      <TopicBadge topic={ex.topic} />
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
@@ -484,7 +466,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
     );
   }
 
-  // ── EXERCISE ─────────────────────────────────────────────────────────────────
+  // ── EXERCISE ──────────────────────────────────────────────────────────────────
   if (stage === 'exercise' && currentExercise) {
     const isCorrect    = feedback?.isCorrect;
     const isFuzzy      = feedback?.type === 'fuzzy';
@@ -507,22 +489,13 @@ export default function Dictation({ onBack, userTracks = [] }) {
 
           {renderImage()}
 
-          {/* Badges */}
+          {/* ── Badges (use BadgePill) ── */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.25rem' }}>
-            {currentExercise.level && (
-              <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600, backgroundColor: currentExercise.level.startsWith('A') ? '#c6f6d5' : currentExercise.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: currentExercise.level.startsWith('A') ? '#276749' : currentExercise.level.startsWith('B') ? '#2b6cb0' : '#c05621' }}>
-                {currentExercise.level}
-              </span>
-            )}
-            {currentExercise.topic && (
-              <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600, backgroundColor: '#f0f0f0', color: '#555' }}>
-                {currentExercise.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-              </span>
-            )}
-            <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, backgroundColor: '#EDE9FE', color: '#553C9A' }}>🤖 AI marked</span>
+            <LevelBadge level={currentExercise.level} />
+            <TopicBadge topic={currentExercise.topic} />
+            <AiMarkedBadge />
           </div>
 
-          {/* Instruction */}
           <p style={{ color: '#718096', fontSize: '0.95rem', marginTop: 0, marginBottom: currentExercise.sentence_template ? '0.75rem' : '1.25rem', fontStyle: 'italic' }}>
             {currentExercise.excerpt_type === 'word'
               ? 'Listen and type the one or two words you hear that complete the sentence.'
@@ -531,7 +504,6 @@ export default function Dictation({ onBack, userTracks = [] }) {
               : 'Listen and type the complete sentence you hear.'}
           </p>
 
-          {/* Sentence template with blank */}
           {currentExercise.sentence_template && (
             <div style={{ background: '#F8FBFF', border: '1px solid #AED6F1', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1.25rem', fontSize: '1rem', color: '#2d3748', lineHeight: 1.8 }}>
               {currentExercise.sentence_template}
@@ -540,7 +512,6 @@ export default function Dictation({ onBack, userTracks = [] }) {
 
           {renderAudioPlayer('Listen')}
 
-          {/* Input */}
           {!feedback && (
             <>
               <div style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 600, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -576,7 +547,6 @@ export default function Dictation({ onBack, userTracks = [] }) {
             </>
           )}
 
-          {/* Feedback */}
           {feedback && (
             <div style={{ border: `2px solid ${borderColour}`, borderRadius: '12px', overflow: 'hidden', marginBottom: '1rem' }}>
               <div style={{ background: isCorrect ? '#48bb78' : '#f56565', color: 'white', padding: '0.6rem 1rem', fontWeight: 700, fontSize: '1rem' }}>
@@ -608,7 +578,6 @@ export default function Dictation({ onBack, userTracks = [] }) {
             </div>
           )}
 
-          {/* Action buttons */}
           {feedback && (
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               {!isCorrect && (

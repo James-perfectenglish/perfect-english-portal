@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
+import { LevelBadge, TopicBadge } from './components/BadgePill';
 
 // Inject global CSS to kill all browser outlines on option tiles
 const STYLE_ID = 'ooo-focus-fix';
@@ -266,9 +267,10 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
               <span>Score: {score}/{questions.length}</span>
             </div>
             <div style={{ border: '2px solid #e2e8f0', borderRadius: '8px', padding: '1.5rem', marginBottom: '1.5rem' }}>
+              {/* ── Badges ── */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
-                {q.level && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: q.level.startsWith('A') ? '#276749' : q.level.startsWith('B') ? '#2b6cb0' : '#c05621' }}>{q.level}</div>}
-                {q.topic && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#e8daef', color: '#6c3483' }}>{q.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>}
+                <LevelBadge level={q.level} />
+                <TopicBadge topic={q.topic} />
               </div>
               <div style={{ fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)', color: '#2d3748', fontWeight: '500', marginBottom: '1.25rem', lineHeight: 1.5 }}>
                 {q.question && q.question.trim() !== '' ? q.question : 'Which one doesn\'t belong? Tap the odd one out.'}

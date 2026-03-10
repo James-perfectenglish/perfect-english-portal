@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
+import { LevelBadge } from './components/BadgePill';
 
 const LEVELS = [
   { key: 'beginner',     label: 'Beginner',     sublabel: 'B1 – B2', description: 'Short, clear conversations and announcements with everyday vocabulary.', colour: '#48bb78', colourLight: '#f0fff4', dbLevels: ['A1', 'A2'], icon: '🌱' },
@@ -358,10 +359,10 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, color: '#2d3748', fontSize: '1rem', marginBottom: '2px' }}>{ex.title}</div>
                     <div style={{ fontSize: '0.85rem', color: '#718096', lineHeight: 1.4 }}>{ex.description}</div>
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '0.78rem', color: '#a0aec0' }}>
-                      <span>{ex.level}</span>
-                      {ex.duration_seconds && <span>{Math.ceil(ex.duration_seconds / 60)} min</span>}
-                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+  <LevelBadge level={ex.level} />
+  {ex.duration_seconds && <span style={{ fontSize: '0.78rem', color: '#a0aec0' }}>{Math.ceil(ex.duration_seconds / 60)} min</span>}
+</div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                     {completedIds.has(ex.id) && <span style={{ fontSize: '1rem' }}>✅</span>}

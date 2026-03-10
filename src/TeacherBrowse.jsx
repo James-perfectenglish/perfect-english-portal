@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import SentenceBuildingInput from './components/SentenceBuildingInput';
+import { LevelBadge, TypeBadge, AiMarkedBadge, TagBadges } from './components/BadgePill';
 import MatchingPairs from './components/MatchingPairs';
 
 const TYPE_INFO = {
@@ -68,16 +69,7 @@ function Badge({ color = '#718096', children, style = {} }) {
     </span>
   );
 }
-function LevelBadge({ level }) {
-  return <Badge color={LEVEL_COLORS[level] || '#718096'}>{level}</Badge>;
-}
-function TagPill({ tag }) {
-  return (
-    <span style={{ background: '#FFF5F7', color: '#97266D', border: '1px solid #FED7E2', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
-      {tag}
-    </span>
-  );
-}
+// LevelBadge and TagPill/TagBadges are imported from ./components/BadgePill
 function FilterSection({ label, children }) {
   return (
     <div style={{ marginBottom: 14 }}>
@@ -163,7 +155,7 @@ function TeacherCard({ item }) {
       {/* Tag pills */}
       {item.tags && item.tags.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
-          {item.tags.map(tag => <TagPill key={tag} tag={tag} />)}
+          <TagBadges tags={item.tags} />
         </div>
       )}
       <p style={{ fontSize: 16, fontWeight: 500, lineHeight: 1.65, margin: '0 0 14px' }}>{item.question}</p>
@@ -436,7 +428,7 @@ function InteractiveQuestion({ item: q }) {
       <div style={{ backgroundColor: 'white', padding: 'clamp(1.5rem, 5vw, 2.5rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
           <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>🎧 Listening</div>
-          {q.level && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: q.level.startsWith('A') ? '#48bb78' : q.level.startsWith('B') ? '#4299e1' : '#ed8936' }}>{q.level}</div>}
+          <LevelBadge level={q.level} />
         </div>
         {q.title && <div style={{ fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', color: '#2C3E50', fontWeight: '700' }}>{q.title}</div>}
         {q.intro_text && <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', color: '#4a5568', lineHeight: '1.6' }}>{q.intro_text}</div>}
@@ -455,33 +447,13 @@ function InteractiveQuestion({ item: q }) {
   return (
     <div style={{ backgroundColor: 'white', padding: 'clamp(1.5rem, 5vw, 2.5rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
-        {q.type !== 'sentence_building' && (
-          <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
-            backgroundColor: q.type === 'gap_fill' ? '#fff3cd' : q.type === 'odd_one_out' ? '#E0F2FE' : q.type === 'error_correction' ? '#FEE2E2' : q.type === 'matching' ? '#D1FAE5' : q.type === 'dictation' ? '#EDE9FE' : '#d4edda',
-            color: q.type === 'gap_fill' ? '#856404' : q.type === 'odd_one_out' ? '#0369A1' : q.type === 'error_correction' ? '#DC2626' : q.type === 'matching' ? '#065F46' : q.type === 'dictation' ? '#553C9A' : '#155724',
-          }}>
-            {q.type === 'gap_fill' ? '✏️ Gap Fill' : q.type === 'odd_one_out' ? '🔍 Odd One Out' : q.type === 'error_correction' ? '🚨 Error Correction' : q.type === 'matching' ? '🔗 Matching' : q.type === 'dictation' ? '⌨️ Dictation' : '📝 Multiple Choice'}
-          </div>
-        )}
-        {q.level && (
-          <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
-            backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8',
-            color: q.level.startsWith('A') ? '#48bb78' : q.level.startsWith('B') ? '#4299e1' : '#ed8936',
-          }}>{q.level}</div>
-        )}
-        {q.topic && q.type !== 'dictation' && (
-          <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
-            backgroundColor: q.topic === 'question_forms' ? '#FEE2E2' : q.topic === 'punctuation' ? '#FEE2E2' : '#f0f0f0',
-            color: q.topic === 'question_forms' ? '#DC2626' : q.topic === 'punctuation' ? '#DC2626' : '#555',
-          }}>
-            {q.topic === 'question_forms' ? '❓ ' : ''}{q.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-          </div>
-        )}
+        <TypeBadge type={q.type} />
+        <LevelBadge level={q.level} />
+        {q.type !== 'dictation' && <TopicBadge topic={q.topic} />}
         {(q.type === 'error_correction' || q.type === 'gap_fill' || q.type === 'sentence_building' || q.type === 'dictation') && (
-          <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>🤖 AI marked</div>
+          <AiMarkedBadge />
         )}
-        {/* Tag pills */}
-        {q.tags && q.tags.map(tag => <TagPill key={tag} tag={tag} />)}
+        <TagBadges tags={q.tags} />
       </div>
 
       {q.type !== 'sentence_building' && q.type !== 'error_correction' && q.type !== 'matching' && q.type !== 'dictation' && q.type !== 'sentence_auction' && q.question && (
