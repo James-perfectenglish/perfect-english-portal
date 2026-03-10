@@ -403,15 +403,36 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
                 const style = feedback.isCorrect
                   ? { bg: '#f0fff4', border: '#c6f6d5', color: '#276749' }
                   : { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c' }
+                const studentAns = q.type === 'multiple_choice' ? (selectedOption || '') : userAnswer
+                const modelDiffers = normalise(feedback.correct) !== normalise(studentAns)
                 return (
                   <div style={{ backgroundColor: style.bg, border: `1px solid ${style.border}`, color: style.color, padding: '1rem 1.25rem', borderRadius: '10px', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: '1.6', marginBottom: '0.75rem' }}>
-                    {feedback.isCorrect
-                    ? normalise(feedback.correct) !== normalise(q.type === 'multiple_choice' ? (selectedOption || '') : userAnswer)
-                      ? `✅ Correct! (or: "${feedback.correct}")`
-                      : '✅ Correct!'
-                    : `❌ Not quite — the answer is "${feedback.correct}"`}
-                    {feedback.isCorrect && feedback.type === 'fuzzy' && <span style={{ display: 'block', fontSize: '0.82rem', marginTop: '2px', color: '#c05621' }}>⚠️ Watch your spelling!</span>}
-                    {feedback.note && feedback.type !== 'fuzzy' && <span style={{ display: 'block', fontSize: '0.82rem', marginTop: '2px' }}>{feedback.note}</span>}
+                    {/* Result line */}
+                    <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>
+                      {feedback.isCorrect
+                        ? modelDiffers ? `✅ Correct! (or: "${feedback.correct}")` : '✅ Correct!'
+                        : `❌ Not quite — the answer is "${feedback.correct}"`}
+                    </div>
+                    {/* Show what they typed for gap fill */}
+                    {q.type === 'gap_fill' && studentAns && (
+                      <div style={{ fontSize: '0.88rem', marginBottom: '0.3rem', opacity: 0.85 }}>
+                        Your answer: <strong>{studentAns}</strong>
+                      </div>
+                    )}
+                    {/* Spelling warning */}
+                    {feedback.isCorrect && feedback.type === 'fuzzy' && (
+                      <div style={{ fontSize: '0.85rem', marginTop: '0.25rem', color: '#c05621' }}>⚠️ Watch your spelling!</div>
+                    )}
+                    {/* AI reason */}
+                    {feedback.note && feedback.type !== 'fuzzy' && (
+                      <div style={{ fontSize: '0.85rem', marginTop: '0.25rem', opacity: 0.85 }}>{feedback.note}</div>
+                    )}
+                    {/* Explanation from question bank */}
+                    {q.explanation && (
+                      <div style={{ fontSize: '0.88rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: `1px solid ${feedback.isCorrect ? '#c6f6d5' : '#fed7d7'}`, opacity: 0.9 }}>
+                        💡 {q.explanation}
+                      </div>
+                    )}
                   </div>
                 )
               })()}
