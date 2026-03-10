@@ -36,8 +36,9 @@ function parseJsonb(val) {
 
 
 function formatTitle(title) {
-  const match = title.match(/^(.*?)\s*([\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]+)$/u)
-  if (match) return match[2] + " " + match[1].trim()
+  // Match trailing emoji including flags (regional indicators), variation selectors, and standard emoji ranges
+  const match = title.match(/^(.*?)\s*([\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}]+)$/u)
+  if (match) return match[2] + ' ' + match[1].trim()
   return title
 }
 
