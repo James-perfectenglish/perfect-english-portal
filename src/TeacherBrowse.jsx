@@ -3,8 +3,6 @@ import { supabase } from './supabaseClient';
 import SentenceBuildingInput from './components/SentenceBuildingInput';
 import MatchingPairs from './components/MatchingPairs';
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
 const TYPE_INFO = {
   gap_fill:          { emoji: '✏️',  label: 'Gap Fill' },
   multiple_choice:   { emoji: '🔘',  label: 'Multiple Choice' },
@@ -31,14 +29,18 @@ const SOURCE_META = {
 
 const NEW_COUNT = 50;
 
-// ── LocalStorage helpers ──────────────────────────────────────────────────────
+const ALL_TAGS = [
+  'Phrasal verb', 'Business phrasal verb',
+  'Dependent preposition', 'Preposition of time', 'Preposition of place', 'Preposition of movement', 'Fixed expression',
+  'Collocation', 'Confusable words', 'Uncountable noun', 'Countable noun',
+  'Business vocabulary', 'Financial vocabulary', 'HR vocabulary',
+  'Hotel vocabulary', 'Bathroom vocabulary', 'Vocabulario',
+];
 
 const SETS_KEY = 'pep_teacher_sets_v1';
 const loadSets  = () => { try { return JSON.parse(localStorage.getItem(SETS_KEY) || '[]'); } catch { return []; } };
 const storeSets = (s) => localStorage.setItem(SETS_KEY, JSON.stringify(s));
 const genId     = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-
-// ── Fisher-Yates shuffle ──────────────────────────────────────────────────────
 
 function shuffle(arr) {
   const a = [...arr];
@@ -48,8 +50,6 @@ function shuffle(arr) {
   }
   return a;
 }
-
-// ── Levenshtein for gap fill fuzzy check ──────────────────────────────────────
 
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
@@ -61,8 +61,6 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
-// ── Shared components ─────────────────────────────────────────────────────────
-
 function Badge({ color = '#718096', children, style = {} }) {
   return (
     <span style={{ background: color, color: 'white', borderRadius: 6, padding: '2px 9px', fontSize: 12, fontWeight: 600, ...style }}>
@@ -73,6 +71,13 @@ function Badge({ color = '#718096', children, style = {} }) {
 function LevelBadge({ level }) {
   return <Badge color={LEVEL_COLORS[level] || '#718096'}>{level}</Badge>;
 }
+function TagPill({ tag }) {
+  return (
+    <span style={{ background: '#FFF5F7', color: '#97266D', border: '1px solid #FED7E2', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+      {tag}
+    </span>
+  );
+}
 function FilterSection({ label, children }) {
   return (
     <div style={{ marginBottom: 14 }}>
@@ -82,34 +87,20 @@ function FilterSection({ label, children }) {
   );
 }
 
-// ── Result banner ─────────────────────────────────────────────────────────────
-
 function ResultBanner({ state, feedback, correctAnswer, onReset }) {
   if (state === 'idle' || state === 'checking') return null;
   const isCorrect = state === 'correct' || state === 'soft';
   return (
-    <div style={{
-      marginTop: 12, padding: '10px 14px', borderRadius: 10,
-      background: isCorrect ? '#f0fff4' : '#fff5f5',
-      border: `2px solid ${isCorrect ? '#48bb78' : '#fc8181'}`,
-    }}>
+    <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: isCorrect ? '#f0fff4' : '#fff5f5', border: `2px solid ${isCorrect ? '#48bb78' : '#fc8181'}` }}>
       <div style={{ fontWeight: 700, fontSize: 15, color: isCorrect ? '#276749' : '#c53030', marginBottom: feedback ? 4 : 0 }}>
         {state === 'correct' ? '✅ Correct!' : state === 'soft' ? '✅ Close enough!' : '❌ Not quite'}
       </div>
       {feedback && <div style={{ fontSize: 13, color: '#4a5568', marginBottom: 6 }}>{feedback}</div>}
-      {!isCorrect && correctAnswer && (
-        <div style={{ fontSize: 13, color: '#276749', fontWeight: 600, marginBottom: 6 }}>
-          ✔ {correctAnswer}
-        </div>
-      )}
-      <button onClick={onReset} style={{ fontSize: 12, color: '#667eea', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700 }}>
-        ↺ Try again
-      </button>
+      {!isCorrect && correctAnswer && <div style={{ fontSize: 13, color: '#276749', fontWeight: 600, marginBottom: 6 }}>✔ {correctAnswer}</div>}
+      <button onClick={onReset} style={{ fontSize: 12, color: '#667eea', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700 }}>↺ Try again</button>
     </div>
   );
 }
-
-// ── Teacher Card ──────────────────────────────────────────────────────────────
 
 function TeacherCard({ item }) {
   if (item._source === 'listening') {
@@ -169,6 +160,12 @@ function TeacherCard({ item }) {
         {item.language && item.language !== 'en' && <Badge color="#f6ad55">🌐 {item.language}</Badge>}
         <span style={{ marginLeft: 'auto', color: '#a0aec0', fontSize: 12 }}>Q{item.question_number}</span>
       </div>
+      {/* Tag pills */}
+      {item.tags && item.tags.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+          {item.tags.map(tag => <TagPill key={tag} tag={tag} />)}
+        </div>
+      )}
       <p style={{ fontSize: 16, fontWeight: 500, lineHeight: 1.65, margin: '0 0 14px' }}>{item.question}</p>
       {opts.length > 0 && (
         <div style={{ marginBottom: 10 }}>
@@ -188,6 +185,11 @@ function TeacherCard({ item }) {
           <div style={{ fontWeight: 700, fontSize: 16 }}>{correct}</div>
         </div>
       )}
+      {item.explanation && (
+        <div style={{ background: '#fffff0', border: '1px solid #ecc94b', borderRadius: 8, padding: 9, fontSize: 13, color: '#744210', marginBottom: 8 }}>
+          💡 {item.explanation}
+        </div>
+      )}
       {item.informal_feedback && <div style={{ background: '#fffbeb', borderRadius: 8, padding: 9, fontSize: 13, color: '#92400e', marginBottom: 8 }}>💬 {item.informal_feedback}</div>}
       {item.acceptable_alternatives && Array.isArray(item.acceptable_alternatives) && item.acceptable_alternatives.length > 0 && (
         <div style={{ fontSize: 13, color: '#718096' }}>Also accepted: {item.acceptable_alternatives.join(', ')}</div>
@@ -195,10 +197,6 @@ function TeacherCard({ item }) {
     </div>
   );
 }
-
-// ── Interactive Question (Student view with real marking) ─────────────────────
-
-// ── Focus-ring fix for OOO + EC tiles (mirrors RandomPracticeExercise) ────────
 
 const TB_STYLE_ID = 'tb-focus-fix';
 if (typeof document !== 'undefined' && !document.getElementById(TB_STYLE_ID)) {
@@ -213,8 +211,6 @@ if (typeof document !== 'undefined' && !document.getElementById(TB_STYLE_ID)) {
   `;
   document.head.appendChild(_s);
 }
-
-// ── Module-level helpers (mirrors RandomPracticeExercise) ─────────────────────
 
 const _isFuzzy = (studentAnswer, correctAnswers) => {
   for (const correct of correctAnswers) {
@@ -253,7 +249,7 @@ function InteractiveQuestion({ item: q }) {
   const [sbFeedback,         setSbFeedback]          = useState(null);
   const [matchingDone,       setMatchingDone]        = useState(false);
   const [audioPlayed,        setAudioPlayed]         = useState(false);
-  const [auctionPicks,       setAuctionPicks]        = useState({});  // idx → true/false
+  const [auctionPicks,       setAuctionPicks]        = useState({});
   const audioRef = useRef(null);
 
   const reset = () => {
@@ -263,7 +259,6 @@ function InteractiveQuestion({ item: q }) {
     setAuctionPicks({});
   };
 
-  // ── Mark: gap fill (verbatim logic from RPE) ──
   const checkAnswer = async () => {
     let isCorrect = false, feedbackType = 'incorrect', explanation = q.explanation || '';
     if (q.type === 'gap_fill') {
@@ -297,7 +292,6 @@ function InteractiveQuestion({ item: q }) {
     }
   };
 
-  // ── Mark: dictation ──
   const checkDictationAnswer = async () => {
     if (!userAnswer.trim() || isChecking) return;
     const answer = userAnswer.trim(), correct = q.correct_answer || '';
@@ -314,14 +308,13 @@ function InteractiveQuestion({ item: q }) {
       } catch(e) {}
       setIsChecking(false);
     }
-    if (feedbackType === 'correct')    feedbackMsg = `✅ Correct!`;
-    else if (feedbackType === 'fuzzy') feedbackMsg = `✅ Correct — watch your spelling! The answer was: "${correct}"`;
+    if (feedbackType === 'correct')        feedbackMsg = `✅ Correct!`;
+    else if (feedbackType === 'fuzzy')     feedbackMsg = `✅ Correct — watch your spelling! The answer was: "${correct}"`;
     else if (feedbackType === 'soft-pass') feedbackMsg = `✅ Close enough! The model answer was: "${correct}"`;
-    else                               feedbackMsg = `❌ The answer was: "${correct}"`;
+    else                                   feedbackMsg = `❌ The answer was: "${correct}"`;
     setFeedback({ type: feedbackType, isCorrect, message: feedbackMsg, studentAnswer: answer, correctAnswer: correct });
   };
 
-  // ── Mark: OOO ──
   const handleOOOSelect = (option) => {
     if (feedback) return;
     setOooSelected(option);
@@ -330,7 +323,6 @@ function InteractiveQuestion({ item: q }) {
     setFeedback({ message: isCorrect ? `✅ Correct! "${oddOne}" is the odd one out. ${q.explanation || ''}` : `❌ Not quite. "${oddOne}" is the odd one out. ${q.explanation || ''}`, type: isCorrect ? 'correct' : 'incorrect', isCorrect, oddOne });
   };
 
-  // ── Mark: EC ──
   const handleECWordTap = (index) => { if (feedback || isChecking) return; setEcSelectedWordIndex(index); setEcCorrection(''); };
   const checkECAnswer = async () => {
     if (ecSelectedWordIndex === null || !ecCorrection.trim() || isChecking) return;
@@ -363,7 +355,6 @@ function InteractiveQuestion({ item: q }) {
     setFeedback({ type: 'incorrect', message: foundRightWord ? `❌ Good — you found the error in "${words[errorInfo.index]}", but "${ecCorrection.trim()}" doesn't quite work here. ${aiResult?.reason ? aiResult.reason + ' ' : ''}It should be "${errorInfo.correctWord}". ${q.explanation || ''}` : `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${q.explanation || ''}`, isCorrect: false, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
   };
 
-  // ── Mark: sentence building ──
   const handleSentenceBuildingResult = (isCorrect, isSoft = false, userAns = '') => {
     if (isCorrect) {
       const msg = `✅ Correct! ${q.explanation || ''}`;
@@ -377,14 +368,12 @@ function InteractiveQuestion({ item: q }) {
     }
   };
 
-  // ── Mark: matching ──
   const handleMatchingResult = (isCorrect, wrongAttempts) => {
     setMatchingDone(true);
     const msg = isCorrect ? `✅ Perfect matching! ${q.explanation || ''}` : `👍 All matched! You had ${wrongAttempts} wrong attempt${wrongAttempts !== 1 ? 's' : ''}. ${q.explanation || ''}`;
     setFeedback({ message: msg, type: isCorrect ? 'correct' : 'incorrect', isCorrect });
   };
 
-  // ── Styles (verbatim from RPE) ──
   const getOOOStyle = (option) => {
     const base = { padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)', borderRadius: '8px', border: 'none', boxShadow: 'inset 0 0 0 2px #e2e8f0', cursor: feedback ? 'default' : 'pointer', fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)', fontWeight: '500', textAlign: 'center', transition: 'all 0.2s ease', backgroundColor: 'white', color: '#2d3748', minHeight: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none', outline: 'none' };
     if (!feedback) {
@@ -413,11 +402,9 @@ function InteractiveQuestion({ item: q }) {
     return base;
   };
 
-  // ── Derived ──
   const ecWords       = q.type === 'error_correction' ? q.question.trim().split(/\s+/) : [];
   const matchingPairs = q.type === 'matching' ? (Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]')) : null;
 
-  // ── Structured feedback (gap fill + MC) — verbatim from RPE ──
   const renderStructuredFeedback = () => {
     if (!feedback || (q.type !== 'gap_fill' && q.type !== 'multiple_choice')) return null;
     const isFuzzy = feedback.type === 'fuzzy', isSoftPass = feedback.type === 'soft-pass', isCorrect = feedback.isCorrect;
@@ -444,7 +431,6 @@ function InteractiveQuestion({ item: q }) {
     );
   };
 
-  // ── Listening exercise: audio-only focus view ──
   if (q._source === 'listening') {
     return (
       <div style={{ backgroundColor: 'white', padding: 'clamp(1.5rem, 5vw, 2.5rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -455,11 +441,7 @@ function InteractiveQuestion({ item: q }) {
         {q.title && <div style={{ fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', color: '#2C3E50', fontWeight: '700' }}>{q.title}</div>}
         {q.intro_text && <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', color: '#4a5568', lineHeight: '1.6' }}>{q.intro_text}</div>}
         {q.description && !q.intro_text && <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', color: '#4a5568', lineHeight: '1.6' }}>{q.description}</div>}
-        {q.audio_url && (
-          <div>
-            <audio controls src={q.audio_url} style={{ width: '100%', borderRadius: '8px' }} />
-          </div>
-        )}
+        {q.audio_url && <div><audio controls src={q.audio_url} style={{ width: '100%', borderRadius: '8px' }} /></div>}
         {q.transcript && (
           <details style={{ backgroundColor: '#f8f9fa', borderRadius: '10px', padding: '1rem' }}>
             <summary style={{ cursor: 'pointer', fontWeight: '600', color: '#553C9A', fontSize: '0.9rem', marginBottom: '0.5rem' }}>📄 Transcript</summary>
@@ -470,11 +452,8 @@ function InteractiveQuestion({ item: q }) {
     );
   }
 
-  // ── Render ──
   return (
     <div style={{ backgroundColor: 'white', padding: 'clamp(1.5rem, 5vw, 2.5rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-
-      {/* Badges — verbatim from RPE */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
         {q.type !== 'sentence_building' && (
           <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
@@ -501,9 +480,10 @@ function InteractiveQuestion({ item: q }) {
         {(q.type === 'error_correction' || q.type === 'gap_fill' || q.type === 'sentence_building' || q.type === 'dictation') && (
           <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>🤖 AI marked</div>
         )}
+        {/* Tag pills */}
+        {q.tags && q.tags.map(tag => <TagPill key={tag} tag={tag} />)}
       </div>
 
-      {/* Question text — same condition as RPE */}
       {q.type !== 'sentence_building' && q.type !== 'error_correction' && q.type !== 'matching' && q.type !== 'dictation' && q.type !== 'sentence_auction' && q.question && (
         <div style={{ fontSize: 'clamp(1.15rem, 4vw, 1.4rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
           {q.question}
@@ -511,8 +491,6 @@ function InteractiveQuestion({ item: q }) {
       )}
 
       <div style={{ flex: 1 }}>
-
-        {/* GAP FILL */}
         {q.type === 'gap_fill' && !feedback && (
           <input type="text" value={userAnswer} onChange={e => setUserAnswer(e.target.value)}
             onKeyPress={e => e.key === 'Enter' && !isChecking && checkAnswer()}
@@ -520,7 +498,6 @@ function InteractiveQuestion({ item: q }) {
             style={{ width: '100%', padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', borderRadius: '10px', border: '2px solid #e0e0e0', boxSizing: 'border-box', color: '#2C3E50', opacity: isChecking ? 0.6 : 1 }} />
         )}
 
-        {/* MULTIPLE CHOICE — before */}
         {q.type === 'multiple_choice' && !feedback && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {q.options.map((option, index) => (
@@ -531,15 +508,14 @@ function InteractiveQuestion({ item: q }) {
           </div>
         )}
 
-        {/* MULTIPLE CHOICE — after */}
         {q.type === 'multiple_choice' && feedback && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '0.5rem' }}>
             {q.options.map((option, index) => {
               const isCorrectOption = option === feedback.correctAnswer;
               const wasSelected     = option === feedback.studentAnswer;
               let bg = '#f7fafc', border = '#e2e8f0', color = '#a0aec0';
-              if (isCorrectOption)                        { bg = '#f0fff4'; border = '#48bb78'; color = '#276749'; }
-              else if (wasSelected && !feedback.isCorrect){ bg = '#fff5f5'; border = '#f56565'; color = '#c53030'; }
+              if (isCorrectOption)                         { bg = '#f0fff4'; border = '#48bb78'; color = '#276749'; }
+              else if (wasSelected && !feedback.isCorrect) { bg = '#fff5f5'; border = '#f56565'; color = '#c53030'; }
               return (
                 <div key={index} style={{ padding: '0.9rem 1.2rem', fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', backgroundColor: bg, color, border: `2px solid ${border}`, borderRadius: '10px', fontWeight: isCorrectOption || wasSelected ? '600' : '400', wordWrap: 'break-word' }}>
                   {isCorrectOption ? '✓ ' : wasSelected && !feedback.isCorrect ? '✗ ' : ''}{option}
@@ -549,12 +525,10 @@ function InteractiveQuestion({ item: q }) {
           </div>
         )}
 
-        {/* SENTENCE BUILDING */}
         {q.type === 'sentence_building' && (
           <SentenceBuildingInput key={q.id} {..._getSbProps(q)} disabled={!!feedback} onResult={handleSentenceBuildingResult} feedback={sbFeedback} showCheckButton={true} onAnswerReady={() => {}} />
         )}
 
-        {/* SENTENCE AUCTION */}
         {q.type === 'sentence_auction' && (() => {
           const sentences = Array.isArray(q.options) ? q.options : (() => { try { return JSON.parse(q.options || '[]'); } catch { return []; } })();
           const revealed = !!feedback;
@@ -574,16 +548,14 @@ function InteractiveQuestion({ item: q }) {
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.25rem' }}>
                 {sentences.map((s, idx) => {
-                  const pick = auctionPicks[idx]; // true=correct, false=incorrect, undefined=no pick
+                  const pick = auctionPicks[idx];
                   const bg     = !revealed ? (pick === true ? '#f0fff4' : pick === false ? '#fff5f5' : 'white') : s.correct ? '#f0fff4' : '#fff5f5';
                   const border = !revealed ? (pick === true ? '#48bb78' : pick === false ? '#f56565' : '#e2e8f0') : s.correct ? '#48bb78' : '#f56565';
                   const colour = !revealed ? '#2d3748' : s.correct ? '#276749' : '#c53030';
-                  // After reveal: did the user get this one right?
                   const pickedRight = revealed && pick !== undefined && pick === s.correct;
                   const pickedWrong = revealed && pick !== undefined && pick !== s.correct;
                   return (
                     <div key={idx} style={{ borderRadius: '10px', border: `2px solid ${border}`, background: bg, padding: '0.9rem 1.1rem', transition: 'all 0.3s', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      {/* Sentence text + explanation */}
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', color: colour, fontWeight: '500', lineHeight: '1.55', marginBottom: revealed && s.explanation ? '0.5rem' : 0 }}>
                           {revealed && <span style={{ marginRight: '7px' }}>{s.correct ? '✅' : '❌'}</span>}
@@ -591,40 +563,23 @@ function InteractiveQuestion({ item: q }) {
                           {revealed && pickedRight && <span style={{ marginLeft: '8px', fontSize: '0.78rem', fontWeight: '700', color: '#276749', background: '#c6f6d5', padding: '2px 7px', borderRadius: '20px' }}>👍 right call</span>}
                           {revealed && pickedWrong && <span style={{ marginLeft: '8px', fontSize: '0.78rem', fontWeight: '700', color: '#9b2c2c', background: '#fed7d7', padding: '2px 7px', borderRadius: '20px' }}>😬 wrong call</span>}
                         </div>
-                        {revealed && s.explanation && (
-                          <div style={{ fontSize: '0.875rem', color: s.correct ? '#2f855a' : '#9b2c2c', lineHeight: '1.5', opacity: 0.9 }}>
-                            {s.explanation}
-                          </div>
-                        )}
+                        {revealed && s.explanation && <div style={{ fontSize: '0.875rem', color: s.correct ? '#2f855a' : '#9b2c2c', lineHeight: '1.5', opacity: 0.9 }}>{s.explanation}</div>}
                       </div>
-                      {/* ✅ / ❌ pick buttons — hidden after reveal */}
                       {!revealed && (
                         <div style={{ display: 'flex', gap: '5px', flexShrink: 0, alignSelf: 'center' }}>
-                          <button
-                            onClick={() => togglePick(idx, true)}
-                            title="Correct"
-                            style={{ width: '36px', height: '36px', borderRadius: '8px', border: `2px solid ${pick === true ? '#48bb78' : '#e2e8f0'}`, background: pick === true ? '#48bb78' : 'white', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
-                          >✅</button>
-                          <button
-                            onClick={() => togglePick(idx, false)}
-                            title="Incorrect"
-                            style={{ width: '36px', height: '36px', borderRadius: '8px', border: `2px solid ${pick === false ? '#f56565' : '#e2e8f0'}`, background: pick === false ? '#f56565' : 'white', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
-                          >❌</button>
+                          <button onClick={() => togglePick(idx, true)} title="Correct" style={{ width: '36px', height: '36px', borderRadius: '8px', border: `2px solid ${pick === true ? '#48bb78' : '#e2e8f0'}`, background: pick === true ? '#48bb78' : 'white', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>✅</button>
+                          <button onClick={() => togglePick(idx, false)} title="Incorrect" style={{ width: '36px', height: '36px', borderRadius: '8px', border: `2px solid ${pick === false ? '#f56565' : '#e2e8f0'}`, background: pick === false ? '#f56565' : 'white', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>❌</button>
                         </div>
                       )}
                     </div>
                   );
                 })}
               </div>
-              {!revealed
-                ? <button onClick={() => setFeedback({ type: 'revealed' })} style={{ width: '100%', padding: '0.9rem', fontSize: '1rem', fontWeight: '700', background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer' }}>🔨 Reveal Answers</button>
-                : null
-              }
+              {!revealed && <button onClick={() => setFeedback({ type: 'revealed' })} style={{ width: '100%', padding: '0.9rem', fontSize: '1rem', fontWeight: '700', background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer' }}>🔨 Reveal Answers</button>}
             </div>
           );
         })()}
 
-        {/* ODD ONE OUT */}
         {q.type === 'odd_one_out' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '1rem' }}>
             {(Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]')).map((option, idx) => (
@@ -636,7 +591,6 @@ function InteractiveQuestion({ item: q }) {
           </div>
         )}
 
-        {/* ERROR CORRECTION */}
         {q.type === 'error_correction' && (
           <div>
             <div style={{ fontSize: '0.9rem', color: '#718096', marginBottom: '1rem', fontStyle: 'italic' }}>
@@ -676,19 +630,13 @@ function InteractiveQuestion({ item: q }) {
           </div>
         )}
 
-        {/* MATCHING */}
         {q.type === 'matching' && matchingPairs && (
           <div>
-            {q.question && q.question.trim() && (
-              <div style={{ fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500', marginBottom: '1rem', wordWrap: 'break-word' }}>
-                {q.question}
-              </div>
-            )}
+            {q.question && q.question.trim() && <div style={{ fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500', marginBottom: '1rem', wordWrap: 'break-word' }}>{q.question}</div>}
             <MatchingPairs key={q.id} pairs={matchingPairs} disabled={!!feedback} onResult={handleMatchingResult} />
           </div>
         )}
 
-        {/* DICTATION */}
         {q.type === 'dictation' && (
           <div>
             <audio ref={audioRef} src={q.audio_url} style={{ display: 'none' }} />
@@ -700,9 +648,7 @@ function InteractiveQuestion({ item: q }) {
               {!audioPlayed && <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#a0aec0' }}>👆 Tap to hear the audio</div>}
             </div>
             {q.sentence_template && !feedback && (
-              <div style={{ backgroundColor: '#EBF8FF', border: '2px solid #90CDF4', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500' }}>
-                {q.sentence_template}
-              </div>
+              <div style={{ backgroundColor: '#EBF8FF', border: '2px solid #90CDF4', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500' }}>{q.sentence_template}</div>
             )}
             {!feedback && (
               <input type="text" value={userAnswer} onChange={e => setUserAnswer(e.target.value)}
@@ -719,21 +665,18 @@ function InteractiveQuestion({ item: q }) {
           </div>
         )}
 
-        {/* AI checking indicator */}
         {isChecking && ['gap_fill', 'error_correction', 'dictation'].includes(q.type) && (
           <div style={{ marginTop: '1rem', textAlign: 'center', padding: '1rem', color: '#553C9A', fontSize: '0.95rem', border: '2px dashed #EDE9FE', borderRadius: '8px' }}>🤖 Checking your answer...</div>
         )}
 
         {renderStructuredFeedback()}
 
-        {/* EC feedback */}
         {feedback && q.type === 'error_correction' && (
           <div style={{ backgroundColor: feedback.type === 'soft-pass' ? '#fffbeb' : feedback.isCorrect ? '#d4edda' : '#f8d7da', color: feedback.type === 'soft-pass' ? '#744210' : feedback.isCorrect ? '#155724' : '#721c24', padding: '1.2rem', borderRadius: '10px', marginTop: '1rem', fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6', wordWrap: 'break-word', overflowWrap: 'break-word', border: feedback.type === 'soft-pass' ? '1px solid #fbd38d' : 'none' }}>
             {feedback.message}
           </div>
         )}
 
-        {/* Simple feedback: OOO, matching */}
         {feedback && !['error_correction', 'sentence_building', 'gap_fill', 'multiple_choice', 'dictation', 'sentence_auction'].includes(q.type) && (
           <div style={{ backgroundColor: feedback.isCorrect ? '#d4edda' : '#f8d7da', color: feedback.isCorrect ? '#155724' : '#721c24', padding: '1.2rem', borderRadius: '10px', marginTop: '1rem', fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
             {feedback.message}
@@ -741,7 +684,6 @@ function InteractiveQuestion({ item: q }) {
         )}
       </div>
 
-      {/* Buttons */}
       <div style={{ marginTop: '1.5rem' }}>
         {!feedback && !['sentence_building', 'odd_one_out', 'error_correction', 'matching', 'sentence_auction'].includes(q.type) && (
           <button
@@ -752,8 +694,7 @@ function InteractiveQuestion({ item: q }) {
           </button>
         )}
         {feedback && (
-          <button onClick={reset}
-            style={{ padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)', backgroundColor: '#718096', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', width: '100%', fontWeight: '600' }}>
+          <button onClick={reset} style={{ padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)', backgroundColor: '#718096', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', width: '100%', fontWeight: '600' }}>
             ↺ Try again
           </button>
         )}
@@ -761,8 +702,6 @@ function InteractiveQuestion({ item: q }) {
     </div>
   );
 }
-
-// ── Focus Mode ────────────────────────────────────────────────────────────────
 
 function FocusMode({ items, index, onChangeIndex, previewMode, setPreviewMode, onExit }) {
   const item = items[index];
@@ -772,9 +711,7 @@ function FocusMode({ items, index, onChangeIndex, previewMode, setPreviewMode, o
       <div style={{ background: 'white', borderBottom: '1px solid #e2e8f0', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
         <div style={{ display: 'flex', background: '#f7fafc', borderRadius: 7, padding: 3, gap: 2 }}>
           {[['teacher', '👨‍🏫 Teacher'], ['student', '👤 Student']].map(([mode, label]) => (
-            <button key={mode} onClick={() => setPreviewMode(mode)} style={{ padding: '5px 14px', borderRadius: 5, border: 'none', background: previewMode === mode ? '#667eea' : 'transparent', color: previewMode === mode ? 'white' : '#718096', cursor: 'pointer', fontSize: 13, fontWeight: previewMode === mode ? 700 : 400 }}>
-              {label}
-            </button>
+            <button key={mode} onClick={() => setPreviewMode(mode)} style={{ padding: '5px 14px', borderRadius: 5, border: 'none', background: previewMode === mode ? '#667eea' : 'transparent', color: previewMode === mode ? 'white' : '#718096', cursor: 'pointer', fontSize: 13, fontWeight: previewMode === mode ? 700 : 400 }}>{label}</button>
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
@@ -786,28 +723,24 @@ function FocusMode({ items, index, onChangeIndex, previewMode, setPreviewMode, o
       </div>
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '2rem 1rem' }}>
         <div style={{ width: '100%', maxWidth: 700, background: 'white', borderRadius: 16, padding: '2rem', boxShadow: '0 4px 32px rgba(0,0,0,0.10)' }}>
-          {previewMode === 'teacher'
-            ? <TeacherCard item={item} />
-            : <InteractiveQuestion key={item._rowKey} item={item} />}
+          {previewMode === 'teacher' ? <TeacherCard item={item} /> : <InteractiveQuestion key={item._rowKey} item={item} />}
         </div>
       </div>
     </div>
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-
 export default function TeacherBrowse({ user, globalLang = 'en' }) {
-  const [filters, setFilters] = useState({ source: 'all', levels: [], types: [], topic: '', lang: 'en', qFrom: '', qTo: '', newOnly: false });
-  const [maxQNumber,   setMaxQNumber]   = useState(null);
-  const [results,      setResults]      = useState([]);
-  const [loading,      setLoading]      = useState(false);
-  const [hasSearched,  setHasSearched]  = useState(false);
-  const [selected,     setSelected]     = useState(new Set());
-  const [previewItem,  setPreviewItem]  = useState(null);
-  const [previewMode,  setPreviewMode]  = useState('student');
-  const [focusMode,    setFocusMode]    = useState(false);
-  const [focusIndex,   setFocusIndex]   = useState(0);
+  const [filters, setFilters] = useState({ source: 'all', levels: [], types: [], tags: [], topic: '', lang: 'en', qFrom: '', qTo: '', newOnly: false });
+  const [maxQNumber,    setMaxQNumber]    = useState(null);
+  const [results,       setResults]       = useState([]);
+  const [loading,       setLoading]       = useState(false);
+  const [hasSearched,   setHasSearched]   = useState(false);
+  const [selected,      setSelected]      = useState(new Set());
+  const [previewItem,   setPreviewItem]   = useState(null);
+  const [previewMode,   setPreviewMode]   = useState('student');
+  const [focusMode,     setFocusMode]     = useState(false);
+  const [focusIndex,    setFocusIndex]    = useState(0);
   const [sets,          setSets]          = useState(loadSets);
   const [activeSet,     setActiveSet]     = useState(null);
   const [showSetsPanel, setShowSetsPanel] = useState(false);
@@ -817,6 +750,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
   const setFilter   = (k, v) => setFilters(f => ({ ...f, [k]: v }));
   const toggleLevel = (lv) => setFilter('levels', filters.levels.includes(lv) ? filters.levels.filter(l => l !== lv) : [...filters.levels, lv]);
   const toggleType  = (tp) => setFilter('types',  filters.types.includes(tp)  ? filters.types.filter(t => t !== tp)  : [...filters.types, tp]);
+  const toggleTag   = (tg) => setFilter('tags',   filters.tags.includes(tg)   ? filters.tags.filter(t => t !== tg)   : [...filters.tags, tg]);
 
   useEffect(() => {
     supabase.from('question_bank').select('question_number').order('question_number', { ascending: false }).limit(1).single()
@@ -834,6 +768,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       else if (f.lang === 'es') q = q.in('language', ['es', 'both']);
       if (f.levels.length) q = q.in('level', f.levels);
       if (f.types.length)  q = q.in('type',  f.types);
+      if (f.tags.length)   q = q.overlaps('tags', f.tags);
       if (f.topic)  q = q.ilike('topic', `%${f.topic}%`);
       if (f.qFrom)  q = q.gte('question_number', parseInt(f.qFrom));
       if (f.qTo)    q = q.lte('question_number', parseInt(f.qTo));
@@ -899,8 +834,6 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
     setSets(updated); storeSets(updated); setResults(prev => prev.filter(r => r.id !== itemId));
   };
 
-  // ── Sidebar ───────────────────────────────────────────────────────────────
-
   const sidebar = (
     <div style={{ width: 220, flexShrink: 0, background: 'white', borderRadius: 12, padding: '1.1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.07)', alignSelf: 'flex-start', position: 'sticky', top: 12 }}>
 
@@ -958,6 +891,18 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
         </FilterSection>
       )}
 
+      {(filters.source === 'all' || filters.source === 'question_bank') && (
+        <FilterSection label="Tag">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {ALL_TAGS.map(tag => (
+              <button key={tag} onClick={() => toggleTag(tag)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '3px 7px', borderRadius: 6, border: filters.tags.includes(tag) ? '1px solid #FED7E2' : 'none', background: filters.tags.includes(tag) ? '#FFF5F7' : 'transparent', color: filters.tags.includes(tag) ? '#97266D' : '#4a5568', cursor: 'pointer', fontSize: 11, fontWeight: filters.tags.includes(tag) ? 700 : 400 }}>
+                {filters.tags.includes(tag) ? '✓' : '○'} {tag}
+              </button>
+            ))}
+          </div>
+        </FilterSection>
+      )}
+
       <FilterSection label="Topic keyword">
         <input value={filters.topic} onChange={e => setFilter('topic', e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="e.g. comparatives" style={{ width: '100%', padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
       </FilterSection>
@@ -981,13 +926,11 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       <button onClick={() => search()} disabled={loading} style={{ width: '100%', padding: '9px', background: '#667eea', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
         {loading ? '…' : '🔍 Search'}
       </button>
-      <button onClick={() => { setFilters({ source: 'all', levels: [], types: [], topic: '', lang: 'en', qFrom: '', qTo: '', newOnly: false }); setResults([]); setHasSearched(false); setActiveSet(null); setSelected(new Set()); }} style={{ width: '100%', padding: '7px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, cursor: 'pointer', marginTop: 5 }}>
+      <button onClick={() => { setFilters({ source: 'all', levels: [], types: [], tags: [], topic: '', lang: 'en', qFrom: '', qTo: '', newOnly: false }); setResults([]); setHasSearched(false); setActiveSet(null); setSelected(new Set()); }} style={{ width: '100%', padding: '7px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, cursor: 'pointer', marginTop: 5 }}>
         Clear all
       </button>
     </div>
   );
-
-  // ── Results list ──────────────────────────────────────────────────────────
 
   const resultsList = (
     <div style={{ flex: 1, minWidth: 0 }}>
@@ -1036,21 +979,28 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       {!loading && hasSearched && results.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: '#718096' }}><div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>No results — try adjusting the filters.</div>}
       {!loading && !hasSearched && <div style={{ textAlign: 'center', padding: '3rem', color: '#718096' }}><div style={{ fontSize: 28, marginBottom: 8 }}>👆</div>Set your filters and hit Search, or open a saved set.</div>}
       {!loading && results.map((item, idx) => {
-        const isSel    = selected.has(item._rowKey);
-        const isActive = previewItem?._rowKey === item._rowKey;
-        const srcMeta  = SOURCE_META[item._source];
-        const title    = item._source === 'question_bank' ? (item.question || '').slice(0, 110) : (item.title || '');
-        const sub      = item._source === 'question_bank' ? `Q${item.question_number} · ${TYPE_INFO[item.type]?.label || item.type}` : (item.description || item.answer || '').slice(0, 70);
+        const isSel   = selected.has(item._rowKey);
+        const srcMeta = SOURCE_META[item._source];
+        const title   = item._source === 'question_bank' ? (item.question || '').slice(0, 110) : (item.title || '');
+        const sub     = item._source === 'question_bank' ? `Q${item.question_number} · ${TYPE_INFO[item.type]?.label || item.type}` : (item.description || item.answer || '').slice(0, 70);
+        const itemTags = item._source === 'question_bank' && item.tags && item.tags.length > 0 ? item.tags : [];
         return (
-          <div key={item._rowKey} onClick={() => enterFocus(idx)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 11px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 5, cursor: 'pointer' }}>
-            <div onClick={e => { e.stopPropagation(); toggleSelect(item._rowKey); }} style={{ flexShrink: 0, width: 18, height: 18, border: `2px solid ${isSel ? '#667eea' : '#cbd5e0'}`, borderRadius: 4, background: isSel ? '#667eea' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 11 }}>
+          <div key={item._rowKey} onClick={() => enterFocus(idx)} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '9px 11px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 5, cursor: 'pointer' }}>
+            <div onClick={e => { e.stopPropagation(); toggleSelect(item._rowKey); }} style={{ flexShrink: 0, width: 18, height: 18, border: `2px solid ${isSel ? '#667eea' : '#cbd5e0'}`, borderRadius: 4, background: isSel ? '#667eea' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 11, marginTop: 2 }}>
               {isSel && '✓'}
             </div>
-            <div style={{ flexShrink: 0, background: srcMeta.color, color: 'white', borderRadius: 5, padding: '2px 6px', fontSize: 12 }}>{srcMeta.emoji}</div>
-            {item.level && <div style={{ flexShrink: 0, background: LEVEL_COLORS[item.level] || '#718096', color: 'white', borderRadius: 5, padding: '2px 7px', fontSize: 11, fontWeight: 700, minWidth: 26, textAlign: 'center' }}>{item.level}</div>}
+            <div style={{ flexShrink: 0, background: srcMeta.color, color: 'white', borderRadius: 5, padding: '2px 6px', fontSize: 12, marginTop: 1 }}>{srcMeta.emoji}</div>
+            {item.level && <div style={{ flexShrink: 0, background: LEVEL_COLORS[item.level] || '#718096', color: 'white', borderRadius: 5, padding: '2px 7px', fontSize: 11, fontWeight: 700, minWidth: 26, textAlign: 'center', marginTop: 1 }}>{item.level}</div>}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: '#2d3748', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</div>
               <div style={{ fontSize: 11, color: '#718096', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>
+              {itemTags.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
+                  {itemTags.map(tag => (
+                    <span key={tag} style={{ background: '#FFF5F7', color: '#97266D', border: '1px solid #FED7E2', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 600 }}>{tag}</span>
+                  ))}
+                </div>
+              )}
             </div>
             <button onClick={e => { e.stopPropagation(); enterFocus(idx); }} title="Open in focus mode" style={{ flexShrink: 0, background: 'none', border: 'none', color: '#a0aec0', cursor: 'pointer', fontSize: 15, padding: '1px 5px', lineHeight: 1 }}>⛶</button>
             {activeSet && <button onClick={e => { e.stopPropagation(); removeFromActiveSet(item.id); }} style={{ flexShrink: 0, background: 'none', border: 'none', color: '#e53e3e', cursor: 'pointer', fontSize: 17, padding: '1px 5px', lineHeight: 1 }}>×</button>}
@@ -1059,8 +1009,6 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       })}
     </div>
   );
-
-  // ── Preview panel ─────────────────────────────────────────────────────────
 
   const previewPanel = previewItem && (
     <div style={{ width: 380, flexShrink: 0, background: 'white', borderRadius: 12, boxShadow: '0 4px 24px rgba(0,0,0,0.11)', alignSelf: 'flex-start', position: 'sticky', top: 12, overflow: 'hidden' }}>
@@ -1076,9 +1024,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
         </div>
       </div>
       <div style={{ padding: '1.1rem', maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
-        {previewMode === 'teacher'
-          ? <TeacherCard item={previewItem} />
-          : <InteractiveQuestion key={previewItem._rowKey} item={previewItem} />}
+        {previewMode === 'teacher' ? <TeacherCard item={previewItem} /> : <InteractiveQuestion key={previewItem._rowKey} item={previewItem} />}
       </div>
     </div>
   );

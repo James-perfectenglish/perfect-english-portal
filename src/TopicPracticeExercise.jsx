@@ -329,6 +329,9 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
                   {q.type === 'multiple_choice' ? '📝 Multiple Choice' : '✏️ Gap Fill'}
                 </div>
                 {q.type === 'gap_fill' && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#EDE9FE', color: '#553C9A' }}>🤖 AI marked</div>}
+                {q.tags && q.tags.map(tag => (
+                  <div key={tag} style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#FFF5F7', color: '#97266D', border: '1px solid #FED7E2' }}>{tag}</div>
+                ))}
               </div>
 
               {/* question text */}
