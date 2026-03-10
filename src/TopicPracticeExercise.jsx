@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { supabase } from './supabaseClient'
-import { LevelBadge, TypeBadge, AiMarkedBadge, TagBadges } from './BadgePill'
+import { LevelBadge, TypeBadge, AiMarkedBadge, TagBadges } from './components/BadgePill'
 
 function shuffleArray(arr) {
   const shuffled = [...arr]
