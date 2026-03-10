@@ -292,7 +292,7 @@ export default function SentenceAuction({ onBack, onComplete }) {
           <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2rem 2rem 1.5rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
             <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🔨 Sentence Auction</h1>
             {selectedLevel && (
-              <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px', border: `2px solid ${selectedLevel.colour}cc` }}>
+              <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>
                 {selectedLevel.badgeLabel}
               </span>
             )}
@@ -390,7 +390,7 @@ export default function SentenceAuction({ onBack, onComplete }) {
         <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
           <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
             <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🔨 Sentence Auction</h1>
-            {selectedLevel && <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px', border: `2px solid ${selectedLevel.colour}cc` }}>{selectedLevel.badgeLabel}</span>}
+            {selectedLevel && <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>{selectedLevel.badgeLabel}</span>}
           </div>
           <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>

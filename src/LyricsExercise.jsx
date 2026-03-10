@@ -31,21 +31,15 @@ function parseJsonField(val) {
 const MODES = {
   easy: {
     label: "Easy", emoji: "🎼",
-    sub: "You can see the name of the artist, but what is the lyric and what is the name of the song?",
+    sub: "You can see the name of the artist — rearrange the lyric and name the song.",
     border: "#48bb78", bg: "#f0fff4", colour: "#48bb78", colourLight: "#f0fff4", text: "#276749",
     sublabel: "2 pts max", lyricPts: 1, maxPts: 2, showArtist: true, distractors: false,
   },
   medium: {
     label: "Medium", emoji: "🎸",
-    sub: "What is the lyric, what is the name of the song, and who sang it?",
+    sub: "Rearrange the lyric, then name the song and the artist.",
     border: "#4299e1", bg: "#ebf8ff", colour: "#4299e1", colourLight: "#ebf8ff", text: "#2b6cb0",
     sublabel: "3 pts max", lyricPts: 1, maxPts: 3, showArtist: false, distractors: false,
-  },
-  hard: {
-    label: "Hard", emoji: "🥁",
-    sub: "What is the lyric, what is the name of the song, and who sang it? Extra words included to make it even harder...",
-    border: "#ed8936", bg: "#fffaf0", colour: "#ed8936", colourLight: "#fffaf0", text: "#c05621",
-    sublabel: "4 pts max · lyric worth 2", lyricPts: 2, maxPts: 4, showArtist: false, distractors: true,
   },
 };
 
@@ -111,8 +105,7 @@ export default function LyricsExercise({ user }) {
 
   function buildPool(exercise, m) {
     const words = parseJsonField(exercise?.words);
-    const extras = (m || mode) === "hard" ? parseJsonField(exercise?.distractor_words) : [];
-    setWordPool(shuffle([...words, ...extras]));
+    setWordPool(shuffle([...words]));
   }
 
   function resetRound() {
@@ -161,10 +154,15 @@ export default function LyricsExercise({ user }) {
     setLeaderboard(lb || []);
   }
 
-  const PageHeader = ({ sub }) => (
+  const PageHeader = ({ sub, badge }) => (
     <div style={{ background: GRADIENT, borderRadius: "12px", padding: "2.5rem 2rem 2rem", textAlign: "center", color: "white", marginBottom: "1.5rem" }}>
       <h1 style={{ margin: 0, fontSize: "1.8rem" }}>🎤 Lyrics Mixer</h1>
       <p style={{ margin: "8px 0 0", opacity: 0.9 }}>{sub || "Rearrange the words, then guess the song"}</p>
+      {badge && (
+        <span style={{ display: "inline-block", background: cfg.colour, padding: "4px 14px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: 600, marginTop: "10px", border: `2px solid ${cfg.colour}` }}>
+          {cfg.emoji} {badge}
+        </span>
+      )}
     </div>
   );
 
