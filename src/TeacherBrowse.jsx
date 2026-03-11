@@ -790,21 +790,22 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       if (f.levels.length) q = q.in('level', f.levels);
       if (f.types.length)  q = q.in('type',  f.types);
       if (f.tags.length)   q = q.overlaps('tags', f.tags);
-      if (f.topic)  q = q.ilike('topic', `%${f.topic}%`);
+      if (f.topic) q = q.or(`topic.ilike.%${f.topic}%,question.ilike.%${f.topic}%,explanation.ilike.%${f.topic}%`);
       if (f.qFrom)  q = q.gte('question_number', parseInt(f.qFrom));
       if (f.qTo)    q = q.lte('question_number', parseInt(f.qTo));
       if (f.newOnly && newThreshold) q = q.gte('question_number', newThreshold);
       const { data } = await q.limit(200);
       if (data) data.forEach(r => all.push({ ...r, _source: 'question_bank', _rowKey: `qb_${r.id}` }));
     }
-    if (f.source === 'all' || f.source === 'listening') {
+    // Skip listening/dictation when tag filter is active — tags only exist on question_bank
+    if ((f.source === 'all' || f.source === 'listening') && !f.tags.length) {
       let q = supabase.from('listening_exercises').select('*').order('title');
       if (f.levels.length) q = q.in('level', f.levels);
       if (f.topic) q = q.ilike('topic', `%${f.topic}%`);
       const { data } = await q.limit(100);
       if (data) data.forEach(r => all.push({ ...r, _source: 'listening', _rowKey: `li_${r.id}` }));
     }
-    if (f.source === 'all' || f.source === 'dictation') {
+    if ((f.source === 'all' || f.source === 'dictation') && !f.tags.length) {
       let q = supabase.from('dictation_exercises').select('*').order('title');
       if (f.lang === 'en') q = q.in('language', ['en', 'both']);
       else if (f.lang === 'es') q = q.in('language', ['es', 'both']);
@@ -928,7 +929,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
           />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 220, overflowY: 'auto' }}>
             {visibleTags.map(tag => (
-              <button key={tag} onClick={() => toggleTag(tag)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '3px 7px', borderRadius: 6, border: filters.tags.includes(tag) ? '1px solid #FED7E2' : 'none', background: filters.tags.includes(tag) ? '#FFF5F7' : 'transparent', color: filters.tags.includes(tag) ? '#97266D' : '#4a5568', cursor: 'pointer', fontSize: 11, fontWeight: filters.tags.includes(tag) ? 700 : 400 }}>
+              <button key={tag} onClick={() => toggleTag(tag)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '3px 7px', borderRadius: 6, border: filters.tags.includes(tag) ? '1px solid #CBD5E0' : 'none', background: filters.tags.includes(tag) ? '#EDF2F7' : 'transparent', color: filters.tags.includes(tag) ? '#2d3748' : '#4a5568', cursor: 'pointer', fontSize: 11, fontWeight: filters.tags.includes(tag) ? 700 : 400 }}>
                 {filters.tags.includes(tag) ? '✓' : '○'} {tag}
               </button>
             ))}
@@ -937,8 +938,8 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
         </FilterSection>
       )}
 
-      <FilterSection label="Topic keyword">
-        <input value={filters.topic} onChange={e => setFilter('topic', e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="e.g. comparatives" style={{ width: '100%', padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+      <FilterSection label="Keyword search">
+        <input value={filters.topic} onChange={e => setFilter('topic', e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="e.g. conditional, would have" style={{ width: '100%', padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
       </FilterSection>
 
       {(filters.source === 'all' || filters.source === 'question_bank') && (
@@ -1035,7 +1036,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
               {itemTags.length > 0 && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
                   {itemTags.map(tag => (
-                    <span key={tag} style={{ background: '#FFF5F7', color: '#97266D', border: '1px solid #FED7E2', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 600 }}>{tag}</span>
+                    <span key={tag} style={{ background: '#EDF2F7', color: '#4a5568', border: '1px solid #CBD5E0', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 600 }}>{tag}</span>
                   ))}
                 </div>
               )}
