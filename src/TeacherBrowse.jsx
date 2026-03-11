@@ -11,15 +11,16 @@ const TYPE_INFO = {
   odd_one_out:       { emoji: '🔍',  label: 'Odd One Out' },
   error_correction:  { emoji: '🔴',  label: 'Error Correction' },
   matching:          { emoji: '🔗',  label: 'Matching' },
-  sentence_auction:  { emoji: '🔨', label: 'Sentence Auction' },
+  sentence_auction:  { emoji: '🔨',  label: 'Sentence Auction' },
 };
 
 const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
+// One colour per band — consistent with the rest of the site
 const LEVEL_COLORS = {
-  A1: '#48bb78', A2: '#38a169',
-  B1: '#4299e1', B2: '#2b6cb0',
-  C1: '#ed8936', C2: '#c05621',
+  A1: '#48bb78', A2: '#48bb78',
+  B1: '#4299e1', B2: '#4299e1',
+  C1: '#ed8936', C2: '#ed8936',
 };
 
 const SOURCE_META = {
@@ -31,11 +32,34 @@ const SOURCE_META = {
 const NEW_COUNT = 50;
 
 const ALL_TAGS = [
-  'Phrasal verb', 'Business phrasal verb',
-  'Dependent preposition', 'Preposition of time', 'Preposition of place', 'Preposition of movement', 'Fixed expression',
-  'Collocation', 'Confusable words', 'Uncountable noun', 'Countable noun',
+  // Grammar — verb forms
+  'Present tense', 'Past tense', 'Future form',
+  'Conditional', 'Passive voice', 'Reported speech',
+  'Modal verb', 'Gerund & infinitive', 'Subjunctive',
+  'Wish & regret', 'Causative',
+  // Grammar — sentence structure
+  'Relative clause', 'Participle clause', 'Cleft sentence',
+  'Inversion', 'Linking word', 'Question form',
+  // Grammar — words & forms
+  'Article', 'Quantifier', 'Pronoun', 'Adjective', 'Adverb',
+  'Comparative', 'Superlative', 'Plural', 'Possessive',
+  'To be', 'Have got', 'There is/are', 'Too & enough',
+  'Irregular verb', 'Word formation', 'Time expression',
+  'Preposition', 'Dependent preposition',
+  'Preposition of time', 'Preposition of place', 'Preposition of movement',
+  // Vocabulary
+  'Vocabulary', 'Collocation', 'Phrasal verb', 'Business phrasal verb',
+  'Fixed expression', 'Confusable words',
+  'Uncountable noun', 'Countable noun',
+  // Specialist vocabulary
   'Business vocabulary', 'Financial vocabulary', 'HR vocabulary',
-  'Hotel vocabulary', 'Bathroom vocabulary', 'Vocabulario',
+  'Hotel vocabulary', 'Bathroom vocabulary', 'Academic English',
+  // Register / style
+  'Formal register', 'Making suggestions',
+  // Spanish
+  'Vocabulario',
+  // Other
+  'Pronunciation',
 ];
 
 const SETS_KEY = 'pep_teacher_sets_v1';
@@ -69,27 +93,24 @@ function Badge({ color = '#718096', children, style = {} }) {
     </span>
   );
 }
-// LevelBadge and TagPill/TagBadges are imported from ./components/BadgePill
-function FilterSection({ label, children }) {
+
+function FilterSection({ label, children, collapsible = false, open, onToggle }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: '#a0aec0', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 6 }}>{label}</div>
-      {children}
-    </div>
-  );
-}
-
-function ResultBanner({ state, feedback, correctAnswer, onReset }) {
-  if (state === 'idle' || state === 'checking') return null;
-  const isCorrect = state === 'correct' || state === 'soft';
-  return (
-    <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: isCorrect ? '#f0fff4' : '#fff5f5', border: `2px solid ${isCorrect ? '#48bb78' : '#fc8181'}` }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: isCorrect ? '#276749' : '#c53030', marginBottom: feedback ? 4 : 0 }}>
-        {state === 'correct' ? '✅ Correct!' : state === 'soft' ? '✅ Close enough!' : '❌ Not quite'}
+      <div
+        onClick={collapsible ? onToggle : undefined}
+        style={{
+          fontSize: 10, fontWeight: 700, color: '#a0aec0', letterSpacing: 1.2,
+          textTransform: 'uppercase', marginBottom: collapsible && !open ? 0 : 6,
+          cursor: collapsible ? 'pointer' : 'default',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          userSelect: 'none',
+        }}
+      >
+        <span>{label}</span>
+        {collapsible && <span style={{ fontSize: 9, opacity: 0.7 }}>{open ? '▲' : '▼'}</span>}
       </div>
-      {feedback && <div style={{ fontSize: 13, color: '#4a5568', marginBottom: 6 }}>{feedback}</div>}
-      {!isCorrect && correctAnswer && <div style={{ fontSize: 13, color: '#276749', fontWeight: 600, marginBottom: 6 }}>✔ {correctAnswer}</div>}
-      <button onClick={onReset} style={{ fontSize: 12, color: '#667eea', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700 }}>↺ Try again</button>
+      {(!collapsible || open) && children}
     </div>
   );
 }
@@ -152,7 +173,6 @@ function TeacherCard({ item }) {
         {item.language && item.language !== 'en' && <Badge color="#f6ad55">🌐 {item.language}</Badge>}
         <span style={{ marginLeft: 'auto', color: '#a0aec0', fontSize: 12 }}>Q{item.question_number}</span>
       </div>
-      {/* Tag pills */}
       {item.tags && item.tags.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
           <TagBadges tags={item.tags} />
@@ -212,9 +232,9 @@ const _isFuzzy = (studentAnswer, correctAnswers) => {
   }
   return false;
 };
-const _normaliseEC         = (s) => s.toLowerCase().trim().replace(/\s+/g, ' ');
-const _normaliseDictation  = (s) => s.toLowerCase().trim().replace(/[.,!?;:'"]/g, '').replace(/\s+/g, ' ');
-const _findErrorIndex      = (words, correctAnswer) => {
+const _normaliseEC        = (s) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+const _normaliseDictation = (s) => s.toLowerCase().trim().replace(/[.,!?;:'"]/g, '').replace(/\s+/g, ' ');
+const _findErrorIndex     = (words, correctAnswer) => {
   const cw = correctAnswer.trim().split(/\s+/);
   for (let i = 0; i < Math.max(words.length, cw.length); i++) {
     if (!words[i] || !cw[i] || words[i].toLowerCase() !== cw[i].toLowerCase())
@@ -230,18 +250,29 @@ const _getSbProps = (q) => {
   return { words: options, questionType: hasPrompt ? 'translation' : 'build', prompt: hasPrompt ? q.question : null, correctSentences: [q.correct_answer || ''], explanation: q.explanation || '' };
 };
 
+// Safe parser for matching pairs — catches malformed JSON and unexpected formats
+const _parseMatchingPairs = (options) => {
+  try {
+    const pairs = Array.isArray(options) ? options : JSON.parse(options || '[]');
+    return Array.isArray(pairs) ? pairs : [];
+  } catch (e) {
+    console.warn('Could not parse matching pairs:', e);
+    return [];
+  }
+};
+
 function InteractiveQuestion({ item: q }) {
-  const [feedback,           setFeedback]           = useState(null);
-  const [isChecking,         setIsChecking]          = useState(false);
-  const [userAnswer,         setUserAnswer]          = useState('');
-  const [selectedOption,     setSelectedOption]      = useState(null);
-  const [oooSelected,        setOooSelected]         = useState(null);
-  const [ecSelectedWordIndex,setEcSelectedWordIndex] = useState(null);
-  const [ecCorrection,       setEcCorrection]        = useState('');
-  const [sbFeedback,         setSbFeedback]          = useState(null);
-  const [matchingDone,       setMatchingDone]        = useState(false);
-  const [audioPlayed,        setAudioPlayed]         = useState(false);
-  const [auctionPicks,       setAuctionPicks]        = useState({});
+  const [feedback,            setFeedback]           = useState(null);
+  const [isChecking,          setIsChecking]          = useState(false);
+  const [userAnswer,          setUserAnswer]          = useState('');
+  const [selectedOption,      setSelectedOption]      = useState(null);
+  const [oooSelected,         setOooSelected]         = useState(null);
+  const [ecSelectedWordIndex, setEcSelectedWordIndex] = useState(null);
+  const [ecCorrection,        setEcCorrection]        = useState('');
+  const [sbFeedback,          setSbFeedback]          = useState(null);
+  const [matchingDone,        setMatchingDone]        = useState(false);
+  const [audioPlayed,         setAudioPlayed]         = useState(false);
+  const [auctionPicks,        setAuctionPicks]        = useState({});
   const audioRef = useRef(null);
 
   const reset = () => {
@@ -394,8 +425,8 @@ function InteractiveQuestion({ item: q }) {
     return base;
   };
 
-  const ecWords       = q.type === 'error_correction' ? q.question.trim().split(/\s+/) : [];
-  const matchingPairs = q.type === 'matching' ? (Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]')) : null;
+  const ecWords       = q.type === 'error_correction' ? (q.question || '').trim().split(/\s+/) : [];
+  const matchingPairs = q.type === 'matching' ? _parseMatchingPairs(q.options) : null;
 
   const renderStructuredFeedback = () => {
     if (!feedback || (q.type !== 'gap_fill' && q.type !== 'multiple_choice')) return null;
@@ -444,12 +475,17 @@ function InteractiveQuestion({ item: q }) {
     );
   }
 
+  // Format topic slug for display
+  const topicDisplay = q.topic ? q.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : null;
+
   return (
     <div style={{ backgroundColor: 'white', padding: 'clamp(1.5rem, 5vw, 2.5rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
         <TypeBadge type={q.type} />
         <LevelBadge level={q.level} />
-        {q.type !== 'dictation' && <TopicBadge topic={q.topic} />}
+        {q.type !== 'dictation' && topicDisplay && (
+          <span style={{ background: '#718096', color: 'white', borderRadius: 6, padding: '2px 9px', fontSize: 12, fontWeight: 600 }}>{topicDisplay}</span>
+        )}
         {(q.type === 'error_correction' || q.type === 'gap_fill' || q.type === 'sentence_building' || q.type === 'dictation') && (
           <AiMarkedBadge />
         )}
@@ -602,10 +638,15 @@ function InteractiveQuestion({ item: q }) {
           </div>
         )}
 
-        {q.type === 'matching' && matchingPairs && (
+        {q.type === 'matching' && matchingPairs && matchingPairs.length > 0 && (
           <div>
             {q.question && q.question.trim() && <div style={{ fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500', marginBottom: '1rem', wordWrap: 'break-word' }}>{q.question}</div>}
             <MatchingPairs key={q.id} pairs={matchingPairs} disabled={!!feedback} onResult={handleMatchingResult} />
+          </div>
+        )}
+        {q.type === 'matching' && (!matchingPairs || matchingPairs.length === 0) && (
+          <div style={{ padding: '1rem', background: '#f7fafc', borderRadius: '8px', color: '#718096', fontSize: '0.95rem' }}>
+            ⚠️ Could not load matching pairs for this question.
           </div>
         )}
 
@@ -718,11 +759,19 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
   const [showSetsPanel, setShowSetsPanel] = useState(false);
   const [addToSetId,    setAddToSetId]    = useState('');
   const [newSetName,    setNewSetName]    = useState('');
+  // Collapsible sidebar sections
+  const [typeOpen,  setTypeOpen]  = useState(false);
+  const [tagOpen,   setTagOpen]   = useState(false);
+  const [tagFilter, setTagFilter] = useState('');
 
   const setFilter   = (k, v) => setFilters(f => ({ ...f, [k]: v }));
   const toggleLevel = (lv) => setFilter('levels', filters.levels.includes(lv) ? filters.levels.filter(l => l !== lv) : [...filters.levels, lv]);
   const toggleType  = (tp) => setFilter('types',  filters.types.includes(tp)  ? filters.types.filter(t => t !== tp)  : [...filters.types, tp]);
   const toggleTag   = (tg) => setFilter('tags',   filters.tags.includes(tg)   ? filters.tags.filter(t => t !== tg)   : [...filters.tags, tg]);
+
+  const visibleTags = tagFilter.trim()
+    ? ALL_TAGS.filter(t => t.toLowerCase().includes(tagFilter.toLowerCase()))
+    : ALL_TAGS;
 
   useEffect(() => {
     supabase.from('question_bank').select('question_number').order('question_number', { ascending: false }).limit(1).single()
@@ -854,7 +903,10 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       </FilterSection>
 
       {(filters.source === 'all' || filters.source === 'question_bank') && (
-        <FilterSection label="Type">
+        <FilterSection
+          label={`Type${filters.types.length ? ` (${filters.types.length})` : ''}`}
+          collapsible open={typeOpen} onToggle={() => setTypeOpen(v => !v)}
+        >
           {Object.entries(TYPE_INFO).map(([key, { emoji, label }]) => (
             <button key={key} onClick={() => toggleType(key)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 7px', borderRadius: 6, border: 'none', background: filters.types.includes(key) ? '#edf2ff' : 'transparent', color: filters.types.includes(key) ? '#667eea' : '#4a5568', cursor: 'pointer', marginBottom: 1, fontSize: 12 }}>
               {filters.types.includes(key) ? '✓' : '○'} {emoji} {label}
@@ -864,13 +916,23 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       )}
 
       {(filters.source === 'all' || filters.source === 'question_bank') && (
-        <FilterSection label="Tag">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {ALL_TAGS.map(tag => (
+        <FilterSection
+          label={`Tag${filters.tags.length ? ` (${filters.tags.length})` : ''}`}
+          collapsible open={tagOpen} onToggle={() => setTagOpen(v => !v)}
+        >
+          <input
+            value={tagFilter}
+            onChange={e => setTagFilter(e.target.value)}
+            placeholder="Filter tags…"
+            style={{ width: '100%', padding: '4px 7px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', marginBottom: 5 }}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 220, overflowY: 'auto' }}>
+            {visibleTags.map(tag => (
               <button key={tag} onClick={() => toggleTag(tag)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '3px 7px', borderRadius: 6, border: filters.tags.includes(tag) ? '1px solid #FED7E2' : 'none', background: filters.tags.includes(tag) ? '#FFF5F7' : 'transparent', color: filters.tags.includes(tag) ? '#97266D' : '#4a5568', cursor: 'pointer', fontSize: 11, fontWeight: filters.tags.includes(tag) ? 700 : 400 }}>
                 {filters.tags.includes(tag) ? '✓' : '○'} {tag}
               </button>
             ))}
+            {visibleTags.length === 0 && <span style={{ fontSize: 11, color: '#a0aec0', padding: '3px 7px' }}>No tags match</span>}
           </div>
         </FilterSection>
       )}
@@ -898,7 +960,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       <button onClick={() => search()} disabled={loading} style={{ width: '100%', padding: '9px', background: '#667eea', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
         {loading ? '…' : '🔍 Search'}
       </button>
-      <button onClick={() => { setFilters({ source: 'all', levels: [], types: [], tags: [], topic: '', lang: 'en', qFrom: '', qTo: '', newOnly: false }); setResults([]); setHasSearched(false); setActiveSet(null); setSelected(new Set()); }} style={{ width: '100%', padding: '7px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, cursor: 'pointer', marginTop: 5 }}>
+      <button onClick={() => { setFilters({ source: 'all', levels: [], types: [], tags: [], topic: '', lang: 'en', qFrom: '', qTo: '', newOnly: false }); setResults([]); setHasSearched(false); setActiveSet(null); setSelected(new Set()); setTagFilter(''); }} style={{ width: '100%', padding: '7px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, cursor: 'pointer', marginTop: 5 }}>
         Clear all
       </button>
     </div>
@@ -962,7 +1024,11 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
               {isSel && '✓'}
             </div>
             <div style={{ flexShrink: 0, background: srcMeta.color, color: 'white', borderRadius: 5, padding: '2px 6px', fontSize: 12, marginTop: 1 }}>{srcMeta.emoji}</div>
-            {item.level && <div style={{ flexShrink: 0, background: LEVEL_COLORS[item.level] || '#718096', color: 'white', borderRadius: 5, padding: '2px 7px', fontSize: 11, fontWeight: 700, minWidth: 26, textAlign: 'center', marginTop: 1 }}>{item.level}</div>}
+            {item.level && (
+              <div style={{ flexShrink: 0, background: LEVEL_COLORS[item.level] || '#718096', color: 'white', borderRadius: 5, padding: '2px 7px', fontSize: 11, fontWeight: 700, minWidth: 26, textAlign: 'center', marginTop: 1 }}>
+                {item.level}
+              </div>
+            )}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: '#2d3748', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</div>
               <div style={{ fontSize: 11, color: '#718096', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>
