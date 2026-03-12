@@ -203,8 +203,8 @@ export default function SentenceBuilding({ onBack, onComplete }) {
             </div>
             <div style={{ border: '2px solid #e2e8f0', borderRadius: '8px', padding: '1.5rem', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
-                {q.level && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: q.level.startsWith('A') ? '#276749' : q.level.startsWith('B') ? '#2b6cb0' : '#c05621' }}>{q.level}</div>}
-                {q.topic && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#e8daef', color: '#6c3483' }}>{q.topic.replace(/_/g, ' ').replace(/\w/g, c => c.toUpperCase())}</div>}
+                {q.level && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: q.level.startsWith('A') ? '#c6f6d5' : q.level.startsWith('B') ? '#bee3f8' : '#feebc8', color: q.level.startsWith('A') ? '#276749' : q.level.startsWith('B') ? '#2b6cb0' : '#c05621', border: q.level.startsWith('A') ? '1px solid #48bb78' : q.level.startsWith('B') ? '1px solid #4299e1' : '1px solid #ed8936' }}>{q.level}</div>}
+                {q.topic && <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#e8daef', color: '#6c3483', border: '1px solid #805ad5' }}>{q.topic.replace(/_/g, ' ').replace(/\w/g, c => c.toUpperCase())}</div>}
               </div>
               <SentenceBuildingInput key={currentQ} {...getQuestionProps(q)} disabled={!!feedback} onResult={handleResult} feedback={feedback} showCheckButton={true} onAnswerReady={setHasAnswer} />
               {feedback && (
