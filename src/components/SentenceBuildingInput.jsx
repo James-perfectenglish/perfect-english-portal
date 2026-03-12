@@ -206,12 +206,12 @@ export default function SentenceBuildingInput({
     <div>
       {/* Type badge */}
       {showTypeBadge && questionType === 'translation' && (
-        <div style={{ display: 'inline-block', padding: '3px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '600', marginBottom: '1rem', backgroundColor: '#EDE9FE', color: '#6B21A8' }}>
+        <div style={{ display: 'inline-block', padding: '3px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '600', marginBottom: '1rem', backgroundColor: '#EDE9FE', color: '#6B21A8', border: '1px solid #9F7AEA' }}>
           🇪🇸 Translate
         </div>
       )}
       {showTypeBadge && questionType === 'build' && (
-        <div style={{ display: 'inline-block', padding: '3px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '600', marginBottom: '1rem', backgroundColor: '#DBEAFE', color: '#1E40AF' }}>
+        <div style={{ display: 'inline-block', padding: '3px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '600', marginBottom: '1rem', backgroundColor: '#DBEAFE', color: '#1E40AF', border: '1px solid #60A5FA' }}>
           🔨 Build a sentence
         </div>
       )}
