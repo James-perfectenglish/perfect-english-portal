@@ -1,8 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk';
+const Anthropic = require('@anthropic-ai/sdk');
 
 const client = new Anthropic();
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ valid: false, reason: 'Method not allowed' });
   }
@@ -20,19 +20,19 @@ export default async function handler(req, res) {
       messages: [
         {
           role: 'user',
-          content: `You are validating a single entry for a word-chain vocabulary game.
+          content: `You are validating a single word entry for a fast-paced vocabulary game played by adult English learners.
 
 Category: "${category_name}"
 Category rules: ${ai_prompt}
 
 The student submitted: "${word}"
 
+IMPORTANT: This is a game. Be very generous — err strongly on the side of accepting. Allow humour, slang, informal language, mild swearing, and creative interpretations. Only reject if the entry clearly and obviously does not belong to this category at all. If in doubt, accept it.
+
 Respond with JSON only — no preamble, no markdown:
 {"valid": true, "reason": "brief explanation"}
 or
-{"valid": false, "reason": "brief explanation"}
-
-Be generous with near-correct spellings and minor variations. Only reject if the entry clearly does not belong to this category.`,
+{"valid": false, "reason": "brief explanation"}`,
         },
       ],
     });
@@ -47,4 +47,4 @@ Be generous with near-correct spellings and minor variations. Only reject if the
     console.error('validate-word-snake error:', err);
     return res.status(500).json({ valid: false, reason: 'Validation unavailable — try again' });
   }
-}
+};

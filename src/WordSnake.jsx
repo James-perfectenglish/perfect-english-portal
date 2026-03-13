@@ -40,11 +40,11 @@ function beep(type) {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const SOLO_DURATION  = 60;
-const LONG_MIN       = 7;
-const MILESTONES     = [10, 20, 30];
+const SOLO_DURATION = 60;
+const LONG_MIN      = 7;
+const MILESTONES    = [10, 20, 30];
 
-const lastChar  = (s) => (s || '').trim().replace(/\s+$/, '').slice(-1).toLowerCase();
+const lastChar  = (s) => (s || '').trim().slice(-1).toLowerCase();
 const firstChar = (s) => (s || '').trim()[0]?.toLowerCase() || '';
 const stripped  = (s) => s.replace(/\s/g, '').length;
 const lvlGroup  = (l) => { const u = (l || '').toUpperCase(); return u.startsWith('A') ? 'A' : u.startsWith('B') ? 'B' : 'C'; };
@@ -64,30 +64,34 @@ function catVisible(cat, profileTracks) {
   return (cat.tracks || ['general']).some(t => t === 'general' || pt.includes(t));
 }
 
+// ─── Colours ──────────────────────────────────────────────────────────────────
+const C = {
+  grad:    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  primary: '#667eea',
+  dark:    '#764ba2',
+  light:   '#f0f0ff',
+  border:  '#c3c9f8',
+  chip:    '#e8eaff',
+  chipTxt: '#4c51bf',
+};
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function WordSnake({ user }) {
-  // profile
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile]   = useState(null);
+  const [screen, setScreen]     = useState('menu');
+  const [mode, setMode]         = useState(null);
+  const [cats, setCats]         = useState([]);
+  const [cat, setCat]           = useState(null);
 
-  // nav
-  const [screen, setScreen]   = useState('menu');
-  const [mode, setMode]       = useState(null);
+  const [isHost, setIsHost]               = useState(false);
+  const [roomCode, setRoomCode]           = useState('');
+  const [codeInput, setCodeInput]         = useState('');
+  const [lobbyPlayers, setLobbyPlayers]   = useState([]);
+  const [lobbyError, setLobbyError]       = useState('');
+  const [lobbyDur, setLobbyDur]           = useState(60);
+  const [oppScore, setOppScore]           = useState(null);
+  const [oppName, setOppName]             = useState('');
 
-  // categories
-  const [cats, setCats]       = useState([]);
-  const [cat, setCat]         = useState(null);
-
-  // multiplayer
-  const [isHost, setIsHost]           = useState(false);
-  const [roomCode, setRoomCode]       = useState('');
-  const [codeInput, setCodeInput]     = useState('');
-  const [lobbyPlayers, setLobbyPlayers] = useState([]);
-  const [lobbyError, setLobbyError]   = useState('');
-  const [lobbyDur, setLobbyDur]       = useState(60);
-  const [oppScore, setOppScore]       = useState(null);
-  const [oppName, setOppName]         = useState('');
-
-  // game
   const [chain, setChain]       = useState([]);
   const [myScore, setMyScore]   = useState(0);
   const [timeLeft, setTimeLeft] = useState(SOLO_DURATION);
@@ -95,11 +99,8 @@ export default function WordSnake({ user }) {
   const [feedback, setFeedback] = useState(null);
   const [gameOver, setGameOver] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [lb, setLb]             = useState([]);
 
-  // leaderboard
-  const [lb, setLb] = useState([]);
-
-  // refs
   const timerRef    = useRef(null);
   const inputRef    = useRef(null);
   const chainEndRef = useRef(null);
@@ -111,43 +112,37 @@ export default function WordSnake({ user }) {
   const subRef      = useRef(null);
   const roomCodeRef = useRef('');
 
-  useEffect(() => { chainRef.current  = chain;   }, [chain]);
-  useEffect(() => { myScoreRef.current = myScore; }, [myScore]);
-  useEffect(() => { screenRef.current  = screen;  }, [screen]);
-  useEffect(() => { isHostRef.current  = isHost;  }, [isHost]);
-  useEffect(() => { modeRef.current    = mode;    }, [mode]);
+  useEffect(() => { chainRef.current    = chain;    }, [chain]);
+  useEffect(() => { myScoreRef.current  = myScore;  }, [myScore]);
+  useEffect(() => { screenRef.current   = screen;   }, [screen]);
+  useEffect(() => { isHostRef.current   = isHost;   }, [isHost]);
+  useEffect(() => { modeRef.current     = mode;     }, [mode]);
   useEffect(() => { roomCodeRef.current = roomCode; }, [roomCode]);
 
-  // ── load profile ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     supabase.from('profiles').select('*').eq('id', user.id).single()
       .then(({ data }) => { if (data) setProfile(data); });
   }, [user]);
 
-  // ── load categories ───────────────────────────────────────────────────────
   useEffect(() => {
     supabase.from('word_snake_categories').select('*').order('sort_order')
       .then(({ data }) => { if (data) setCats(data); });
   }, []);
 
-  // ── scroll chain to bottom ────────────────────────────────────────────────
   useEffect(() => { chainEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chain.length]);
 
-  // ── fade out invalid words after 1.8s ────────────────────────────────────
   useEffect(() => {
     if (!chain.some(w => w.valid === false)) return;
     const t = setTimeout(() => setChain(prev => prev.filter(w => w.valid !== false)), 1800);
     return () => clearTimeout(t);
   }, [chain]);
 
-  // ── cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => () => {
     clearInterval(timerRef.current);
     if (subRef.current) supabase.removeChannel(subRef.current);
   }, []);
 
-  // ── timer ─────────────────────────────────────────────────────────────────
   const startTimer = useCallback((seconds) => {
     setTimeLeft(seconds);
     clearInterval(timerRef.current);
@@ -159,7 +154,6 @@ export default function WordSnake({ user }) {
     }, 1000);
   }, []);
 
-  // ── game over: save session, leaderboard, then go to results ──────────────
   useEffect(() => {
     if (!gameOver || screenRef.current !== 'game') return;
     clearInterval(timerRef.current);
@@ -167,7 +161,6 @@ export default function WordSnake({ user }) {
     (async () => {
       const finalScore = myScoreRef.current;
       const finalChain = chainRef.current.filter(w => w.valid !== false);
-
       if (!cat) return;
 
       await supabase.from('word_snake_sessions').insert({
@@ -202,7 +195,6 @@ export default function WordSnake({ user }) {
     setTimeout(() => setScreen('results'), delay);
   }, [gameOver]); // eslint-disable-line
 
-  // ── realtime room subscription ────────────────────────────────────────────
   useEffect(() => {
     if (!roomCode || !mode || mode === 'solo') return;
 
@@ -213,17 +205,13 @@ export default function WordSnake({ user }) {
       }, ({ new: room }) => {
         const state   = room.state || {};
         const players = state.players || {};
-
-        // Update lobby player list
         setLobbyPlayers(Object.values(players));
 
-        // H2H: update opponent score live
         if (modeRef.current === 'h2h') {
           const opp = Object.values(players).find(p => p.id !== user.id);
           if (opp) { setOppScore(opp.score || 0); setOppName(opp.name || 'Opponent'); }
         }
 
-        // Class: sync shared chain + my score
         if (modeRef.current === 'class' && screenRef.current === 'game') {
           const serverChain = (state.chain || []).map(w => ({ ...w, pending: false }));
           setChain(serverChain);
@@ -231,7 +219,6 @@ export default function WordSnake({ user }) {
           if (me) setMyScore(me.score || 0);
         }
 
-        // Game start (non-host)
         if (room.status === 'active' && screenRef.current === 'lobby' && !isHostRef.current) {
           const dur     = room.duration_seconds || 60;
           const elapsed = Math.floor((Date.now() - new Date(room.started_at).getTime()) / 1000);
@@ -244,7 +231,6 @@ export default function WordSnake({ user }) {
           setTimeout(() => inputRef.current?.focus(), 300);
         }
 
-        // Game end (timer ran out on server or host finished)
         if (room.status === 'finished' && !gameOver) setGameOver(true);
       })
       .subscribe();
@@ -253,7 +239,6 @@ export default function WordSnake({ user }) {
     return () => { supabase.removeChannel(ch); };
   }, [roomCode, mode]); // eslint-disable-line
 
-  // ── create room ───────────────────────────────────────────────────────────
   const createRoom = async (m) => {
     const code = randCode();
     const me   = { id: user.id, name: profile?.full_name || 'Host', initials: mkInit(profile?.full_name), score: 0, level_group: lvlGroup(profile?.level) };
@@ -271,7 +256,6 @@ export default function WordSnake({ user }) {
     setMode(m);
   };
 
-  // ── join room ─────────────────────────────────────────────────────────────
   const joinRoom = async () => {
     setLobbyError('');
     const code = codeInput.trim();
@@ -294,23 +278,19 @@ export default function WordSnake({ user }) {
     setScreen('lobby');
   };
 
-  // ── host start game ───────────────────────────────────────────────────────
   const hostStart = async () => {
     const now = new Date().toISOString();
-    // Start locally immediately
     setScreen('game');
     setGameOver(false);
     setChain([]);
     setMyScore(0);
     startTimer(lobbyDur);
     setTimeout(() => inputRef.current?.focus(), 300);
-    // Notify others
     await supabase.from('word_snake_rooms').update({
       status: 'active', started_at: now, duration_seconds: lobbyDur,
     }).eq('room_code', roomCode);
   };
 
-  // ── start solo ────────────────────────────────────────────────────────────
   const startSolo = useCallback((selectedCat) => {
     const c = selectedCat || cat;
     setCat(c);
@@ -325,15 +305,13 @@ export default function WordSnake({ user }) {
     setTimeout(() => inputRef.current?.focus(), 300);
   }, [cat, startTimer]);
 
-  // ── submit word ───────────────────────────────────────────────────────────
   const submitWord = useCallback(async () => {
     const word = input.trim().toLowerCase();
     if (!word || !cat || gameOver || checking) return;
 
-    const valid  = chainRef.current.filter(w => w.valid !== false && !w.pending);
-    const last   = valid[valid.length - 1];
+    const valid = chainRef.current.filter(w => w.valid !== false && !w.pending);
+    const last  = valid[valid.length - 1];
 
-    // letter check
     if (last) {
       const need  = lastChar(last.word);
       const given = firstChar(word);
@@ -346,7 +324,6 @@ export default function WordSnake({ user }) {
       }
     }
 
-    // duplicate check
     if (valid.some(w => w.word === word)) {
       beep('fail');
       setFeedback({ ok: false, word, reason: 'Already used!' });
@@ -356,14 +333,12 @@ export default function WordSnake({ user }) {
     }
 
     setInput('');
-
     const pending = { word, playerId: user.id, playerName: profile?.full_name || 'You', pending: true, valid: null, score: 0 };
     const curMode = modeRef.current;
 
     if (curMode !== 'class') setChain(prev => [...prev, pending]);
     else setChecking(true);
 
-    // AI validation
     try {
       const res    = await fetch('/api/validate-word-snake', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -390,7 +365,6 @@ export default function WordSnake({ user }) {
           setMyScore(newScore);
           beep(isMile ? 'milestone' : isLong ? 'bonus' : 'ok');
           setFeedback({ ok: true, word, pts });
-          // Push score to room
           const { data: row } = await supabase.from('word_snake_rooms').select('state').eq('room_code', roomCodeRef.current).single();
           if (row) {
             const ns = { ...row.state, players: { ...row.state.players, [user.id]: { ...(row.state.players?.[user.id] || {}), score: newScore } } };
@@ -404,11 +378,9 @@ export default function WordSnake({ user }) {
             p_expected_chain_len: serverChain.length,
             p_word_entry:         entry,
           });
-
           if (addResult?.success) {
             beep(isMile ? 'milestone' : isLong ? 'bonus' : 'ok');
             setFeedback({ ok: true, word, pts });
-            // Chain will update via realtime
           } else {
             beep('fail');
             setFeedback({ ok: false, word, reason: addResult?.reason === 'chain_changed' ? 'Someone was faster — try again!' : 'Could not add word' });
@@ -432,7 +404,6 @@ export default function WordSnake({ user }) {
 
   const onKey = (e) => { if (e.key === 'Enter') submitWord(); };
 
-  // ── reset ─────────────────────────────────────────────────────────────────
   const reset = () => {
     clearInterval(timerRef.current);
     if (subRef.current) { supabase.removeChannel(subRef.current); subRef.current = null; }
@@ -442,31 +413,28 @@ export default function WordSnake({ user }) {
     setOppScore(null); setOppName(''); setLobbyError('');
   };
 
-  // ── computed ───────────────────────────────────────────────────────────────
-  const validChain  = chain.filter(w => w.valid !== false);
-  const lastWord    = validChain[validChain.length - 1];
-  const nextLetter  = lastWord ? lastChar(lastWord.word).toUpperCase() : null;
-  const visibleCats = cats.filter(c => catVisible(c, profile?.tracks));
-  const timerColor  = timeLeft <= 10 ? '#e53e3e' : timeLeft <= 20 ? '#ed8936' : '#276749';
+  const validChain = chain.filter(w => w.valid !== false);
+  const lastWord   = validChain[validChain.length - 1];
+  const nextLetter = lastWord ? lastChar(lastWord.word).toUpperCase() : null;
+  const visCats    = cats.filter(c => catVisible(c, profile?.tracks));
+  const timerColor = timeLeft <= 10 ? '#e53e3e' : timeLeft <= 20 ? '#ed8936' : C.primary;
 
-  // ── styles ─────────────────────────────────────────────────────────────────
   const S = {
     page:  { backgroundColor: '#f8f9fa', minHeight: '100vh', padding: '1rem' },
     inner: { maxWidth: 700, margin: '0 auto' },
-    head:  { background: 'linear-gradient(135deg, #38a169 0%, #276749 100%)', borderRadius: 12, padding: '2rem 2rem 1.5rem', color: '#fff', marginBottom: '1.25rem', textAlign: 'center' },
+    head:  { background: C.grad, borderRadius: 12, padding: '2rem 2rem 1.5rem', color: '#fff', marginBottom: '1.25rem', textAlign: 'center' },
     card:  { background: '#fff', borderRadius: 12, padding: '1.5rem', boxShadow: '0 10px 40px rgba(0,0,0,0.12)', marginBottom: '1rem' },
-    btn:   (bg = '#38a169', col = '#fff', extra = {}) => ({ background: bg, color: col, border: 'none', borderRadius: 10, padding: '0.75rem 1.5rem', fontSize: 16, cursor: 'pointer', fontWeight: 600, ...extra }),
+    btn:   (bg = C.primary, col = '#fff', extra = {}) => ({ background: bg, color: col, border: 'none', borderRadius: 10, padding: '0.75rem 1.5rem', fontSize: 16, cursor: 'pointer', fontWeight: 600, ...extra }),
     chip:  (v, p) => ({
       display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px',
       borderRadius: 20, fontSize: 14, fontWeight: 600,
-      background: p ? '#e2e8f0' : v === false ? '#fed7d7' : '#c6f6d5',
-      color:      p ? '#718096' : v === false ? '#c53030' : '#276749',
+      background: p ? '#e2e8f0' : v === false ? '#fed7d7' : C.chip,
+      color:      p ? '#718096' : v === false ? '#c53030' : C.chipTxt,
       textDecoration: v === false ? 'line-through' : 'none',
       opacity: p ? 0.7 : 1, transition: 'all 0.2s',
     }),
   };
 
-  // ─────────────────────────────── MENU ─────────────────────────────────────
   if (screen === 'menu') return (
     <div style={S.page}><div style={S.inner}>
       <div style={S.head}>
@@ -478,9 +446,9 @@ export default function WordSnake({ user }) {
       <div style={S.card}>
         <h2 style={{ margin: '0 0 1rem', color: '#2d3748', fontSize: 18 }}>Choose a mode</h2>
         {[
-          { id: 'solo',  emoji: '🎯', label: 'Solo',          desc: '60 seconds — build the longest chain you can' },
-          { id: 'h2h',   emoji: '⚔️', label: 'Head to Head',  desc: 'Race a friend simultaneously — highest score wins' },
-          { id: 'class', emoji: '👥', label: 'Class Mode',     desc: 'Shared chain — who\'s quickest to grab the next word?' },
+          { id: 'solo',  emoji: '🎯', label: 'Solo',         desc: '60 seconds — build the longest chain you can' },
+          { id: 'h2h',   emoji: '⚔️', label: 'Head to Head', desc: 'Race a friend simultaneously — highest score wins' },
+          { id: 'class', emoji: '👥', label: 'Class Mode',    desc: "Shared chain — who's quickest to grab the next word?" },
         ].map(m => (
           <button key={m.id}
             onClick={() => { setMode(m.id); setScreen('categories'); }}
@@ -500,7 +468,7 @@ export default function WordSnake({ user }) {
           <input value={codeInput} onChange={e => setCodeInput(e.target.value.replace(/\D/g,'').slice(0,4))}
             placeholder="Room code" maxLength={4}
             style={{ flex: 1, padding: '0.75rem', border: '2px solid #e2e8f0', borderRadius: 10, fontSize: 22, textAlign: 'center', letterSpacing: 6, fontWeight: 800, outline: 'none' }} />
-          <button onClick={joinRoom} style={S.btn('#4299e1')}>Join</button>
+          <button onClick={joinRoom} style={S.btn()}>Join</button>
         </div>
         {lobbyError && <div style={{ color: '#e53e3e', marginTop: 8, fontSize: 14 }}>{lobbyError}</div>}
       </div>
@@ -515,24 +483,17 @@ export default function WordSnake({ user }) {
     </div></div>
   );
 
-  // ──────────────────────────── CATEGORIES ──────────────────────────────────
   if (screen === 'categories') return (
     <div style={S.page}><div style={S.inner}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem' }}>
         <button onClick={() => setScreen('menu')} style={S.btn('#e2e8f0', '#2d3748', { padding: '0.5rem 1rem', fontSize: 14 })}>← Back</button>
         <h2 style={{ margin: 0, color: '#2d3748', fontSize: 20 }}>Pick a topic</h2>
       </div>
-
-      {visibleCats.length === 0 && <div style={S.card}>Loading...</div>}
-
+      {visCats.length === 0 && <div style={S.card}>Loading...</div>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(195px, 1fr))', gap: '0.7rem' }}>
-        {visibleCats.map(c => (
+        {visCats.map(c => (
           <button key={c.id}
-            onClick={() => {
-              setCat(c);
-              if (mode === 'solo') startSolo(c);
-              else { setLobbyError(''); setScreen('lobby'); }
-            }}
+            onClick={() => { setCat(c); if (mode === 'solo') startSolo(c); else { setLobbyError(''); setScreen('lobby'); } }}
             style={{ ...S.btn('#fff', '#2d3748', { padding: '0.9rem 1rem', textAlign: 'left', border: '2px solid #e2e8f0', borderRadius: 12, lineHeight: 1.4 }) }}>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{c.name}</div>
             <div style={{ fontSize: 12, color: '#718096', fontWeight: 400 }}>{c.description}</div>
@@ -542,7 +503,6 @@ export default function WordSnake({ user }) {
     </div></div>
   );
 
-  // ─────────────────────────────── LOBBY ────────────────────────────────────
   if (screen === 'lobby') return (
     <div style={S.page}><div style={S.inner}>
       <div style={S.head}>
@@ -551,7 +511,6 @@ export default function WordSnake({ user }) {
         <div style={{ opacity: 0.85, fontSize: 14 }}>{cat?.name}</div>
       </div>
 
-      {/* Create / join form */}
       {!roomCode && (
         <div style={S.card}>
           {mode === 'class' && (
@@ -560,72 +519,61 @@ export default function WordSnake({ user }) {
               <div style={{ display: 'flex', gap: 8 }}>
                 {[30, 60, 90, 120].map(d => (
                   <button key={d} onClick={() => setLobbyDur(d)}
-                    style={S.btn(lobbyDur === d ? '#38a169' : '#e2e8f0', lobbyDur === d ? '#fff' : '#2d3748', { padding: '0.4rem 0.9rem', fontSize: 14 })}>
+                    style={S.btn(lobbyDur === d ? C.primary : '#e2e8f0', lobbyDur === d ? '#fff' : '#2d3748', { padding: '0.4rem 0.9rem', fontSize: 14 })}>
                     {d}s
                   </button>
                 ))}
               </div>
             </div>
           )}
-          <button onClick={() => createRoom(mode)} style={{ ...S.btn('#38a169'), width: '100%', fontSize: 16, padding: '0.85rem' }}>
-            Create room
-          </button>
+          <button onClick={() => createRoom(mode)} style={{ ...S.btn(), width: '100%', fontSize: 16, padding: '0.85rem' }}>Create room</button>
           <div style={{ textAlign: 'center', color: '#718096', fontSize: 13, margin: '0.75rem 0' }}>or join with a code</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <input value={codeInput} onChange={e => setCodeInput(e.target.value.replace(/\D/g,'').slice(0,4))}
               placeholder="Room code" maxLength={4}
               style={{ flex: 1, padding: '0.75rem', border: '2px solid #e2e8f0', borderRadius: 10, fontSize: 22, textAlign: 'center', letterSpacing: 6, fontWeight: 800, outline: 'none' }} />
-            <button onClick={joinRoom} style={S.btn('#4299e1')}>Join</button>
+            <button onClick={joinRoom} style={S.btn()}>Join</button>
           </div>
           {lobbyError && <div style={{ color: '#e53e3e', marginTop: 8, fontSize: 14 }}>{lobbyError}</div>}
         </div>
       )}
 
-      {/* Room is open */}
       {roomCode && (<>
         <div style={{ ...S.card, textAlign: 'center', padding: '1.25rem' }}>
           <div style={{ fontSize: 13, color: '#718096', marginBottom: 6 }}>Share this code</div>
-          <div style={{ fontSize: 56, fontWeight: 900, letterSpacing: 14, color: '#38a169', lineHeight: 1 }}>{roomCode}</div>
+          <div style={{ fontSize: 56, fontWeight: 900, letterSpacing: 14, background: C.grad, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1 }}>{roomCode}</div>
         </div>
-
         <div style={S.card}>
           <div style={{ fontWeight: 700, color: '#2d3748', marginBottom: 10, fontSize: 15 }}>Players — {lobbyPlayers.length}</div>
           {lobbyPlayers.length === 0
             ? <div style={{ color: '#718096', fontSize: 14 }}>Waiting for players to join...</div>
             : lobbyPlayers.map((p, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#38a169', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
-                  {p.initials || '?'}
-                </div>
+                <div style={{ width: 34, height: 34, borderRadius: '50%', background: C.grad, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>{p.initials || '?'}</div>
                 <span style={{ fontSize: 15 }}>{p.name}</span>
               </div>
             ))
           }
         </div>
-
         {isHost && (
           mode === 'h2h'
             ? lobbyPlayers.length >= 2
-              ? <button onClick={hostStart} style={{ ...S.btn('#38a169'), width: '100%', fontSize: 17, padding: '0.9rem' }}>Start ▶</button>
+              ? <button onClick={hostStart} style={{ ...S.btn(), width: '100%', fontSize: 17, padding: '0.9rem' }}>Start ▶</button>
               : <div style={{ ...S.card, textAlign: 'center', color: '#718096', fontSize: 15 }}>Waiting for your opponent to join...</div>
             : <button onClick={hostStart} disabled={lobbyPlayers.length < 2}
-                style={{ ...S.btn(lobbyPlayers.length < 2 ? '#cbd5e0' : '#38a169'), width: '100%', fontSize: 17, padding: '0.9rem' }}>
+                style={{ ...S.btn(lobbyPlayers.length < 2 ? '#cbd5e0' : C.primary), width: '100%', fontSize: 17, padding: '0.9rem' }}>
                 {lobbyPlayers.length < 2 ? 'Waiting for students...' : `Start class (${lobbyPlayers.length} players) ▶`}
               </button>
         )}
-        {!isHost && (
-          <div style={{ ...S.card, textAlign: 'center', color: '#718096', fontSize: 15 }}>⏳ Waiting for the host to start...</div>
-        )}
+        {!isHost && <div style={{ ...S.card, textAlign: 'center', color: '#718096', fontSize: 15 }}>⏳ Waiting for the host to start...</div>}
       </>)}
 
       <button onClick={reset} style={{ ...S.btn('#e2e8f0', '#4a5568', { fontSize: 14, marginTop: 8 }) }}>← Menu</button>
     </div></div>
   );
 
-  // ─────────────────────────────── GAME ─────────────────────────────────────
   if (screen === 'game') return (
     <div style={S.page}><div style={S.inner}>
-      {/* Header */}
       <div style={{ ...S.head, padding: '1.1rem 1.5rem', textAlign: 'left' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
@@ -633,26 +581,23 @@ export default function WordSnake({ user }) {
             <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1 }}>{myScore} <span style={{ fontSize: 16, opacity: 0.8, fontWeight: 400 }}>pts</span></div>
             <div style={{ fontSize: 12, opacity: 0.75, marginTop: 3 }}>{validChain.length} word{validChain.length !== 1 ? 's' : ''}</div>
           </div>
-
           {mode === 'h2h' && oppName && (
             <div style={{ textAlign: 'center', opacity: 0.9 }}>
               <div style={{ fontSize: 11, opacity: 0.8 }}>{oppName.split(' ')[0]}</div>
               <div style={{ fontSize: 22, fontWeight: 700 }}>{oppScore ?? '–'}</div>
             </div>
           )}
-
           <div style={{ width: 68, height: 68, borderRadius: '50%', border: `4px solid ${timerColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800, color: timerColor, background: 'rgba(255,255,255,0.15)', flexShrink: 0, transition: 'color 0.3s, border-color 0.3s' }}>
             {fmtTime(timeLeft)}
           </div>
         </div>
       </div>
 
-      {/* Class mode: live scoreboard */}
       {mode === 'class' && lobbyPlayers.length > 0 && (
         <div style={{ ...S.card, padding: '0.7rem 1rem' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
             {[...lobbyPlayers].sort((a, b) => (b.score || 0) - (a.score || 0)).map((p, i) => (
-              <span key={i} style={{ fontSize: 14, fontWeight: 700, color: p.id === user.id ? '#276749' : '#4a5568' }}>
+              <span key={i} style={{ fontSize: 14, fontWeight: 700, color: p.id === user.id ? C.primary : '#4a5568' }}>
                 {p.initials}: {p.score || 0}
               </span>
             ))}
@@ -660,25 +605,22 @@ export default function WordSnake({ user }) {
         </div>
       )}
 
-      {/* Next letter prompt */}
-      <div style={{ ...S.card, padding: '0.75rem 1rem', background: nextLetter ? '#f0fff4' : '#ebf8ff', border: `2px solid ${nextLetter ? '#9ae6b4' : '#90cdf4'}`, textAlign: 'center' }}>
+      <div style={{ ...S.card, padding: '0.75rem 1rem', background: C.light, border: `2px solid ${C.border}`, textAlign: 'center' }}>
         {nextLetter
-          ? <span style={{ color: '#276749', fontSize: 16 }}>Next word must start with <strong style={{ fontSize: 26 }}>{nextLetter}</strong></span>
-          : <span style={{ color: '#2b6cb0', fontSize: 14 }}>👆 Type any word in the category to start the chain</span>
+          ? <span style={{ color: C.dark, fontSize: 16 }}>Next word must start with <strong style={{ fontSize: 26 }}>{nextLetter}</strong></span>
+          : <span style={{ color: C.dark, fontSize: 14 }}>👆 Type any word in the category to start the chain</span>
         }
       </div>
 
-      {/* Feedback */}
       {feedback && (
         <div style={{ ...S.card, padding: '0.7rem 1rem', background: feedback.ok ? '#f0fff4' : '#fff5f5', border: `1px solid ${feedback.ok ? '#9ae6b4' : '#feb2b2'}`, color: feedback.ok ? '#276749' : '#c53030', fontSize: 14 }}>
           {feedback.ok
-            ? <span>✅ <strong>{feedback.word}</strong> +{feedback.pts}{feedback.pts > 1 ? `pt${feedback.pts !== 1 ? 's' : ''}` : 'pt'}{feedback.isMile ? ' 🎉 milestone!' : feedback.isLong ? ' 🔥 long word bonus!' : ''}</span>
+            ? <span>✅ <strong>{feedback.word}</strong> +{feedback.pts}pt{feedback.pts !== 1 ? 's' : ''}{feedback.isMile ? ' 🎉 milestone!' : feedback.isLong ? ' 🔥 long word bonus!' : ''}</span>
             : <span>❌ <strong>{feedback.word}</strong> — {feedback.reason}</span>
           }
         </div>
       )}
 
-      {/* Chain */}
       <div style={{ ...S.card, maxHeight: 240, overflowY: 'auto', padding: '1rem' }}>
         {chain.length === 0
           ? <div style={{ color: '#a0aec0', textAlign: 'center', fontSize: 14 }}>Your chain will appear here...</div>
@@ -700,35 +642,33 @@ export default function WordSnake({ user }) {
         }
       </div>
 
-      {/* Input */}
       {!gameOver ? (
         <div style={S.card}>
           <div style={{ display: 'flex', gap: 8 }}>
             <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={onKey}
               placeholder={nextLetter ? `Word starting with ${nextLetter}…` : 'Type a word…'}
               disabled={checking} autoFocus
-              style={{ flex: 1, padding: '0.875rem 1rem', border: `2px solid ${nextLetter ? '#9ae6b4' : '#e2e8f0'}`, borderRadius: 10, fontSize: 18, outline: 'none', background: checking ? '#f7fafc' : '#fff' }} />
+              style={{ flex: 1, padding: '0.875rem 1rem', border: `2px solid ${nextLetter ? C.border : '#e2e8f0'}`, borderRadius: 10, fontSize: 18, outline: 'none', background: checking ? '#f7fafc' : '#fff' }} />
             <button onClick={submitWord} disabled={!input.trim() || checking}
-              style={S.btn(!input.trim() || checking ? '#cbd5e0' : '#38a169', '#fff', { padding: '0.875rem 1.25rem', fontSize: 22 })}>
+              style={S.btn(!input.trim() || checking ? '#cbd5e0' : C.primary, '#fff', { padding: '0.875rem 1.25rem', fontSize: 22 })}>
               ↵
             </button>
           </div>
           {checking && <div style={{ fontSize: 13, color: '#718096', marginTop: 6 }}>Checking...</div>}
         </div>
       ) : (
-        <div style={{ ...S.card, textAlign: 'center', background: '#f0fff4' }}>
+        <div style={{ ...S.card, textAlign: 'center', background: C.light }}>
           <div style={{ fontSize: 28, marginBottom: 8 }}>⏱️ Time's up!</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: '#276749' }}>{myScore} pts</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: C.dark }}>{myScore} pts</div>
           <div style={{ fontSize: 14, color: '#4a5568', marginTop: 4 }}>{validChain.length} words</div>
         </div>
       )}
     </div></div>
   );
 
-  // ─────────────────────────────── RESULTS ──────────────────────────────────
   if (screen === 'results') {
     const finalChain = chain.filter(w => w.valid !== false);
-    const won = mode === 'h2h' && oppScore !== null && myScore > oppScore;
+    const won  = mode === 'h2h' && oppScore !== null && myScore > oppScore;
     const lost = mode === 'h2h' && oppScore !== null && myScore < oppScore;
 
     return (
@@ -740,9 +680,8 @@ export default function WordSnake({ user }) {
         </div>
 
         <div style={{ ...S.card, textAlign: 'center' }}>
-          <div style={{ fontSize: 56, fontWeight: 900, color: '#276749', lineHeight: 1 }}>{myScore}</div>
+          <div style={{ fontSize: 56, fontWeight: 900, background: C.grad, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1 }}>{myScore}</div>
           <div style={{ fontSize: 15, color: '#718096', marginTop: 4 }}>points · {finalChain.length} word{finalChain.length !== 1 ? 's' : ''}</div>
-
           {mode === 'h2h' && oppName && (
             <div style={{ marginTop: 14, padding: '0.9rem', background: '#f7fafc', borderRadius: 10 }}>
               <div style={{ fontSize: 13, color: '#718096', marginBottom: 4 }}>{oppName}</div>
@@ -761,7 +700,7 @@ export default function WordSnake({ user }) {
               {finalChain.map((w, i) => (
                 <span key={i} style={S.chip(true, false)}>
                   {w.word}
-                  {i < finalChain.length - 1 && <span style={{ color: '#9ae6b4', marginLeft: 3, fontSize: 12 }}>›</span>}
+                  {i < finalChain.length - 1 && <span style={{ color: C.border, marginLeft: 3, fontSize: 12 }}>›</span>}
                 </span>
               ))}
             </div>
@@ -787,11 +726,8 @@ export default function WordSnake({ user }) {
         )}
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {mode === 'solo' && (
-            <button onClick={() => startSolo(cat)} style={{ ...S.btn('#38a169'), flex: 1 }}>Play again</button>
-          )}
-          <button onClick={() => { setScreen('categories'); }}
-            style={{ ...S.btn('#4299e1'), flex: 1 }}>Change topic</button>
+          {mode === 'solo' && <button onClick={() => startSolo(cat)} style={{ ...S.btn(), flex: 1 }}>Play again</button>}
+          <button onClick={() => setScreen('categories')} style={{ ...S.btn(C.grad), flex: 1 }}>Change topic</button>
           <button onClick={reset} style={{ ...S.btn('#e2e8f0', '#4a5568'), flex: 1 }}>Menu</button>
         </div>
       </div></div>
