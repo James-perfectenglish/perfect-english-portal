@@ -28,7 +28,7 @@ const ACTIVE_EXERCISES = new Set([
   'Borrás Flashcards', 'Borrás Memory Game',
   'Hotel Flashcards', 'Hotel Memory Game',
   'Odd One Out', 'Error Correction',
-  'Matching', 'Sentence Auction', 'Lyrics Mixer', 'Blurt!',
+  'Matching', 'Sentence Auction', 'Lyrics Mixer', 'Blurt!', 'Word Snake',
 ])
 
 const EXERCISE_ICONS = {
@@ -55,6 +55,7 @@ const EXERCISE_ICONS = {
   'Sentence Auction':             '🏛️',
   'Lyrics Mixer':                 '🎤',
   'Blurt!':                       '⏱️',
+  'Word Snake':                   '🐍',
 }
 
 const TABS = [
@@ -158,8 +159,9 @@ export default function ExerciseList({
   const startExercise = (exercise) => {
     if (!ACTIVE_EXERCISES.has(exercise.title)) return
     recordOpen(exercise.title)
-    if (exercise.title === 'Lyrics Mixer') { navigate('/lyrics'); return }
-    if (exercise.type === 'blurt') { navigate('/blurt'); return }
+    if (exercise.title === 'Lyrics Mixer') { navigate('/lyrics');     return }
+    if (exercise.type === 'blurt')         { navigate('/blurt');      return }
+    if (exercise.title === 'Word Snake')   { navigate('/wordsnake');  return }
     setActiveExercise(exercise)
   }
 

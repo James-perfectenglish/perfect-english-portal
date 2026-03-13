@@ -11,6 +11,7 @@ import TeacherDashboard from './TeacherDashboard'
 import LyricsExercise from './LyricsExercise'
 import Blurt from './Blurt'
 import TeacherBrowse from './TeacherBrowse'
+import WordSnake from './WordSnake'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -115,6 +116,7 @@ function Dashboard({ session }) {
         <Route path="/blurt"          element={<Blurt user={session.user} />} />
         <Route path="/teacher"        element={isTeacher ? <TeacherDashboard profile={profile} handleLogout={handleLogout} globalLang={globalLang} onToggleLang={toggleLang} onBrowseClick={() => navigate('/teacher/browse')} onHomeClick={() => navigate('/')} /> : <Navigate to="/" />} />
         <Route path="/teacher/browse" element={isTeacher ? <TeacherBrowse user={session.user} globalLang={globalLang} /> : <Navigate to="/" />} />
+        <Route path="/wordsnake" element={<WordSnake user={session.user} />} />
       </Routes>
     </div>
   )
