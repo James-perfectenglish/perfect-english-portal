@@ -1,11 +1,7 @@
-const Anthropic = require('@anthropic-ai/sdk');
+// api/validate-word-snake.js
 
-const client = new Anthropic();
-
-module.exports = async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ valid: false, reason: 'Method not allowed' });
-  }
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).end();
 
   const { word, category_name, ai_prompt } = req.body;
 
@@ -13,38 +9,47 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ valid: false, reason: 'Missing required fields' });
   }
 
-  try {
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 150,
-      messages: [
-        {
-          role: 'user',
-          content: `You are validating a single word entry for a fast-paced vocabulary game played by adult English learners.
+  const prompt = `You are validating a single word entry for a fast-paced vocabulary game played by adult English learners.
 
 Category: "${category_name}"
 Category rules: ${ai_prompt}
 
 The student submitted: "${word}"
 
-IMPORTANT: This is a game. Be very generous — err strongly on the side of accepting. Allow humour, slang, informal language, mild swearing, and creative interpretations. Only reject if the entry clearly and obviously does not belong to this category at all. If in doubt, accept it.
+GENERAL RULES:
+- This is a game. Be very generous — err strongly on the side of accepting.
+- Allow humour, slang, informal language, mild swearing, and creative interpretations.
+- Only reject if the entry clearly and obviously does not belong to this category at all.
+- If in doubt, accept it.
 
-Respond with JSON only — no preamble, no markdown:
+Return ONLY a valid JSON object with no other text, preamble or markdown:
 {"valid": true, "reason": "brief explanation"}
 or
-{"valid": false, "reason": "brief explanation"}`,
-        },
-      ],
+{"valid": false, "reason": "brief explanation"}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 150,
+        messages: [{ role: 'user', content: prompt }],
+      }),
     });
 
-    const raw = message.content[0].text.trim().replace(/```json|```/g, '').trim();
-    const result = JSON.parse(raw);
-    return res.status(200).json({
-      valid: Boolean(result.valid),
-      reason: result.reason || '',
-    });
+    const data = await response.json();
+    const raw = data.content[0].text.trim();
+    const clean = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const result = JSON.parse(clean);
+
+    res.json({ valid: Boolean(result.valid), reason: result.reason || '' });
   } catch (err) {
     console.error('validate-word-snake error:', err);
-    return res.status(500).json({ valid: false, reason: 'Validation unavailable — try again' });
+    res.status(500).json({ valid: false, reason: 'Validation unavailable — try again' });
   }
-};
+}
