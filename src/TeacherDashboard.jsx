@@ -344,7 +344,7 @@ export default function TeacherDashboard({ profile, handleLogout, globalLang, on
             onClick={() => setPrivateMode(m => !m)}
             style={{ height: '34px', padding: '0 10px', borderRadius: '8px', border: `2px solid ${privateMode ? '#667eea' : '#e2e8f0'}`, background: privateMode ? '#667eea' : 'white', color: privateMode ? 'white' : '#718096', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600', transition: 'all 0.2s', whiteSpace: 'nowrap' }}
           >
-            {privateMode ? '🔒 Private' : '👁 Public'}
+            {privateMode ? '🔒 Private' : 'Public'}
           </button>
           {privateMode && (
             <button
@@ -371,7 +371,7 @@ export default function TeacherDashboard({ profile, handleLogout, globalLang, on
       {/* PUBLIC MODE */}
       {!privateMode && (
         <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '1rem' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: '0 0 1rem' }}>👁️ Public View — Class Overview</h2>
+          <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: '0 0 1rem' }}>Public View — Class Overview</h2>
           <p style={{ fontSize: '0.85rem', color: '#718096', marginBottom: '1rem', background: '#f7fafc', padding: '0.75rem', borderRadius: '8px' }}>
             Screen-share safe — shows initials only, no individual performance data visible.
           </p>
