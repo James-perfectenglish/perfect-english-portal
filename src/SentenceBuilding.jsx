@@ -26,11 +26,33 @@ export default function SentenceBuilding({ onBack, onComplete }) {
   const [score, setScore] = useState(0);
   const [feedback, setFeedback] = useState(null);
   const [hasAnswer, setHasAnswer] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
 
-  useEffect(() => { fetchCounts(); }, []);
+  const isSpanish = userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
+
+  useEffect(() => { fetchCounts(); fetchUserProfile(); }, []);
+
+  useEffect(() => {
+    if (!userProfile) return;
+    if (isSpanish && stage === 'level-select') {
+      setStage('loading');
+      fetchQuestions([]);
+    }
+  }, [userProfile]);
+
+  const fetchUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from('profiles').select('level, tracks').eq('id', user.id).single();
+      if (data) setUserProfile(data);
+    } catch (e) { console.error(e); }
+  };
 
   const fetchCounts = async () => {
-    const { data } = await supabase.from('question_bank').select('level').eq('type', 'sentence_building');
+    const { data } = await supabase.from('question_bank').select('level')
+      .eq('type', 'sentence_building')
+      .in('language', ['en', 'both']);
     if (data) {
       const counts = {};
       LEVELS.forEach(lv => { counts[lv.key] = data.filter(q => lv.dbLevels.includes(q.level)).length; });
@@ -44,7 +66,12 @@ export default function SentenceBuilding({ onBack, onComplete }) {
   };
 
   const fetchQuestions = async (dbLevels) => {
-    const { data, error } = await supabase.from('question_bank').select('*').eq('type', 'sentence_building').in('level', dbLevels);
+    const spanish = dbLevels.length === 0;
+    let query = supabase.from('question_bank').select('*')
+      .eq('type', 'sentence_building')
+      .in('language', spanish ? ['es', 'both'] : ['en', 'both']);
+    if (!spanish && dbLevels.length > 0) query = query.in('level', dbLevels);
+    const { data, error } = await query;
     if (error) { console.error('Error fetching questions:', error); setStage('playing'); return; }
     if (data && data.length > 0) {
       const translation = shuffleArray(data.filter(q => q.question && q.question.trim() !== ''));
@@ -72,20 +99,25 @@ export default function SentenceBuilding({ onBack, onComplete }) {
 
   const nextQuestion = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-    if (currentQ + 1 >= questions.length) { setStage('finished'); }
+    if (currentQ + 1 >= questions.length) setStage('finished');
     else { setCurrentQ(c => c + 1); setFeedback(null); setHasAnswer(false); }
   };
 
   const backToLevelSelect = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-    setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0);
-    setFeedback(null); setHasAnswer(false); setStage('level-select'); fetchCounts();
+    if (isSpanish) {
+      setQuestions([]); setCurrentQ(0); setScore(0); setFeedback(null); setHasAnswer(false);
+      setStage('loading'); fetchQuestions([]);
+    } else {
+      setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0);
+      setFeedback(null); setHasAnswer(false); setStage('level-select'); fetchCounts();
+    }
   };
 
   const restartExercise = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     setCurrentQ(0); setScore(0); setFeedback(null); setHasAnswer(false);
-    setStage('loading'); fetchQuestions(selectedLevel.dbLevels);
+    setStage('loading'); fetchQuestions(isSpanish ? [] : selectedLevel.dbLevels);
   };
 
   const q = questions[currentQ];
@@ -103,31 +135,15 @@ export default function SentenceBuilding({ onBack, onComplete }) {
     };
   };
 
-  // =============================================
-  // LEVEL SELECT SCREEN
-  // =============================================
   if (stage === 'level-select') {
     return (
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
-        <div style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          borderRadius: '12px',
-          padding: '2.5rem 2rem 2rem',
-          textAlign: 'center',
-          color: 'white',
-          position: 'relative',
-          marginBottom: '1.5rem'
-        }}>
+        <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', position: 'relative', marginBottom: '1.5rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Sentence Building</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Build correct sentences by putting words in the right order</p>
         </div>
-        <div style={{
-          background: 'white',
-          padding: '2rem',
-          borderRadius: '12px',
-          boxShadow: '0 10px 40px rgba(0,0,0,0.15)'
-        }}>
+        <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
           <h2 style={{ color: '#2d3748', fontSize: '1.15rem', fontWeight: 600, margin: '0 0 6px', textAlign: 'center' }}>Choose your level</h2>
           <p style={{ color: '#718096', fontSize: '0.9rem', margin: '0 0 24px', textAlign: 'center' }}>Select a difficulty to start practising</p>
           <div style={{ display: 'grid', gap: '16px' }}>
@@ -167,20 +183,10 @@ export default function SentenceBuilding({ onBack, onComplete }) {
     );
   }
 
-  // =============================================
-  // EXERCISE SCREEN (loading / playing / finished)
-  // =============================================
   return (
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
-      <div style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        borderRadius: '12px',
-        padding: '2.5rem 2rem 2rem',
-        textAlign: 'center',
-        color: 'white',
-        position: 'relative'
-      }}>
+      <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', position: 'relative' }}>
         <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Sentence Building</h1>
         <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Drag the words into the correct order to build sentences</p>
         {selectedLevel && <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>{selectedLevel.badgeLabel}</span>}
@@ -192,7 +198,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
             <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📝</div>
             <h2 style={{ color: '#2C3E50', marginBottom: '0.5rem' }}>Coming Soon!</h2>
             <p style={{ color: '#666' }}>Questions for this level are being added.</p>
-            <button onClick={backToLevelSelect} style={{ marginTop: '1rem', padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>← Choose Another Level</button>
+            <button onClick={backToLevelSelect} style={{ marginTop: '1rem', padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>← {isSpanish ? 'Try Again' : 'Choose Another Level'}</button>
           </div>
         )}
         {stage === 'playing' && q && (
@@ -223,7 +229,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
             <p style={{ color: '#4a5568' }}>{score >= 9 ? 'Outstanding! Perfect sentence construction.' : score >= 7 ? 'Great work! Your sentence building is strong.' : score >= 5 ? 'Good effort. Keep practising to improve.' : 'Keep going — practice makes perfect!'}</p>
             <div style={{ marginTop: '20px', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={restartExercise} style={{ padding: '10px 24px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Try Again</button>
-              <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Change Level</button>
+              {!isSpanish && <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Change Level</button>}
               {onBack && <button onClick={onBack} style={{ padding: '10px 24px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', fontSize: '1rem' }}>Back to Exercises</button>}
             </div>
           </div>

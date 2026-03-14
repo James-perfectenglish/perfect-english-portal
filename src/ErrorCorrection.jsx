@@ -62,7 +62,7 @@ const findErrorIndex = (questionWords, correctAnswer) => {
   return { index: -1, correctWord: '' };
 };
 
-const getQuestionLanguage = (question) => question?.topic === 'spanish' ? 'es' : 'en';
+const getQuestionLanguage = (question) => question?.topic === 'spanish' || question?.language === 'es' ? 'es' : 'en';
 
 const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en') => {
   try {
@@ -92,11 +92,34 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
   const [correction, setCorrection] = useState('');
   const [feedback, setFeedback] = useState(null);
   const [isChecking, setIsChecking] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
 
-  useEffect(() => { fetchCounts(); }, []);
+  const isSpanish = userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
+
+  useEffect(() => { fetchCounts(); fetchUserProfile(); }, []);
+
+  // Auto-bypass level select for Spanish students
+  useEffect(() => {
+    if (!userProfile) return;
+    if (isSpanish && stage === 'level-select') {
+      setStage('loading');
+      fetchQuestions([]);
+    }
+  }, [userProfile]);
+
+  const fetchUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from('profiles').select('level, tracks').eq('id', user.id).single();
+      if (data) setUserProfile(data);
+    } catch (e) { console.error(e); }
+  };
 
   const fetchCounts = async () => {
-    let query = supabase.from('question_bank').select('level').eq('type', 'error_correction');
+    let query = supabase.from('question_bank').select('level')
+      .eq('type', 'error_correction')
+      .in('language', ['en', 'both']);
     if (topicFilter) query = query.eq('topic', topicFilter);
     const { data } = await query;
     if (data) {
@@ -113,8 +136,13 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
     fetchQuestions(level.dbLevels);
   };
 
+  // dbLevels === [] signals Spanish mode (no level filter, Spanish language)
   const fetchQuestions = async (dbLevels) => {
-    let query = supabase.from('question_bank').select('*').eq('type', 'error_correction').in('level', dbLevels);
+    const spanish = dbLevels.length === 0;
+    let query = supabase.from('question_bank').select('*')
+      .eq('type', 'error_correction')
+      .in('language', spanish ? ['es', 'both'] : ['en', 'both']);
+    if (!spanish && dbLevels.length > 0) query = query.in('level', dbLevels);
     if (topicFilter) query = query.eq('topic', topicFilter);
     const { data, error } = await query;
     if (error) { console.error('Error:', error); setStage('playing'); return; }
@@ -185,13 +213,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
 
     setIsChecking(true);
     const lang = getQuestionLanguage(q);
-    const aiResult = await aiMarkCorrection(
-      q.question,
-      words[selectedWordIndex],
-      correction.trim(),
-      correctAnswer,
-      lang
-    );
+    const aiResult = await aiMarkCorrection(q.question, words[selectedWordIndex], correction.trim(), correctAnswer, lang);
     setIsChecking(false);
 
     if (aiResult?.valid) {
@@ -223,15 +245,22 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
 
   const backToLevelSelect = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-    setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0);
-    setSelectedWordIndex(null); setCorrection(''); setFeedback(null);
-    setStage('level-select'); fetchCounts();
+    if (isSpanish) {
+      setQuestions([]); setCurrentQ(0); setScore(0);
+      setSelectedWordIndex(null); setCorrection(''); setFeedback(null);
+      setStage('loading'); fetchQuestions([]);
+    } else {
+      setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0);
+      setSelectedWordIndex(null); setCorrection(''); setFeedback(null);
+      setStage('level-select'); fetchCounts();
+    }
   };
 
   const restartExercise = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     setCurrentQ(0); setScore(0); setSelectedWordIndex(null); setCorrection(''); setFeedback(null);
-    setStage('loading'); fetchQuestions(selectedLevel.dbLevels);
+    setStage('loading');
+    fetchQuestions(isSpanish ? [] : selectedLevel.dbLevels);
   };
 
   const q = questions[currentQ];
@@ -247,25 +276,18 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
       transition: 'all 0.15s ease', userSelect: 'none',
       backgroundColor: 'white', border: '2px solid #e2e8f0', color: '#2d3748'
     };
-
     if (feedback) {
       const isPass = feedback.type === 'pass' || feedback.type === 'soft-pass';
-      if (index === feedback.errorIndex && isPass) {
+      if (index === feedback.errorIndex && isPass)
         return { ...base, backgroundColor: '#f0fff4', border: '2px solid #48bb78', color: '#276749', textDecoration: 'line-through', textDecorationColor: '#c53030' };
-      }
-      if (index === feedback.errorIndex && !isPass) {
+      if (index === feedback.errorIndex && !isPass)
         return { ...base, backgroundColor: '#fff5f5', border: '2px solid #f56565', color: '#c53030', textDecoration: 'line-through', textDecorationColor: '#c53030' };
-      }
-      if (index === selectedWordIndex && selectedWordIndex !== feedback.errorIndex) {
+      if (index === selectedWordIndex && selectedWordIndex !== feedback.errorIndex)
         return { ...base, backgroundColor: '#fff5f5', border: '2px solid #f56565', color: '#c53030', opacity: 0.6 };
-      }
       return { ...base, opacity: 0.6 };
     }
-
-    if (index === selectedWordIndex) {
+    if (index === selectedWordIndex)
       return { ...base, backgroundColor: '#EDE9FE', border: '2px solid #667eea', color: '#553C9A' };
-    }
-
     return base;
   };
 
@@ -275,7 +297,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
     fail:        { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c' },
   }[feedback.type] : null;
 
-  // LEVEL SELECT
+  // LEVEL SELECT — only shown for non-Spanish students
   if (stage === 'level-select') {
     return (
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
@@ -345,7 +367,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
             <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>✏️</div>
             <h2 style={{ color: '#2C3E50', marginBottom: '0.5rem' }}>Coming Soon!</h2>
             <p style={{ color: '#666' }}>Questions for this level are being added. Check back soon!</p>
-            <button onClick={backToLevelSelect} style={{ marginTop: '1rem', padding: '0.75rem 1.5rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>← Choose Another Level</button>
+            <button onClick={backToLevelSelect} style={{ marginTop: '1rem', padding: '0.75rem 1.5rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>← {isSpanish ? 'Try Again' : 'Choose Another Level'}</button>
           </div>
         )}
 
@@ -357,7 +379,6 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
             </div>
 
             <div style={{ border: '2px solid #e2e8f0', borderRadius: '8px', padding: '1.5rem', marginBottom: '1.5rem' }}>
-              {/* ── Badges ── */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
                 <LevelBadge level={q.level} />
                 <TopicBadge topic={q.topic} />
@@ -376,38 +397,16 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
                         : 'See the correction below.'}
               </div>
 
-              <div style={{
-                backgroundColor: '#F8FBFF', padding: '1.25rem', borderRadius: '10px',
-                border: '1px solid #AED6F1', lineHeight: '2.4', marginBottom: '1.25rem',
-                display: 'flex', flexWrap: 'wrap', alignItems: 'center'
-              }}>
+              <div style={{ backgroundColor: '#F8FBFF', padding: '1.25rem', borderRadius: '10px', border: '1px solid #AED6F1', lineHeight: '2.4', marginBottom: '1.25rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
                 {questionWords.map((word, index) => (
-                  <span
-                    key={index}
-                    onClick={() => handleWordTap(index)}
-                    style={getWordTileStyle(index)}
-                    onMouseEnter={e => {
-                      if (!feedback && !isChecking && selectedWordIndex !== index) {
-                        e.currentTarget.style.borderColor = '#667eea';
-                        e.currentTarget.style.backgroundColor = '#f7f7ff';
-                      }
-                    }}
-                    onMouseLeave={e => {
-                      if (!feedback && !isChecking && selectedWordIndex !== index) {
-                        e.currentTarget.style.borderColor = '#e2e8f0';
-                        e.currentTarget.style.backgroundColor = 'white';
-                      }
-                    }}
-                  >
-                    {word}
-                  </span>
+                  <span key={index} onClick={() => handleWordTap(index)} style={getWordTileStyle(index)}
+                    onMouseEnter={e => { if (!feedback && !isChecking && selectedWordIndex !== index) { e.currentTarget.style.borderColor = '#667eea'; e.currentTarget.style.backgroundColor = '#f7f7ff'; } }}
+                    onMouseLeave={e => { if (!feedback && !isChecking && selectedWordIndex !== index) { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.backgroundColor = 'white'; } }}
+                  >{word}</span>
                 ))}
-
                 {feedback && feedback.errorIndex >= 0 && (
                   <div style={{ width: '100%', marginTop: '0.75rem', fontSize: '1rem', paddingLeft: '4px' }}>
-                    <span style={{ color: '#c53030', textDecoration: 'line-through', fontWeight: 500 }}>
-                      {questionWords[feedback.errorIndex]}
-                    </span>
+                    <span style={{ color: '#c53030', textDecoration: 'line-through', fontWeight: 500 }}>{questionWords[feedback.errorIndex]}</span>
                     <span style={{ margin: '0 8px', color: '#718096' }}>→</span>
                     <span style={{ color: '#276749', fontWeight: 600 }}>{feedback.correctWord}</span>
                   </div>
@@ -426,32 +425,15 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
                     <div style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       Your correction for "{questionWords[selectedWordIndex]}":
                     </div>
-                    <input
-                      type="text" value={correction}
-                      onChange={(e) => setCorrection(e.target.value)}
+                    <input type="text" value={correction} onChange={(e) => setCorrection(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && checkAnswer()}
-                      placeholder="Type the correct word..."
-                      autoFocus
-                      style={{
-                        width: '100%', padding: '0.9rem 1rem',
-                        fontSize: 'clamp(1rem, 3.5vw, 1.15rem)',
-                        borderRadius: '8px', border: '2px solid #667eea',
-                        boxSizing: 'border-box', color: '#2d3748',
-                        fontWeight: 500, backgroundColor: '#EDE9FE'
-                      }}
-                    />
+                      placeholder="Type the correct word..." autoFocus
+                      style={{ width: '100%', padding: '0.9rem 1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', borderRadius: '8px', border: '2px solid #667eea', boxSizing: 'border-box', color: '#2d3748', fontWeight: 500, backgroundColor: '#EDE9FE' }} />
                   </div>
-                  <button
-                    onClick={checkAnswer}
-                    disabled={!correction.trim()}
-                    style={{
-                      padding: '0 1.5rem',
-                      background: correction.trim() ? GRADIENT : '#cbd5e0',
-                      color: 'white', border: 'none', borderRadius: '8px',
-                      cursor: correction.trim() ? 'pointer' : 'not-allowed',
-                      fontWeight: 600, fontSize: '1rem', alignSelf: 'flex-end', minHeight: '48px'
-                    }}
-                  >Check</button>
+                  <button onClick={checkAnswer} disabled={!correction.trim()}
+                    style={{ padding: '0 1.5rem', background: correction.trim() ? GRADIENT : '#cbd5e0', color: 'white', border: 'none', borderRadius: '8px', cursor: correction.trim() ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '1rem', alignSelf: 'flex-end', minHeight: '48px' }}>
+                    Check
+                  </button>
                 </div>
               )}
 
@@ -462,19 +444,15 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
               )}
 
               {feedback && feedbackStyle && (
-                <div style={{
-                  backgroundColor: feedbackStyle.bg, border: `1px solid ${feedbackStyle.border}`,
-                  color: feedbackStyle.color, padding: '1rem 1.25rem', borderRadius: '10px',
-                  fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: '1.6', marginBottom: '0.75rem'
-                }}>{feedback.message}</div>
+                <div style={{ backgroundColor: feedbackStyle.bg, border: `1px solid ${feedbackStyle.border}`, color: feedbackStyle.color, padding: '1rem 1.25rem', borderRadius: '10px', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: '1.6', marginBottom: '0.75rem' }}>
+                  {feedback.message}
+                </div>
               )}
 
               {feedback && (
-                <button onClick={nextQuestion} style={{
-                  width: '100%', padding: '1rem', marginTop: '0.5rem', fontSize: '1rem',
-                  background: GRADIENT, color: 'white', border: 'none',
-                  borderRadius: '10px', cursor: 'pointer', fontWeight: '600'
-                }}>{currentQ + 1 >= questions.length ? 'See Results' : 'Next Question →'}</button>
+                <button onClick={nextQuestion} style={{ width: '100%', padding: '1rem', marginTop: '0.5rem', fontSize: '1rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '600' }}>
+                  {currentQ + 1 >= questions.length ? 'See Results' : 'Next Question →'}
+                </button>
               )}
             </div>
           </>
@@ -490,7 +468,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
             </p>
             <div style={{ marginTop: '20px', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={restartExercise} style={{ padding: '10px 24px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Try Again</button>
-              <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Change Level</button>
+              {!isSpanish && <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Change Level</button>}
               {onBack && <button onClick={onBack} style={{ padding: '10px 24px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', fontSize: '1rem' }}>Back to Exercises</button>}
             </div>
           </div>

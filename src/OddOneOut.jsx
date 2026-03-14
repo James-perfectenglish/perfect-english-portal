@@ -2,19 +2,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { LevelBadge, TopicBadge } from './components/BadgePill';
 
-// Inject global CSS to kill all browser outlines on option tiles
 const STYLE_ID = 'ooo-focus-fix';
 if (typeof document !== 'undefined' && !document.getElementById(STYLE_ID)) {
   const style = document.createElement('style');
   style.id = STYLE_ID;
-  style.textContent = `
-    .ooo-option, .ooo-option:focus, .ooo-option:focus-visible, .ooo-option:focus-within, 
-    .ooo-option:active, .ooo-option:visited, .ooo-option:target, .ooo-option * { 
-      outline: none !important; 
-      outline-width: 0 !important;
-      -webkit-tap-highlight-color: transparent !important; 
-    }
-  `;
+  style.textContent = `.ooo-option, .ooo-option:focus, .ooo-option:focus-visible, .ooo-option:focus-within, .ooo-option:active, .ooo-option:visited, .ooo-option:target, .ooo-option * { outline: none !important; outline-width: 0 !important; -webkit-tap-highlight-color: transparent !important; }`;
   document.head.appendChild(style);
 }
 
@@ -28,39 +20,9 @@ function shuffleArray(arr) {
 }
 
 const LEVELS = [
-  {
-    key: 'beginner',
-    label: 'Beginner',
-    sublabel: 'A1 – A2',
-    badgeLabel: 'Level: A1-A2',
-    description: 'Basic vocabulary categories — colours, animals, food, everyday objects.',
-    colour: '#48bb78',
-    colourLight: '#f0fff4',
-    dbLevels: ['A1', 'A2'],
-    icon: '🌱'
-  },
-  {
-    key: 'intermediate',
-    label: 'Intermediate',
-    sublabel: 'B1 – B2',
-    badgeLabel: 'Level: B1-B2',
-    description: 'Grammar categories, collocations, phrasal verbs, and word families.',
-    colour: '#4299e1',
-    colourLight: '#ebf8ff',
-    dbLevels: ['B1', 'B2'],
-    icon: '📘'
-  },
-  {
-    key: 'advanced',
-    label: 'Advanced',
-    sublabel: 'C1 – C2',
-    badgeLabel: 'Level: C1-C2',
-    description: 'Subtle distinctions, formal vs informal register, advanced word groups.',
-    colour: '#ed8936',
-    colourLight: '#fffaf0',
-    dbLevels: ['C1', 'C2'],
-    icon: '🎓'
-  }
+  { key: 'beginner', label: 'Beginner', sublabel: 'A1 – A2', badgeLabel: 'Level: A1-A2', description: 'Basic vocabulary categories — colours, animals, food, everyday objects.', colour: '#48bb78', colourLight: '#f0fff4', dbLevels: ['A1', 'A2'], icon: '🌱' },
+  { key: 'intermediate', label: 'Intermediate', sublabel: 'B1 – B2', badgeLabel: 'Level: B1-B2', description: 'Grammar categories, collocations, phrasal verbs, and word families.', colour: '#4299e1', colourLight: '#ebf8ff', dbLevels: ['B1', 'B2'], icon: '📘' },
+  { key: 'advanced', label: 'Advanced', sublabel: 'C1 – C2', badgeLabel: 'Level: C1-C2', description: 'Subtle distinctions, formal vs informal register, advanced word groups.', colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '🎓' }
 ];
 
 const GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
@@ -75,11 +37,33 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
   const [score, setScore] = useState(0);
   const [selected, setSelected] = useState(null);
   const [feedback, setFeedback] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
 
-  useEffect(() => { fetchCounts(); }, []);
+  const isSpanish = userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
+
+  useEffect(() => { fetchCounts(); fetchUserProfile(); }, []);
+
+  useEffect(() => {
+    if (!userProfile) return;
+    if (isSpanish && stage === 'level-select') {
+      setStage('loading');
+      fetchQuestions([]);
+    }
+  }, [userProfile]);
+
+  const fetchUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from('profiles').select('level, tracks').eq('id', user.id).single();
+      if (data) setUserProfile(data);
+    } catch (e) { console.error(e); }
+  };
 
   const fetchCounts = async () => {
-    let query = supabase.from('question_bank').select('level').eq('type', 'odd_one_out');
+    let query = supabase.from('question_bank').select('level')
+      .eq('type', 'odd_one_out')
+      .in('language', ['en', 'both']);
     if (topicFilter) query = query.eq('topic', topicFilter);
     const { data } = await query;
     if (data) {
@@ -97,11 +81,22 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
   };
 
   const fetchQuestions = async (dbLevels) => {
-    let query = supabase.from('question_bank').select('*').eq('type', 'odd_one_out').in('level', dbLevels);
+    const spanish = dbLevels.length === 0;
+    let query = supabase.from('question_bank').select('*')
+      .eq('type', 'odd_one_out')
+      .in('language', spanish ? ['es', 'both'] : ['en', 'both']);
+    if (!spanish && dbLevels.length > 0) query = query.in('level', dbLevels);
     if (topicFilter) query = query.eq('topic', topicFilter);
     const { data, error } = await query;
     if (error) { console.error('Error:', error); setStage('playing'); return; }
-    if (data && data.length > 0) setQuestions(shuffleArray(data).slice(0, QUESTIONS_PER_ROUND));
+    if (data && data.length > 0) {
+      const shuffled = shuffleArray(data).slice(0, QUESTIONS_PER_ROUND);
+      // Shuffle options within each question
+      setQuestions(shuffled.map(q => ({
+        ...q,
+        options: Array.isArray(q.options) ? shuffleArray(q.options) : shuffleArray(JSON.parse(q.options || '[]'))
+      })));
+    }
     setStage('playing');
   };
 
@@ -125,57 +120,38 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
     const q = questions[currentQ];
     const oddOne = q.correct_answer || '';
     const isCorrect = option.toLowerCase().trim() === oddOne.toLowerCase().trim();
-
-    if (isCorrect) {
-      setScore(s => s + 1);
-      setFeedback({ correct: true, oddOne, message: `✅ Correct! "${oddOne}" is the odd one out. ${q.explanation || ''}` });
-    } else {
-      setFeedback({ correct: false, oddOne, message: `❌ Not quite. "${oddOne}" is the odd one out. ${q.explanation || ''}` });
-    }
+    if (isCorrect) setScore(s => s + 1);
+    setFeedback({ correct: isCorrect, oddOne, message: isCorrect ? `✅ Correct! "${oddOne}" is the odd one out. ${q.explanation || ''}` : `❌ Not quite. "${oddOne}" is the odd one out. ${q.explanation || ''}` });
     saveAnswer(q, option, isCorrect);
   };
 
   const nextQuestion = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-    if (currentQ + 1 >= questions.length) { setStage('finished'); }
+    if (currentQ + 1 >= questions.length) setStage('finished');
     else { setCurrentQ(c => c + 1); setSelected(null); setFeedback(null); }
   };
 
   const backToLevelSelect = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-    setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0);
-    setSelected(null); setFeedback(null); setStage('level-select'); fetchCounts();
+    if (isSpanish) {
+      setQuestions([]); setCurrentQ(0); setScore(0); setSelected(null); setFeedback(null);
+      setStage('loading'); fetchQuestions([]);
+    } else {
+      setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0);
+      setSelected(null); setFeedback(null); setStage('level-select'); fetchCounts();
+    }
   };
 
   const restartExercise = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     setCurrentQ(0); setScore(0); setSelected(null); setFeedback(null);
-    setStage('loading'); fetchQuestions(selectedLevel.dbLevels);
+    setStage('loading'); fetchQuestions(isSpanish ? [] : selectedLevel.dbLevels);
   };
 
   const q = questions[currentQ];
 
   const getOptionStyle = (option) => {
-    const base = {
-      padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)',
-      borderRadius: '8px',
-      border: 'none',
-      boxShadow: 'inset 0 0 0 2px #e2e8f0',
-      cursor: feedback ? 'default' : 'pointer',
-      fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)',
-      fontWeight: '500',
-      textAlign: 'center',
-      transition: 'all 0.2s ease',
-      backgroundColor: 'white',
-      color: '#2d3748',
-      minHeight: '55px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      userSelect: 'none',
-      outline: 'none',
-      WebkitTapHighlightColor: 'transparent'
-    };
+    const base = { padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)', borderRadius: '8px', border: 'none', boxShadow: 'inset 0 0 0 2px #e2e8f0', cursor: feedback ? 'default' : 'pointer', fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)', fontWeight: '500', textAlign: 'center', transition: 'all 0.2s ease', backgroundColor: 'white', color: '#2d3748', minHeight: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none', outline: 'none', WebkitTapHighlightColor: 'transparent' };
     if (!feedback) {
       if (selected === option) return { ...base, boxShadow: 'inset 0 0 0 2px #667eea', backgroundColor: '#EDE9FE', color: '#553C9A' };
       return base;
@@ -188,7 +164,6 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
     return { ...base, opacity: 0.5 };
   };
 
-  // LEVEL SELECT
   if (stage === 'level-select') {
     return (
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
@@ -205,12 +180,7 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
               const count = questionCounts[level.key] || 0;
               const available = count > 0;
               return (
-                <div key={level.key} onClick={() => available && selectLevel(level)} style={{
-                  border: `2px solid ${available ? level.colour : '#e2e8f0'}`, borderRadius: '12px', padding: '1.25rem 1.5rem',
-                  cursor: available ? 'pointer' : 'default', background: available ? level.colourLight : '#f9fafb',
-                  opacity: available ? 1 : 0.55, transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                  display: 'flex', alignItems: 'center', gap: '1rem'
-                }}
+                <div key={level.key} onClick={() => available && selectLevel(level)} style={{ border: `2px solid ${available ? level.colour : '#e2e8f0'}`, borderRadius: '12px', padding: '1.25rem 1.5rem', cursor: available ? 'pointer' : 'default', background: available ? level.colourLight : '#f9fafb', opacity: available ? 1 : 0.55, transition: 'transform 0.15s ease, box-shadow 0.15s ease', display: 'flex', alignItems: 'center', gap: '1rem' }}
                   onMouseEnter={e => { if (available) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 4px 16px ${level.colour}30`; } }}
                   onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
@@ -241,7 +211,6 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
     );
   }
 
-  // EXERCISE
   return (
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
@@ -257,7 +226,7 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
             <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🔍</div>
             <h2 style={{ color: '#2C3E50', marginBottom: '0.5rem' }}>Coming Soon!</h2>
             <p style={{ color: '#666' }}>Questions for this level are being added. Check back soon!</p>
-            <button onClick={backToLevelSelect} style={{ marginTop: '1rem', padding: '0.75rem 1.5rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>← Choose Another Level</button>
+            <button onClick={backToLevelSelect} style={{ marginTop: '1rem', padding: '0.75rem 1.5rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>← {isSpanish ? 'Try Again' : 'Choose Another Level'}</button>
           </div>
         )}
         {stage === 'playing' && q && (
@@ -267,7 +236,6 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
               <span>Score: {score}/{questions.length}</span>
             </div>
             <div style={{ border: '2px solid #e2e8f0', borderRadius: '8px', padding: '1.5rem', marginBottom: '1.5rem' }}>
-              {/* ── Badges ── */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
                 <LevelBadge level={q.level} />
                 <TopicBadge topic={q.topic} />
@@ -293,12 +261,10 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
             <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>{score >= 9 ? '🏆' : score >= 7 ? '⭐' : score >= 5 ? '👍' : '💪'}</div>
             <h2 style={{ color: '#2d3748', margin: '0 0 12px' }}>Exercise Complete!</h2>
             <div style={{ fontSize: '3rem', fontWeight: 700, margin: '12px 0', color: score >= 7 ? '#48bb78' : score >= 5 ? '#ed8936' : '#f56565' }}>{score}/{questions.length}</div>
-            <p style={{ color: '#4a5568' }}>
-              {score >= 9 ? 'Outstanding! You really know your word groups.' : score >= 7 ? 'Great work! Strong vocabulary knowledge.' : score >= 5 ? 'Good effort. Keep building your vocabulary.' : 'Keep going — practice makes perfect!'}
-            </p>
+            <p style={{ color: '#4a5568' }}>{score >= 9 ? 'Outstanding! You really know your word groups.' : score >= 7 ? 'Great work! Strong vocabulary knowledge.' : score >= 5 ? 'Good effort. Keep building your vocabulary.' : 'Keep going — practice makes perfect!'}</p>
             <div style={{ marginTop: '20px', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={restartExercise} style={{ padding: '10px 24px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Try Again</button>
-              <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Change Level</button>
+              {!isSpanish && <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Change Level</button>}
               {onBack && <button onClick={onBack} style={{ padding: '10px 24px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', fontSize: '1rem' }}>Back to Exercises</button>}
             </div>
           </div>

@@ -43,19 +43,33 @@ export default function SentenceAuction({ onBack, onComplete }) {
   const [scoreSaved, setScoreSaved] = useState(false);
   const revealTimerRef = useRef(null);
 
+  const isSpanish = userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
+
   useEffect(() => { fetchCounts(); fetchUserProfile(); }, []);
+
+  // Auto-bypass level select for Spanish students
+  useEffect(() => {
+    if (!userProfile) return;
+    if (isSpanish && stage === 'level-select') {
+      setStage('loading');
+      fetchAuctions([]);
+    }
+  }, [userProfile]);
 
   const fetchUserProfile = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase.from('profiles').select('full_name, level').eq('id', user.id).single();
+      const { data } = await supabase.from('profiles').select('full_name, level, tracks').eq('id', user.id).single();
       setUserProfile(data);
     } catch (e) { console.error(e); }
   };
 
   const fetchCounts = async () => {
-    const { data } = await supabase.from('question_bank').select('level').eq('type', 'sentence_auction').neq('topic', 'spanish');
+    const { data } = await supabase.from('question_bank').select('level')
+      .eq('type', 'sentence_auction')
+      .neq('topic', 'spanish')
+      .in('language', ['en', 'both']);
     if (data) {
       const counts = {};
       LEVELS.forEach(lv => { counts[lv.key] = data.filter(q => lv.dbLevels.includes(q.level)).length; });
@@ -70,8 +84,15 @@ export default function SentenceAuction({ onBack, onComplete }) {
     fetchAuctions(level.dbLevels);
   };
 
+  // dbLevels === [] signals Spanish mode
   const fetchAuctions = async (dbLevels) => {
-    const { data, error } = await supabase.from('question_bank').select('*').eq('type', 'sentence_auction').neq('topic', 'spanish').in('level', dbLevels);
+    const spanish = dbLevels.length === 0;
+    let query = supabase.from('question_bank').select('*')
+      .eq('type', 'sentence_auction')
+      .in('language', spanish ? ['es', 'both'] : ['en', 'both']);
+    if (!spanish) query = query.neq('topic', 'spanish');
+    if (!spanish && dbLevels.length > 0) query = query.in('level', dbLevels);
+    const { data, error } = await query;
     if (error) { console.error(error); setStage('bidding'); return; }
     const shuffled = shuffleArray(data || []).slice(0, AUCTIONS_PER_ROUND);
     setAuctions(shuffled);
@@ -146,7 +167,7 @@ export default function SentenceAuction({ onBack, onComplete }) {
   };
 
   const saveLeaderboardScore = async (finalBudget, auctionsCompleted) => {
-    if (scoreSaved) return;
+    if (scoreSaved || isSpanish) return; // no leaderboard for Spanish mode
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -162,6 +183,7 @@ export default function SentenceAuction({ onBack, onComplete }) {
   };
 
   const fetchLeaderboard = async () => {
+    if (isSpanish) return;
     try {
       const { data } = await supabase.from('auction_scores').select('*').order('final_budget', { ascending: false }).limit(100);
       if (!data) return;
@@ -179,11 +201,20 @@ export default function SentenceAuction({ onBack, onComplete }) {
     else { setCurrentIdx(next); resetAuctionState(); setStage('bidding'); }
   };
 
-  const restartRound = () => { window.scrollTo({ top: 0, behavior: 'instant' }); setStage('loading'); fetchAuctions(selectedLevel.dbLevels); };
+  const restartRound = () => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    setStage('loading');
+    fetchAuctions(isSpanish ? [] : selectedLevel.dbLevels);
+  };
+
   const backToLevelSelect = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     clearTimeout(revealTimerRef.current);
-    setSelectedLevel(null); setAuctions([]); setStage('level-select'); fetchCounts();
+    if (isSpanish) {
+      setAuctions([]); setStage('loading'); fetchAuctions([]);
+    } else {
+      setSelectedLevel(null); setAuctions([]); setStage('level-select'); fetchCounts();
+    }
   };
 
   const getParsedSentences = () => {
@@ -199,7 +230,7 @@ export default function SentenceAuction({ onBack, onComplete }) {
     return '#f56565';
   };
 
-  const validForBoard = userProfile && selectedLevel ? isValidForLeaderboard(userProfile.level || 'A1', selectedLevel.key) : false;
+  const validForBoard = !isSpanish && userProfile && selectedLevel ? isValidForLeaderboard(userProfile.level || 'A1', selectedLevel.key) : false;
 
   // ── LEVEL SELECT ────────────────────────────────────────────────────────────
   if (stage === 'level-select') {
@@ -256,7 +287,6 @@ export default function SentenceAuction({ onBack, onComplete }) {
     );
   }
 
-  // ── LOADING ─────────────────────────────────────────────────────────────────
   if (stage === 'loading') {
     return (
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
@@ -272,13 +302,10 @@ export default function SentenceAuction({ onBack, onComplete }) {
     );
   }
 
-  // ── BIDDING + REVEALING + RESULT ─────────────────────────────────────────────
   if (['bidding', 'revealing', 'result'].includes(stage)) {
     const sentences = getParsedSentences();
     const auction = auctions[currentIdx];
     const auctionLevel = auction?.level || '';
-
-    // Level colour for the question context label (topic display, not a badge)
     const levelColourMap = {
       A1: { bg: '#c6f6d5', text: '#276749' }, A2: { bg: '#c6f6d5', text: '#276749' },
       B1: { bg: '#bee3f8', text: '#2b6cb0' }, B2: { bg: '#bee3f8', text: '#2b6cb0' },
@@ -369,7 +396,7 @@ export default function SentenceAuction({ onBack, onComplete }) {
                   }
                   <div style={{ fontSize: '0.9rem', color: '#4a5568' }}>Won: <strong style={{ color: '#276749' }}>+{auctionResult.gained} pta</strong> · Lost: <strong style={{ color: '#c53030' }}>-{auctionResult.lost} pta</strong>{!isBust && <> · Budget: <strong style={{ color: getBudgetColour() }}>{budget.toLocaleString()} pta</strong></>}</div>
                 </div>
-                <button onClick={nextAuction} style={{ width: '100%', padding: '1.1rem', fontSize: '1.1rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }}>{isBust ? '💸 Game Over — See Leaderboard' : currentIdx + 1 >= auctions.length ? 'See Final Results' : 'Next Auction →'}</button>
+                <button onClick={nextAuction} style={{ width: '100%', padding: '1.1rem', fontSize: '1.1rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }}>{isBust ? '💸 Game Over — See Results' : currentIdx + 1 >= auctions.length ? 'See Final Results' : 'Next Auction →'}</button>
               </div>
             )}
           </div>
@@ -378,13 +405,32 @@ export default function SentenceAuction({ onBack, onComplete }) {
     );
   }
 
-  // ── FINISHED ─────────────────────────────────────────────────────────────────
   if (stage === 'finished') {
     const auctionsCompleted = roundResults.length;
     const finalBudget = isBust ? 0 : budget;
     const profit = finalBudget - STARTING_BUDGET;
     const totalGained = roundResults.reduce((a, r) => a + r.gained, 0);
     const totalLost = roundResults.reduce((a, r) => a + r.lost, 0);
+
+    // No questions available for Spanish
+    if (auctions.length === 0) {
+      return (
+        <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
+            <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
+              <h1 style={{ margin: 0, fontSize: '1.8rem' }}>🔨 Sentence Auction</h1>
+            </div>
+            <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', textAlign: 'center' }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🔨</div>
+              <h2 style={{ color: '#2C3E50', marginBottom: '0.5rem' }}>Coming Soon!</h2>
+              <p style={{ color: '#666' }}>Spanish auction questions are being added. Check back soon!</p>
+              {onBack && <button onClick={onBack} style={{ marginTop: '1rem', padding: '0.75rem 1.5rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>← Back to Exercises</button>}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
         <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
@@ -397,7 +443,7 @@ export default function SentenceAuction({ onBack, onComplete }) {
               <div style={{ fontSize: '3rem', marginBottom: '8px' }}>{isBust ? '💸' : profit >= 500 ? '🏆' : profit >= 0 ? '🤑' : '😬'}</div>
               <h2 style={{ color: '#2d3748', margin: '0 0 4px' }}>{isBust ? 'Bust! Better luck next time.' : profit >= 500 ? 'Outstanding!' : profit >= 0 ? 'You made a profit!' : 'Rough round!'}</h2>
               <p style={{ color: '#718096', margin: 0, fontSize: '0.9rem' }}>{isBust ? `You lasted ${auctionsCompleted} auction${auctionsCompleted !== 1 ? 's' : ''} before going bust.` : auctionsCompleted >= auctions.length ? 'You survived all the auctions!' : `Completed ${auctionsCompleted} auctions.`}</p>
-              {!validForBoard && <div style={{ marginTop: '10px', fontSize: '0.85rem', color: '#a0aec0', fontStyle: 'italic' }}>👁 Practice mode — play at your level or above to appear on the leaderboard</div>}
+              {!validForBoard && !isSpanish && <div style={{ marginTop: '10px', fontSize: '0.85rem', color: '#a0aec0', fontStyle: 'italic' }}>👁 Practice mode — play at your level or above to appear on the leaderboard</div>}
               {validForBoard && scoreSaved && <div style={{ marginTop: '10px', fontSize: '0.85rem', color: '#667eea', fontWeight: 500 }}>🏆 Score saved to leaderboard!</div>}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '24px' }}>
@@ -457,7 +503,7 @@ export default function SentenceAuction({ onBack, onComplete }) {
             )}
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={restartRound} style={{ padding: '10px 24px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Try Again</button>
-              <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Change Level</button>
+              {!isSpanish && <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Change Level</button>}
               {onBack && <button onClick={onBack} style={{ padding: '10px 24px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', fontSize: '1rem' }}>Back to Exercises</button>}
             </div>
           </div>
