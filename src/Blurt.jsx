@@ -219,7 +219,6 @@ export default function Blurt({ user }) {
 
   async function finishGame() {
     setView('results');
-    // wait for pending marks (max 8s)
     let waited = 0;
     while (waited < 8000) {
       if (chipsRef.current.every(c => c.status !== 'pending')) break;
@@ -254,7 +253,6 @@ export default function Blurt({ user }) {
     }
   }
 
-  // chip styling
   function chipStyle(status) {
     const base = { borderRadius: '10px', padding: '0.4rem 0.8rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', border: '2px solid', transition: 'background-color 0.2s, border-color 0.2s' };
     if (status === 'pending') return { ...base, backgroundColor: '#f7fafc', borderColor: '#e2e8f0' };
@@ -387,7 +385,9 @@ export default function Blurt({ user }) {
               <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '0.2rem' }}>Blurt!</div>
               <div style={{ color: 'white', fontWeight: 700, fontSize: '1.1rem' }}>{selected?.name}</div>
             </div>
-            <div style={{ fontSize: '2.6rem', fontWeight: 900, color: timerColor, backgroundColor: 'white', borderRadius: '10px', padding: '0.15rem 0.65rem', minWidth: '68px', textAlign: 'center', lineHeight: 1.25, transition: 'color 0.3s' }}>
+
+            {/* Circle timer — matching Word Snake style */}
+            <div style={{ width: 68, height: 68, borderRadius: '50%', border: `4px solid ${timerColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 900, color: timerColor, background: 'rgba(255,255,255,0.15)', flexShrink: 0, transition: 'color 0.3s, border-color 0.3s' }}>
               {timeLeft}
             </div>
           </div>
