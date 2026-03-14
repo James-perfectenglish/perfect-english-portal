@@ -344,7 +344,7 @@ export default function TeacherDashboard({ profile, handleLogout, globalLang, on
             onClick={() => setPrivateMode(m => !m)}
             style={{ height: '34px', padding: '0 10px', borderRadius: '8px', border: `2px solid ${privateMode ? '#667eea' : '#e2e8f0'}`, background: privateMode ? '#667eea' : 'white', color: privateMode ? 'white' : '#718096', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600', transition: 'all 0.2s', whiteSpace: 'nowrap' }}
           >
-            {privateMode ? '🔒 Private' : '👁 Public'}
+            {privateMode ? '🔒 Private' : '👁️ Public'}
           </button>
           {privateMode && (
             <button
