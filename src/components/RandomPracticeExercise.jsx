@@ -122,8 +122,22 @@ const aiMarkDictation = async (correctAnswer, studentAnswer) => {
   } catch (e) { console.error('AI dictation marking error:', e); return null; }
 };
 
-export default function RandomPracticeExercise({ levels, levelTitle, levelSubtitle, gradient, language = 'en', onBack }) {
+export default function RandomPracticeExercise({ levels, levelTitle, levelSubtitle, gradient, language = 'en', userTracks = [], onBack }) {
   const isSpanish = language === 'es';
+
+  // Topics that are restricted to specific tracks
+  const TRACK_TOPICS = {
+    bathroom_vocabulary: 'bathroom',
+    hotel_vocabulary:    'hotels',
+    business_vocabulary: 'business',
+    business_phrasal_verbs: 'business',
+  };
+
+  const isAllowedByTrack = (topic) => {
+    const requiredTrack = TRACK_TOPICS[topic];
+    if (!requiredTrack) return true; // general topic, always allowed
+    return userTracks.includes(requiredTrack);
+  };
 
   const [stage, setStage] = useState('start');
   const [questions, setQuestions] = useState([]);
@@ -236,6 +250,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
       const queryForType = (type) => {
         let q = supabase.from('question_bank').select('*').eq('type', type).in('language', langFilter);
+        if (!isSpanish) q = q.neq('topic', 'spanish');
         if (!isSpanish && levels && levels.length > 0) q = q.in('level', levels);
         return q;
       };
@@ -254,6 +269,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         queryForType('error_correction'),
         (() => {
           let q = supabase.from('question_bank').select('*').eq('type', 'matching').in('language', langFilter).is('sequence_group', null);
+          if (!isSpanish) q = q.neq('topic', 'spanish');
           if (!isSpanish && levels && levels.length > 0) q = q.in('level', levels);
           return q;
         })(),
@@ -264,7 +280,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         throw gfRes.error || mcRes.error || sbRes.error || oooRes.error || ecRes.error || matchRes.error;
       }
 
-      const pick = (data, type) => shuffleArray(data || []).slice(0, QUESTION_MIX[type] || 0).map(q => {
+      const pick = (data, type) => shuffleArray((data || []).filter(q => isAllowedByTrack(q.topic))).slice(0, QUESTION_MIX[type] || 0).map(q => {
         if ((type === 'multiple_choice' || type === 'odd_one_out') && Array.isArray(q.options)) {
           return { ...q, options: shuffleArray(q.options) };
         }

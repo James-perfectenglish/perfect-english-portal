@@ -123,6 +123,7 @@ export default function PracticePage({
         levelSubtitle={selectedLevel.subtitle}
         gradient={selectedLevel.gradient}
         language={selectedLevel.language}
+        userTracks={profile?.tracks || []}
         onBack={() => setSelectedLevel(null)}
       />
     );
