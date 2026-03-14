@@ -84,7 +84,7 @@ const GradHeader = ({ emoji = '🐍', title = 'Word Snake', subtitle = null, sma
 );
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-export default function WordSnake({ user }) {
+export default function WordSnake({ user, profileOverride = null }) {
   const [profile, setProfile]   = useState(null);
   const [screen, setScreen]     = useState('home');
   const [mode, setMode]         = useState(null);
@@ -133,8 +133,11 @@ export default function WordSnake({ user }) {
   useEffect(() => {
     if (!user) return;
     supabase.from('profiles').select('*').eq('id', user.id).single()
-      .then(({ data }) => { if (data) setProfile(data); });
-  }, [user]);
+      .then(({ data }) => {
+        if (profileOverride) setProfile(profileOverride);
+        else if (data) setProfile(data);
+      });
+  }, [user, profileOverride]);
 
   useEffect(() => {
     supabase.from('word_snake_categories').select('*').order('sort_order')

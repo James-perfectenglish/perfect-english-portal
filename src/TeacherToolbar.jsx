@@ -1,7 +1,7 @@
 // TeacherToolbar — drop into any page that needs the teacher controls.
 // Usage:
 //   import TeacherToolbar from './TeacherToolbar'
-//   <TeacherToolbar isTeacher={isTeacher} globalLang={globalLang} onToggleLang={onToggleLang} onBrowseClick={onBrowseClick} onTeacherClick={onTeacherClick} />
+//   <TeacherToolbar isTeacher={isTeacher} teacherTrack={teacherTrack} onCycleTrack={onCycleTrack} onBrowseClick={onBrowseClick} onTeacherClick={onTeacherClick} />
 
 const BTN = {
   height: '34px',
@@ -15,17 +15,35 @@ const BTN = {
   color: '#4a5568',
 }
 
-export default function TeacherToolbar({ isTeacher, globalLang, onToggleLang, onBrowseClick, onTeacherClick }) {
+export const TRACK_CYCLE = ['en', 'spanish', 'bathroom', 'hotels', 'business']
+
+export const TRACK_EMOJI = {
+  en:       '🇬🇧',
+  spanish:  '🇪🇸',
+  bathroom: '🛁',
+  hotels:   '🏨',
+  business: '💼',
+}
+
+export const TRACK_LABEL = {
+  en:       'English (no override)',
+  spanish:  'Spanish track',
+  bathroom: 'Bathroom track',
+  hotels:   'Hotels track',
+  business: 'Business track',
+}
+
+export default function TeacherToolbar({ isTeacher, teacherTrack = 'en', onCycleTrack, onBrowseClick, onTeacherClick }) {
   if (!isTeacher) return null
   return (
     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-      {onToggleLang && (
+      {onCycleTrack && (
         <button
-          onClick={onToggleLang}
-          title={globalLang === 'en' ? 'Switch to Spanish mode' : 'Switch to English mode'}
+          onClick={onCycleTrack}
+          title={`Track: ${TRACK_LABEL[teacherTrack]} — click to cycle`}
           style={{ ...BTN, width: '34px', fontSize: '1.1rem' }}
         >
-          {globalLang === 'en' ? '🇬🇧' : '🇪🇸'}
+          {TRACK_EMOJI[teacherTrack] || '🇬🇧'}
         </button>
       )}
       {onBrowseClick && (

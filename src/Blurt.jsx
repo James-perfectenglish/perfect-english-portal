@@ -51,7 +51,7 @@ const btnPrimary = { background: gradientBg, color: 'white', border: 'none', bor
 const btnSecondary = { backgroundColor: 'white', color: '#667eea', border: '2px solid #667eea', borderRadius: '10px', padding: '0.875rem 1.5rem', fontSize: '1rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' };
 
 // ── Main Component ─────────────────────────────────────────────────────────
-export default function Blurt({ user }) {
+export default function Blurt({ user, profileOverride = null }) {
   const [view, setView] = useState('home');
   const [categories, setCategories] = useState([]);
   const [profile, setProfile] = useState(null);
@@ -80,8 +80,9 @@ export default function Blurt({ user }) {
 
   async function fetchProfile() {
     const { data } = await supabase.from('profiles').select('level, tracks, full_name').eq('id', user.id).single();
-    if (data) setProfile(data);
-    fetchCategories(data?.tracks || [], data?.level);
+    const resolved = profileOverride || data;
+    if (resolved) setProfile(resolved);
+    fetchCategories(resolved?.tracks || [], resolved?.level);
   }
 
   async function fetchCategories(userTracks, userLevel) {

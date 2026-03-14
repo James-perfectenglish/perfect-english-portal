@@ -66,6 +66,8 @@ export default function PracticePage({
   onBrowseClick,
   globalLang,
   onToggleLang,
+  teacherTrack,
+  onCycleTrack,
 }) {
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [survivalMode, setSurvivalMode] = useState(false);
@@ -144,13 +146,13 @@ export default function PracticePage({
               gap: '6px',
               alignItems: 'center',
             }}>
-              {onToggleLang && (
+              {onCycleTrack && (
                 <button
-                  onClick={onToggleLang}
-                  title={globalLang === 'en' ? 'Switch to Spanish mode' : 'Switch to English mode'}
+                  onClick={onCycleTrack}
+                  title={`Track override: ${teacherTrack || 'en'} — click to cycle`}
                   style={{ ...BTN, width: '34px', fontSize: '1.1rem' }}
                 >
-                  {globalLang === 'en' ? '🇬🇧' : '🇪🇸'}
+                  {teacherTrack === 'spanish' ? '🇪🇸' : teacherTrack === 'bathroom' ? '🛁' : teacherTrack === 'hotels' ? '🏨' : teacherTrack === 'business' ? '💼' : '🇬🇧'}
                 </button>
               )}
               {onBrowseClick && (

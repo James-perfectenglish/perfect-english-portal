@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
+import { TRACK_EMOJI, TRACK_LABEL } from './components/TeacherToolbar'
 
 const TYPE_INFO = {
   gap_fill:          { label: 'Gap Fill',          emoji: '✏️' },
@@ -58,14 +59,13 @@ function exportCSV(students) {
   URL.revokeObjectURL(url)
 }
 
-export default function TeacherDashboard({ profile, handleLogout, globalLang, onToggleLang, onBrowseClick, onHomeClick }) {
+export default function TeacherDashboard({ profile, handleLogout, globalLang, onToggleLang, onBrowseClick, onHomeClick, teacherTrack = 'en', onCycleTrack }) {
   const [students, setStudents]         = useState([])
   const [loading, setLoading]           = useState(true)
   const [privateMode, setPrivateMode]   = useState(false)
   const [sortKey, setSortKey]           = useState('lastActive')
   const [sortDir, setSortDir]           = useState('desc')
 
-  // Word of the Day state
   const [wotdSubmissions, setWotdSubmissions] = useState([])
   const [wotdWords, setWotdWords]             = useState([])
   const [wotdLoading, setWotdLoading]         = useState(true)
@@ -106,7 +106,6 @@ export default function TeacherDashboard({ profile, handleLogout, globalLang, on
         .eq('student_id', id)
         .or('is_correct.eq.true,is_soft_pass.eq.true')
     )
-    // NEW: topic_sessions pass counts
     const topicPassPromises = ids.map(id =>
       supabase.from('topic_sessions').select('*', { count: 'exact', head: true })
         .eq('student_id', id)
@@ -320,9 +319,14 @@ export default function TeacherDashboard({ profile, handleLogout, globalLang, on
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {onToggleLang && (
-            <button onClick={onToggleLang} title="Toggle language" style={{ height: '34px', width: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {globalLang === 'en' ? '🇬🇧' : '🇪🇸'}
+          {/* Track cycler — replaces lang toggle */}
+          {onCycleTrack && (
+            <button
+              onClick={onCycleTrack}
+              title={`Track: ${TRACK_LABEL[teacherTrack]} — click to cycle`}
+              style={{ height: '34px', width: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              {TRACK_EMOJI[teacherTrack] || '🇬🇧'}
             </button>
           )}
           {onBrowseClick && (

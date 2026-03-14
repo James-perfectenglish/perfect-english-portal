@@ -12,6 +12,7 @@ import LyricsExercise from './LyricsExercise'
 import Blurt from './Blurt'
 import TeacherBrowse from './TeacherBrowse'
 import WordSnake from './WordSnake'
+import { TRACK_CYCLE } from './components/TeacherToolbar'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -42,11 +43,22 @@ function App() {
   )
 }
 
+// ── Compute effectiveProfile for teacher track simulation ──────────────────
+// Spanish override sets level so PracticePage/Blurt/WordSnake detect it correctly.
+function buildEffectiveProfile(profile, teacherTrack) {
+  if (!profile || !teacherTrack || teacherTrack === 'en') return profile
+  if (teacherTrack === 'spanish') return { ...profile, level: 'Spanish', tracks: ['spanish'] }
+  return { ...profile, tracks: [teacherTrack] }
+}
+
 function Dashboard({ session }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [globalLang, setGlobalLang] = useState(
     () => localStorage.getItem('pep_teach_lang') || 'en'
+  )
+  const [teacherTrack, setTeacherTrack] = useState(
+    () => localStorage.getItem('pep_teacher_track') || 'en'
   )
   const navigate = useNavigate()
 
@@ -69,6 +81,17 @@ function Dashboard({ session }) {
     localStorage.setItem('pep_teach_lang', next)
   }
 
+  const cycleTrack = () => {
+    const idx = TRACK_CYCLE.indexOf(teacherTrack)
+    const next = TRACK_CYCLE[(idx + 1) % TRACK_CYCLE.length]
+    setTeacherTrack(next)
+    localStorage.setItem('pep_teacher_track', next)
+    // keep globalLang in sync for TeacherBrowse
+    const lang = next === 'spanish' ? 'es' : 'en'
+    setGlobalLang(lang)
+    localStorage.setItem('pep_teach_lang', lang)
+  }
+
   if (loading) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading...</div>
 
   if (!profile?.approved) {
@@ -85,10 +108,11 @@ function Dashboard({ session }) {
   }
 
   const isTeacher = profile?.is_teacher || false
+  const effectiveProfile = isTeacher ? buildEffectiveProfile(profile, teacherTrack) : profile
 
   return (
     <div>
-      {/* HEADER — nav only, no teacher buttons here */}
+      {/* HEADER */}
       <header style={{ background: 'white', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', position: 'sticky', top: 0, zIndex: 1000, width: '100%' }}>
         <div style={{ width: '100%', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
           <a href="https://perfect-english.org" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
@@ -109,22 +133,78 @@ function Dashboard({ session }) {
 
       {/* ROUTES */}
       <Routes>
-        <Route path="/" element={<StudentDashboard profile={profile} session={session} handleLogout={handleLogout} globalLang={globalLang} onToggleLang={isTeacher ? toggleLang : undefined} onBrowseClick={isTeacher ? () => navigate('/teacher/browse') : undefined} onTeacherClick={isTeacher ? () => navigate('/teacher') : undefined} />} />
-        <Route path="/practice"       element={<PracticePageWrapper profile={profile} globalLang={globalLang} toggleLang={toggleLang} />} />
-        <Route path="/exercises"      element={<ExercisesPage profile={profile} globalLang={globalLang} toggleLang={toggleLang} />} />
-        <Route path="/lyrics"         element={<LyricsExercise user={session.user} />} />
-        <Route path="/blurt"          element={<Blurt user={session.user} />} />
-        <Route path="/teacher"        element={isTeacher ? <TeacherDashboard profile={profile} handleLogout={handleLogout} globalLang={globalLang} onToggleLang={toggleLang} onBrowseClick={() => navigate('/teacher/browse')} onHomeClick={() => navigate('/')} /> : <Navigate to="/" />} />
-        <Route path="/teacher/browse" element={isTeacher ? <TeacherBrowse user={session.user} globalLang={globalLang} /> : <Navigate to="/" />} />
-        <Route path="/wordsnake" element={<WordSnake user={session.user} />} />
+        <Route path="/" element={
+          <StudentDashboard
+            profile={effectiveProfile}
+            session={session}
+            handleLogout={handleLogout}
+            globalLang={globalLang}
+            onToggleLang={isTeacher ? toggleLang : undefined}
+            onBrowseClick={isTeacher ? () => navigate('/teacher/browse') : undefined}
+            onTeacherClick={isTeacher ? () => navigate('/teacher') : undefined}
+            teacherTrack={isTeacher ? teacherTrack : undefined}
+            onCycleTrack={isTeacher ? cycleTrack : undefined}
+          />
+        } />
+        <Route path="/practice" element={
+          <PracticePageWrapper
+            profile={effectiveProfile}
+            isTeacher={isTeacher}
+            teacherTrack={teacherTrack}
+            onCycleTrack={isTeacher ? cycleTrack : undefined}
+            globalLang={globalLang}
+            toggleLang={toggleLang}
+          />
+        } />
+        <Route path="/exercises" element={
+          <ExercisesPage
+            profile={effectiveProfile}
+            globalLang={globalLang}
+            toggleLang={toggleLang}
+            isTeacher={isTeacher}
+            teacherTrack={teacherTrack}
+            onCycleTrack={isTeacher ? cycleTrack : undefined}
+          />
+        } />
+        <Route path="/lyrics"    element={<LyricsExercise user={session.user} />} />
+        <Route path="/blurt"     element={
+          <Blurt
+            user={session.user}
+            profileOverride={isTeacher && teacherTrack !== 'en' ? effectiveProfile : null}
+          />
+        } />
+        <Route path="/teacher" element={
+          isTeacher
+            ? <TeacherDashboard
+                profile={profile}
+                handleLogout={handleLogout}
+                globalLang={globalLang}
+                onToggleLang={toggleLang}
+                onBrowseClick={() => navigate('/teacher/browse')}
+                onHomeClick={() => navigate('/')}
+                teacherTrack={teacherTrack}
+                onCycleTrack={cycleTrack}
+              />
+            : <Navigate to="/" />
+        } />
+        <Route path="/teacher/browse" element={
+          isTeacher
+            ? <TeacherBrowse user={session.user} globalLang={globalLang} />
+            : <Navigate to="/" />
+        } />
+        <Route path="/wordsnake" element={
+          <WordSnake
+            user={session.user}
+            profileOverride={isTeacher && teacherTrack !== 'en' ? effectiveProfile : null}
+          />
+        } />
       </Routes>
     </div>
   )
 }
 
-function ExercisesPage({ profile, globalLang, toggleLang }) {
+function ExercisesPage({ profile, globalLang, toggleLang, isTeacher, teacherTrack, onCycleTrack }) {
   const navigate = useNavigate()
-  const isTeacher = profile?.is_teacher || false
   return (
     <ExerciseList
       userLevel={profile.level}
@@ -134,17 +214,20 @@ function ExercisesPage({ profile, globalLang, toggleLang }) {
       onBrowseClick={isTeacher ? () => navigate('/teacher/browse') : undefined}
       globalLang={globalLang}
       onToggleLang={isTeacher ? toggleLang : undefined}
+      teacherTrack={teacherTrack}
+      onCycleTrack={onCycleTrack}
     />
   )
 }
 
-function PracticePageWrapper({ profile, globalLang, toggleLang }) {
+function PracticePageWrapper({ profile, isTeacher, teacherTrack, onCycleTrack, globalLang, toggleLang }) {
   const navigate = useNavigate()
-  const isTeacher = profile?.is_teacher || false
   return (
     <PracticePage
       profile={profile}
       isTeacher={isTeacher}
+      teacherTrack={teacherTrack}
+      onCycleTrack={onCycleTrack}
       onTeacherClick={isTeacher ? () => navigate('/teacher') : undefined}
       onBrowseClick={isTeacher ? () => navigate('/teacher/browse') : undefined}
       globalLang={globalLang}
