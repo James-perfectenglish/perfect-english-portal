@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import RandomPracticeExercise from './RandomPracticeExercise.jsx';
 import SurvivalMode from './SurvivalMode.jsx';
+import { TRACK_EMOJI, TRACK_LABEL } from './TeacherToolbar';
 
 const LEVEL_CONFIG = [
   {
@@ -90,14 +91,27 @@ export default function PracticePage({
   // Spanish students skip the level select entirely
   if (isSpanish) {
     return (
-      <RandomPracticeExercise
-        levels={SPANISH_CONFIG.levels}
-        levelTitle={SPANISH_CONFIG.levelTitle}
-        levelSubtitle={SPANISH_CONFIG.levelSubtitle}
-        gradient={SPANISH_CONFIG.gradient}
-        language={SPANISH_CONFIG.language}
-        onBack={null}
-      />
+      <div style={{ position: 'relative' }}>
+        {isTeacher && onCycleTrack && (
+          <div style={{ position: 'fixed', top: '70px', right: '1rem', zIndex: 500 }}>
+            <button
+              onClick={onCycleTrack}
+              title={`Track: ${TRACK_LABEL[teacherTrack] || 'English'} — click to cycle`}
+              style={{ height: '34px', width: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
+            >
+              {TRACK_EMOJI[teacherTrack] || '🇬🇧'}
+            </button>
+          </div>
+        )}
+        <RandomPracticeExercise
+          levels={SPANISH_CONFIG.levels}
+          levelTitle={SPANISH_CONFIG.levelTitle}
+          levelSubtitle={SPANISH_CONFIG.levelSubtitle}
+          gradient={SPANISH_CONFIG.gradient}
+          language={SPANISH_CONFIG.language}
+          onBack={null}
+        />
+      </div>
     );
   }
 

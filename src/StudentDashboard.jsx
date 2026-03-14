@@ -2,25 +2,26 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import WordOfTheDay from './WordOfTheDay'
+import { TRACK_EMOJI, TRACK_LABEL } from './components/TeacherToolbar'
 
 const TRACK_CONFIG = {
-  general: { label: 'General English', emoji: '📚', description: 'Mixed vocabulary, grammar and skills across all areas', color: '#667eea', topicFilter: null },
-  business: { label: 'Business English', emoji: '💼', description: 'Professional communication and workplace vocabulary', color: '#ed8936', topicFilter: 'business' },
-  hotels: { label: 'Hotel English', emoji: '🏨', description: 'Vocabulary and phrases for the hospitality industry', color: '#48bb78', topicFilter: 'hotels' },
-  bathroom: { label: 'Bathroom & Interiors', emoji: '🚿', description: 'Product vocabulary for the Borrás showroom', color: '#4299e1', topicFilter: 'borras' },
-  exam: { label: 'Exam Preparation', emoji: '🎓', description: 'Targeted practice for English language exams', color: '#9f7aea', topicFilter: 'exam' },
-  spanish: { label: 'Spanish Practice', emoji: '🇪🇸', description: 'English practice with Spanish — ideal for A2 towards B1', color: '#e53e3e', topicFilter: 'spanish' },
+  general:  { label: 'General English',       emoji: '📚', description: 'Mixed vocabulary, grammar and skills across all areas',    color: '#667eea', topicFilter: null },
+  business: { label: 'Business English',       emoji: '💼', description: 'Professional communication and workplace vocabulary',      color: '#ed8936', topicFilter: 'business' },
+  hotels:   { label: 'Hotel English',          emoji: '🏨', description: 'Vocabulary and phrases for the hospitality industry',     color: '#48bb78', topicFilter: 'hotels' },
+  bathroom: { label: 'Bathroom & Interiors',   emoji: '🚿', description: 'Product vocabulary for the Borrás showroom',             color: '#4299e1', topicFilter: 'borras' },
+  exam:     { label: 'Exam Preparation',       emoji: '🎓', description: 'Targeted practice for English language exams',           color: '#9f7aea', topicFilter: 'exam' },
+  spanish:  { label: 'Spanish Practice',       emoji: '🇪🇸', description: 'English practice with Spanish — ideal for A2 towards B1', color: '#e53e3e', topicFilter: 'spanish' },
 }
 
 const TYPE_INFO = {
-  gap_fill:         { label: 'Gap Fill',          emoji: '✏️' },
-  multiple_choice:  { label: 'Multiple Choice',    emoji: '📝' },
-  sentence_building:{ label: 'Sentence Building',  emoji: '🧩' },
-  odd_one_out:      { label: 'Odd One Out',         emoji: '🔍' },
-  error_correction: { label: 'Error Correction',   emoji: '🚨' },
-  matching:         { label: 'Matching',            emoji: '🔗' },
-  sentence_auction: { label: 'Sentence Auction',   emoji: '🔨' },
-  dictation:        { label: 'Dictation',           emoji: '⌨️' },
+  gap_fill:          { label: 'Gap Fill',          emoji: '✏️' },
+  multiple_choice:   { label: 'Multiple Choice',   emoji: '📝' },
+  sentence_building: { label: 'Sentence Building', emoji: '🧩' },
+  odd_one_out:       { label: 'Odd One Out',        emoji: '🔍' },
+  error_correction:  { label: 'Error Correction',  emoji: '🚨' },
+  matching:          { label: 'Matching',           emoji: '🔗' },
+  sentence_auction:  { label: 'Sentence Auction',  emoji: '🔨' },
+  dictation:         { label: 'Dictation',          emoji: '⌨️' },
 }
 
 function toPercent(score, answers) {
@@ -66,7 +67,7 @@ function getRecommendation(profile, attempts, studentTracks) {
   }
 }
 
-export default function StudentDashboard({ profile, session, handleLogout, globalLang, onToggleLang, onBrowseClick, onTeacherClick }) {
+export default function StudentDashboard({ profile, session, handleLogout, globalLang, onToggleLang, onBrowseClick, onTeacherClick, teacherTrack, onCycleTrack }) {
   const [stats, setStats] = useState(null)
   const [attempts, setAttempts] = useState([])
   const [typeBreakdown, setTypeBreakdown] = useState({})
@@ -86,41 +87,25 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
     const userId = session.user.id
 
     const { count: totalCount } = await supabase
-      .from('student_answers')
-      .select('*', { count: 'exact', head: true })
-      .eq('student_id', userId)
-
+      .from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', userId)
     const { count: correctCount } = await supabase
-      .from('student_answers')
-      .select('*', { count: 'exact', head: true })
-      .eq('student_id', userId)
-      .eq('is_correct', true)
+      .from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', userId).eq('is_correct', true)
 
-    if (totalCount > 0) {
-      setStats({ total: totalCount, correct: correctCount, accuracy: Math.round((correctCount / totalCount) * 100) })
-    } else {
-      setStats({ total: 0, correct: 0, accuracy: 0 })
-    }
+    setStats(totalCount > 0
+      ? { total: totalCount, correct: correctCount, accuracy: Math.round((correctCount / totalCount) * 100) }
+      : { total: 0, correct: 0, accuracy: 0 })
 
     const { data: recentAnswers } = await supabase
-      .from('student_answers')
-      .select('is_correct, question_id, answered_at')
-      .eq('student_id', userId)
-      .order('answered_at', { ascending: false })
-      .limit(2000)
+      .from('student_answers').select('is_correct, question_id, answered_at')
+      .eq('student_id', userId).order('answered_at', { ascending: false }).limit(2000)
 
     if (recentAnswers && recentAnswers.length > 0) {
       const questionIds = [...new Set(recentAnswers.map(a => a.question_id).filter(Boolean))]
       if (questionIds.length > 0) {
-        const { data: questions } = await supabase
-          .from('question_bank')
-          .select('question_number, type')
-          .in('question_number', questionIds)
-
+        const { data: questions } = await supabase.from('question_bank').select('question_number, type').in('question_number', questionIds)
         if (questions) {
           const typeMap = {}
           questions.forEach(q => { typeMap[q.question_number] = q.type })
-
           const byType = {}
           recentAnswers.forEach(a => {
             const type = typeMap[a.question_id]
@@ -135,19 +120,12 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
     }
 
     const { data: attemptData } = await supabase
-      .from('student_attempts')
-      .select('score, completed_at, answers')
-      .eq('student_id', userId)
-      .order('completed_at', { ascending: false })
-      .limit(100)
+      .from('student_attempts').select('score, completed_at, answers')
+      .eq('student_id', userId).order('completed_at', { ascending: false }).limit(100)
 
     if (attemptData && attemptData.length > 0) {
-      const normalised = attemptData.map(a => ({
-        ...a,
-        scorePercent: toPercent(a.score, a.answers)
-      }))
+      const normalised = attemptData.map(a => ({ ...a, scorePercent: toPercent(a.score, a.answers) }))
       setLessonsPassed(normalised.filter(a => a.scorePercent >= 70).length)
-
       const attemptDays = normalised.map(a => new Date(a.completed_at).toDateString())
       const answerDays = (recentAnswers || []).map(a => new Date(a.answered_at).toDateString())
       setDaysStudied(new Set([...attemptDays, ...answerDays]).size)
@@ -158,10 +136,8 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
     }
 
     const { count: listenCount } = await supabase
-      .from('listening_sessions')
-      .select('*', { count: 'exact', head: true })
-      .eq('student_id', userId)
-      .eq('stage_reached', 'review')
+      .from('listening_sessions').select('*', { count: 'exact', head: true })
+      .eq('student_id', userId).eq('stage_reached', 'review')
 
     setListeningCompleted(listenCount || 0)
     setLoading(false)
@@ -192,18 +168,22 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
         </div>
         {profile.is_teacher && (
           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-            {onToggleLang && (
-              <button onClick={onToggleLang} title="Toggle language" style={{ height: '34px', width: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {globalLang === 'en' ? '🇬🇧' : '🇪🇸'}
+            {/* Track cycler — replaces lang toggle */}
+            {onCycleTrack && (
+              <button onClick={onCycleTrack} title={`Track: ${TRACK_LABEL[teacherTrack] || 'English'} — click to cycle`}
+                style={{ height: '34px', width: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {TRACK_EMOJI[teacherTrack] || '🇬🇧'}
               </button>
             )}
             {onBrowseClick && (
-              <button onClick={onBrowseClick} title="Browse questions" style={{ height: '34px', padding: '0 10px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, color: '#2d3748', whiteSpace: 'nowrap' }}>
+              <button onClick={onBrowseClick} title="Browse questions"
+                style={{ height: '34px', padding: '0 10px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, color: '#2d3748', whiteSpace: 'nowrap' }}>
                 🔍 Browse
               </button>
             )}
             {onTeacherClick && (
-              <button onClick={onTeacherClick} title="Teacher Dashboard" style={{ height: '34px', width: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={onTeacherClick} title="Teacher Dashboard"
+                style={{ height: '34px', width: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 👨‍🏫
               </button>
             )}
@@ -277,16 +257,13 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
         <div style={{ fontSize: '0.875rem', color: '#718096' }}>
           Your level: <strong style={{ color: '#667eea' }}>{profile.level || 'Not assigned yet'}</strong>
         </div>
-        <button
-          onClick={handleLogout}
-          style={{ padding: '0.5rem 1.25rem', backgroundColor: '#f44336', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500' }}
-        >Logout</button>
+        <button onClick={handleLogout} style={{ padding: '0.5rem 1.25rem', backgroundColor: '#f44336', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500' }}>
+          Logout
+        </button>
       </div>
     </div>
   )
 }
-
-// ─── SUB-COMPONENTS ───────────────────────────────────────────────────────────
 
 function StatCard({ emoji, label, value }) {
   return (
@@ -312,14 +289,10 @@ function Section({ title, subtitle, children }) {
 
 function RecommendedCard({ recommendation: r }) {
   return (
-    <div
-      style={{ background: `linear-gradient(135deg, ${r.color}18, ${r.color}08)`, border: `2px solid ${r.color}50`, borderRadius: '12px', padding: '1rem', cursor: 'pointer', height: '100%', boxSizing: 'border-box', position: 'relative', transition: 'transform 0.15s ease, box-shadow 0.15s ease' }}
+    <div style={{ background: `linear-gradient(135deg, ${r.color}18, ${r.color}08)`, border: `2px solid ${r.color}50`, borderRadius: '12px', padding: '1rem', cursor: 'pointer', height: '100%', boxSizing: 'border-box', position: 'relative', transition: 'transform 0.15s ease, box-shadow 0.15s ease' }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 8px 20px ${r.color}25` }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}
-    >
-      <div style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', fontSize: '0.62rem', fontWeight: '700', letterSpacing: '0.4px', textTransform: 'uppercase', color: r.color, backgroundColor: `${r.color}18`, padding: '2px 7px', borderRadius: '99px' }}>
-        ⭐ {r.tag}
-      </div>
+      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}>
+      <div style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', fontSize: '0.62rem', fontWeight: '700', letterSpacing: '0.4px', textTransform: 'uppercase', color: r.color, backgroundColor: `${r.color}18`, padding: '2px 7px', borderRadius: '99px' }}>⭐ {r.tag}</div>
       <div style={{ fontSize: '1.75rem', marginBottom: '0.35rem' }}>{r.emoji}</div>
       <div style={{ fontWeight: '700', color: '#2C3E50', fontSize: '0.95rem', marginBottom: '0.2rem', paddingRight: '3rem' }}>{r.title}</div>
       <div style={{ fontSize: '0.76rem', color: '#718096', lineHeight: '1.4', marginBottom: '0.6rem' }}>{r.desc}</div>
@@ -364,9 +337,7 @@ function TypeBar({ info, pct, total }) {
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
           <span style={{ fontSize: '0.82rem', fontWeight: '500', color: '#2C3E50' }}>{info.label}</span>
-          <span style={{ fontSize: '0.78rem', color: '#718096' }}>
-            {pct}% <span style={{ fontSize: '0.68rem', color: '#a0aec0' }}>({total} question{total !== 1 ? 's' : ''})</span>
-          </span>
+          <span style={{ fontSize: '0.78rem', color: '#718096' }}>{pct}% <span style={{ fontSize: '0.68rem', color: '#a0aec0' }}>({total} question{total !== 1 ? 's' : ''})</span></span>
         </div>
         <div style={{ background: '#edf2f7', borderRadius: '99px', height: '7px', overflow: 'hidden' }}>
           <div style={{ width: `${pct}%`, height: '100%', backgroundColor: barColor, borderRadius: '99px' }} />
@@ -379,11 +350,9 @@ function TypeBar({ info, pct, total }) {
 function TrackCard({ trackKey, track }) {
   return (
     <Link to={`/practice?track=${trackKey}`} style={{ textDecoration: 'none' }}>
-      <div
-        style={{ borderRadius: '12px', padding: '1rem', border: `2px solid ${track.color}30`, backgroundColor: `${track.color}0d`, cursor: 'pointer', height: '100%', boxSizing: 'border-box', transition: 'transform 0.15s ease, box-shadow 0.15s ease' }}
+      <div style={{ borderRadius: '12px', padding: '1rem', border: `2px solid ${track.color}30`, backgroundColor: `${track.color}0d`, cursor: 'pointer', height: '100%', boxSizing: 'border-box', transition: 'transform 0.15s ease, box-shadow 0.15s ease' }}
         onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)' }}
-        onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}
-      >
+        onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}>
         <div style={{ fontSize: '1.75rem', marginBottom: '0.35rem' }}>{track.emoji}</div>
         <div style={{ fontWeight: '600', color: '#2C3E50', fontSize: '0.92rem', marginBottom: '0.25rem' }}>{track.label}</div>
         <div style={{ fontSize: '0.76rem', color: '#718096', lineHeight: '1.45', marginBottom: '0.6rem' }}>{track.description}</div>
@@ -395,11 +364,9 @@ function TrackCard({ trackKey, track }) {
 
 function QuickLinkCard({ emoji, title, desc, color }) {
   return (
-    <div
-      style={{ background: `${color}0f`, border: `2px solid ${color}40`, borderRadius: '12px', padding: '1rem', cursor: 'pointer', transition: 'transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease' }}
+    <div style={{ background: `${color}0f`, border: `2px solid ${color}40`, borderRadius: '12px', padding: '1rem', cursor: 'pointer', transition: 'transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease' }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 8px 20px ${color}30`; e.currentTarget.style.background = `${color}1a`; e.currentTarget.style.borderColor = `${color}90` }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = `${color}0f`; e.currentTarget.style.borderColor = `${color}40` }}
-    >
+      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = `${color}0f`; e.currentTarget.style.borderColor = `${color}40` }}>
       <div style={{ fontSize: '1.75rem', marginBottom: '0.35rem' }}>{emoji}</div>
       <div style={{ fontWeight: '600', color: '#2C3E50', fontSize: '0.92rem', marginBottom: '0.2rem' }}>{title}</div>
       <div style={{ fontSize: '0.76rem', color: '#718096', lineHeight: '1.4' }}>{desc}</div>
