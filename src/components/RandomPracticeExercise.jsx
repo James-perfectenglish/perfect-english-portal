@@ -23,7 +23,6 @@ const getAutoSpeed = (level) => {
   return 1.0;
 };
 
-// AI soft-marking is used for error correction at all levels
 // Inject CSS for focus fix on OOO, EC, and matching tiles
 const RP_STYLE_ID = 'rp-focus-fix';
 if (typeof document !== 'undefined' && !document.getElementById(RP_STYLE_ID)) {
@@ -83,7 +82,7 @@ const findErrorIndex = (questionWords, correctAnswer) => {
   return { index: -1, correctWord: '' };
 };
 
-const getQuestionLanguage = (question) => question?.topic === 'spanish' ? 'es' : 'en';
+const getQuestionLanguage = (question) => question?.topic === 'spanish' || question?.language === 'es' ? 'es' : 'en';
 
 const aiMarkGapFill = async (question, correctAnswer, studentAnswer, language = 'en') => {
   try {
@@ -123,7 +122,9 @@ const aiMarkDictation = async (correctAnswer, studentAnswer) => {
   } catch (e) { console.error('AI dictation marking error:', e); return null; }
 };
 
-export default function RandomPracticeExercise({ levels, levelTitle, levelSubtitle, gradient, onBack }) {
+export default function RandomPracticeExercise({ levels, levelTitle, levelSubtitle, gradient, language = 'en', onBack }) {
+  const isSpanish = language === 'es';
+
   const [stage, setStage] = useState('start');
   const [questions, setQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -150,6 +151,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   useEffect(() => { window.scrollTo(0, 0); }, [stage]);
 
   const getLevelKey = () => {
+    if (isSpanish) return 'spanish';
     if (levels && levels.length > 0) return levels.sort().join('-');
     return 'all';
   };
@@ -227,19 +229,20 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     window.scrollTo({ top: 0, behavior: 'instant' });
     setLoading(true);
     try {
+      // ── Language filter ──
+      // Spanish students: language IN ('es', 'both'), no level filter
+      // English students: language IN ('en', 'both'), level filter applied
+      const langFilter = isSpanish ? ['es', 'both'] : ['en', 'both'];
+
       const queryForType = (type) => {
-        let q = supabase.from('question_bank').select('*').eq('type', type).in('language', ['en', 'both']);
-        if (levels && levels.length > 0) q = q.in('level', levels);
+        let q = supabase.from('question_bank').select('*').eq('type', type).in('language', langFilter);
+        if (!isSpanish && levels && levels.length > 0) q = q.in('level', levels);
         return q;
       };
 
       const fetchDictation = () => {
-        let q = supabase
-          .from('dictation_exercises')
-          .select('*')
-          .eq('language', 'en')
-          .eq('dictation_type', 'quick');
-        if (levels && levels.length > 0) q = q.in('level', levels);
+        let q = supabase.from('dictation_exercises').select('*').eq('language', isSpanish ? 'es' : 'en');
+        if (!isSpanish && levels && levels.length > 0) q = q.in('level', levels);
         return q;
       };
 
@@ -250,8 +253,8 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         queryForType('odd_one_out'),
         queryForType('error_correction'),
         (() => {
-          let q = supabase.from('question_bank').select('*').eq('type', 'matching').in('language', ['en', 'both']).is('sequence_group', null);
-          if (levels && levels.length > 0) q = q.in('level', levels);
+          let q = supabase.from('question_bank').select('*').eq('type', 'matching').in('language', langFilter).is('sequence_group', null);
+          if (!isSpanish && levels && levels.length > 0) q = q.in('level', levels);
           return q;
         })(),
         fetchDictation(),
@@ -295,7 +298,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
       const allQuestions = shuffleArray(baseQuestions);
       if (allQuestions.length === 0) {
-        alert('No questions available for this level yet. Check back soon!');
+        alert('No questions available yet. Check back soon!');
         setLoading(false);
         return;
       }
@@ -631,13 +634,17 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
             )}
             <h1 style={{ fontSize: 'clamp(2rem, 8vw, 2.5rem)', color: '#2C3E50', marginBottom: '1.5rem', fontWeight: '700' }}>{displayTitle}</h1>
             <p style={{ fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', color: '#2C3E50', marginBottom: '1rem', lineHeight: '1.5' }}>
-              Test your English with 20 random questions!
+              {isSpanish
+                ? '20 preguntas variadas — ¡vamos!'
+                : 'Test your English with 20 random questions!'}
             </p>
             <p style={{ fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', color: '#666', marginBottom: '2.5rem', lineHeight: '1.5' }}>
-              A mix of multiple choice, gap fill, sentence building, odd one out, error correction, matching, and dictation. Answer all questions and see your score at the end.
+              {isSpanish
+                ? 'Una mezcla de tipos de ejercicios. Responde todas las preguntas y mira tu puntuación al final.'
+                : 'A mix of multiple choice, gap fill, sentence building, odd one out, error correction, matching, and dictation. Answer all questions and see your score at the end.'}
             </p>
             <button onClick={startExercise} disabled={loading} style={{ padding: '1.25rem', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', background: displayGradient, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', width: '100%', maxWidth: '350px', margin: '0 auto', fontWeight: '600', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-              {loading ? 'Loading...' : 'Start Practice'}
+              {loading ? 'Loading...' : isSpanish ? 'Empezar' : 'Start Practice'}
             </button>
             {onBack && (
               <button onClick={onBack} style={{ marginTop: '1.5rem', padding: '0.75rem 1.5rem', fontSize: 'clamp(0.9rem, 3vw, 1rem)', backgroundColor: 'transparent', color: '#666', border: '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}>
@@ -660,7 +667,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
             <div style={{ backgroundColor: 'white', padding: 'clamp(1.5rem, 5vw, 2.5rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-              {/* ── Badges (via BadgePill) ── */}
+              {/* ── Badges ── */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
                 <TypeBadge type={currentQuestion.type} />
                 <LevelBadge level={currentQuestion.level} />
@@ -890,7 +897,9 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         {stage === 'finished' && (
           <div style={{ width: '100%', maxWidth: '600px', margin: '2rem auto 0' }}>
             <div style={{ backgroundColor: 'white', padding: 'clamp(2rem, 6vw, 3rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', textAlign: 'center' }}>
-              <h1 style={{ fontSize: 'clamp(1.8rem, 6vw, 2.2rem)', color: '#2C3E50', marginBottom: '0.5rem', fontWeight: '700' }}>Practice Complete!</h1>
+              <h1 style={{ fontSize: 'clamp(1.8rem, 6vw, 2.2rem)', color: '#2C3E50', marginBottom: '0.5rem', fontWeight: '700' }}>
+                {isSpanish ? '¡Práctica completada!' : 'Practice Complete!'}
+              </h1>
               <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', marginBottom: '1.5rem', color: '#666' }}>
                 {scorePercent >= 90 ? '🌟 Outstanding work!' : scorePercent >= 75 ? '👍 Great job!' : scorePercent >= 50 ? '👌 Good effort!' : '💪 Keep practicing!'}
               </div>
@@ -921,7 +930,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <button onClick={retry} style={{ padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)', background: displayGradient, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '600' }}>
-                  Try Again
+                  {isSpanish ? 'Otra vez' : 'Try Again'}
                 </button>
                 {onBack && (
                   <button onClick={onBack} style={{ padding: '1rem', fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', backgroundColor: 'transparent', color: '#666', border: '1px solid #ddd', borderRadius: '10px', cursor: 'pointer', fontWeight: '500' }}>

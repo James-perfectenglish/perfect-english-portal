@@ -143,6 +143,7 @@ function PracticePageWrapper({ profile, globalLang, toggleLang }) {
   const isTeacher = profile?.is_teacher || false
   return (
     <PracticePage
+      profile={profile}
       isTeacher={isTeacher}
       onTeacherClick={isTeacher ? () => navigate('/teacher') : undefined}
       onBrowseClick={isTeacher ? () => navigate('/teacher/browse') : undefined}

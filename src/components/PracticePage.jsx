@@ -12,7 +12,8 @@ const LEVEL_CONFIG = [
     levels: ['A1', 'A2'],
     emoji: '🌱',
     gradient: 'linear-gradient(135deg, #43b581, #2ecc71)',
-    shadow: 'rgba(46, 204, 113, 0.3)'
+    shadow: 'rgba(46, 204, 113, 0.3)',
+    language: 'en',
   },
   {
     id: 'intermediate',
@@ -22,7 +23,8 @@ const LEVEL_CONFIG = [
     levels: ['B1', 'B2'],
     emoji: '📚',
     gradient: 'linear-gradient(135deg, #3498DB, #667eea)',
-    shadow: 'rgba(52, 152, 219, 0.3)'
+    shadow: 'rgba(52, 152, 219, 0.3)',
+    language: 'en',
   },
   {
     id: 'advanced',
@@ -32,9 +34,18 @@ const LEVEL_CONFIG = [
     levels: ['C1', 'C2'],
     emoji: '🎯',
     gradient: 'linear-gradient(135deg, #ed8936, #f6ad55)',
-    shadow: 'rgba(237, 137, 54, 0.3)'
-  }
+    shadow: 'rgba(237, 137, 54, 0.3)',
+    language: 'en',
+  },
 ];
+
+const SPANISH_CONFIG = {
+  levels: [],
+  levelTitle: 'Español',
+  levelSubtitle: 'A2 · Práctica',
+  gradient: 'linear-gradient(135deg, #e53e3e, #c53030)',
+  language: 'es',
+};
 
 const BTN = {
   height: '34px',
@@ -49,6 +60,7 @@ const BTN = {
 };
 
 export default function PracticePage({
+  profile,
   isTeacher = false,
   onTeacherClick,
   onBrowseClick,
@@ -59,6 +71,11 @@ export default function PracticePage({
   const [survivalMode, setSurvivalMode] = useState(false);
   const location = useLocation();
 
+  // Detect Spanish student: level === 'Spanish' OR tracks includes 'spanish'
+  const isSpanish =
+    profile?.level === 'Spanish' ||
+    (Array.isArray(profile?.tracks) && profile.tracks.includes('spanish'));
+
   useEffect(() => {
     setSelectedLevel(null);
     setSurvivalMode(false);
@@ -68,6 +85,20 @@ export default function PracticePage({
     return <SurvivalMode onBack={() => setSurvivalMode(false)} />;
   }
 
+  // Spanish students skip the level select entirely
+  if (isSpanish) {
+    return (
+      <RandomPracticeExercise
+        levels={SPANISH_CONFIG.levels}
+        levelTitle={SPANISH_CONFIG.levelTitle}
+        levelSubtitle={SPANISH_CONFIG.levelSubtitle}
+        gradient={SPANISH_CONFIG.gradient}
+        language={SPANISH_CONFIG.language}
+        onBack={null}
+      />
+    );
+  }
+
   if (selectedLevel) {
     return (
       <RandomPracticeExercise
@@ -75,6 +106,7 @@ export default function PracticePage({
         levelTitle={selectedLevel.title}
         levelSubtitle={selectedLevel.subtitle}
         gradient={selectedLevel.gradient}
+        language={selectedLevel.language}
         onBack={() => setSelectedLevel(null)}
       />
     );
