@@ -264,7 +264,12 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         throw gfRes.error || mcRes.error || sbRes.error || oooRes.error || ecRes.error || matchRes.error;
       }
 
-      const pick = (data, type) => shuffleArray(data || []).slice(0, QUESTION_MIX[type] || 0);
+      const pick = (data, type) => shuffleArray(data || []).slice(0, QUESTION_MIX[type] || 0).map(q => {
+        if ((type === 'multiple_choice' || type === 'odd_one_out') && Array.isArray(q.options)) {
+          return { ...q, options: shuffleArray(q.options) };
+        }
+        return q;
+      });
 
       const pickDictation = (data) => {
         return shuffleArray(data || []).slice(0, QUESTION_MIX.dictation || 0).map(ex => ({

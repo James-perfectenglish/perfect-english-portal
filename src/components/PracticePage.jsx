@@ -42,8 +42,8 @@ const LEVEL_CONFIG = [
 const SPANISH_CONFIG = {
   levels: [],
   levelTitle: 'Español',
-  levelSubtitle: 'A2 · Práctica',
-  gradient: 'linear-gradient(135deg, #e53e3e, #c53030)',
+  levelSubtitle: null,
+  gradient: 'linear-gradient(135deg, #667eea, #764ba2)',
   language: 'es',
 };
 
