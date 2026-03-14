@@ -16,6 +16,13 @@ const QUESTION_MIX = {
   // Total: 20
 };
 
+// ── Auto playback speed for quick dictation by level ──
+const getAutoSpeed = (level) => {
+  if (['A1', 'A2'].includes(level)) return 0.9;
+  if (['C1', 'C2'].includes(level)) return 1.1;
+  return 1.0;
+};
+
 // AI soft-marking is used for error correction at all levels
 // Inject CSS for focus fix on OOO, EC, and matching tiles
 const RP_STYLE_ID = 'rp-focus-fix';
@@ -227,7 +234,11 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       };
 
       const fetchDictation = () => {
-        let q = supabase.from('dictation_exercises').select('*').eq('language', 'en');
+        let q = supabase
+          .from('dictation_exercises')
+          .select('*')
+          .eq('language', 'en')
+          .eq('dictation_type', 'quick');
         if (levels && levels.length > 0) q = q.in('level', levels);
         return q;
       };
@@ -794,6 +805,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                         onClick={() => {
                           if (audioRef.current) {
                             audioRef.current.currentTime = 0;
+                            audioRef.current.playbackRate = getAutoSpeed(currentQuestion.level);
                             audioRef.current.play();
                             setAudioPlayed(true);
                           }

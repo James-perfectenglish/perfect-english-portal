@@ -382,7 +382,7 @@ export default function Blurt({ user }) {
         <div style={{ background: gradientBg, borderRadius: '12px', padding: '1.25rem 1.5rem 0.75rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
             <div>
-              <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '0.2rem' }}>Blurt!</div>
+              <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '0.2rem' }}>⏱️ Blurt!</div>
               <div style={{ color: 'white', fontWeight: 700, fontSize: '1.1rem' }}>{selected?.name}</div>
             </div>
 

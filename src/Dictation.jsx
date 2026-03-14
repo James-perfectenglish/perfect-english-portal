@@ -126,7 +126,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
   };
 
   const fetchCounts = async () => {
-    let query = supabase.from('dictation_exercises').select('level');
+    let query = supabase.from('dictation_exercises').select('level').eq('dictation_type', 'class');
     query = applyTrackFilter(query);
     const { data } = await query;
     if (data) {
@@ -148,6 +148,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
     let query = supabase
       .from('dictation_exercises')
       .select('id, title, level, topic, excerpt_type, image_url')
+      .eq('dictation_type', 'class')
       .in('level', dbLevels)
       .order('created_at', { ascending: true });
     query = applyTrackFilter(query);
