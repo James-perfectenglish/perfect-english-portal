@@ -81,14 +81,16 @@ export default function Blurt({ user }) {
   async function fetchProfile() {
     const { data } = await supabase.from('profiles').select('level, tracks, full_name').eq('id', user.id).single();
     if (data) setProfile(data);
-    fetchCategories(data?.tracks || []);
+    fetchCategories(data?.tracks || [], data?.level);
   }
 
-  async function fetchCategories(userTracks) {
+  async function fetchCategories(userTracks, userLevel) {
     const { data } = await supabase.from('blurt_categories').select('*').order('sort_order');
     if (!data) return;
+    const isSpanish = userLevel === 'Spanish' || userTracks.includes('spanish');
     setCategories(data.filter((c) => {
       const t = c.tracks || [];
+      if (isSpanish) return t.includes('spanish');
       if (t.includes('general')) return true;
       if (t.includes('hotels') && userTracks.includes('hotels')) return true;
       if (t.includes('bathroom') && userTracks.includes('bathroom')) return true;
@@ -385,8 +387,6 @@ export default function Blurt({ user }) {
               <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '0.2rem' }}>⏱️ Blurt!</div>
               <div style={{ color: 'white', fontWeight: 700, fontSize: '1.1rem' }}>{selected?.name}</div>
             </div>
-
-            {/* Circle timer — matching Word Snake style */}
             <div style={{ width: 68, height: 68, borderRadius: '50%', border: `4px solid ${timerColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 900, color: timerColor, background: 'rgba(255,255,255,0.15)', flexShrink: 0, transition: 'color 0.3s, border-color 0.3s' }}>
               {timeLeft}
             </div>

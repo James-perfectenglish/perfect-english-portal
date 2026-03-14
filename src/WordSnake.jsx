@@ -47,9 +47,14 @@ function wordScore(word, newLen) {
   return pts;
 }
 
-function catVisible(cat, profileTracks) {
-  const pt = profileTracks || ['general'];
-  return (cat.tracks || ['general']).some(t => t === 'general' || pt.includes(t));
+// Spanish students see only spanish-tagged categories.
+// English track students see general + their track categories.
+function catVisible(cat, profile) {
+  const pt = profile?.tracks || [];
+  const isSpanish = profile?.level === 'Spanish' || pt.includes('spanish');
+  const ct = cat.tracks || ['general'];
+  if (isSpanish) return ct.includes('spanish');
+  return ct.some(t => t === 'general' || pt.includes(t));
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -151,7 +156,7 @@ export default function WordSnake({ user }) {
 
   // ── pick random category ──────────────────────────────────────────────────
   const pickRandom = useCallback((currentCat) => {
-    const visible = cats.filter(c => catVisible(c, profile?.tracks));
+    const visible = cats.filter(c => catVisible(c, profile));
     if (!visible.length) return;
     const pool = visible.filter(c => c.id !== currentCat?.id);
     const picked = pool.length ? pool[Math.floor(Math.random() * pool.length)] : visible[0];
@@ -448,7 +453,6 @@ export default function WordSnake({ user }) {
   const timerPct   = (timeLeft / (duration || SOLO_DURATION)) * 100;
   const timerColor = timeLeft <= 10 ? '#e53e3e' : timeLeft <= 20 ? '#dd6b20' : '#38a169';
 
-  // chip styles (for chain)
   const chipStyle = (valid, pending) => ({
     display: 'inline-flex', alignItems: 'center', gap: 5,
     padding: '5px 12px', borderRadius: 20, fontSize: 14, fontWeight: 600,
@@ -616,7 +620,6 @@ export default function WordSnake({ user }) {
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh', padding: '1rem' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
 
-        {/* Header */}
         <div style={{ background: gradientBg, borderRadius: '12px', padding: '1.25rem 1.5rem 0.75rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
             <div>
@@ -638,19 +641,16 @@ export default function WordSnake({ user }) {
               </div>
             )}
 
-            {/* Circle timer — Word Snake style */}
             <div style={{ width: 68, height: 68, borderRadius: '50%', border: `4px solid ${timerColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 900, color: timerColor, background: 'rgba(255,255,255,0.15)', flexShrink: 0, transition: 'color 0.3s, border-color 0.3s' }}>
               {timeLeft}
             </div>
           </div>
 
-          {/* Progress bar */}
           <div style={{ height: '4px', backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: '2px', overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${timerPct}%`, backgroundColor: 'white', borderRadius: '2px', transition: 'width 1s linear' }} />
           </div>
         </div>
 
-        {/* Class scoreboard */}
         {mode === 'class' && lobbyPlayers.length > 0 && (
           <div style={{ ...card, padding: '0.7rem 1rem' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
@@ -663,7 +663,6 @@ export default function WordSnake({ user }) {
           </div>
         )}
 
-        {/* Next letter prompt */}
         <div style={{ ...card, padding: '0.75rem 1rem', background: '#f0f0ff', border: '2px solid #c3c9f8', textAlign: 'center' }}>
           {nextLetter
             ? <span style={{ color: '#764ba2', fontSize: 16 }}>Next word must start with <strong style={{ fontSize: 26 }}>{nextLetter}</strong></span>
@@ -671,7 +670,6 @@ export default function WordSnake({ user }) {
           }
         </div>
 
-        {/* Feedback */}
         {feedback && (
           <div style={{ ...card, padding: '0.7rem 1rem', background: feedback.ok ? '#f0fff4' : '#fff5f5', border: `1px solid ${feedback.ok ? '#9ae6b4' : '#feb2b2'}`, color: feedback.ok ? '#276749' : '#c53030', fontSize: 14 }}>
             {feedback.ok
@@ -681,7 +679,6 @@ export default function WordSnake({ user }) {
           </div>
         )}
 
-        {/* Chain */}
         <div style={{ ...card, maxHeight: 240, overflowY: 'auto', padding: '1rem' }}>
           {chain.length === 0
             ? <div style={{ color: '#a0aec0', textAlign: 'center', fontSize: 14 }}>Your chain will appear here...</div>
@@ -703,7 +700,6 @@ export default function WordSnake({ user }) {
           }
         </div>
 
-        {/* Input */}
         {!gameOver ? (
           <div style={{ ...card, padding: '1.25rem' }}>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -738,7 +734,6 @@ export default function WordSnake({ user }) {
 
     return wrap(
       <>
-        {/* Score header */}
         <div style={{ background: gradientBg, borderRadius: '12px', padding: '2rem', marginBottom: '1rem', textAlign: 'center', color: 'white' }}>
           <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 1, opacity: 0.8, marginBottom: '0.5rem' }}>{cat?.name}</div>
           <div style={{ fontSize: '4.5rem', fontWeight: 900, lineHeight: 1 }}>{myScore}</div>
@@ -756,7 +751,6 @@ export default function WordSnake({ user }) {
           )}
         </div>
 
-        {/* Chain */}
         {finalChain.length > 0 && (
           <div style={card}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -770,7 +764,6 @@ export default function WordSnake({ user }) {
           </div>
         )}
 
-        {/* Leaderboard — 3 column A/B/C */}
         {hasLb && (
           <div style={card}>
             <div style={{ fontWeight: 700, fontSize: '1rem', color: '#2d3748', marginBottom: '1rem' }}>🏆 {cat?.name} — Leaderboard</div>
@@ -794,7 +787,6 @@ export default function WordSnake({ user }) {
           </div>
         )}
 
-        {/* Buttons */}
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button onClick={reset} style={{ ...btnSecondary, flex: 1 }}>🏠 Home</button>
           <button onClick={() => {
