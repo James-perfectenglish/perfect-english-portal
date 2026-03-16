@@ -14,6 +14,9 @@ const SPEED_OPTIONS = [
   { label: 'Faster', value: 1.1 }
 ];
 
+const IconPlay  = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>;
+const IconPause = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><rect x="5" y="3" width="4" height="18" rx="1"/><rect x="15" y="3" width="4" height="18" rx="1"/></svg>;
+
 export default function ListeningExercise({ onBack, userTracks = [] }) {
   const [stage, setStage]               = useState('level-select');
   const [selectedLevel, setSelectedLevel] = useState(null);
@@ -130,6 +133,15 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
     if (audioRef.current) audioRef.current.playbackRate = newSpeed;
   };
 
+  const handleProgressClick = (e) => {
+    if (!audioRef.current || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percent = Math.max(0, Math.min(1, x / rect.width));
+    audioRef.current.currentTime = percent * duration;
+    setCurrentTime(percent * duration);
+  };
+
   const handleAudioEnded    = () => setIsPlaying(false);
   const handleTimeUpdate    = () => { if (audioRef.current) setCurrentTime(audioRef.current.currentTime); };
   const handleLoadedMetadata = () => { if (audioRef.current) setDuration(audioRef.current.duration); };
@@ -197,11 +209,14 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
       <div style={{ background: '#f7fafc', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.25rem', border: '1px solid #e2e8f0' }}>
         <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#667eea', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{stageLabel}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button onClick={togglePlay} style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            {isPlaying ? '⏸' : '▶'}
+          <button onClick={togglePlay} style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {isPlaying ? <IconPause /> : <IconPlay />}
           </button>
           <div style={{ flex: 1 }}>
-            <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden', marginBottom: '6px' }}>
+            <div
+              onClick={handleProgressClick}
+              style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden', marginBottom: '6px', cursor: 'pointer' }}
+            >
               <div style={{ width: `${progressPercent}%`, height: '100%', background: 'linear-gradient(135deg, #667eea, #764ba2)', borderRadius: '3px', transition: 'width 0.3s' }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#718096' }}>
@@ -360,9 +375,9 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
                     <div style={{ fontWeight: 700, color: '#2d3748', fontSize: '1rem', marginBottom: '2px' }}>{ex.title}</div>
                     <div style={{ fontSize: '0.85rem', color: '#718096', lineHeight: 1.4 }}>{ex.description}</div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-  <LevelBadge level={ex.level} />
-  {ex.duration_seconds && <span style={{ fontSize: '0.78rem', color: '#a0aec0' }}>{Math.ceil(ex.duration_seconds / 60)} min</span>}
-</div>
+                      <LevelBadge level={ex.level} />
+                      {ex.duration_seconds && <span style={{ fontSize: '0.78rem', color: '#a0aec0' }}>{Math.ceil(ex.duration_seconds / 60)} min</span>}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                     {completedIds.has(ex.id) && <span style={{ fontSize: '1rem' }}>✅</span>}
