@@ -54,8 +54,28 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
   const [currentQ, setCurrentQ] = useState(0);
   const [score, setScore] = useState(0);
   const [questionResult, setQuestionResult] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
 
-  useEffect(() => { fetchCounts(); }, []);
+  const isSpanish = userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
+
+  useEffect(() => { fetchCounts(); fetchUserProfile(); }, []);
+
+  useEffect(() => {
+    if (!userProfile) return;
+    if (isSpanish && stage === 'level-select') {
+      setStage('loading');
+      fetchQuestions([]);
+    }
+  }, [userProfile]);
+
+  const fetchUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from('profiles').select('level, tracks').eq('id', user.id).single();
+      if (data) setUserProfile(data);
+    } catch (e) { console.error(e); }
+  };
 
   const fetchCounts = async () => {
     let query = supabase
@@ -80,12 +100,14 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
   };
 
   const fetchQuestions = async (dbLevels) => {
+    const spanish = dbLevels.length === 0;
     let query = supabase
       .from('question_bank')
       .select('*')
       .eq('type', 'matching')
-      .neq('topic', 'spanish')
-      .in('level', dbLevels);
+      .in('language', spanish ? ['es', 'both'] : ['en', 'both']);
+    if (!spanish) query = query.neq('topic', 'spanish');
+    if (!spanish && dbLevels.length > 0) query = query.in('level', dbLevels);
     if (topicFilter) query = query.eq('topic', topicFilter);
     const { data, error } = await query;
     if (error) { console.error('Matching fetch error:', error); setStage('playing'); return; }
@@ -125,20 +147,25 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
 
   const backToLevelSelect = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-    setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0);
-    setQuestionResult(null); setStage('level-select'); fetchCounts();
+    if (isSpanish) {
+      setQuestions([]); setCurrentQ(0); setScore(0); setQuestionResult(null);
+      setStage('loading'); fetchQuestions([]);
+    } else {
+      setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0);
+      setQuestionResult(null); setStage('level-select'); fetchCounts();
+    }
   };
 
   const restartExercise = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     setStage('loading');
-    fetchQuestions(selectedLevel.dbLevels);
+    fetchQuestions(isSpanish ? [] : selectedLevel.dbLevels);
   };
 
   const q = questions[currentQ];
   const parsedPairs = q ? (Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]')) : [];
 
-  // ── LEVEL SELECT ────────────────────────────────────────────
+  // ── LEVEL SELECT — only for non-Spanish students ────────────────────────
   if (stage === 'level-select') {
     return (
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
@@ -191,7 +218,7 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
     );
   }
 
-  // ── EXERCISE ────────────────────────────────────────────
+  // ── EXERCISE ────────────────────────────────────────────────────────────
   return (
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
@@ -210,7 +237,7 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
             <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🔗</div>
             <h2 style={{ color: '#2C3E50', marginBottom: '0.5rem' }}>Coming Soon!</h2>
             <p style={{ color: '#666' }}>Matching sets for this level are being added. Check back soon!</p>
-            <button onClick={backToLevelSelect} style={{ marginTop: '1rem', padding: '0.75rem 1.5rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>← Choose Another Level</button>
+            <button onClick={backToLevelSelect} style={{ marginTop: '1rem', padding: '0.75rem 1.5rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>← {isSpanish ? 'Try Again' : 'Choose Another Level'}</button>
           </div>
         )}
         {stage === 'playing' && q && (
@@ -256,7 +283,7 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
             <p style={{ color: '#718096', fontSize: '0.88rem' }}>A point is awarded for each set matched with no wrong attempts.</p>
             <div style={{ marginTop: '20px', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={restartExercise} style={{ padding: '10px 24px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Try Again</button>
-              <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Change Level</button>
+              {!isSpanish && <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Change Level</button>}
               {onBack && <button onClick={onBack} style={{ padding: '10px 24px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', fontSize: '1rem' }}>Back to Exercises</button>}
             </div>
           </div>
