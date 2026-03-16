@@ -46,8 +46,8 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
   useEffect(() => { fetchCounts(); }, []);
 
   const applyTrackFilter = (query) => {
-    if (!userTracks || userTracks.length === 0) return query;
-    return query.overlaps('tracks', userTracks);
+    const effectiveTracks = (userTracks && userTracks.length > 0) ? userTracks : ['general'];
+    return query.overlaps('tracks', effectiveTracks);
   };
 
   const fetchCounts = async () => {

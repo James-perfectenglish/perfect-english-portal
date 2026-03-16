@@ -68,11 +68,16 @@ const TABS = [
 
 const SPECIFIC_TRACKS = ['bathroom', 'hotels', 'spanish', 'business', 'law', 'sports']
 
+// Treat empty/null tracks as ['general'] — prevents Spanish/track-specific content
+// leaking to users who haven't been assigned a track yet.
+const effectiveTracks = (userTracks) =>
+  (!userTracks || userTracks.length === 0) ? ['general'] : userTracks
+
 function shouldShowExercise(exercise, userTracks) {
-  if (!userTracks || userTracks.length === 0) return true
+  const tracks = effectiveTracks(userTracks)
   const exTracks = exercise.tracks || ['general']
   if (exTracks.includes('general')) return true
-  return exTracks.some(t => userTracks.includes(t))
+  return exTracks.some(t => tracks.includes(t))
 }
 
 // For You: exercise must match at least one of the user's specific tracks,
@@ -131,9 +136,11 @@ export default function ExerciseList({
   const fetchListeningNew = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    let q = supabase.from('listening_exercises').select('id')
-    if (userTracks && userTracks.length > 0) q = q.overlaps('tracks', userTracks)
-    const { data: available } = await q
+    const tracks = effectiveTracks(userTracks)
+    const { data: available } = await supabase
+      .from('listening_exercises')
+      .select('id')
+      .overlaps('tracks', tracks)
     if (!available || available.length === 0) return
     const { data: sessions } = await supabase.from('listening_sessions').select('exercise_id').eq('student_id', user.id)
     const completedIds = new Set((sessions || []).map(s => s.exercise_id))
