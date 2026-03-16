@@ -34,6 +34,8 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
   const [gistSubmitted, setGistSubmitted]   = useState(false);
   const [detailSubmitted, setDetailSubmitted] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
+  const [markingGapFills, setMarkingGapFills] = useState(false);
+  const [aiGapResults, setAiGapResults]     = useState({});
 
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying]       = useState(false);
@@ -90,6 +92,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
     setDetailQuestions((qData || []).filter(q => q.stage === 'detail'));
     setGistAnswers({}); setDetailAnswers({}); setGapInputs({});
     setGistSubmitted(false); setDetailSubmitted(false); setShowTranscript(false);
+    setMarkingGapFills(false); setAiGapResults({});
     setIsPlaying(false); setCurrentTime(0); setDuration(0); setPlaybackSpeed(1.0);
     setExerciseStage('intro');
     setStage('exercise');
@@ -161,12 +164,61 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
   };
 
   const isAnswerCorrect = (q, userAnswer) => {
+    if (q.type === 'gap_fill') {
+      const aiResult = aiGapResults[q.id];
+      if (aiResult !== undefined) return aiResult.valid;
+      // Fallback to string match if AI result not yet available
+      const ua = (userAnswer || '').toLowerCase().trim();
+      return ua === (q.correct_answer || '').toLowerCase().trim();
+    }
     const ua = (userAnswer || '').toLowerCase().trim();
     return ua === (q.correct_answer || '').toLowerCase().trim();
   };
 
-  const submitGist   = () => setGistSubmitted(true);
-  const submitDetail = () => { setDetailSubmitted(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const submitGist = () => setGistSubmitted(true);
+
+  const submitDetail = async () => {
+    const gapQuestions = detailQuestions.filter(q => q.type === 'gap_fill');
+    if (gapQuestions.length === 0) {
+      setDetailSubmitted(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setMarkingGapFills(true);
+    const transcript = currentExercise?.transcript || '';
+
+    const results = await Promise.all(
+      gapQuestions.map(async (q) => {
+        try {
+          const res = await fetch('/api/mark-listening-gap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              student_answer: detailAnswers[q.id] || '',
+              correct_answer: q.correct_answer,
+              question: q.question,
+              transcript,
+            })
+          });
+          const data = await res.json();
+          return { id: q.id, valid: data.valid, reason: data.reason };
+        } catch {
+          // On API failure, fall back to string match
+          const ua = (detailAnswers[q.id] || '').toLowerCase().trim();
+          const correct = ua === (q.correct_answer || '').toLowerCase().trim();
+          return { id: q.id, valid: correct, reason: null };
+        }
+      })
+    );
+
+    const resultsMap = {};
+    results.forEach(r => { resultsMap[r.id] = { valid: r.valid, reason: r.reason }; });
+    setAiGapResults(resultsMap);
+    setMarkingGapFills(false);
+    setDetailSubmitted(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const moveToDetail = () => {
     saveListeningSession('gist');
@@ -244,6 +296,8 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
   const renderQuestion = (q, answers, setAnswer, isSubmitted, gapState) => {
     const userAnswer = answers[q.id] || '';
     const correct    = isSubmitted ? isAnswerCorrect(q, userAnswer) : null;
+    const aiResult   = isSubmitted && q.type === 'gap_fill' ? aiGapResults[q.id] : null;
+
     return (
       <div key={q.id} style={{ border: `2px solid ${isSubmitted ? (correct ? '#48bb78' : '#f56565') : '#e2e8f0'}`, background: isSubmitted ? (correct ? '#f0fff4' : '#fff5f5') : 'white', borderRadius: '8px', padding: '1.25rem', marginBottom: '1rem' }}>
         <div style={{ fontWeight: 700, color: '#667eea', fontSize: '0.85rem', marginBottom: '6px' }}>Question {q.question_number}</div>
@@ -266,8 +320,12 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
         )}
         {isSubmitted && (
           <div style={{ marginTop: '10px', padding: '10px', borderRadius: '6px', background: correct ? '#c6f6d5' : '#fed7d7', color: correct ? '#22543d' : '#742a2a', borderLeft: `4px solid ${correct ? '#48bb78' : '#f56565'}`, fontSize: '0.9rem', lineHeight: 1.5 }}>
-            <strong>{correct ? '✓ Correct!' : `✗ Incorrect — ${q.correct_answer}`}</strong>
-            {q.explanation && <><br />{q.explanation}</>}
+            {correct
+              ? <strong>✓ Correct!</strong>
+              : <><strong>✗ Incorrect — {q.correct_answer}</strong></>
+            }
+            {aiResult?.reason && <><br /><span style={{ fontStyle: 'italic', opacity: 0.85 }}>{aiResult.reason}</span></>}
+            {!aiResult && q.explanation && <><br />{q.explanation}</>}
           </div>
         )}
       </div>
@@ -435,7 +493,15 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
               <p style={{ color: '#718096', fontSize: '0.9rem', marginBottom: '1rem', marginTop: 0 }}>Listen again more carefully and answer the questions below.</p>
               {renderAudioPlayer('Second Listen')}
               {detailQuestions.map(q => renderQuestion(q, detailAnswers, selectDetailAnswer, detailSubmitted, gapInputs))}
-              {!detailSubmitted && <button onClick={submitDetail} disabled={!detailAllAnswered} style={{ width: '100%', padding: '1rem', fontSize: '1rem', background: detailAllAnswered ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#cbd5e0', color: 'white', border: 'none', borderRadius: '10px', cursor: detailAllAnswered ? 'pointer' : 'not-allowed', fontWeight: 600 }}>Submit Answers</button>}
+              {!detailSubmitted && (
+                <button
+                  onClick={submitDetail}
+                  disabled={!detailAllAnswered || markingGapFills}
+                  style={{ width: '100%', padding: '1rem', fontSize: '1rem', background: detailAllAnswered && !markingGapFills ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#cbd5e0', color: 'white', border: 'none', borderRadius: '10px', cursor: detailAllAnswered && !markingGapFills ? 'pointer' : 'not-allowed', fontWeight: 600 }}
+                >
+                  {markingGapFills ? 'Marking…' : 'Submit Answers'}
+                </button>
+              )}
               {detailSubmitted && <button onClick={moveToReview} style={{ width: '100%', padding: '1rem', fontSize: '1rem', marginTop: '0.5rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 600 }}>See Results →</button>}
             </>
           )}
