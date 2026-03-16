@@ -12,44 +12,13 @@ function shuffleArray(arr) {
 }
 
 const LEVELS = [
-  {
-    key: 'beginner',
-    label: 'Beginner',
-    sublabel: 'A1 – A2',
-    badgeLabel: 'Level: A1-A2',
-    description: 'Simple verb errors, word order, and basic grammar mistakes.',
-    colour: '#48bb78',
-    colourLight: '#f0fff4',
-    dbLevels: ['A1', 'A2'],
-    icon: '🌱'
-  },
-  {
-    key: 'intermediate',
-    label: 'Intermediate',
-    sublabel: 'B1 – B2',
-    badgeLabel: 'Level: B1-B2',
-    description: 'Tense errors, prepositions, conditionals, and tricky collocations.',
-    colour: '#4299e1',
-    colourLight: '#ebf8ff',
-    dbLevels: ['B1', 'B2'],
-    icon: '📘'
-  },
-  {
-    key: 'advanced',
-    label: 'Advanced',
-    sublabel: 'C1 – C2',
-    badgeLabel: 'Level: C1-C2',
-    description: 'Subtle grammar errors, register mistakes, and advanced structures.',
-    colour: '#ed8936',
-    colourLight: '#fffaf0',
-    dbLevels: ['C1', 'C2'],
-    icon: '🎓'
-  }
+  { key: 'beginner', label: 'Beginner', sublabel: 'A1 – A2', badgeLabel: 'Level: A1-A2', description: 'Simple verb errors, word order, and basic grammar mistakes.', colour: '#48bb78', colourLight: '#f0fff4', dbLevels: ['A1', 'A2'], icon: '🌱' },
+  { key: 'intermediate', label: 'Intermediate', sublabel: 'B1 – B2', badgeLabel: 'Level: B1-B2', description: 'Tense errors, prepositions, conditionals, and tricky collocations.', colour: '#4299e1', colourLight: '#ebf8ff', dbLevels: ['B1', 'B2'], icon: '📘' },
+  { key: 'advanced', label: 'Advanced', sublabel: 'C1 – C2', badgeLabel: 'Level: C1-C2', description: 'Subtle grammar errors, register mistakes, and advanced structures.', colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '🎓' }
 ];
 
 const GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
 const QUESTIONS_PER_ROUND = 10;
-
 const normalise = (s) => s.toLowerCase().trim().replace(/\s+/g, ' ');
 
 const findErrorIndex = (questionWords, correctAnswer) => {
@@ -75,13 +44,10 @@ const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement,
     const result = await response.json();
     if (result.valid === null) return null;
     return result;
-  } catch (e) {
-    console.error('AI marking error:', e);
-    return null;
-  }
+  } catch (e) { console.error('AI marking error:', e); return null; }
 };
 
-export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
+export default function ErrorCorrection({ onBack, onComplete, topicFilter, userTracks = [] }) {
   const [stage, setStage] = useState('level-select');
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [questionCounts, setQuestionCounts] = useState({});
@@ -94,18 +60,17 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
   const [isChecking, setIsChecking] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
 
-  const isSpanish = userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
+  const isSpanish = userTracks.includes('spanish') || userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
 
   useEffect(() => { fetchCounts(); fetchUserProfile(); }, []);
 
-  // Auto-bypass level select for Spanish students
   useEffect(() => {
     if (!userProfile) return;
     if (isSpanish && stage === 'level-select') {
       setStage('loading');
       fetchQuestions([]);
     }
-  }, [userProfile]);
+  }, [userProfile, userTracks]);
 
   const fetchUserProfile = async () => {
     try {
@@ -131,12 +96,9 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
 
   const selectLevel = (level) => {
     if ((questionCounts[level.key] || 0) === 0) return;
-    setSelectedLevel(level);
-    setStage('loading');
-    fetchQuestions(level.dbLevels);
+    setSelectedLevel(level); setStage('loading'); fetchQuestions(level.dbLevels);
   };
 
-  // dbLevels === [] signals Spanish mode (no level filter, Spanish language)
   const fetchQuestions = async (dbLevels) => {
     const spanish = dbLevels.length === 0;
     let query = supabase.from('question_bank').select('*')
@@ -155,58 +117,41 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       await supabase.from('student_answers').insert({
-        student_id: user.id,
-        question_id: question.question_number,
-        student_answer: studentAnswer,
-        correct_answer: question.correct_answer || '',
-        is_correct: isCorrect,
-        is_soft_pass: isSoftPass
+        student_id: user.id, question_id: question.question_number,
+        student_answer: studentAnswer, correct_answer: question.correct_answer || '',
+        is_correct: isCorrect, is_soft_pass: isSoftPass
       });
     } catch (error) { console.error('Error saving answer:', error); }
   };
 
   const handleWordTap = (index) => {
     if (feedback || isChecking) return;
-    setSelectedWordIndex(index);
-    setCorrection('');
+    setSelectedWordIndex(index); setCorrection('');
   };
 
   const checkAnswer = async () => {
     if (selectedWordIndex === null || !correction.trim() || isChecking) return;
-
     const q = questions[currentQ];
     const words = q.question.trim().split(/\s+/);
     const correctAnswer = q.correct_answer || '';
-
     const originalWord = words[selectedWordIndex];
     const trailingPunct = originalWord.match(/[.,!?;:]+$/)?.[0] || '';
     const cleanCorrection = correction.trim().replace(/[.,!?;:]+$/, '');
     const correctedWords = [...words];
     correctedWords[selectedWordIndex] = cleanCorrection + trailingPunct;
     const correctedSentence = correctedWords.join(' ');
-
     const isExactMatch = normalise(correctedSentence) === normalise(correctAnswer);
     const errorInfo = findErrorIndex(words, correctAnswer);
 
     if (isExactMatch) {
       setScore(s => s + 1);
-      setFeedback({
-        type: 'pass',
-        message: `✅ Correct! ${q.explanation || ''}`,
-        errorIndex: selectedWordIndex,
-        correctWord: cleanCorrection + trailingPunct
-      });
+      setFeedback({ type: 'pass', message: `✅ Correct! ${q.explanation || ''}`, errorIndex: selectedWordIndex, correctWord: cleanCorrection + trailingPunct });
       saveAnswer(q, `${words[selectedWordIndex]} → ${cleanCorrection + trailingPunct}`, true, false);
       return;
     }
 
     if (selectedWordIndex !== errorInfo.index) {
-      setFeedback({
-        type: 'fail',
-        message: `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${q.explanation || ''}`,
-        errorIndex: errorInfo.index,
-        correctWord: errorInfo.correctWord
-      });
+      setFeedback({ type: 'fail', message: `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${q.explanation || ''}`, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
       saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, false, false);
       return;
     }
@@ -218,28 +163,18 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
 
     if (aiResult?.valid) {
       setScore(s => s + 1);
-      setFeedback({
-        type: 'soft-pass',
-        message: `✅ Good — that works too! ${aiResult.reason} The model answer was "${errorInfo.correctWord}". ${q.explanation || ''}`,
-        errorIndex: selectedWordIndex,
-        correctWord: cleanCorrection + trailingPunct
-      });
+      setFeedback({ type: 'soft-pass', message: `✅ Good — that works too! ${aiResult.reason} The model answer was "${errorInfo.correctWord}". ${q.explanation || ''}`, errorIndex: selectedWordIndex, correctWord: cleanCorrection + trailingPunct });
       saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, true, true);
       return;
     }
 
-    setFeedback({
-      type: 'fail',
-      message: `❌ Good — you found the error in "${words[errorInfo.index]}", but "${correction.trim()}" doesn't quite work here. ${aiResult?.reason ? aiResult.reason + ' ' : ''}It should be "${errorInfo.correctWord}". ${q.explanation || ''}`,
-      errorIndex: errorInfo.index,
-      correctWord: errorInfo.correctWord
-    });
+    setFeedback({ type: 'fail', message: `❌ Good — you found the error in "${words[errorInfo.index]}", but "${correction.trim()}" doesn't quite work here. ${aiResult?.reason ? aiResult.reason + ' ' : ''}It should be "${errorInfo.correctWord}". ${q.explanation || ''}`, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
     saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, false, false);
   };
 
   const nextQuestion = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-    if (currentQ + 1 >= questions.length) { setStage('finished'); }
+    if (currentQ + 1 >= questions.length) setStage('finished');
     else { setCurrentQ(c => c + 1); setSelectedWordIndex(null); setCorrection(''); setFeedback(null); }
   };
 
@@ -259,45 +194,27 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
   const restartExercise = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     setCurrentQ(0); setScore(0); setSelectedWordIndex(null); setCorrection(''); setFeedback(null);
-    setStage('loading');
-    fetchQuestions(isSpanish ? [] : selectedLevel.dbLevels);
+    setStage('loading'); fetchQuestions(isSpanish ? [] : selectedLevel.dbLevels);
   };
 
   const q = questions[currentQ];
   const questionWords = q ? q.question.trim().split(/\s+/) : [];
 
   const getWordTileStyle = (index) => {
-    const base = {
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)',
-      margin: '4px 3px', borderRadius: '8px',
-      fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)', fontWeight: '500',
-      cursor: (feedback || isChecking) ? 'default' : 'pointer',
-      transition: 'all 0.15s ease', userSelect: 'none',
-      backgroundColor: 'white', border: '2px solid #e2e8f0', color: '#2d3748'
-    };
+    const base = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)', margin: '4px 3px', borderRadius: '8px', fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)', fontWeight: '500', cursor: (feedback || isChecking) ? 'default' : 'pointer', transition: 'all 0.15s ease', userSelect: 'none', backgroundColor: 'white', border: '2px solid #e2e8f0', color: '#2d3748' };
     if (feedback) {
       const isPass = feedback.type === 'pass' || feedback.type === 'soft-pass';
-      if (index === feedback.errorIndex && isPass)
-        return { ...base, backgroundColor: '#f0fff4', border: '2px solid #48bb78', color: '#276749', textDecoration: 'line-through', textDecorationColor: '#c53030' };
-      if (index === feedback.errorIndex && !isPass)
-        return { ...base, backgroundColor: '#fff5f5', border: '2px solid #f56565', color: '#c53030', textDecoration: 'line-through', textDecorationColor: '#c53030' };
-      if (index === selectedWordIndex && selectedWordIndex !== feedback.errorIndex)
-        return { ...base, backgroundColor: '#fff5f5', border: '2px solid #f56565', color: '#c53030', opacity: 0.6 };
+      if (index === feedback.errorIndex && isPass) return { ...base, backgroundColor: '#f0fff4', border: '2px solid #48bb78', color: '#276749', textDecoration: 'line-through', textDecorationColor: '#c53030' };
+      if (index === feedback.errorIndex && !isPass) return { ...base, backgroundColor: '#fff5f5', border: '2px solid #f56565', color: '#c53030', textDecoration: 'line-through', textDecorationColor: '#c53030' };
+      if (index === selectedWordIndex && selectedWordIndex !== feedback.errorIndex) return { ...base, backgroundColor: '#fff5f5', border: '2px solid #f56565', color: '#c53030', opacity: 0.6 };
       return { ...base, opacity: 0.6 };
     }
-    if (index === selectedWordIndex)
-      return { ...base, backgroundColor: '#EDE9FE', border: '2px solid #667eea', color: '#553C9A' };
+    if (index === selectedWordIndex) return { ...base, backgroundColor: '#EDE9FE', border: '2px solid #667eea', color: '#553C9A' };
     return base;
   };
 
-  const feedbackStyle = feedback ? {
-    pass:        { bg: '#f0fff4', border: '#c6f6d5', color: '#276749' },
-    'soft-pass': { bg: '#fffbeb', border: '#fbd38d', color: '#744210' },
-    fail:        { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c' },
-  }[feedback.type] : null;
+  const feedbackStyle = feedback ? { pass: { bg: '#f0fff4', border: '#c6f6d5', color: '#276749' }, 'soft-pass': { bg: '#fffbeb', border: '#fbd38d', color: '#744210' }, fail: { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c' } }[feedback.type] : null;
 
-  // LEVEL SELECT — only shown for non-Spanish students
   if (stage === 'level-select') {
     return (
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
@@ -314,12 +231,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
               const count = questionCounts[level.key] || 0;
               const available = count > 0;
               return (
-                <div key={level.key} onClick={() => available && selectLevel(level)} style={{
-                  border: `2px solid ${available ? level.colour : '#e2e8f0'}`, borderRadius: '12px', padding: '1.25rem 1.5rem',
-                  cursor: available ? 'pointer' : 'default', background: available ? level.colourLight : '#f9fafb',
-                  opacity: available ? 1 : 0.55, transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                  display: 'flex', alignItems: 'center', gap: '1rem'
-                }}
+                <div key={level.key} onClick={() => available && selectLevel(level)} style={{ border: `2px solid ${available ? level.colour : '#e2e8f0'}`, borderRadius: '12px', padding: '1.25rem 1.5rem', cursor: available ? 'pointer' : 'default', background: available ? level.colourLight : '#f9fafb', opacity: available ? 1 : 0.55, transition: 'transform 0.15s ease, box-shadow 0.15s ease', display: 'flex', alignItems: 'center', gap: '1rem' }}
                   onMouseEnter={e => { if (available) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 4px 16px ${level.colour}30`; } }}
                   onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
@@ -350,7 +262,6 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
     );
   }
 
-  // EXERCISE
   return (
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
@@ -361,7 +272,6 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
       </div>
       <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
         {stage === 'loading' && <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#666' }}>Loading questions...</div>}
-
         {stage === 'playing' && questions.length === 0 && (
           <div style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>✏️</div>
@@ -370,33 +280,21 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
             <button onClick={backToLevelSelect} style={{ marginTop: '1rem', padding: '0.75rem 1.5rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>← {isSpanish ? 'Try Again' : 'Choose Another Level'}</button>
           </div>
         )}
-
         {stage === 'playing' && q && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', background: '#f7fafc', padding: '12px 16px', borderRadius: '8px', marginBottom: '24px', fontSize: '0.9rem', color: '#4a5568', fontWeight: 500 }}>
               <span>Progress: {currentQ + 1}/{questions.length}</span>
               <span>Score: {score}/{questions.length}</span>
             </div>
-
             <div style={{ border: '2px solid #e2e8f0', borderRadius: '8px', padding: '1.5rem', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
                 <LevelBadge level={q.level} />
                 <TopicBadge topic={q.topic} />
                 <AiMarkedBadge />
               </div>
-
               <div style={{ fontSize: '0.9rem', color: '#718096', marginBottom: '1rem', fontStyle: 'italic' }}>
-                {isChecking
-                  ? '🤖 Checking your answer...'
-                  : !feedback
-                    ? '👆 Tap the word that is wrong, then type the correction below.'
-                    : feedback.type === 'pass'
-                      ? 'Well done!'
-                      : feedback.type === 'soft-pass'
-                        ? 'Valid alternative — well spotted!'
-                        : 'See the correction below.'}
+                {isChecking ? '🤖 Checking your answer...' : !feedback ? '👆 Tap the word that is wrong, then type the correction below.' : feedback.type === 'pass' ? 'Well done!' : feedback.type === 'soft-pass' ? 'Valid alternative — well spotted!' : 'See the correction below.'}
               </div>
-
               <div style={{ backgroundColor: '#F8FBFF', padding: '1.25rem', borderRadius: '10px', border: '1px solid #AED6F1', lineHeight: '2.4', marginBottom: '1.25rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
                 {questionWords.map((word, index) => (
                   <span key={index} onClick={() => handleWordTap(index)} style={getWordTileStyle(index)}
@@ -412,60 +310,28 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter }) {
                   </div>
                 )}
               </div>
-
-              {isChecking && (
-                <div style={{ textAlign: 'center', padding: '1rem', color: '#553C9A', fontSize: '0.95rem', border: '2px dashed #EDE9FE', borderRadius: '8px', marginBottom: '1rem' }}>
-                  🤖 Asking the AI marker...
-                </div>
-              )}
-
+              {isChecking && <div style={{ textAlign: 'center', padding: '1rem', color: '#553C9A', fontSize: '0.95rem', border: '2px dashed #EDE9FE', borderRadius: '8px', marginBottom: '1rem' }}>🤖 Asking the AI marker...</div>}
               {selectedWordIndex !== null && !feedback && !isChecking && (
                 <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', alignItems: 'stretch' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Your correction for "{questionWords[selectedWordIndex]}":
-                    </div>
-                    <input type="text" value={correction} onChange={(e) => setCorrection(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && checkAnswer()}
-                      placeholder="Type the correct word..." autoFocus
-                      style={{ width: '100%', padding: '0.9rem 1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', borderRadius: '8px', border: '2px solid #667eea', boxSizing: 'border-box', color: '#2d3748', fontWeight: 500, backgroundColor: '#EDE9FE' }} />
+                    <div style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Your correction for "{questionWords[selectedWordIndex]}":</div>
+                    <input type="text" value={correction} onChange={(e) => setCorrection(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && checkAnswer()} placeholder="Type the correct word..." autoFocus style={{ width: '100%', padding: '0.9rem 1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', borderRadius: '8px', border: '2px solid #667eea', boxSizing: 'border-box', color: '#2d3748', fontWeight: 500, backgroundColor: '#EDE9FE' }} />
                   </div>
-                  <button onClick={checkAnswer} disabled={!correction.trim()}
-                    style={{ padding: '0 1.5rem', background: correction.trim() ? GRADIENT : '#cbd5e0', color: 'white', border: 'none', borderRadius: '8px', cursor: correction.trim() ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '1rem', alignSelf: 'flex-end', minHeight: '48px' }}>
-                    Check
-                  </button>
+                  <button onClick={checkAnswer} disabled={!correction.trim()} style={{ padding: '0 1.5rem', background: correction.trim() ? GRADIENT : '#cbd5e0', color: 'white', border: 'none', borderRadius: '8px', cursor: correction.trim() ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '1rem', alignSelf: 'flex-end', minHeight: '48px' }}>Check</button>
                 </div>
               )}
-
-              {selectedWordIndex === null && !feedback && !isChecking && (
-                <div style={{ textAlign: 'center', padding: '1rem', color: '#A0AEC0', fontSize: '0.95rem', border: '2px dashed #E2E8F0', borderRadius: '8px' }}>
-                  👆 Tap the word you think is wrong
-                </div>
-              )}
-
-              {feedback && feedbackStyle && (
-                <div style={{ backgroundColor: feedbackStyle.bg, border: `1px solid ${feedbackStyle.border}`, color: feedbackStyle.color, padding: '1rem 1.25rem', borderRadius: '10px', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: '1.6', marginBottom: '0.75rem' }}>
-                  {feedback.message}
-                </div>
-              )}
-
-              {feedback && (
-                <button onClick={nextQuestion} style={{ width: '100%', padding: '1rem', marginTop: '0.5rem', fontSize: '1rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '600' }}>
-                  {currentQ + 1 >= questions.length ? 'See Results' : 'Next Question →'}
-                </button>
-              )}
+              {selectedWordIndex === null && !feedback && !isChecking && <div style={{ textAlign: 'center', padding: '1rem', color: '#A0AEC0', fontSize: '0.95rem', border: '2px dashed #E2E8F0', borderRadius: '8px' }}>👆 Tap the word you think is wrong</div>}
+              {feedback && feedbackStyle && <div style={{ backgroundColor: feedbackStyle.bg, border: `1px solid ${feedbackStyle.border}`, color: feedbackStyle.color, padding: '1rem 1.25rem', borderRadius: '10px', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: '1.6', marginBottom: '0.75rem' }}>{feedback.message}</div>}
+              {feedback && <button onClick={nextQuestion} style={{ width: '100%', padding: '1rem', marginTop: '0.5rem', fontSize: '1rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '600' }}>{currentQ + 1 >= questions.length ? 'See Results' : 'Next Question →'}</button>}
             </div>
           </>
         )}
-
         {stage === 'finished' && (
           <div style={{ background: '#f7fafc', border: '2px solid #e2e8f0', borderRadius: '8px', padding: '2rem', textAlign: 'center', marginTop: '1rem' }}>
             <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>{score >= 9 ? '🏆' : score >= 7 ? '⭐' : score >= 5 ? '👍' : '💪'}</div>
             <h2 style={{ color: '#2d3748', margin: '0 0 12px' }}>Exercise Complete!</h2>
             <div style={{ fontSize: '3rem', fontWeight: 700, margin: '12px 0', color: score >= 7 ? '#48bb78' : score >= 5 ? '#ed8936' : '#f56565' }}>{score}/{questions.length}</div>
-            <p style={{ color: '#4a5568' }}>
-              {score >= 9 ? 'Outstanding! Sharp eye for errors.' : score >= 7 ? 'Great work! You spotted most mistakes.' : score >= 5 ? 'Good effort. Keep training your error detection.' : 'Keep going — the more you practise, the easier it gets!'}
-            </p>
+            <p style={{ color: '#4a5568' }}>{score >= 9 ? 'Outstanding! Sharp eye for errors.' : score >= 7 ? 'Great work! You spotted most mistakes.' : score >= 5 ? 'Good effort. Keep training your error detection.' : 'Keep going — the more you practise, the easier it gets!'}</p>
             <div style={{ marginTop: '20px', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={restartExercise} style={{ padding: '10px 24px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Try Again</button>
               {!isSpanish && <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Change Level</button>}

@@ -46,7 +46,7 @@ function buildQuestionList(data) {
   return shuffleArray(blocks).flat().slice(0, QUESTIONS_PER_ROUND);
 }
 
-export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
+export default function MatchingExercise({ onBack, onComplete, topicFilter, userTracks = [] }) {
   const [stage, setStage] = useState('level-select');
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [questionCounts, setQuestionCounts] = useState({});
@@ -56,7 +56,7 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter }) {
   const [questionResult, setQuestionResult] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
 
-  const isSpanish = userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
+  const isSpanish = userTracks.includes('spanish') || userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
 
   useEffect(() => { fetchCounts(); fetchUserProfile(); }, []);
 

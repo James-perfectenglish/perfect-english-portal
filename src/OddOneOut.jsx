@@ -28,7 +28,7 @@ const LEVELS = [
 const GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
 const QUESTIONS_PER_ROUND = 10;
 
-export default function OddOneOut({ onBack, onComplete, topicFilter }) {
+export default function OddOneOut({ onBack, onComplete, topicFilter, userTracks = [] }) {
   const [stage, setStage] = useState('level-select');
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [questionCounts, setQuestionCounts] = useState({});
@@ -39,7 +39,7 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
   const [feedback, setFeedback] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
 
-  const isSpanish = userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
+  const isSpanish = userTracks.includes('spanish') || userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
 
   useEffect(() => { fetchCounts(); fetchUserProfile(); }, []);
 
@@ -49,7 +49,7 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
       setStage('loading');
       fetchQuestions([]);
     }
-  }, [userProfile]);
+  }, [userProfile, userTracks]);
 
   const fetchUserProfile = async () => {
     try {
@@ -91,7 +91,6 @@ export default function OddOneOut({ onBack, onComplete, topicFilter }) {
     if (error) { console.error('Error:', error); setStage('playing'); return; }
     if (data && data.length > 0) {
       const shuffled = shuffleArray(data).slice(0, QUESTIONS_PER_ROUND);
-      // Shuffle options within each question
       setQuestions(shuffled.map(q => ({
         ...q,
         options: Array.isArray(q.options) ? shuffleArray(q.options) : shuffleArray(JSON.parse(q.options || '[]'))

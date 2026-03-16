@@ -17,7 +17,7 @@ const LEVELS = [
   { key: 'advanced', label: 'Advanced', sublabel: 'C1 – C2', badgeLabel: 'Level: C1-C2 Advanced', description: 'Complex sentences with advanced grammar, idioms, and nuanced word order.', colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '🎓' }
 ];
 
-export default function SentenceBuilding({ onBack, onComplete }) {
+export default function SentenceBuilding({ onBack, onComplete, userTracks = [] }) {
   const [stage, setStage] = useState('level-select');
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [questionCounts, setQuestionCounts] = useState({});
@@ -28,7 +28,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
   const [hasAnswer, setHasAnswer] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
 
-  const isSpanish = userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
+  const isSpanish = userTracks.includes('spanish') || userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
 
   useEffect(() => { fetchCounts(); fetchUserProfile(); }, []);
 
@@ -38,7 +38,7 @@ export default function SentenceBuilding({ onBack, onComplete }) {
       setStage('loading');
       fetchQuestions([]);
     }
-  }, [userProfile]);
+  }, [userProfile, userTracks]);
 
   const fetchUserProfile = async () => {
     try {

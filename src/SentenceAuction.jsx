@@ -26,7 +26,7 @@ const LEVELS = [
   { key: 'advanced', label: 'Advanced', sublabel: 'C1 – C2', badgeLabel: 'Level: C1-C2', description: 'Subtle errors — register, nuance, advanced grammar.', colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '🎓' },
 ];
 
-export default function SentenceAuction({ onBack, onComplete }) {
+export default function SentenceAuction({ onBack, onComplete, userTracks = [] }) {
   const [stage, setStage] = useState('level-select');
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [questionCounts, setQuestionCounts] = useState({});
@@ -43,18 +43,17 @@ export default function SentenceAuction({ onBack, onComplete }) {
   const [scoreSaved, setScoreSaved] = useState(false);
   const revealTimerRef = useRef(null);
 
-  const isSpanish = userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
+  const isSpanish = userTracks.includes('spanish') || userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
 
   useEffect(() => { fetchCounts(); fetchUserProfile(); }, []);
 
-  // Auto-bypass level select for Spanish students
   useEffect(() => {
     if (!userProfile) return;
     if (isSpanish && stage === 'level-select') {
       setStage('loading');
       fetchAuctions([]);
     }
-  }, [userProfile]);
+  }, [userProfile, userTracks]);
 
   const fetchUserProfile = async () => {
     try {
@@ -84,7 +83,6 @@ export default function SentenceAuction({ onBack, onComplete }) {
     fetchAuctions(level.dbLevels);
   };
 
-  // dbLevels === [] signals Spanish mode
   const fetchAuctions = async (dbLevels) => {
     const spanish = dbLevels.length === 0;
     let query = supabase.from('question_bank').select('*')
@@ -167,7 +165,7 @@ export default function SentenceAuction({ onBack, onComplete }) {
   };
 
   const saveLeaderboardScore = async (finalBudget, auctionsCompleted) => {
-    if (scoreSaved || isSpanish) return; // no leaderboard for Spanish mode
+    if (scoreSaved || isSpanish) return;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -412,7 +410,6 @@ export default function SentenceAuction({ onBack, onComplete }) {
     const totalGained = roundResults.reduce((a, r) => a + r.gained, 0);
     const totalLost = roundResults.reduce((a, r) => a + r.lost, 0);
 
-    // No questions available for Spanish
     if (auctions.length === 0) {
       return (
         <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
