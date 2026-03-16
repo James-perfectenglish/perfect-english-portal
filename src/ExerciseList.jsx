@@ -131,7 +131,8 @@ export default function ExerciseList({
   const fetchListeningNew = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const tracksWithGeneral = [...new Set([...(userTracks || []), 'general'])]
+    const isSpanishTrack = (userTracks || []).includes('spanish')
+    const tracksWithGeneral = isSpanishTrack ? (userTracks || []) : [...new Set([...(userTracks || []), 'general'])]
     let q = supabase.from('listening_exercises').select('id')
     if (tracksWithGeneral.length > 0) q = q.overlaps('tracks', tracksWithGeneral)
     const { data: available } = await q
@@ -175,8 +176,10 @@ export default function ExerciseList({
     if (t === 'Irregular Verbs Flashcards') return <FlashcardTemplate flashcardSetId={IRREGULAR_VERBS_ID} setName="irregular-verbs" onBack={back} />
     if (t === 'Essential Phrasal Verbs')    return <FlashcardTemplate flashcardSetId={PHRASAL_VERBS_ID} setName="phrasal-verbs" onBack={back} />
     if (t === 'Sentence Building')          return <SentenceBuilding onComplete={back} onBack={back} />
-    if (t === 'Listening Exercises') return <ListeningExercise onBack={back} userTracks={[...new Set([...userTracks, 'general'])]} />
-    if (t === 'Dictation')           return <Dictation onBack={back} userTracks={[...new Set([...userTracks, 'general'])]} />
+    const isSpanishTrack = userTracks.includes('spanish')
+    const listeningTracks = isSpanishTrack ? userTracks : [...new Set([...userTracks, 'general'])]
+    if (t === 'Listening Exercises') return <ListeningExercise onBack={back} userTracks={listeningTracks} />
+    if (t === 'Dictation')           return <Dictation onBack={back} userTracks={listeningTracks} />
     if (t === 'Borrás Flashcards') return <FlashcardTemplate title="Borrás Flashcards" subtitle="Bathroom vocabulary in context 🚿" levelBadge="Level: A1–B1" setName="borras" cards={BORRAS_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
     if (t === 'Borrás Memory Game') return <MemoryGame title="Borrás Memory Game" subtitle="Match the English word to its Spanish translation 🚿" levelBadge="Level: A1–B1" cards={BORRAS_CARDS} gameName="borras" cardBackImage="/og-image.png" onBack={back} />
     if (t === 'Hotel Flashcards') return <FlashcardTemplate title="Hotel Flashcards" subtitle="Essential hotel vocabulary in context 🏩" levelBadge="Level: A2" setName="hotel" cards={HOTEL_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
