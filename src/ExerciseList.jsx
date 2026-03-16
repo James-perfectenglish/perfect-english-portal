@@ -68,16 +68,11 @@ const TABS = [
 
 const SPECIFIC_TRACKS = ['bathroom', 'hotels', 'spanish', 'business', 'law', 'sports']
 
-// Treat empty/null tracks as ['general'] — prevents Spanish/track-specific content
-// leaking to users who haven't been assigned a track yet.
-const effectiveTracks = (userTracks) =>
-  (!userTracks || userTracks.length === 0) ? ['general'] : userTracks
-
 function shouldShowExercise(exercise, userTracks) {
-  const tracks = effectiveTracks(userTracks)
+  if (!userTracks || userTracks.length === 0) return true
   const exTracks = exercise.tracks || ['general']
   if (exTracks.includes('general')) return true
-  return exTracks.some(t => tracks.includes(t))
+  return exTracks.some(t => userTracks.includes(t))
 }
 
 // For You: exercise must match at least one of the user's specific tracks,
@@ -136,11 +131,10 @@ export default function ExerciseList({
   const fetchListeningNew = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const tracks = effectiveTracks(userTracks)
-    const { data: available } = await supabase
-      .from('listening_exercises')
-      .select('id')
-      .overlaps('tracks', tracks)
+    const tracksWithGeneral = [...new Set([...(userTracks || []), 'general'])]
+    let q = supabase.from('listening_exercises').select('id')
+    if (tracksWithGeneral.length > 0) q = q.overlaps('tracks', tracksWithGeneral)
+    const { data: available } = await q
     if (!available || available.length === 0) return
     const { data: sessions } = await supabase.from('listening_sessions').select('exercise_id').eq('student_id', user.id)
     const completedIds = new Set((sessions || []).map(s => s.exercise_id))
@@ -177,21 +171,20 @@ export default function ExerciseList({
   // ── Exercise routing ──────────────────────────────────────────────────────
   if (activeExercise) {
     const t = activeExercise.title
-    const effectiveUserTracks = (isTeacher && teacherTrack) ? [teacherTrack] : userTracks
     if (activeExercise.type === 'topic_practice') return <TopicPracticeExercise exercise={activeExercise} userLevel={userLevel} onBack={back} onComplete={back} />
     if (t === 'Irregular Verbs Flashcards') return <FlashcardTemplate flashcardSetId={IRREGULAR_VERBS_ID} setName="irregular-verbs" onBack={back} />
     if (t === 'Essential Phrasal Verbs')    return <FlashcardTemplate flashcardSetId={PHRASAL_VERBS_ID} setName="phrasal-verbs" onBack={back} />
-    if (t === 'Sentence Building')          return <SentenceBuilding onComplete={back} onBack={back} userTracks={effectiveUserTracks} />
-    if (t === 'Listening Exercises')        return <ListeningExercise onBack={back} userTracks={effectiveUserTracks} />
-    if (t === 'Dictation')                  return <Dictation onBack={back} userTracks={effectiveUserTracks} />
+    if (t === 'Sentence Building')          return <SentenceBuilding onComplete={back} onBack={back} />
+    if (t === 'Listening Exercises') return <ListeningExercise onBack={back} userTracks={[...new Set([...userTracks, 'general'])]} />
+    if (t === 'Dictation')           return <Dictation onBack={back} userTracks={[...new Set([...userTracks, 'general'])]} />
     if (t === 'Borrás Flashcards') return <FlashcardTemplate title="Borrás Flashcards" subtitle="Bathroom vocabulary in context 🚿" levelBadge="Level: A1–B1" setName="borras" cards={BORRAS_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
     if (t === 'Borrás Memory Game') return <MemoryGame title="Borrás Memory Game" subtitle="Match the English word to its Spanish translation 🚿" levelBadge="Level: A1–B1" cards={BORRAS_CARDS} gameName="borras" cardBackImage="/og-image.png" onBack={back} />
     if (t === 'Hotel Flashcards') return <FlashcardTemplate title="Hotel Flashcards" subtitle="Essential hotel vocabulary in context 🏩" levelBadge="Level: A2" setName="hotel" cards={HOTEL_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
     if (t === 'Hotel Memory Game') return <MemoryGame title="Hotel Memory Game" subtitle="Match the English word to its Spanish translation 🏩" levelBadge="Level: A2" cards={HOTEL_CARDS} gameName="hotel" cardBackImage="/og-image.png" onBack={back} />
-    if (t === 'Odd One Out')      return <OddOneOut onComplete={back} onBack={back} userTracks={effectiveUserTracks} />
-    if (t === 'Error Correction') return <ErrorCorrection onComplete={back} onBack={back} userTracks={effectiveUserTracks} />
-    if (t === 'Matching')         return <MatchingExercise onComplete={back} onBack={back} userTracks={effectiveUserTracks} />
-    if (t === 'Sentence Auction') return <SentenceAuction onComplete={back} onBack={back} userTracks={effectiveUserTracks} />
+    if (t === 'Odd One Out')      return <OddOneOut onComplete={back} onBack={back} />
+    if (t === 'Error Correction') return <ErrorCorrection onComplete={back} onBack={back} />
+    if (t === 'Matching')         return <MatchingExercise onComplete={back} onBack={back} />
+    if (t === 'Sentence Auction') return <SentenceAuction onComplete={back} onBack={back} />
   }
 
   // ── Filter + sort for active tab ──────────────────────────────────────────
