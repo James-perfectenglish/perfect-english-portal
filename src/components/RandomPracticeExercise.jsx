@@ -256,7 +256,9 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       };
 
       const fetchDictation = () => {
-        let q = supabase.from('dictation_exercises').select('*').eq('language', isSpanish ? 'es' : 'en');
+        let q = supabase.from('dictation_exercises').select('*')
+          .eq('language', isSpanish ? 'es' : 'en')
+          .ilike('audio_url', '%quick%');
         if (!isSpanish && levels && levels.length > 0) q = q.in('level', levels);
         return q;
       };
