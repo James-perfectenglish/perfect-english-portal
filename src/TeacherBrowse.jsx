@@ -16,7 +16,6 @@ const TYPE_INFO = {
 
 const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
-// One colour per band — consistent with the rest of the site
 const LEVEL_COLORS = {
   A1: '#48bb78', A2: '#48bb78',
   B1: '#4299e1', B2: '#4299e1',
@@ -32,33 +31,25 @@ const SOURCE_META = {
 const NEW_COUNT = 50;
 
 const ALL_TAGS = [
-  // Grammar — verb forms
   'Present tense', 'Past tense', 'Future form',
   'Conditional', 'Passive voice', 'Reported speech',
   'Modal verb', 'Gerund & infinitive', 'Subjunctive',
   'Wish & regret', 'Causative',
-  // Grammar — sentence structure
   'Relative clause', 'Participle clause', 'Cleft sentence',
   'Inversion', 'Linking word', 'Question form',
-  // Grammar — words & forms
   'Article', 'Quantifier', 'Pronoun', 'Adjective', 'Adverb',
   'Comparative', 'Superlative', 'Plural', 'Possessive',
   'To be', 'Have got', 'There is/are', 'Too & enough',
   'Irregular verb', 'Word formation', 'Time expression',
   'Preposition', 'Dependent preposition',
   'Preposition of time', 'Preposition of place', 'Preposition of movement',
-  // Vocabulary
   'Vocabulary', 'Collocation', 'Phrasal verb', 'Business phrasal verb',
   'Fixed expression', 'Confusable words',
   'Uncountable noun', 'Countable noun',
-  // Specialist vocabulary
   'Business vocabulary', 'Financial vocabulary', 'HR vocabulary',
   'Hotel vocabulary', 'Bathroom vocabulary', 'Academic English',
-  // Register / style
   'Formal register', 'Making suggestions',
-  // Spanish
   'Vocabulario',
-  // Other
   'Pronunciation',
 ];
 
@@ -250,7 +241,6 @@ const _getSbProps = (q) => {
   return { words: options, questionType: hasPrompt ? 'translation' : 'build', prompt: hasPrompt ? q.question : null, correctSentences: [q.correct_answer || ''], explanation: q.explanation || '' };
 };
 
-// Safe parser for matching pairs — catches malformed JSON and unexpected formats
 const _parseMatchingPairs = (options) => {
   try {
     const pairs = Array.isArray(options) ? options : JSON.parse(options || '[]');
@@ -274,6 +264,14 @@ function InteractiveQuestion({ item: q }) {
   const [audioPlayed,         setAudioPlayed]         = useState(false);
   const [auctionPicks,        setAuctionPicks]        = useState({});
   const audioRef = useRef(null);
+
+  // Shuffle MC options once per question, preserving order for the life of this render
+  const shuffledOptions = useMemo(
+    () => q.type === 'multiple_choice'
+      ? shuffle(Array.isArray(q.options) ? q.options : [])
+      : [],
+    [q.id]
+  );
 
   const reset = () => {
     setFeedback(null); setUserAnswer(''); setSelectedOption(null);
@@ -378,7 +376,7 @@ function InteractiveQuestion({ item: q }) {
     setFeedback({ type: 'incorrect', message: foundRightWord ? `❌ Good — you found the error in "${words[errorInfo.index]}", but "${ecCorrection.trim()}" doesn't quite work here. ${aiResult?.reason ? aiResult.reason + ' ' : ''}It should be "${errorInfo.correctWord}". ${q.explanation || ''}` : `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${q.explanation || ''}`, isCorrect: false, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
   };
 
-  const handleSentenceBuildingResult = (isCorrect, isSoft = false, userAns = '') => {
+  const handleSentenceBuildingResult = (isCorrect) => {
     if (isCorrect) {
       const msg = `✅ Correct! ${q.explanation || ''}`;
       setSbFeedback({ correct: true, message: msg });
@@ -475,7 +473,6 @@ function InteractiveQuestion({ item: q }) {
     );
   }
 
-  // Format topic slug for display
   const topicDisplay = q.topic ? q.topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : null;
 
   return (
@@ -508,7 +505,7 @@ function InteractiveQuestion({ item: q }) {
 
         {q.type === 'multiple_choice' && !feedback && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {q.options.map((option, index) => (
+            {shuffledOptions.map((option, index) => (
               <button key={index} onClick={() => setSelectedOption(option)}
                 style={{ padding: '1.2rem', fontSize: 'clamp(1.05rem, 3.5vw, 1.2rem)', textAlign: 'left', backgroundColor: selectedOption === option ? '#3498DB' : 'white', color: selectedOption === option ? 'white' : '#2C3E50', border: `2px solid ${selectedOption === option ? '#3498DB' : '#e0e0e0'}`, borderRadius: '10px', cursor: 'pointer', transition: 'all 0.2s', wordWrap: 'break-word', width: '100%', boxSizing: 'border-box', fontWeight: '500' }}
               >{option}</button>
@@ -518,7 +515,7 @@ function InteractiveQuestion({ item: q }) {
 
         {q.type === 'multiple_choice' && feedback && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '0.5rem' }}>
-            {q.options.map((option, index) => {
+            {shuffledOptions.map((option, index) => {
               const isCorrectOption = option === feedback.correctAnswer;
               const wasSelected     = option === feedback.studentAnswer;
               let bg = '#f7fafc', border = '#e2e8f0', color = '#a0aec0';
@@ -759,10 +756,9 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
   const [showSetsPanel, setShowSetsPanel] = useState(false);
   const [addToSetId,    setAddToSetId]    = useState('');
   const [newSetName,    setNewSetName]    = useState('');
-  // Collapsible sidebar sections
-  const [typeOpen,  setTypeOpen]  = useState(false);
-  const [tagOpen,   setTagOpen]   = useState(false);
-  const [tagFilter, setTagFilter] = useState('');
+  const [typeOpen,      setTypeOpen]      = useState(false);
+  const [tagOpen,       setTagOpen]       = useState(false);
+  const [tagFilter,     setTagFilter]     = useState('');
 
   const setFilter   = (k, v) => setFilters(f => ({ ...f, [k]: v }));
   const toggleLevel = (lv) => setFilter('levels', filters.levels.includes(lv) ? filters.levels.filter(l => l !== lv) : [...filters.levels, lv]);
@@ -797,7 +793,6 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       const { data } = await q.limit(200);
       if (data) data.forEach(r => all.push({ ...r, _source: 'question_bank', _rowKey: `qb_${r.id}` }));
     }
-    // Skip listening/dictation when tag filter is active — tags only exist on question_bank
     if ((f.source === 'all' || f.source === 'listening') && !f.tags.length) {
       let q = supabase.from('listening_exercises').select('*').order('title');
       if (f.levels.length) q = q.in('level', f.levels);
@@ -858,7 +853,6 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
 
   const sidebar = (
     <div style={{ width: 220, flexShrink: 0, background: 'white', borderRadius: 12, padding: '1.1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.07)', alignSelf: 'flex-start', position: 'sticky', top: 12 }}>
-
       <FilterSection label="My Sets">
         <button onClick={() => setShowSetsPanel(v => !v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 9px', borderRadius: 7, border: `1px solid ${showSetsPanel ? '#667eea' : '#e2e8f0'}`, background: showSetsPanel ? '#f0f4ff' : 'white', color: showSetsPanel ? '#667eea' : '#4a5568', cursor: 'pointer', fontSize: 13, fontWeight: showSetsPanel ? 700 : 500 }}>
           📂 {sets.length === 0 ? 'No sets yet' : `${sets.length} set${sets.length !== 1 ? 's' : ''}`}
@@ -904,10 +898,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       </FilterSection>
 
       {(filters.source === 'all' || filters.source === 'question_bank') && (
-        <FilterSection
-          label={`Type${filters.types.length ? ` (${filters.types.length})` : ''}`}
-          collapsible open={typeOpen} onToggle={() => setTypeOpen(v => !v)}
-        >
+        <FilterSection label={`Type${filters.types.length ? ` (${filters.types.length})` : ''}`} collapsible open={typeOpen} onToggle={() => setTypeOpen(v => !v)}>
           {Object.entries(TYPE_INFO).map(([key, { emoji, label }]) => (
             <button key={key} onClick={() => toggleType(key)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 7px', borderRadius: 6, border: 'none', background: filters.types.includes(key) ? '#edf2ff' : 'transparent', color: filters.types.includes(key) ? '#667eea' : '#4a5568', cursor: 'pointer', marginBottom: 1, fontSize: 12 }}>
               {filters.types.includes(key) ? '✓' : '○'} {emoji} {label}
@@ -917,16 +908,8 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       )}
 
       {(filters.source === 'all' || filters.source === 'question_bank') && (
-        <FilterSection
-          label={`Tag${filters.tags.length ? ` (${filters.tags.length})` : ''}`}
-          collapsible open={tagOpen} onToggle={() => setTagOpen(v => !v)}
-        >
-          <input
-            value={tagFilter}
-            onChange={e => setTagFilter(e.target.value)}
-            placeholder="Filter tags…"
-            style={{ width: '100%', padding: '4px 7px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', marginBottom: 5 }}
-          />
+        <FilterSection label={`Tag${filters.tags.length ? ` (${filters.tags.length})` : ''}`} collapsible open={tagOpen} onToggle={() => setTagOpen(v => !v)}>
+          <input value={tagFilter} onChange={e => setTagFilter(e.target.value)} placeholder="Filter tags…" style={{ width: '100%', padding: '4px 7px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', marginBottom: 5 }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 220, overflowY: 'auto' }}>
             {visibleTags.map(tag => (
               <button key={tag} onClick={() => toggleTag(tag)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '3px 7px', borderRadius: 6, border: filters.tags.includes(tag) ? '1px solid #CBD5E0' : 'none', background: filters.tags.includes(tag) ? '#EDF2F7' : 'transparent', color: filters.tags.includes(tag) ? '#2d3748' : '#4a5568', cursor: 'pointer', fontSize: 11, fontWeight: filters.tags.includes(tag) ? 700 : 400 }}>
