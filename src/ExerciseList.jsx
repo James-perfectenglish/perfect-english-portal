@@ -13,10 +13,10 @@ import ErrorCorrection from './ErrorCorrection'
 import MatchingExercise from './MatchingExercise'
 import SentenceAuction from './SentenceAuction'
 import FlashcardTemplate from './FlashcardTemplate'
-import BilingualVerbsFlashcard from './BilingualVerbsFlashcard'
 import MemoryGame from './MemoryGame'
 import { BORRAS_CARDS } from './data/BorrasCards'
 import { HOTEL_CARDS } from './data/HotelCards'
+import { VERB_CARDS } from './data/VerbCards'
 
 const IRREGULAR_VERBS_ID = 1
 const PHRASAL_VERBS_ID   = 2
@@ -44,7 +44,7 @@ const EXERCISE_ICONS = {
   'Vocabulary 📒':             '📒',
   'Irregular Verbs Flashcards':'📚',
   'Essential Phrasal Verbs':   '📖',
-  'Verbs Flashcards':          '🔄',
+  'Verbs Flashcards':          '📔',
   'Sentence Building':         '🏗️',
   'Listening Exercises':       '🎧',
   'Dictation':                 '⌨️',
@@ -174,16 +174,16 @@ export default function ExerciseList({
     if (activeExercise.type === 'topic_practice') return <TopicPracticeExercise exercise={activeExercise} userLevel={userLevel} onBack={back} onComplete={back} />
     if (t === 'Irregular Verbs Flashcards') return <FlashcardTemplate flashcardSetId={IRREGULAR_VERBS_ID} setName="irregular-verbs" onBack={back} />
     if (t === 'Essential Phrasal Verbs')    return <FlashcardTemplate flashcardSetId={PHRASAL_VERBS_ID} setName="phrasal-verbs" onBack={back} />
-    if (t === 'Verbs Flashcards')           return <BilingualVerbsFlashcard onBack={back} />
+    if (t === 'Verbs Flashcards')           return <FlashcardTemplate title="Verb Flashcards" subtitle="30 essential verbs — español ↔ English" setName="bilingual_verbs" cards={VERB_CARDS} onBack={back} />
     if (t === 'Sentence Building')          return <SentenceBuilding onComplete={back} onBack={back} />
     const isSpanishTrack = userTracks.includes('spanish')
     const listeningTracks = isSpanishTrack ? userTracks : [...new Set([...userTracks, 'general'])]
     if (t === 'Listening Exercises') return <ListeningExercise onBack={back} userTracks={listeningTracks} />
     if (t === 'Dictation')           return <Dictation onBack={back} userTracks={listeningTracks} />
-    if (t === 'Borrás Flashcards')   return <FlashcardTemplate title="Borrás Flashcards" subtitle="Bathroom vocabulary in context 🚿" levelBadge="Level: A1–B1" setName="borras" cards={BORRAS_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
-    if (t === 'Borrás Memory Game')  return <MemoryGame title="Borrás Memory Game" subtitle="Match the English word to its Spanish translation 🚿" levelBadge="Level: A1–B1" cards={BORRAS_CARDS} gameName="borras" cardBackImage="/og-image.png" onBack={back} />
-    if (t === 'Hotel Flashcards')    return <FlashcardTemplate title="Hotel Flashcards" subtitle="Essential hotel vocabulary in context 🏩" levelBadge="Level: A2" setName="hotel" cards={HOTEL_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
-    if (t === 'Hotel Memory Game')   return <MemoryGame title="Hotel Memory Game" subtitle="Match the English word to its Spanish translation 🏩" levelBadge="Level: A2" cards={HOTEL_CARDS} gameName="hotel" cardBackImage="/og-image.png" onBack={back} />
+    if (t === 'Borrás Flashcards')   return <FlashcardTemplate title="Borrás Flashcards" subtitle="Bathroom vocabulary in context 🚿" setName="borras" cards={BORRAS_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
+    if (t === 'Borrás Memory Game')  return <MemoryGame title="Borrás Memory Game" subtitle="Match the English word to its Spanish translation 🚿" cards={BORRAS_CARDS} gameName="borras" cardBackImage="/og-image.png" onBack={back} />
+    if (t === 'Hotel Flashcards')    return <FlashcardTemplate title="Hotel Flashcards" subtitle="Essential hotel vocabulary in context 🏩" setName="hotel" cards={HOTEL_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
+    if (t === 'Hotel Memory Game')   return <MemoryGame title="Hotel Memory Game" subtitle="Match the English word to its Spanish translation 🏩" cards={HOTEL_CARDS} gameName="hotel" cardBackImage="/og-image.png" onBack={back} />
     if (t === 'Odd One Out')         return <OddOneOut onComplete={back} onBack={back} />
     if (t === 'Error Correction')    return <ErrorCorrection onComplete={back} onBack={back} />
     if (t === 'Matching')            return <MatchingExercise onComplete={back} onBack={back} />
@@ -302,28 +302,24 @@ export default function ExerciseList({
           <div style={{ fontSize: '0.78rem', color: '#718096', marginTop: '2px' }}>⭐️ For You exercises appear first</div>
         </div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0, marginTop: '2px' }}>
-
           {isTeacher && onCycleTrack && (
             <button onClick={onCycleTrack} title={`Track: ${TRACK_LABEL[teacherTrack] || 'English'} — click to cycle`}
               style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {TRACK_EMOJI[teacherTrack] || '🇬🇧'}
             </button>
           )}
-
           {isTeacher && onBrowseClick && (
             <button onClick={onBrowseClick} title="Question browser"
               style={{ height: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, color: '#4a5568', padding: '0 10px', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
               🔍 Browse
             </button>
           )}
-
           {isTeacher && onTeacherClick && (
             <button onClick={onTeacherClick} title="Teacher dashboard"
               style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               👨‍🏫
             </button>
           )}
-
           <button onClick={() => setIsListView(v => !v)}
             style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#f0f0f5', borderRadius: '8px', padding: '5px 9px', cursor: 'pointer', border: 'none', fontSize: '0.72rem', fontWeight: 600, color: '#4a5568', whiteSpace: 'nowrap' }}>
             {isListView ? '⊞ Grid' : '☰ List'}
