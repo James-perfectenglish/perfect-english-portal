@@ -279,11 +279,7 @@ export default function FlashcardTemplate({
         <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px', padding: '2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
           <h1 style={{ margin: 0, fontSize: 'clamp(1.8rem,5vw,2.2rem)', fontWeight: 700 }}>{displayTitle}</h1>
           {displaySubtitle && <p style={{ margin: '0.5rem 0 0', opacity: 0.9, fontSize: 'clamp(0.9rem,3vw,1.1rem)' }}>{displaySubtitle}</p>}
-          {displayLevelBadge && (
-            <span style={{ display: 'inline-block', background: '#48bb78', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '0.5rem' }}>
-              {displayLevelBadge}{hasRounds ? ` · ${currentRoundName}` : ''}
-            </span>
-          )}
+         
         </div>
 
         {/* ROUND TABS */}
