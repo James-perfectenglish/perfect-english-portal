@@ -18,11 +18,13 @@ const levelColourMap = {
 }
 
 function getLevelColour(level) {
+  if (level === 'Spanish') return '#e53e3e'
   return levelColourMap[level] || '#718096'
 }
 
 function getLevelLabel(level) {
   if (!level) return '?'
+  if (level === 'Spanish') return 'ES'
   if (level.includes('/')) return level
   return level
 }
@@ -204,7 +206,6 @@ export default function WordOfTheDay({ profile }) {
 
           if (saved) {
             setSubmission(saved)
-            // Always fetch community after submission — right or wrong
             fetchCommunity(word.id)
           }
         }
@@ -238,7 +239,6 @@ export default function WordOfTheDay({ profile }) {
   const levelColour = isSpanish ? '#e53e3e' : getLevelColour(bucket)
   const levelLabel = isSpanish ? 'ES' : bucket
 
-  // Show community once the student has submitted (right or wrong)
   const showCommunity = community.length > 0 && (alreadySubmitted || feedback != null)
 
   return (
@@ -293,7 +293,7 @@ export default function WordOfTheDay({ profile }) {
           <p style={{ margin: '0.15rem 0 0', fontSize: '0.88rem', color: '#4a5568', fontStyle: 'italic', lineHeight: '1.5' }}>"{word.example_sentence}"</p>
         </div>
 
-        {/* Already submitted — show their sentence + feedback */}
+        {/* Already submitted */}
         {alreadySubmitted && (
           <div>
             <div style={{ fontSize: '0.78rem', fontWeight: '600', color: '#718096', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '0.4rem' }}>Your sentence</div>
@@ -321,7 +321,7 @@ export default function WordOfTheDay({ profile }) {
           </div>
         )}
 
-        {/* Not yet submitted — show input */}
+        {/* Not yet submitted */}
         {!alreadySubmitted && !feedback && (
           <div>
             <div style={{ fontSize: '0.78rem', fontWeight: '600', color: '#718096', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '0.4rem' }}>
@@ -394,7 +394,7 @@ export default function WordOfTheDay({ profile }) {
         )}
       </div>
 
-      {/* ── Community sentences ── shown after any submission (right or wrong) */}
+      {/* Community sentences */}
       {showCommunity && (
         <div style={{ borderTop: '1px solid #f0f0f0', padding: '1rem 1.25rem 1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.85rem' }}>
