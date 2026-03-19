@@ -32,6 +32,35 @@ function toPercent(score, answers) {
   return Math.round((score / 20) * 100)
 }
 
+function computeStreak(answeredAtDates) {
+  if (!answeredAtDates || answeredAtDates.length === 0) return 0
+  const uniqueDays = [...new Set(answeredAtDates.map(d => {
+    const date = new Date(d)
+    date.setHours(0, 0, 0, 0)
+    return date.getTime()
+  }))].sort((a, b) => b - a)
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todayMs = today.getTime()
+  const yesterdayMs = todayMs - 86400000
+
+  // streak only counts if studied today or yesterday
+  if (uniqueDays[0] !== todayMs && uniqueDays[0] !== yesterdayMs) return 0
+
+  let streak = 0
+  let checkMs = uniqueDays[0]
+  for (const dayMs of uniqueDays) {
+    if (dayMs === checkMs) {
+      streak++
+      checkMs -= 86400000
+    } else {
+      break
+    }
+  }
+  return streak
+}
+
 function getRecommendation(profile, attempts, studentTracks) {
   if (studentTracks.length > 0) {
     const key = studentTracks[0]
@@ -73,6 +102,7 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
   const [typeBreakdown, setTypeBreakdown] = useState({})
   const [lessonsPassed, setLessonsPassed] = useState(0)
   const [daysStudied, setDaysStudied] = useState(0)
+  const [streak, setStreak] = useState(0)
   const [listeningCompleted, setListeningCompleted] = useState(0)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
@@ -100,6 +130,10 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
       .eq('student_id', userId).order('answered_at', { ascending: false }).limit(2000)
 
     if (recentAnswers && recentAnswers.length > 0) {
+      // Compute streak
+      const answeredDates = recentAnswers.map(a => a.answered_at)
+      setStreak(computeStreak(answeredDates))
+
       const questionIds = [...new Set(recentAnswers.map(a => a.question_id).filter(Boolean))]
       if (questionIds.length > 0) {
         const { data: questions } = await supabase.from('question_bank').select('question_number, type').in('question_number', questionIds)
@@ -168,7 +202,6 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
         </div>
         {profile.is_teacher && (
           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-            {/* Track cycler — replaces lang toggle */}
             {onCycleTrack && (
               <button onClick={onCycleTrack} title={`Track: ${TRACK_LABEL[teacherTrack] || 'English'} — click to cycle`}
                 style={{ height: '34px', width: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -194,12 +227,15 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
       <WordOfTheDay profile={profile} />
 
       {/* STAT CARDS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
         <StatCard emoji="📊" label="Questions Answered" value={hasData ? stats.total.toLocaleString() : '—'} />
         <StatCard emoji="🎯" label="Overall Accuracy"   value={hasData ? `${stats.accuracy}%` : '—'} />
         <StatCard emoji="🏆" label="Lessons Passed"     value={hasAttempts ? lessonsPassed : '—'} />
         <StatCard emoji="🎧" label="Listening Done"     value={listeningCompleted > 0 ? listeningCompleted : '—'} />
         <StatCard emoji="📅" label="Days Studied"       value={hasAttempts ? daysStudied : '—'} />
+        {streak > 0 && (
+          <StatCard emoji="🔥" label="Day Streak" value={streak} highlight={streak >= 7} />
+        )}
       </div>
 
       {/* SCORE TREND */}
@@ -265,9 +301,15 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
   )
 }
 
-function StatCard({ emoji, label, value }) {
+function StatCard({ emoji, label, value, highlight }) {
   return (
-    <div style={{ background: 'white', borderRadius: '12px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderTop: '3px solid #667eea', textAlign: 'center' }}>
+    <div style={{
+      background: highlight ? 'linear-gradient(135deg, #fffaf0, #fff5e0)' : 'white',
+      borderRadius: '12px', padding: '1rem',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+      borderTop: `3px solid ${highlight ? '#ed8936' : '#667eea'}`,
+      textAlign: 'center'
+    }}>
       <div style={{ fontSize: '1.4rem', marginBottom: '0.2rem' }}>{emoji}</div>
       <div style={{ fontSize: 'clamp(1.25rem, 3vw, 1.75rem)', fontWeight: '700', color: '#2C3E50', lineHeight: 1.1 }}>{value}</div>
       <div style={{ fontSize: '0.72rem', color: '#718096', marginTop: '0.2rem', lineHeight: 1.3 }}>{label}</div>
@@ -305,12 +347,23 @@ function ScoreTrendChart({ attempts }) {
   const recent = attempts.slice(-10)
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '90px', padding: '0 2px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '110px', padding: '0 2px' }}>
         {recent.map((a, i) => {
           const pct = a.scorePercent ?? 0
-          const barH = Math.max(4, (pct / 100) * 90)
+          const score = a.score ?? 0
+          const barH = Math.max(4, (pct / 100) * 80)
           const color = pct >= 70 ? '#48bb78' : pct >= 50 ? '#ed8936' : '#fc8181'
-          return <div key={i} title={`Session ${i + 1}: ${pct}%`} style={{ flex: 1, height: `${barH}px`, backgroundColor: color, borderRadius: '4px 4px 0 0', minWidth: '8px' }} />
+          return (
+            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '110px', minWidth: '8px' }}>
+              <span style={{ fontSize: '0.65rem', fontWeight: '700', color: color, marginBottom: '3px', lineHeight: 1 }}>
+                {score}
+              </span>
+              <div
+                title={`Session ${i + 1}: ${score}/20 (${pct}%)`}
+                style={{ width: '100%', height: `${barH}px`, backgroundColor: color, borderRadius: '4px 4px 0 0' }}
+              />
+            </div>
+          )
         })}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', borderTop: '1px solid #e2e8f0', paddingTop: '4px' }}>

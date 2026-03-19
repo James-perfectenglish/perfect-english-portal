@@ -48,20 +48,21 @@ export default function SurvivalMode({ onBack }) {
   const fetchQuestionsForStage = async (stageIndex) => {
     const stageConfig = STAGES[stageIndex];
 
-    let gapFillQuery = supabase
+    const { data: gapFill, error: gapError } = await supabase
       .from('question_bank')
       .select('*')
       .eq('type', 'gap_fill')
-      .in('level', stageConfig.levels);
+      .in('level', stageConfig.levels)
+      .in('language', ['en', 'both'])
+      .neq('topic', 'spanish');
 
-    let mcQuery = supabase
+    const { data: mc, error: mcError } = await supabase
       .from('question_bank')
       .select('*')
       .eq('type', 'multiple_choice')
-      .in('level', stageConfig.levels);
-
-    const { data: gapFill, error: gapError } = await gapFillQuery;
-    const { data: mc, error: mcError } = await mcQuery;
+      .in('level', stageConfig.levels)
+      .in('language', ['en', 'both'])
+      .neq('topic', 'spanish');
 
     if (gapError || mcError) throw gapError || mcError;
 
