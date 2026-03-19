@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import RandomPracticeExercise from './RandomPracticeExercise.jsx';
 import SurvivalMode from './SurvivalMode.jsx';
 import { TRACK_EMOJI, TRACK_LABEL } from './TeacherToolbar';
@@ -60,6 +60,15 @@ const BTN = {
   color: '#4a5568',
 };
 
+// Map profile level to a LEVEL_CONFIG entry
+function getLevelConfigForProfile(profileLevel) {
+  if (!profileLevel) return LEVEL_CONFIG[1]; // default intermediate
+  const l = profileLevel.toUpperCase();
+  if (l.startsWith('A')) return LEVEL_CONFIG[0];
+  if (l.startsWith('C')) return LEVEL_CONFIG[2];
+  return LEVEL_CONFIG[1];
+}
+
 export default function PracticePage({
   profile,
   isTeacher = false,
@@ -72,9 +81,11 @@ export default function PracticePage({
 }) {
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [survivalMode, setSurvivalMode] = useState(false);
+  const [weakSpotsMode, setWeakSpotsMode] = useState(false);
+  const [weakTypes, setWeakTypes] = useState([]);
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
-  // Detect Spanish student: level === 'Spanish' OR tracks includes 'spanish'
   const isSpanish =
     profile?.level === 'Spanish' ||
     (Array.isArray(profile?.tracks) && profile.tracks.includes('spanish'));
@@ -82,10 +93,40 @@ export default function PracticePage({
   useEffect(() => {
     setSelectedLevel(null);
     setSurvivalMode(false);
+    setWeakSpotsMode(false);
+    setWeakTypes([]);
+
+    const mode = searchParams.get('mode');
+    const weak = searchParams.get('weak');
+
+    if (mode === 'weakspots' && weak) {
+      const types = weak.split(',').filter(Boolean);
+      setWeakTypes(types);
+      setWeakSpotsMode(true);
+      // Auto-select level from profile
+      const levelConfig = getLevelConfigForProfile(profile?.level);
+      setSelectedLevel(levelConfig);
+    }
   }, [location.key]);
 
   if (survivalMode) {
     return <SurvivalMode onBack={() => setSurvivalMode(false)} />;
+  }
+
+  // Weak spots mode — auto-launched with student's level + skewed mix
+  if (weakSpotsMode && selectedLevel) {
+    return (
+      <RandomPracticeExercise
+        levels={selectedLevel.levels}
+        levelTitle="Weak Spots"
+        levelSubtitle={selectedLevel.subtitle}
+        gradient="linear-gradient(135deg, #e53e3e, #c53030)"
+        language={selectedLevel.language}
+        userTracks={profile?.tracks || []}
+        weakTypes={weakTypes}
+        onBack={() => { setWeakSpotsMode(false); setSelectedLevel(null); }}
+      />
+    );
   }
 
   // Spanish students skip the level select entirely
@@ -150,7 +191,6 @@ export default function PracticePage({
             Test Yourself
           </h1>
 
-          {/* Teacher toolbar — right-aligned, all #f0f0f5 */}
           {isTeacher && (
             <div style={{
               position: 'absolute',

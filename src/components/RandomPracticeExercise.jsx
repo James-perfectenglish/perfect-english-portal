@@ -16,6 +16,22 @@ const QUESTION_MIX = {
   // Total: 20
 };
 
+// ── Weak Spots question mix ──
+const buildWeakMix = (weakTypes) => {
+  if (!weakTypes || weakTypes.length === 0) return QUESTION_MIX;
+  const mix = Object.fromEntries(Object.keys(QUESTION_MIX).map(k => [k, 0]));
+  const perWeak = Math.floor(15 / weakTypes.length);
+  weakTypes.forEach(t => { if (t in mix) mix[t] = perWeak; });
+  const fallback = ['multiple_choice', 'dictation', 'matching', 'gap_fill'].filter(t => !weakTypes.includes(t));
+  let rem = 20 - weakTypes.reduce((s, t) => s + (mix[t] || 0), 0);
+  for (const t of fallback) {
+    if (rem <= 0) break;
+    const give = Math.min(rem, QUESTION_MIX[t] || 2);
+    mix[t] = give; rem -= give;
+  }
+  return mix;
+};
+
 // ── Auto playback speed for quick dictation by level ──
 const getAutoSpeed = (level) => {
   if (['A1', 'A2'].includes(level)) return 0.9;
@@ -122,7 +138,7 @@ const aiMarkDictation = async (correctAnswer, studentAnswer) => {
   } catch (e) { console.error('AI dictation marking error:', e); return null; }
 };
 
-export default function RandomPracticeExercise({ levels, levelTitle, levelSubtitle, gradient, language = 'en', userTracks = [], onBack }) {
+export default function RandomPracticeExercise({ levels, levelTitle, levelSubtitle, gradient, language = 'en', userTracks = [], weakTypes = [], onBack }) {
   const isSpanish = language === 'es';
 
   // Topics that are restricted to specific tracks
@@ -135,7 +151,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
   const isAllowedByTrack = (topic) => {
     const requiredTrack = TRACK_TOPICS[topic];
-    if (!requiredTrack) return true; // general topic, always allowed
+    if (!requiredTrack) return true;
     return userTracks.includes(requiredTrack);
   };
 
@@ -243,9 +259,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     window.scrollTo({ top: 0, behavior: 'instant' });
     setLoading(true);
     try {
-      // ── Language filter ──
-      // Spanish students: language IN ('es', 'both'), no level filter
-      // English students: language IN ('en', 'both'), level filter applied
       const langFilter = isSpanish ? ['es', 'both'] : ['en', 'both'];
 
       const queryForType = (type) => {
@@ -282,7 +295,10 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         throw gfRes.error || mcRes.error || sbRes.error || oooRes.error || ecRes.error || matchRes.error;
       }
 
-      const pick = (data, type) => shuffleArray((data || []).filter(q => isAllowedByTrack(q.topic))).slice(0, QUESTION_MIX[type] || 0).map(q => {
+      const activeMix = buildWeakMix(weakTypes);
+      const TARGET_TOTAL = Object.values(activeMix).reduce((a, b) => a + b, 0);
+
+      const pick = (data, type) => shuffleArray((data || []).filter(q => isAllowedByTrack(q.topic))).slice(0, activeMix[type] || 0).map(q => {
         if ((type === 'multiple_choice' || type === 'odd_one_out') && Array.isArray(q.options)) {
           return { ...q, options: shuffleArray(q.options) };
         }
@@ -290,7 +306,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       });
 
       const pickDictation = (data) => {
-        return shuffleArray(data || []).slice(0, QUESTION_MIX.dictation || 0).map(ex => ({
+        return shuffleArray(data || []).slice(0, activeMix.dictation || 0).map(ex => ({
           ...ex,
           type: 'dictation',
           question: ex.hint || '',
@@ -300,7 +316,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         }));
       };
 
-      const TARGET_TOTAL = Object.values(QUESTION_MIX).reduce((a, b) => a + b, 0); // 20
       const pickedMC = pick(mcRes.data, 'multiple_choice');
       let baseQuestions = [
         ...pick(gfRes.data, 'gap_fill'),
@@ -659,7 +674,9 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
             <p style={{ fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', color: '#2C3E50', marginBottom: '1rem', lineHeight: '1.5' }}>
               {isSpanish
                 ? '20 preguntas variadas — ¡vamos!'
-                : 'Test your English with 20 random questions!'}
+                : weakTypes.length > 0
+                  ? 'A focused session on your toughest question types. Let\'s turn those weaknesses into strengths!'
+                  : 'Test your English with 20 random questions!'}
             </p>
             <p style={{ fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', color: '#666', marginBottom: '2.5rem', lineHeight: '1.5' }}>
               {isSpanish

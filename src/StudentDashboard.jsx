@@ -343,7 +343,12 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
           <Link to={recommendation.href} style={{ textDecoration: 'none' }}>
             <RecommendedCard recommendation={recommendation} />
           </Link>
-          <Link to="/practice" style={{ textDecoration: 'none' }}>
+          <Link to={`/practice?mode=weakspots&weak=${
+  Object.entries(typeBreakdown)
+    .filter(([, d]) => d.total >= 5 && Math.round((d.correct / d.total) * 100) < 70)
+    .sort((a, b) => (a[1].correct / a[1].total) - (b[1].correct / b[1].total))
+    .slice(0, 3).map(([t]) => t).join(',')
+}`} style={{ textDecoration: 'none' }}>
             <QuickLinkCard emoji="🎯" title="Random Practice" desc="20 mixed questions covering all topics and types" color="#667eea" />
           </Link>
           {hasWeakSpots && (
