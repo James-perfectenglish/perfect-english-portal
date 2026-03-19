@@ -2,10 +2,8 @@ name: Weekly DB Backup
 
 on:
   schedule:
-    # Every Sunday at 02:00 UTC
     - cron: '0 2 * * 0'
   workflow_dispatch:
-    # Also allows manual trigger from GitHub Actions tab
 
 jobs:
   backup:
@@ -31,23 +29,20 @@ jobs:
         run: |
           DATE=$(date +%Y-%m-%d)
           mkdir -p backups
-
           echo "Backing up question_bank..."
-          pg_dump "$DB_URL" \
+          /usr/lib/postgresql/17/bin/pg_dump "$DB_URL" \
             --table=question_bank \
             --data-only \
             --column-inserts \
             --no-password \
             > backups/question_bank_${DATE}.sql
-
           echo "Backing up student_answers..."
-          pg_dump "$DB_URL" \
+          /usr/lib/postgresql/17/bin/pg_dump "$DB_URL" \
             --table=student_answers \
             --data-only \
             --column-inserts \
             --no-password \
             > backups/student_answers_${DATE}.sql
-
           echo "Backup complete."
           ls -lh backups/
 
