@@ -36,7 +36,7 @@ export default function FlashcardTemplate({
   const [currentIndex, setCurrentIndex]   = useState(0)
   const [isFlipped, setIsFlipped]         = useState(false)
   const [finished, setFinished]           = useState(false)
-  const [memoryRoundCards, setMemoryRoundCards] = useState(null) // non-null = show memory game
+  const [memoryRoundCards, setMemoryRoundCards] = useState(null)
 
   // Progress
   const [knownCards, setKnownCards]       = useState(new Set())
@@ -69,13 +69,13 @@ export default function FlashcardTemplate({
   }
 
   // ── Derived state ──
-  const rounds       = hasRounds ? [...new Set(allCards.map(c => c.round))] : []
+  const rounds        = hasRounds ? [...new Set(allCards.map(c => c.round))] : []
   const filteredCards = hasRounds && selectedRound !== 'all'
     ? allCards.filter(c => c.round === selectedRound)
     : allCards
 
-  const currentCard = filteredCards[currentIndex]
-  const totalCards  = filteredCards.length
+  const currentCard    = filteredCards[currentIndex]
+  const totalCards     = filteredCards.length
   const isSupabaseCard = currentCard && currentCard.front !== undefined
 
   // ── Display metadata ──
@@ -223,7 +223,7 @@ export default function FlashcardTemplate({
           </>
         )
       }
-      // Phrasal verb / vocabulary
+      // Phrasal verb / vocabulary / bilingual
       return (
         <>
           {currentCard.back.translation && <div style={{ fontSize: 'clamp(1.5rem,5vw,2rem)', fontWeight: 600, marginBottom: '1.5rem', color: '#764ba2' }}>{currentCard.back.translation}</div>}
@@ -290,7 +290,7 @@ export default function FlashcardTemplate({
         {hasRounds && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '1.5rem' }}>
             {['all', ...rounds].map(r => {
-              const label = r === 'all' ? 'All Cards' : `${r}. ${allCards.find(c => c.round === r)?.roundName}`
+              const label    = r === 'all' ? 'All Cards' : `${r}. ${allCards.find(c => c.round === r)?.roundName}`
               const isActive = selectedRound === r
               return (
                 <button key={r} onClick={() => changeRound(r)} style={{
@@ -321,13 +321,32 @@ export default function FlashcardTemplate({
 
             {/* CARD */}
             <div style={{ perspective: '1000px', marginBottom: '1.5rem' }} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
-              <div onClick={handleFlip} style={{ position: 'relative', width: '100%', minHeight: '350px', transformStyle: 'preserve-3d', transition: 'transform 0.6s', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)', cursor: 'pointer' }}>
+              <div onClick={handleFlip} style={{
+                position: 'relative', width: '100%', minHeight: '480px',
+                transformStyle: 'preserve-3d', transition: 'transform 0.6s',
+                transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)', cursor: 'pointer'
+              }}>
                 {/* FRONT */}
-                <div style={{ position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '16px', padding: 'clamp(3rem,10vw,5rem) clamp(2rem,5vw,3rem)', minHeight: '350px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', color: 'white', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', boxSizing: 'border-box' }}>
+                <div style={{
+                  position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: '16px', padding: 'clamp(3rem,10vw,5rem) clamp(2rem,5vw,3rem)',
+                  minHeight: '480px', display: 'flex', flexDirection: 'column',
+                  justifyContent: 'center', alignItems: 'center', textAlign: 'center',
+                  color: 'white', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', boxSizing: 'border-box'
+                }}>
                   {renderFront()}
                 </div>
                 {/* BACK */}
-                <div style={{ position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', backgroundColor: 'white', borderRadius: '16px', padding: 'clamp(2rem,6vw,3rem) clamp(2rem,5vw,3rem)', minHeight: '350px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', color: '#667eea', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', border: '3px solid #667eea', boxSizing: 'border-box', gap: '1rem' }}>
+                <div style={{
+                  position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden',
+                  transform: 'rotateY(180deg)', backgroundColor: 'white',
+                  borderRadius: '16px', padding: 'clamp(2rem,6vw,3rem) clamp(2rem,5vw,3rem)',
+                  minHeight: '480px', overflowY: 'auto', display: 'flex', flexDirection: 'column',
+                  justifyContent: 'center', alignItems: 'center', textAlign: 'center',
+                  color: '#667eea', boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                  border: '3px solid #667eea', boxSizing: 'border-box', gap: '1rem'
+                }}>
                   {renderBack()}
                 </div>
               </div>
@@ -373,7 +392,6 @@ export default function FlashcardTemplate({
               </div>
             </div>
 
-            {/* MEMORY GAME BUTTON — only for round-based sets with memory enabled */}
             {showMemoryGame && hasRounds && selectedRound !== 'all' && (
               <button
                 onClick={() => setMemoryRoundCards(filteredCards)}
