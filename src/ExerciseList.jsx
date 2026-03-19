@@ -13,6 +13,7 @@ import ErrorCorrection from './ErrorCorrection'
 import MatchingExercise from './MatchingExercise'
 import SentenceAuction from './SentenceAuction'
 import FlashcardTemplate from './FlashcardTemplate'
+import BilingualVerbsFlashcard from './BilingualVerbsFlashcard'
 import MemoryGame from './MemoryGame'
 import { BORRAS_CARDS } from './data/BorrasCards'
 import { HOTEL_CARDS } from './data/HotelCards'
@@ -24,7 +25,7 @@ const ACTIVE_EXERCISES = new Set([
   'Prepositions 📄', 'Business Phrasal Verbs 💼', 'Phrasal Verbs 📚',
   'Business Vocabulary 🗂️', 'Spanish Vocabulary 🇪🇸',
   'Hotel Vocabulary 🏨', 'Bathroom Vocabulary 🛁', 'Vocabulary 📒',
-  'Irregular Verbs Flashcards', 'Essential Phrasal Verbs',
+  'Irregular Verbs Flashcards', 'Essential Phrasal Verbs', 'Verbs Flashcards',
   'Sentence Building', 'Listening Exercises', 'Dictation',
   'Borrás Flashcards', 'Borrás Memory Game',
   'Hotel Flashcards', 'Hotel Memory Game',
@@ -43,6 +44,7 @@ const EXERCISE_ICONS = {
   'Vocabulary 📒':             '📒',
   'Irregular Verbs Flashcards':'📚',
   'Essential Phrasal Verbs':   '📖',
+  'Verbs Flashcards':          '🔄',
   'Sentence Building':         '🏗️',
   'Listening Exercises':       '🎧',
   'Dictation':                 '⌨️',
@@ -75,12 +77,9 @@ function shouldShowExercise(exercise, userTracks) {
   return exTracks.some(t => userTracks.includes(t))
 }
 
-// For You: exercise must match at least one of the user's specific tracks,
-// AND must NOT also be a general exercise (to avoid bathroom cards appearing on Spanish track etc.)
 function isForYouFn(exercise, userTracks) {
   if (!userTracks || userTracks.length === 0) return false
   const exTracks = exercise.tracks || ['general']
-  // Exclude exercises tagged 'general' — they're for everyone, not track-specific
   if (exTracks.includes('general')) return false
   return exTracks.some(t => SPECIFIC_TRACKS.includes(t) && userTracks.includes(t))
 }
@@ -175,19 +174,20 @@ export default function ExerciseList({
     if (activeExercise.type === 'topic_practice') return <TopicPracticeExercise exercise={activeExercise} userLevel={userLevel} onBack={back} onComplete={back} />
     if (t === 'Irregular Verbs Flashcards') return <FlashcardTemplate flashcardSetId={IRREGULAR_VERBS_ID} setName="irregular-verbs" onBack={back} />
     if (t === 'Essential Phrasal Verbs')    return <FlashcardTemplate flashcardSetId={PHRASAL_VERBS_ID} setName="phrasal-verbs" onBack={back} />
+    if (t === 'Verbs Flashcards')           return <BilingualVerbsFlashcard onBack={back} />
     if (t === 'Sentence Building')          return <SentenceBuilding onComplete={back} onBack={back} />
     const isSpanishTrack = userTracks.includes('spanish')
     const listeningTracks = isSpanishTrack ? userTracks : [...new Set([...userTracks, 'general'])]
     if (t === 'Listening Exercises') return <ListeningExercise onBack={back} userTracks={listeningTracks} />
     if (t === 'Dictation')           return <Dictation onBack={back} userTracks={listeningTracks} />
-    if (t === 'Borrás Flashcards') return <FlashcardTemplate title="Borrás Flashcards" subtitle="Bathroom vocabulary in context 🚿" levelBadge="Level: A1–B1" setName="borras" cards={BORRAS_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
-    if (t === 'Borrás Memory Game') return <MemoryGame title="Borrás Memory Game" subtitle="Match the English word to its Spanish translation 🚿" levelBadge="Level: A1–B1" cards={BORRAS_CARDS} gameName="borras" cardBackImage="/og-image.png" onBack={back} />
-    if (t === 'Hotel Flashcards') return <FlashcardTemplate title="Hotel Flashcards" subtitle="Essential hotel vocabulary in context 🏩" levelBadge="Level: A2" setName="hotel" cards={HOTEL_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
-    if (t === 'Hotel Memory Game') return <MemoryGame title="Hotel Memory Game" subtitle="Match the English word to its Spanish translation 🏩" levelBadge="Level: A2" cards={HOTEL_CARDS} gameName="hotel" cardBackImage="/og-image.png" onBack={back} />
-    if (t === 'Odd One Out')      return <OddOneOut onComplete={back} onBack={back} />
-    if (t === 'Error Correction') return <ErrorCorrection onComplete={back} onBack={back} />
-    if (t === 'Matching')         return <MatchingExercise onComplete={back} onBack={back} />
-    if (t === 'Sentence Auction') return <SentenceAuction onComplete={back} onBack={back} />
+    if (t === 'Borrás Flashcards')   return <FlashcardTemplate title="Borrás Flashcards" subtitle="Bathroom vocabulary in context 🚿" levelBadge="Level: A1–B1" setName="borras" cards={BORRAS_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
+    if (t === 'Borrás Memory Game')  return <MemoryGame title="Borrás Memory Game" subtitle="Match the English word to its Spanish translation 🚿" levelBadge="Level: A1–B1" cards={BORRAS_CARDS} gameName="borras" cardBackImage="/og-image.png" onBack={back} />
+    if (t === 'Hotel Flashcards')    return <FlashcardTemplate title="Hotel Flashcards" subtitle="Essential hotel vocabulary in context 🏩" levelBadge="Level: A2" setName="hotel" cards={HOTEL_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
+    if (t === 'Hotel Memory Game')   return <MemoryGame title="Hotel Memory Game" subtitle="Match the English word to its Spanish translation 🏩" levelBadge="Level: A2" cards={HOTEL_CARDS} gameName="hotel" cardBackImage="/og-image.png" onBack={back} />
+    if (t === 'Odd One Out')         return <OddOneOut onComplete={back} onBack={back} />
+    if (t === 'Error Correction')    return <ErrorCorrection onComplete={back} onBack={back} />
+    if (t === 'Matching')            return <MatchingExercise onComplete={back} onBack={back} />
+    if (t === 'Sentence Auction')    return <SentenceAuction onComplete={back} onBack={back} />
   }
 
   // ── Filter + sort for active tab ──────────────────────────────────────────
@@ -303,7 +303,6 @@ export default function ExerciseList({
         </div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0, marginTop: '2px' }}>
 
-          {/* Track cycler — replaces lang toggle */}
           {isTeacher && onCycleTrack && (
             <button onClick={onCycleTrack} title={`Track: ${TRACK_LABEL[teacherTrack] || 'English'} — click to cycle`}
               style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
