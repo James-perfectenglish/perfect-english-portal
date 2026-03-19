@@ -24,6 +24,24 @@ const TYPE_INFO = {
   dictation:         { label: 'Dictation',          emoji: '⌨️' },
 }
 
+const TOPIC_LABELS = {
+  prepositions:            'Prepositions',
+  phrasal_verbs:           'Phrasal Verbs',
+  business_phrasal_verbs:  'Business Phrasal Verbs',
+  business_vocabulary:     'Business Vocabulary',
+  hotel_vocabulary:        'Hotel Vocabulary',
+  bathroom_vocabulary:     'Bathroom Vocabulary',
+  vocabulary:              'Vocabulary',
+  grammar:                 'Grammar',
+  routines:                'Routines',
+  idioms:                  'Idioms',
+  used_to:                 'Used To',
+  second_conditional:      'Second Conditional',
+  work_and_study:          'Work & Study',
+  daily_life:              'Daily Life',
+  spanish:                 'Spanish',
+}
+
 function toPercent(score, answers) {
   if (score === null || score === undefined) return 0
   const total = answers?.total_questions
@@ -39,24 +57,16 @@ function computeStreak(answeredAtDates) {
     date.setHours(0, 0, 0, 0)
     return date.getTime()
   }))].sort((a, b) => b - a)
-
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const todayMs = today.getTime()
   const yesterdayMs = todayMs - 86400000
-
-  // streak only counts if studied today or yesterday
   if (uniqueDays[0] !== todayMs && uniqueDays[0] !== yesterdayMs) return 0
-
   let streak = 0
   let checkMs = uniqueDays[0]
   for (const dayMs of uniqueDays) {
-    if (dayMs === checkMs) {
-      streak++
-      checkMs -= 86400000
-    } else {
-      break
-    }
+    if (dayMs === checkMs) { streak++; checkMs -= 86400000 }
+    else break
   }
   return streak
 }
@@ -100,6 +110,7 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
   const [stats, setStats] = useState(null)
   const [attempts, setAttempts] = useState([])
   const [typeBreakdown, setTypeBreakdown] = useState({})
+  const [topicProgress, setTopicProgress] = useState([])
   const [lessonsPassed, setLessonsPassed] = useState(0)
   const [daysStudied, setDaysStudied] = useState(0)
   const [streak, setStreak] = useState(0)
@@ -130,9 +141,7 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
       .eq('student_id', userId).order('answered_at', { ascending: false }).limit(2000)
 
     if (recentAnswers && recentAnswers.length > 0) {
-      // Compute streak
-      const answeredDates = recentAnswers.map(a => a.answered_at)
-      setStreak(computeStreak(answeredDates))
+      setStreak(computeStreak(recentAnswers.map(a => a.answered_at)))
 
       const questionIds = [...new Set(recentAnswers.map(a => a.question_id).filter(Boolean))]
       if (questionIds.length > 0) {
@@ -172,8 +181,32 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
     const { count: listenCount } = await supabase
       .from('listening_sessions').select('*', { count: 'exact', head: true })
       .eq('student_id', userId).eq('stage_reached', 'review')
-
     setListeningCompleted(listenCount || 0)
+
+    // Topic progress
+    const { data: topicSessions } = await supabase
+      .from('topic_sessions').select('topic, score, total, passed').eq('student_id', userId)
+    if (topicSessions && topicSessions.length > 0) {
+      const byTopic = {}
+      topicSessions.forEach(s => {
+        if (!byTopic[s.topic]) byTopic[s.topic] = { correct: 0, total: 0, passed: 0, sessions: 0 }
+        byTopic[s.topic].correct += s.score
+        byTopic[s.topic].total += s.total
+        if (s.passed) byTopic[s.topic].passed++
+        byTopic[s.topic].sessions++
+      })
+      const topicList = Object.entries(byTopic)
+        .map(([topic, data]) => ({
+          topic,
+          label: TOPIC_LABELS[topic] || topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+          pct: data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0,
+          sessions: data.sessions,
+          passed: data.passed,
+        }))
+        .sort((a, b) => a.pct - b.pct) // weakest first
+      setTopicProgress(topicList)
+    }
+
     setLoading(false)
   }
 
@@ -181,6 +214,10 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
   const hasData = stats && stats.total > 0
   const hasAttempts = attempts.length > 0
   const recommendation = getRecommendation(profile, attempts, studentTracks)
+
+  const hasWeakSpots = Object.entries(typeBreakdown)
+    .filter(([, d]) => d.total >= 5)
+    .some(([, d]) => Math.round((d.correct / d.total) * 100) < 70)
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '3rem', color: '#667eea' }}>Loading your dashboard...</div>
@@ -233,9 +270,7 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
         <StatCard emoji="🏆" label="Lessons Passed"     value={hasAttempts ? lessonsPassed : '—'} />
         <StatCard emoji="🎧" label="Listening Done"     value={listeningCompleted > 0 ? listeningCompleted : '—'} />
         <StatCard emoji="📅" label="Days Studied"       value={hasAttempts ? daysStudied : '—'} />
-        {streak > 0 && (
-          <StatCard emoji="🔥" label="Day Streak" value={streak} highlight={streak >= 7} />
-        )}
+        {streak > 0 && <StatCard emoji="🔥" label="Day Streak" value={streak} highlight={streak >= 7} />}
       </div>
 
       {/* SCORE TREND */}
@@ -256,6 +291,35 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
                 const info = TYPE_INFO[type] || { label: type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), emoji: '📋' }
                 return <TypeBar key={type} info={info} pct={pct} total={data.total} />
               })}
+          </div>
+        </Section>
+      )}
+
+      {/* PROGRESS BY TOPIC */}
+      {topicProgress.length > 0 && (
+        <Section title="📚 Progress by Topic" subtitle="Your accuracy across topic practice sessions — weakest first">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            {topicProgress.map(({ topic, label, pct, sessions, passed }) => (
+              <div key={topic} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: '500', color: '#2C3E50' }}>{label}</span>
+                    <span style={{ fontSize: '0.78rem', color: '#718096' }}>
+                      {pct}%
+                      <span style={{ fontSize: '0.68rem', color: '#a0aec0', marginLeft: '4px' }}>
+                        ({sessions} session{sessions !== 1 ? 's' : ''}{passed > 0 ? `, ${passed} passed` : ''})
+                      </span>
+                    </span>
+                  </div>
+                  <div style={{ background: '#edf2f7', borderRadius: '99px', height: '7px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${pct}%`, height: '100%', borderRadius: '99px',
+                      backgroundColor: pct >= 70 ? '#48bb78' : pct >= 50 ? '#ed8936' : '#fc8181'
+                    }} />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </Section>
       )}
@@ -282,6 +346,11 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
           <Link to="/practice" style={{ textDecoration: 'none' }}>
             <QuickLinkCard emoji="🎯" title="Random Practice" desc="20 mixed questions covering all topics and types" color="#667eea" />
           </Link>
+          {hasWeakSpots && (
+            <Link to="/practice?mode=weakspots" style={{ textDecoration: 'none' }}>
+              <QuickLinkCard emoji="🔧" title="Weak Spots" desc="Practice focused on your toughest question types" color="#e53e3e" />
+            </Link>
+          )}
           <Link to="/exercises" style={{ textDecoration: 'none' }}>
             <QuickLinkCard emoji="📚" title="All Exercises" desc="Browse and choose by topic, type, or level" color="#48bb78" />
           </Link>
@@ -303,13 +372,7 @@ export default function StudentDashboard({ profile, session, handleLogout, globa
 
 function StatCard({ emoji, label, value, highlight }) {
   return (
-    <div style={{
-      background: highlight ? 'linear-gradient(135deg, #fffaf0, #fff5e0)' : 'white',
-      borderRadius: '12px', padding: '1rem',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      borderTop: `3px solid ${highlight ? '#ed8936' : '#667eea'}`,
-      textAlign: 'center'
-    }}>
+    <div style={{ background: highlight ? 'linear-gradient(135deg, #fffaf0, #fff5e0)' : 'white', borderRadius: '12px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderTop: `3px solid ${highlight ? '#ed8936' : '#667eea'}`, textAlign: 'center' }}>
       <div style={{ fontSize: '1.4rem', marginBottom: '0.2rem' }}>{emoji}</div>
       <div style={{ fontSize: 'clamp(1.25rem, 3vw, 1.75rem)', fontWeight: '700', color: '#2C3E50', lineHeight: 1.1 }}>{value}</div>
       <div style={{ fontSize: '0.72rem', color: '#718096', marginTop: '0.2rem', lineHeight: 1.3 }}>{label}</div>
@@ -355,13 +418,8 @@ function ScoreTrendChart({ attempts }) {
           const color = pct >= 70 ? '#48bb78' : pct >= 50 ? '#ed8936' : '#fc8181'
           return (
             <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '110px', minWidth: '8px' }}>
-              <span style={{ fontSize: '0.65rem', fontWeight: '700', color: color, marginBottom: '3px', lineHeight: 1 }}>
-                {score}
-              </span>
-              <div
-                title={`Session ${i + 1}: ${score}/20 (${pct}%)`}
-                style={{ width: '100%', height: `${barH}px`, backgroundColor: color, borderRadius: '4px 4px 0 0' }}
-              />
+              <span style={{ fontSize: '0.65rem', fontWeight: '700', color, marginBottom: '3px', lineHeight: 1 }}>{score}</span>
+              <div title={`Session ${i + 1}: ${score}/20 (${pct}%)`} style={{ width: '100%', height: `${barH}px`, backgroundColor: color, borderRadius: '4px 4px 0 0' }} />
             </div>
           )
         })}
