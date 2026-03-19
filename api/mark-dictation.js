@@ -37,7 +37,7 @@ The student listened to audio and tried to write what they heard.
 Ignore capitalisation and punctuation differences.
 Accept minor spelling variations if the word is clearly the same sound.
 ${excerptType === 'word' ? 'The student only needed to type one or two words.' : excerptType === 'phrase' ? 'The student needed to type a short phrase or clause.' : 'The student needed to type the full sentence.'}
-Reject if key words are missing, significant extra words are added, or the meaning changes.
+${excerptType !== 'sentence' ? 'For word and phrase exercises: if the student has the core verb or noun correct but is missing a modifier or adverb (e.g. typed "rain" instead of "rain heavily"), accept it — the core word is the important part. Only reject if the core word itself is wrong or missing.' : 'Reject if key words are missing, significant extra words are added, or the meaning changes.'}
 
 Reply ONLY with a JSON object:
 {"valid": true, "reason": "one short sentence explaining why it is acceptable"}
