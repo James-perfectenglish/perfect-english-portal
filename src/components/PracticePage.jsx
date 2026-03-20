@@ -60,9 +60,8 @@ const BTN = {
   color: '#4a5568',
 };
 
-// Map profile level to a LEVEL_CONFIG entry
 function getLevelConfigForProfile(profileLevel) {
-  if (!profileLevel) return LEVEL_CONFIG[1]; // default intermediate
+  if (!profileLevel) return LEVEL_CONFIG[1];
   const l = profileLevel.toUpperCase();
   if (l.startsWith('A')) return LEVEL_CONFIG[0];
   if (l.startsWith('C')) return LEVEL_CONFIG[2];
@@ -83,12 +82,15 @@ export default function PracticePage({
   const [survivalMode, setSurvivalMode] = useState(false);
   const [weakSpotsMode, setWeakSpotsMode] = useState(false);
   const [weakTypes, setWeakTypes] = useState([]);
+
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
   const isSpanish =
     profile?.level === 'Spanish' ||
     (Array.isArray(profile?.tracks) && profile.tracks.includes('spanish'));
+
+  const profileLevelConfig = getLevelConfigForProfile(profile?.level);
 
   useEffect(() => {
     setSelectedLevel(null);
@@ -98,12 +100,10 @@ export default function PracticePage({
 
     const mode = searchParams.get('mode');
     const weak = searchParams.get('weak');
-
     if (mode === 'weakspots' && weak) {
       const types = weak.split(',').filter(Boolean);
       setWeakTypes(types);
       setWeakSpotsMode(true);
-      // Auto-select level from profile
       const levelConfig = getLevelConfigForProfile(profile?.level);
       setSelectedLevel(levelConfig);
     }
@@ -113,7 +113,6 @@ export default function PracticePage({
     return <SurvivalMode onBack={() => setSurvivalMode(false)} />;
   }
 
-  // Weak spots mode — auto-launched with student's level + skewed mix
   if (weakSpotsMode && selectedLevel) {
     return (
       <RandomPracticeExercise
@@ -124,12 +123,14 @@ export default function PracticePage({
         language={selectedLevel.language}
         userTracks={profile?.tracks || []}
         weakTypes={weakTypes}
-        onBack={() => { setWeakSpotsMode(false); setSelectedLevel(null); }}
+        onBack={() => {
+          setWeakSpotsMode(false);
+          setSelectedLevel(null);
+        }}
       />
     );
   }
 
-  // Spanish students skip the level select entirely
   if (isSpanish) {
     return (
       <div style={{ position: 'relative' }}>
@@ -138,7 +139,12 @@ export default function PracticePage({
             <button
               onClick={onCycleTrack}
               title={`Track: ${TRACK_LABEL[teacherTrack] || 'English'} — click to cycle`}
-              style={{ height: '34px', width: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
+              style={{
+                height: '34px', width: '34px', borderRadius: '8px',
+                background: '#f0f0f5', border: 'none', cursor: 'pointer',
+                fontSize: '1.1rem', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
+              }}
             >
               {TRACK_EMOJI[teacherTrack] || '🇬🇧'}
             </button>
@@ -171,60 +177,31 @@ export default function PracticePage({
   }
 
   return (
-    <div style={{
-      width: '100%',
-      minHeight: '80vh',
-      backgroundColor: '#f8f9fa',
-      padding: '1rem',
-      boxSizing: 'border-box'
-    }}>
+    <div style={{ width: '100%', minHeight: '80vh', backgroundColor: '#f8f9fa', padding: '1rem', boxSizing: 'border-box' }}>
       <div style={{ maxWidth: '700px', margin: '0 auto', textAlign: 'center' }}>
 
-        {/* Heading row with teacher toolbar */}
         <div style={{ position: 'relative', marginBottom: '0.5rem' }}>
-          <h1 style={{
-            fontSize: 'clamp(1.8rem, 6vw, 2.5rem)',
-            color: '#2C3E50',
-            margin: 0,
-            fontWeight: '700'
-          }}>
-            Test Yourself
+          <h1 style={{ fontSize: 'clamp(1.8rem, 6vw, 2.5rem)', color: '#2C3E50', margin: 0, fontWeight: '700' }}>
+            Practise
           </h1>
-
           {isTeacher && (
             <div style={{
-              position: 'absolute',
-              top: '50%',
-              right: 0,
+              position: 'absolute', top: '50%', right: 0,
               transform: 'translateY(-50%)',
-              display: 'flex',
-              gap: '6px',
-              alignItems: 'center',
+              display: 'flex', gap: '6px', alignItems: 'center',
             }}>
               {onCycleTrack && (
-                <button
-                  onClick={onCycleTrack}
-                  title={`Track override: ${teacherTrack || 'en'} — click to cycle`}
-                  style={{ ...BTN, width: '34px', fontSize: '1.1rem' }}
-                >
+                <button onClick={onCycleTrack} title={`Track override: ${teacherTrack || 'en'} — click to cycle`} style={{ ...BTN, width: '34px', fontSize: '1.1rem' }}>
                   {teacherTrack === 'spanish' ? '🇪🇸' : teacherTrack === 'bathroom' ? '🛁' : teacherTrack === 'hotels' ? '🏨' : teacherTrack === 'business' ? '💼' : '🇬🇧'}
                 </button>
               )}
               {onBrowseClick && (
-                <button
-                  onClick={onBrowseClick}
-                  title="Question browser"
-                  style={{ ...BTN, padding: '0 10px', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}
-                >
+                <button onClick={onBrowseClick} title="Question browser" style={{ ...BTN, padding: '0 10px', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
                   🔍 Browse
                 </button>
               )}
               {onTeacherClick && (
-                <button
-                  onClick={onTeacherClick}
-                  title="Teacher dashboard"
-                  style={{ ...BTN, width: '34px', fontSize: '1rem' }}
-                >
+                <button onClick={onTeacherClick} title="Teacher dashboard" style={{ ...BTN, width: '34px', fontSize: '1rem' }}>
                   👨‍🏫
                 </button>
               )}
@@ -232,135 +209,101 @@ export default function PracticePage({
           )}
         </div>
 
-        <p style={{
-          fontSize: 'clamp(1rem, 3vw, 1.15rem)',
-          color: '#666',
-          marginBottom: '2rem',
-          lineHeight: '1.5'
-        }}>
+        <p style={{ fontSize: 'clamp(1rem, 3vw, 1.15rem)', color: '#666', marginBottom: '2rem', lineHeight: '1.5' }}>
           Choose your level. 20 random questions, a variety of exercises. Let's go!
         </p>
 
-        {/* Level Cards */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1rem',
-          marginBottom: '1.5rem'
-        }}>
-          {LEVEL_CONFIG.map(level => (
-            <button
-              key={level.id}
-              onClick={() => setSelectedLevel(level)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'clamp(0.75rem, 3vw, 1.25rem)',
-                padding: 'clamp(1rem, 3vw, 1.5rem)',
-                backgroundColor: 'white',
-                border: '1px solid #e2e8f0',
-                borderRadius: '16px',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'all 0.2s',
-                boxShadow: `0 4px 12px ${level.shadow}`,
-                width: '100%',
-                boxSizing: 'border-box'
-              }}
-            >
-              <div style={{
-                background: level.gradient,
-                borderRadius: '12px',
-                width: 'clamp(55px, 15vw, 70px)',
-                height: 'clamp(55px, 15vw, 70px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 'clamp(1.5rem, 5vw, 2rem)',
-                flexShrink: 0
-              }}>
-                {level.emoji}
-              </div>
-
-              <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+          {LEVEL_CONFIG.map(level => {
+            const isYourLevel = !isTeacher && level.id === profileLevelConfig.id;
+            return (
+              <button
+                key={level.id}
+                onClick={() => setSelectedLevel(level)}
+                style={{
+                  display: 'flex', alignItems: 'center',
+                  gap: 'clamp(0.75rem, 3vw, 1.25rem)',
+                  padding: 'clamp(1rem, 3vw, 1.5rem)',
+                  backgroundColor: 'white',
+                  border: isYourLevel ? '2px solid #667eea' : '1px solid #e2e8f0',
+                  borderRadius: '16px', cursor: 'pointer', textAlign: 'left',
+                  transition: 'all 0.2s',
+                  boxShadow: isYourLevel ? '0 4px 16px rgba(102,126,234,0.25)' : `0 4px 12px ${level.shadow}`,
+                  width: '100%', boxSizing: 'border-box',
+                  position: 'relative',
+                }}
+              >
+                {isYourLevel && (
+                  <div style={{
+                    position: 'absolute', top: '-1px', right: '14px',
+                    background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                    color: 'white', fontSize: '0.7rem', fontWeight: '700',
+                    padding: '3px 10px', borderRadius: '0 0 8px 8px',
+                    letterSpacing: '0.3px',
+                  }}>
+                    Your level
+                  </div>
+                )}
                 <div style={{
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  gap: '0.5rem',
-                  flexWrap: 'wrap',
-                  marginBottom: '0.3rem'
+                  background: level.gradient, borderRadius: '12px',
+                  width: 'clamp(55px, 15vw, 70px)', height: 'clamp(55px, 15vw, 70px)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 'clamp(1.5rem, 5vw, 2rem)', flexShrink: 0
                 }}>
-                  <span style={{ fontSize: 'clamp(1.15rem, 4vw, 1.35rem)', fontWeight: '700', color: '#2C3E50' }}>
-                    {level.title}
-                  </span>
-                  <span style={{ fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)', color: '#888', fontWeight: '500' }}>
-                    {level.subtitle}
-                  </span>
+                  {level.emoji}
                 </div>
-                <p style={{ fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)', color: '#666', margin: 0, lineHeight: '1.4' }}>
-                  {level.description}
-                </p>
-              </div>
-
-              <div style={{ fontSize: '1.5rem', color: '#ccc', flexShrink: 0 }}>→</div>
-            </button>
-          ))}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.3rem' }}>
+                    <span style={{ fontSize: 'clamp(1.15rem, 4vw, 1.35rem)', fontWeight: '700', color: '#2C3E50' }}>
+                      {level.title}
+                    </span>
+                    <span style={{ fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)', color: '#888', fontWeight: '500' }}>
+                      {level.subtitle}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)', color: '#666', margin: 0, lineHeight: '1.4' }}>
+                    {level.description}
+                  </p>
+                </div>
+                <div style={{ fontSize: '1.5rem', color: '#ccc', flexShrink: 0 }}>→</div>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Survival Mode Card */}
         <div style={{ marginTop: '0.5rem' }}>
           <button
             onClick={() => setSurvivalMode(true)}
             style={{
-              display: 'flex',
-              alignItems: 'center',
+              display: 'flex', alignItems: 'center',
               gap: 'clamp(0.75rem, 3vw, 1.25rem)',
               padding: 'clamp(1rem, 3vw, 1.5rem)',
               backgroundColor: '#1a1a2e',
-              border: '1px solid #333',
-              borderRadius: '16px',
-              cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'all 0.2s',
+              border: '1px solid #333', borderRadius: '16px',
+              cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s',
               boxShadow: '0 4px 12px rgba(237, 137, 54, 0.3)',
-              width: '100%',
-              boxSizing: 'border-box'
+              width: '100%', boxSizing: 'border-box'
             }}
           >
             <div style={{
               background: 'linear-gradient(135deg, #ed8936, #e74c3c)',
               borderRadius: '12px',
-              width: 'clamp(55px, 15vw, 70px)',
-              height: 'clamp(55px, 15vw, 70px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 'clamp(1.5rem, 5vw, 2rem)',
-              flexShrink: 0
+              width: 'clamp(55px, 15vw, 70px)', height: 'clamp(55px, 15vw, 70px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 'clamp(1.5rem, 5vw, 2rem)', flexShrink: 0
             }}>
               ⚔️
             </div>
-
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'baseline',
-                gap: '0.5rem',
-                flexWrap: 'wrap',
-                marginBottom: '0.3rem'
-              }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.3rem' }}>
                 <span style={{ fontSize: 'clamp(1.15rem, 4vw, 1.35rem)', fontWeight: '700', color: 'white' }}>
                   Survival Mode
                 </span>
                 <span style={{
-                  fontSize: 'clamp(0.75rem, 2vw, 0.8rem)',
-                  fontWeight: '600',
-                  color: '#ed8936',
-                  backgroundColor: 'rgba(237, 137, 54, 0.15)',
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
+                  fontSize: 'clamp(0.75rem, 2vw, 0.8rem)', fontWeight: '600',
+                  color: '#ed8936', backgroundColor: 'rgba(237, 137, 54, 0.15)',
+                  padding: '2px 8px', borderRadius: '6px',
+                  textTransform: 'uppercase', letterSpacing: '0.5px'
                 }}>
                   Challenge
                 </span>
@@ -369,10 +312,10 @@ export default function PracticePage({
                 5 lives. Start at Beginner, level up through Intermediate to Advanced. How far can you go?
               </p>
             </div>
-
             <div style={{ fontSize: '1.5rem', color: '#ed8936', flexShrink: 0 }}>→</div>
           </button>
         </div>
+
       </div>
     </div>
   );
