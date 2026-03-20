@@ -1,0 +1,315 @@
+import { useState, useEffect } from 'react'
+import { supabase } from './supabaseClient'
+
+const TYPE_INFO = {
+  gap_fill:          { label: 'Gap Fill',          emoji: '✏️' },
+  multiple_choice:   { label: 'Multiple Choice',   emoji: '📝' },
+  sentence_building: { label: 'Sentence Building', emoji: '🧩' },
+  odd_one_out:       { label: 'Odd One Out',        emoji: '🔍' },
+  error_correction:  { label: 'Error Correction',  emoji: '🚨' },
+  matching:          { label: 'Matching',           emoji: '🔗' },
+  sentence_auction:  { label: 'Sentence Auction',  emoji: '🔨' },
+  dictation:         { label: 'Dictation',          emoji: '⌨️' },
+}
+
+const TOPIC_LABELS = {
+  prepositions:            'Prepositions',
+  phrasal_verbs:           'Phrasal Verbs',
+  business_phrasal_verbs:  'Business Phrasal Verbs',
+  business_vocabulary:     'Business Vocabulary',
+  hotel_vocabulary:        'Hotel Vocabulary',
+  bathroom_vocabulary:     'Bathroom Vocabulary',
+  vocabulary:              'Vocabulary',
+  grammar:                 'Grammar',
+  routines:                'Routines',
+  idioms:                  'Idioms',
+  used_to:                 'Used To',
+  second_conditional:      'Second Conditional',
+  work_and_study:          'Work & Study',
+  daily_life:              'Daily Life',
+  spanish:                 'Spanish',
+}
+
+function toPercent(score, answers) {
+  if (score === null || score === undefined) return 0
+  const total = answers?.total_questions
+  if (total && total > 0) return Math.round((score / total) * 100)
+  if (score > 20) return score
+  return Math.round((score / 20) * 100)
+}
+
+function Section({ title, subtitle, children }) {
+  return (
+    <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '1rem' }}>
+      <div style={{ marginBottom: '0.85rem' }}>
+        <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: '0 0 0.1rem' }}>{title}</h2>
+        {subtitle && <p style={{ fontSize: '0.78rem', color: '#718096', margin: 0 }}>{subtitle}</p>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function TypeBar({ info, pct, total }) {
+  const barColor = pct >= 70 ? '#48bb78' : pct >= 50 ? '#ed8936' : '#fc8181'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <span style={{ fontSize: '1.1rem', width: '1.4rem', textAlign: 'center', flexShrink: 0 }}>{info.emoji}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+          <span style={{ fontSize: '0.82rem', fontWeight: '500', color: '#2C3E50' }}>{info.label}</span>
+          <span style={{ fontSize: '0.78rem', color: '#718096' }}>{pct}% <span style={{ fontSize: '0.68rem', color: '#a0aec0' }}>({total} q{total !== 1 ? 's' : ''})</span></span>
+        </div>
+        <div style={{ background: '#edf2f7', borderRadius: '99px', height: '7px', overflow: 'hidden' }}>
+          <div style={{ width: `${pct}%`, height: '100%', backgroundColor: barColor, borderRadius: '99px' }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function Progress({ session, profile, handleLogout }) {
+  const [stats, setStats]               = useState(null)
+  const [attempts, setAttempts]         = useState([])
+  const [typeBreakdown, setTypeBreakdown] = useState({})
+  const [topicProgress, setTopicProgress] = useState([])
+  const [lessonsPassed, setLessonsPassed] = useState(0)
+  const [daysStudied, setDaysStudied]   = useState(0)
+  const [streak, setStreak]             = useState(0)
+  const [listeningCompleted, setListeningCompleted] = useState(0)
+  const [loading, setLoading]           = useState(true)
+
+  useEffect(() => { fetchData() }, [session])
+
+  function computeStreak(dates) {
+    if (!dates || dates.length === 0) return 0
+    const uniqueDays = [...new Set(dates.map(d => {
+      const dt = new Date(d); dt.setHours(0,0,0,0); return dt.getTime()
+    }))].sort((a, b) => b - a)
+    const today = new Date(); today.setHours(0,0,0,0)
+    const todayMs = today.getTime()
+    const yesterdayMs = todayMs - 86400000
+    if (uniqueDays[0] !== todayMs && uniqueDays[0] !== yesterdayMs) return 0
+    let streak = 0, checkMs = uniqueDays[0]
+    for (const dayMs of uniqueDays) {
+      if (dayMs === checkMs) { streak++; checkMs -= 86400000 } else break
+    }
+    return streak
+  }
+
+  async function fetchData() {
+    const userId = session.user.id
+
+    const { count: totalCount } = await supabase
+      .from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', userId)
+    const { count: correctCount } = await supabase
+      .from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', userId).eq('is_correct', true)
+
+    setStats(totalCount > 0
+      ? { total: totalCount, correct: correctCount, accuracy: Math.round((correctCount / totalCount) * 100) }
+      : { total: 0, correct: 0, accuracy: 0 })
+
+    const { data: recentAnswers } = await supabase
+      .from('student_answers').select('is_correct, question_id, answered_at')
+      .eq('student_id', userId).order('answered_at', { ascending: false }).limit(2000)
+
+    if (recentAnswers && recentAnswers.length > 0) {
+      setStreak(computeStreak(recentAnswers.map(a => a.answered_at)))
+      const questionIds = [...new Set(recentAnswers.map(a => a.question_id).filter(Boolean))]
+      if (questionIds.length > 0) {
+        const { data: questions } = await supabase.from('question_bank').select('question_number, type').in('question_number', questionIds)
+        if (questions) {
+          const typeMap = {}
+          questions.forEach(q => { typeMap[q.question_number] = q.type })
+          const byType = {}
+          recentAnswers.forEach(a => {
+            const type = typeMap[a.question_id]
+            if (!type) return
+            if (!byType[type]) byType[type] = { correct: 0, total: 0 }
+            byType[type].total++
+            if (a.is_correct) byType[type].correct++
+          })
+          setTypeBreakdown(byType)
+        }
+      }
+    }
+
+    const { data: attemptData } = await supabase
+      .from('student_attempts').select('score, completed_at, answers')
+      .eq('student_id', userId).order('completed_at', { ascending: false }).limit(100)
+
+    if (attemptData && attemptData.length > 0) {
+      const normalised = attemptData.map(a => ({ ...a, scorePercent: toPercent(a.score, a.answers) }))
+      setLessonsPassed(normalised.filter(a => a.scorePercent >= 70).length)
+      const attemptDays = normalised.map(a => new Date(a.completed_at).toDateString())
+      const answerDays = (recentAnswers || []).map(a => new Date(a.answered_at).toDateString())
+      setDaysStudied(new Set([...attemptDays, ...answerDays]).size)
+      setAttempts([...normalised].reverse())
+    } else if (recentAnswers && recentAnswers.length > 0) {
+      const answerDays = recentAnswers.map(a => new Date(a.answered_at).toDateString())
+      setDaysStudied(new Set(answerDays).size)
+    }
+
+    const { count: listenCount } = await supabase
+      .from('listening_sessions').select('*', { count: 'exact', head: true })
+      .eq('student_id', userId).eq('stage_reached', 'review')
+    setListeningCompleted(listenCount || 0)
+
+    const { data: topicSessions } = await supabase
+      .from('topic_sessions').select('topic, score, total, passed').eq('student_id', userId)
+    if (topicSessions && topicSessions.length > 0) {
+      const byTopic = {}
+      topicSessions.forEach(s => {
+        if (!byTopic[s.topic]) byTopic[s.topic] = { correct: 0, total: 0, passed: 0, sessions: 0 }
+        byTopic[s.topic].correct += s.score
+        byTopic[s.topic].total += s.total
+        if (s.passed) byTopic[s.topic].passed++
+        byTopic[s.topic].sessions++
+      })
+      const topicList = Object.entries(byTopic)
+        .map(([topic, data]) => ({
+          topic,
+          label: TOPIC_LABELS[topic] || topic.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+          pct: data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0,
+          sessions: data.sessions,
+          passed: data.passed,
+        }))
+        .sort((a, b) => a.pct - b.pct)
+      setTopicProgress(topicList)
+    }
+
+    setLoading(false)
+  }
+
+  if (loading) {
+    return <div style={{ textAlign: 'center', padding: '3rem', color: '#667eea' }}>Loading your progress...</div>
+  }
+
+  const hasData = stats && stats.total > 0
+  const hasAttempts = attempts.length > 0
+  const recent = attempts.slice(-10)
+
+  return (
+    <div className="pep-page-content" style={{ maxWidth: '900px', margin: '0 auto', padding: '1.25rem 1rem 2rem' }}>
+      <h1 style={{ fontSize: 'clamp(1.3rem, 4vw, 1.6rem)', color: '#2C3E50', margin: '0 0 1.25rem', fontWeight: '700' }}>
+        📊 My Progress
+      </h1>
+
+      {/* STAT CARDS */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+        {[
+          { emoji: '📊', label: 'Questions Answered', value: hasData ? stats.total.toLocaleString() : '—' },
+          { emoji: '🎯', label: 'Overall Accuracy',   value: hasData ? `${stats.accuracy}%` : '—' },
+          { emoji: '🏆', label: 'Lessons Passed',     value: hasAttempts ? lessonsPassed : '—' },
+          { emoji: '🎧', label: 'Listening Done',     value: listeningCompleted > 0 ? listeningCompleted : '—' },
+          { emoji: '📅', label: 'Days Studied',       value: hasAttempts ? daysStudied : '—' },
+          ...(streak > 0 ? [{ emoji: '🔥', label: 'Day Streak', value: streak, highlight: streak >= 7 }] : []),
+        ].map(({ emoji, label, value, highlight }) => (
+          <div key={label} style={{
+            background: highlight ? 'linear-gradient(135deg, #fffaf0, #fff5e0)' : 'white',
+            borderRadius: '12px', padding: '1rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+            borderTop: `3px solid ${highlight ? '#ed8936' : '#667eea'}`,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '1.4rem', marginBottom: '0.2rem' }}>{emoji}</div>
+            <div style={{ fontSize: 'clamp(1.25rem, 3vw, 1.75rem)', fontWeight: '700', color: '#2C3E50', lineHeight: 1.1 }}>{value}</div>
+            <div style={{ fontSize: '0.72rem', color: '#718096', marginTop: '0.2rem', lineHeight: 1.3 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* SCORE TREND */}
+      {recent.length > 1 && (
+        <Section title="📈 Score Trend" subtitle={`Your last ${recent.length} sessions`}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '110px', padding: '0 2px' }}>
+            {recent.map((a, i) => {
+              const pct = a.scorePercent ?? 0
+              const score = a.score ?? 0
+              const barH = Math.max(4, (pct / 100) * 80)
+              const color = pct >= 70 ? '#48bb78' : pct >= 50 ? '#ed8936' : '#fc8181'
+              return (
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '110px', minWidth: '8px' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: '700', color, marginBottom: '3px', lineHeight: 1 }}>{score}</span>
+                  <div title={`Session ${i + 1}: ${score}/20 (${pct}%)`}
+                    style={{ width: '100%', height: `${barH}px`, backgroundColor: color, borderRadius: '4px 4px 0 0' }} />
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', borderTop: '1px solid #e2e8f0', paddingTop: '4px' }}>
+            <span style={{ fontSize: '0.68rem', color: '#a0aec0' }}>Older</span>
+            <span style={{ fontSize: '0.68rem', color: '#a0aec0' }}>Most recent</span>
+          </div>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+            {[['#48bb78', '70%+ (Pass)'], ['#ed8936', '50–69%'], ['#fc8181', 'Below 50%']].map(([c, l]) => (
+              <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: c }} />
+                <span style={{ fontSize: '0.72rem', color: '#718096' }}>{l}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* STRENGTHS & WEAKNESSES */}
+      {Object.keys(typeBreakdown).length > 0 && (
+        <Section title="💪 Strengths & Weaknesses" subtitle="Accuracy by question type">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            {Object.entries(typeBreakdown)
+              .sort((a, b) => (b[1].correct / b[1].total) - (a[1].correct / a[1].total))
+              .map(([type, data]) => {
+                const pct = Math.round((data.correct / data.total) * 100)
+                const info = TYPE_INFO[type] || { label: type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), emoji: '📋' }
+                return <TypeBar key={type} info={info} pct={pct} total={data.total} />
+              })}
+          </div>
+        </Section>
+      )}
+
+      {/* PROGRESS BY TOPIC */}
+      {topicProgress.length > 0 && (
+        <Section title="📚 Progress by Topic" subtitle="Your accuracy across topic practice sessions — weakest first">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            {topicProgress.map(({ topic, label, pct, sessions, passed }) => (
+              <div key={topic} style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: '500', color: '#2C3E50' }}>{label}</span>
+                  <span style={{ fontSize: '0.78rem', color: '#718096' }}>
+                    {pct}%
+                    <span style={{ fontSize: '0.68rem', color: '#a0aec0', marginLeft: '4px' }}>
+                      ({sessions} session{sessions !== 1 ? 's' : ''}{passed > 0 ? `, ${passed} passed` : ''})
+                    </span>
+                  </span>
+                </div>
+                <div style={{ background: '#edf2f7', borderRadius: '99px', height: '7px', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${pct}%`, height: '100%', borderRadius: '99px',
+                    backgroundColor: pct >= 70 ? '#48bb78' : pct >= 50 ? '#ed8936' : '#fc8181'
+                  }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {!hasData && (
+        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#718096' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>📊</div>
+          <p style={{ margin: 0 }}>No data yet — complete some practice sessions and your progress will appear here.</p>
+        </div>
+      )}
+
+      {/* FOOTER logout */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ fontSize: '0.875rem', color: '#718096' }}>
+          Level: <strong style={{ color: '#667eea' }}>{profile?.level || 'Not assigned yet'}</strong>
+        </div>
+        <button onClick={handleLogout} style={{ padding: '0.5rem 1.25rem', backgroundColor: '#f44336', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500' }}>
+          Logout
+        </button>
+      </div>
+    </div>
+  )
+}
