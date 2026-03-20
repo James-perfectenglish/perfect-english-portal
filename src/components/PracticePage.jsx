@@ -3,6 +3,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import RandomPracticeExercise from './RandomPracticeExercise.jsx';
 import SurvivalMode from './SurvivalMode.jsx';
 import { TRACK_EMOJI, TRACK_LABEL } from './TeacherToolbar';
+import Breadcrumb from './Breadcrumb';
 
 const LEVEL_CONFIG = [
   {
@@ -115,19 +116,22 @@ export default function PracticePage({
 
   if (weakSpotsMode && selectedLevel) {
     return (
-      <RandomPracticeExercise
-        levels={selectedLevel.levels}
-        levelTitle="Weak Spots"
-        levelSubtitle={selectedLevel.subtitle}
-        gradient="linear-gradient(135deg, #e53e3e, #c53030)"
-        language={selectedLevel.language}
-        userTracks={profile?.tracks || []}
-        weakTypes={weakTypes}
-        onBack={() => {
-          setWeakSpotsMode(false);
-          setSelectedLevel(null);
-        }}
-      />
+      <>
+        <Breadcrumb section="Practise" title="Weak Spots" onExit={() => { setWeakSpotsMode(false); setSelectedLevel(null); }} />
+        <RandomPracticeExercise
+          levels={selectedLevel.levels}
+          levelTitle="Weak Spots"
+          levelSubtitle={selectedLevel.subtitle}
+          gradient="linear-gradient(135deg, #e53e3e, #c53030)"
+          language={selectedLevel.language}
+          userTracks={profile?.tracks || []}
+          weakTypes={weakTypes}
+          onBack={() => {
+            setWeakSpotsMode(false);
+            setSelectedLevel(null);
+          }}
+        />
+      </>
     );
   }
 
@@ -164,15 +168,18 @@ export default function PracticePage({
 
   if (selectedLevel) {
     return (
-      <RandomPracticeExercise
-        levels={selectedLevel.levels}
-        levelTitle={selectedLevel.title}
-        levelSubtitle={selectedLevel.subtitle}
-        gradient={selectedLevel.gradient}
-        language={selectedLevel.language}
-        userTracks={profile?.tracks || []}
-        onBack={() => setSelectedLevel(null)}
-      />
+      <>
+        <Breadcrumb section="Practise" title={selectedLevel.title} onExit={() => setSelectedLevel(null)} />
+        <RandomPracticeExercise
+          levels={selectedLevel.levels}
+          levelTitle={selectedLevel.title}
+          levelSubtitle={selectedLevel.subtitle}
+          gradient={selectedLevel.gradient}
+          language={selectedLevel.language}
+          userTracks={profile?.tracks || []}
+          onBack={() => setSelectedLevel(null)}
+        />
+      </>
     );
   }
 

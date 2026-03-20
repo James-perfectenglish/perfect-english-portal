@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { TRACK_EMOJI, TRACK_LABEL } from './components/TeacherToolbar'
+import Breadcrumb from './components/Breadcrumb'
 
+// Exercises
 import TopicPracticeExercise from './TopicPracticeExercise'
 import SentenceBuilding from './SentenceBuilding'
 import ListeningExercise from './ListeningExercise'
@@ -60,18 +62,12 @@ const EXERCISE_ICONS = {
   'Word Snake':                '🐍',
 }
 
-const ALL_TABS = [
+const TABS = [
   { key: 'learn',    label: 'Learn'    },
   { key: 'practice', label: 'Practice' },
   { key: 'listen',   label: 'Listen'   },
   { key: 'play',     label: 'Play'     },
 ]
-
-const ROUTE_TAB_GROUPS = {
-  learn: ['learn', 'practice', 'listen'],
-  play:  ['play'],
-  all:   ['learn', 'practice', 'listen', 'play'],
-}
 
 const SPECIFIC_TRACKS = ['bathroom', 'hotels', 'spanish', 'business', 'law', 'sports']
 
@@ -89,26 +85,38 @@ function isForYouFn(exercise, userTracks) {
   return exTracks.some(t => SPECIFIC_TRACKS.includes(t) && userTracks.includes(t))
 }
 
-export default function ExerciseList({
-  userLevel, userTracks = [], isTeacher = false,
-  onTeacherClick, onBrowseClick, globalLang, onToggleLang,
-  teacherTrack, onCycleTrack, defaultTab = 'learn',
-}) {
-  const tabGroup   = ROUTE_TAB_GROUPS[defaultTab] || ROUTE_TAB_GROUPS.learn
-  const visibleTabs = ALL_TABS.filter(t => tabGroup.includes(t.key))
+// Map category to breadcrumb section label
+function getSectionLabel(category) {
+  if (category === 'play') return 'Play'
+  if (category === 'listen') return 'Listen'
+  if (category === 'practice') return 'Practice'
+  return 'Learn'
+}
 
-  const [exercises, setExercises]           = useState([])
-  const [loading, setLoading]               = useState(true)
-  const [activeTab, setActiveTab]           = useState(tabGroup[0])
-  const [isListView, setIsListView]         = useState(false)
-  const [activeExercise, setActiveExercise] = useState(null)
-  const [openedTitles, setOpenedTitles]     = useState(new Set())
+export default function ExerciseList({
+  userLevel,
+  userTracks = [],
+  isTeacher = false,
+  onTeacherClick,
+  onBrowseClick,
+  globalLang,
+  onToggleLang,
+  teacherTrack,
+  onCycleTrack,
+  defaultTab,
+}) {
+  const [exercises, setExercises]             = useState([])
+  const [loading, setLoading]                 = useState(true)
+  const [activeTab, setActiveTab]             = useState(defaultTab || 'learn')
+  const [isListView, setIsListView]           = useState(false)
+  const [activeExercise, setActiveExercise]   = useState(null)
+  const [openedTitles, setOpenedTitles]       = useState(new Set())
   const [hasNewListening, setHasNewListening] = useState(false)
 
   const location = useLocation()
   const navigate = useNavigate()
 
-  useEffect(() => { setActiveExercise(null); setActiveTab(tabGroup[0]) }, [location.key])
+  useEffect(() => { setActiveExercise(null) }, [location.key])
   useEffect(() => { fetchAll() }, [userTracks])
 
   const fetchAll = async () => {
@@ -170,35 +178,51 @@ export default function ExerciseList({
     return !openedTitles.has(exercise.title)
   }
 
+  // ── Exercise routing ──────────────────────────────────────────────────────
   if (activeExercise) {
     const t = activeExercise.title
-    if (activeExercise.type === 'topic_practice') return <TopicPracticeExercise exercise={activeExercise} userLevel={userLevel} onBack={back} onComplete={back} />
-    if (t === 'Irregular Verbs Flashcards') return <FlashcardTemplate flashcardSetId={IRREGULAR_VERBS_ID} setName="irregular-verbs" onBack={back} />
-    if (t === 'Essential Phrasal Verbs')    return <FlashcardTemplate flashcardSetId={PHRASAL_VERBS_ID} setName="phrasal-verbs" onBack={back} />
-    if (t === 'Verbs Flashcards')           return <FlashcardTemplate title="Verb Flashcards" subtitle="30 essential verbs — español ↔ English" setName="bilingual_verbs" cards={VERB_CARDS} onBack={back} />
-    if (t === 'Sentence Building')          return <SentenceBuilding onComplete={back} onBack={back} />
+    const sectionLabel = getSectionLabel(activeExercise.category)
+
     const isSpanishTrack = userTracks.includes('spanish')
     const listeningTracks = isSpanishTrack ? userTracks : [...new Set([...userTracks, 'general'])]
-    if (t === 'Listening Exercises') return <ListeningExercise onBack={back} userTracks={listeningTracks} />
-    if (t === 'Dictation')           return <Dictation onBack={back} userTracks={listeningTracks} />
-    if (t === 'Borrás Flashcards')   return <FlashcardTemplate title="Borrás Flashcards" subtitle="Bathroom vocabulary in context 🚿" setName="borras" cards={BORRAS_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
-    if (t === 'Borrás Memory Game')  return <MemoryGame title="Borrás Memory Game" subtitle="Match the English word to its Spanish translation 🚿" cards={BORRAS_CARDS} gameName="borras" cardBackImage="/og-image.png" onBack={back} />
-    if (t === 'Hotel Flashcards')    return <FlashcardTemplate title="Hotel Flashcards" subtitle="Essential hotel vocabulary in context 🏩" setName="hotel" cards={HOTEL_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
-    if (t === 'Hotel Memory Game')   return <MemoryGame title="Hotel Memory Game" subtitle="Match the English word to its Spanish translation 🏩" cards={HOTEL_CARDS} gameName="hotel" cardBackImage="/og-image.png" onBack={back} />
-    if (t === 'Odd One Out')         return <OddOneOut onComplete={back} onBack={back} />
-    if (t === 'Error Correction')    return <ErrorCorrection onComplete={back} onBack={back} />
-    if (t === 'Matching')            return <MatchingExercise onComplete={back} onBack={back} />
-    if (t === 'Sentence Auction')    return <SentenceAuction onComplete={back} onBack={back} />
+
+    let exerciseComponent = null
+    if (activeExercise.type === 'topic_practice')   exerciseComponent = <TopicPracticeExercise exercise={activeExercise} userLevel={userLevel} onBack={back} onComplete={back} />
+    else if (t === 'Irregular Verbs Flashcards')    exerciseComponent = <FlashcardTemplate flashcardSetId={IRREGULAR_VERBS_ID} setName="irregular-verbs" onBack={back} />
+    else if (t === 'Essential Phrasal Verbs')        exerciseComponent = <FlashcardTemplate flashcardSetId={PHRASAL_VERBS_ID} setName="phrasal-verbs" onBack={back} />
+    else if (t === 'Verbs Flashcards')               exerciseComponent = <FlashcardTemplate title="Verb Flashcards" subtitle="30 essential verbs — español ↔ English" setName="bilingual_verbs" cards={VERB_CARDS} onBack={back} />
+    else if (t === 'Sentence Building')              exerciseComponent = <SentenceBuilding onComplete={back} onBack={back} />
+    else if (t === 'Listening Exercises')            exerciseComponent = <ListeningExercise onBack={back} userTracks={listeningTracks} />
+    else if (t === 'Dictation')                      exerciseComponent = <Dictation onBack={back} userTracks={listeningTracks} />
+    else if (t === 'Borrás Flashcards')              exerciseComponent = <FlashcardTemplate title="Borrás Flashcards" subtitle="Bathroom vocabulary in context 🚿" setName="borras" cards={BORRAS_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
+    else if (t === 'Borrás Memory Game')             exerciseComponent = <MemoryGame title="Borrás Memory Game" subtitle="Match the English word to its Spanish translation 🚿" cards={BORRAS_CARDS} gameName="borras" cardBackImage="/og-image.png" onBack={back} />
+    else if (t === 'Hotel Flashcards')               exerciseComponent = <FlashcardTemplate title="Hotel Flashcards" subtitle="Essential hotel vocabulary in context 🏩" setName="hotel" cards={HOTEL_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
+    else if (t === 'Hotel Memory Game')              exerciseComponent = <MemoryGame title="Hotel Memory Game" subtitle="Match the English word to its Spanish translation 🏩" cards={HOTEL_CARDS} gameName="hotel" cardBackImage="/og-image.png" onBack={back} />
+    else if (t === 'Odd One Out')                    exerciseComponent = <OddOneOut onComplete={back} onBack={back} />
+    else if (t === 'Error Correction')               exerciseComponent = <ErrorCorrection onComplete={back} onBack={back} />
+    else if (t === 'Matching')                       exerciseComponent = <MatchingExercise onComplete={back} onBack={back} />
+    else if (t === 'Sentence Auction')               exerciseComponent = <SentenceAuction onComplete={back} onBack={back} />
+
+    if (exerciseComponent) {
+      return (
+        <>
+          <Breadcrumb section={sectionLabel} title={t} onExit={back} />
+          {exerciseComponent}
+        </>
+      )
+    }
   }
 
+  // ── Filter + sort for active tab ──────────────────────────────────────────
   const tabExercises = exercises
     .filter(e => shouldShowExercise(e, userTracks))
     .filter(e => (e.category || 'practice') === activeTab)
 
-  const forYouList = tabExercises.filter(e => isForYouFn(e, userTracks))
+  const forYouList  = tabExercises.filter(e => isForYouFn(e, userTracks))
   const generalList = tabExercises.filter(e => !isForYouFn(e, userTracks))
-  const hasBoth = forYouList.length > 0 && generalList.length > 0
+  const hasBoth     = forYouList.length > 0 && generalList.length > 0
 
+  // ── Sub-components ────────────────────────────────────────────────────────
   const LevelBadge = ({ level }) => {
     const key = level?.[0] || 'B'
     const styles = { A: { background: '#f0fff4', color: '#276749' }, B: { background: '#ebf8ff', color: '#2b6cb0' }, C: { background: '#fffaf0', color: '#c05621' } }
@@ -221,11 +245,11 @@ export default function ExerciseList({
   )
 
   const GridCard = ({ exercise }) => {
-    const fy = isForYouFn(exercise, userTracks)
+    const fy      = isForYouFn(exercise, userTracks)
     const newFlag = isNew(exercise)
-    const active = ACTIVE_EXERCISES.has(exercise.title)
-    const icon = EXERCISE_ICONS[exercise.title] || '📝'
-    const isWide = exercise.category === 'listen'
+    const active  = ACTIVE_EXERCISES.has(exercise.title)
+    const icon    = EXERCISE_ICONS[exercise.title] || '📝'
+    const isWide  = exercise.category === 'listen'
     const cardStyle = {
       border: `1.5px solid ${fy ? '#667eea' : '#e8e8f0'}`, borderRadius: '14px', padding: isWide ? '12px 14px' : '12px',
       background: fy ? 'linear-gradient(160deg, #f7f8ff 0%, #fdf5ff 100%)' : 'white',
@@ -254,7 +278,7 @@ export default function ExerciseList({
     return (
       <div style={cardStyle} onClick={() => active && startExercise(exercise)}>
         {newFlag && <div style={{ position: 'absolute', top: 8, left: 8 }}><NewBadge /></div>}
-        {fy && <div style={{ position: 'absolute', top: 8, right: 8 }}><ForYouBadge /></div>}
+        {fy      && <div style={{ position: 'absolute', top: 8, right: 8 }}><ForYouBadge /></div>}
         <div style={{ fontSize: '1.5rem', marginTop: (newFlag || fy) ? '18px' : '0' }}>{icon}</div>
         <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#2d3748', lineHeight: 1.25 }}>{exercise.title}</div>
         <div style={{ fontSize: '0.71rem', color: '#718096', lineHeight: 1.4 }}>{exercise.description}</div>
@@ -267,10 +291,10 @@ export default function ExerciseList({
   }
 
   const ListCard = ({ exercise }) => {
-    const fy = isForYouFn(exercise, userTracks)
+    const fy      = isForYouFn(exercise, userTracks)
     const newFlag = isNew(exercise)
-    const active = ACTIVE_EXERCISES.has(exercise.title)
-    const icon = EXERCISE_ICONS[exercise.title] || '📝'
+    const active  = ACTIVE_EXERCISES.has(exercise.title)
+    const icon    = EXERCISE_ICONS[exercise.title] || '📝'
     return (
       <div style={{ border: `1.5px solid ${fy ? '#667eea' : '#e8e8f0'}`, borderRadius: '12px', padding: '12px 14px', background: fy ? 'linear-gradient(160deg, #f7f8ff 0%, #fdf5ff 100%)' : 'white', cursor: active ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
         onClick={() => active && startExercise(exercise)}>
@@ -290,14 +314,15 @@ export default function ExerciseList({
     )
   }
 
+  // ── Main render ───────────────────────────────────────────────────────────
   return (
-    <div className="pep-page-content" style={{ maxWidth: '860px', margin: '0 auto', padding: '0 0 2rem', minHeight: '60vh' }}>
+    <div style={{ maxWidth: '860px', margin: '0 auto', padding: '0 0 80px', minHeight: '60vh' }}>
+
+      {/* Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '1rem 1rem 0.5rem' }}>
         <div>
-          <div style={{ fontSize: 'clamp(1.1rem, 4vw, 1.4rem)', fontWeight: 700, color: '#2d3748' }}>
-            {defaultTab === 'play' ? 'Play' : 'Exercises'}
-          </div>
-          {defaultTab !== 'play' && <div style={{ fontSize: '0.78rem', color: '#718096', marginTop: '2px' }}>⭐️ For You exercises appear first</div>}
+          <div style={{ fontSize: 'clamp(1.1rem, 4vw, 1.4rem)', fontWeight: 700, color: '#2d3748' }}>Exercises</div>
+          <div style={{ fontSize: '0.78rem', color: '#718096', marginTop: '2px' }}>⭐️ For You exercises appear first</div>
         </div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0, marginTop: '2px' }}>
           {isTeacher && onCycleTrack && (
@@ -325,17 +350,17 @@ export default function ExerciseList({
         </div>
       </div>
 
-      {visibleTabs.length > 1 && (
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '0.75rem 1rem', scrollbarWidth: 'none' }}>
-          {visibleTabs.map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              style={{ padding: '8px 18px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s', border: activeTab === tab.key ? '2px solid transparent' : '2px solid #e2e8f0', background: activeTab === tab.key ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'white', color: activeTab === tab.key ? 'white' : '#4a5568', boxShadow: activeTab === tab.key ? '0 2px 8px rgba(102,126,234,0.35)' : 'none' }}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '0.75rem 1rem', scrollbarWidth: 'none' }}>
+        {TABS.map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            style={{ padding: '8px 18px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s', border: activeTab === tab.key ? '2px solid transparent' : '2px solid #e2e8f0', background: activeTab === tab.key ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'white', color: activeTab === tab.key ? 'white' : '#4a5568', boxShadow: activeTab === tab.key ? '0 2px 8px rgba(102,126,234,0.35)' : 'none' }}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
+      {/* Exercise content */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#718096' }}>Loading exercises...</div>
       ) : tabExercises.length === 0 ? (
