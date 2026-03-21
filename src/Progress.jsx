@@ -301,15 +301,7 @@ export default function Progress({ session, profile, handleLogout }) {
         </div>
       )}
 
-      {/* FOOTER logout */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <div style={{ fontSize: '0.875rem', color: '#718096' }}>
-          Level: <strong style={{ color: '#667eea' }}>{profile?.level || 'Not assigned yet'}</strong>
-        </div>
-        <button onClick={handleLogout} style={{ padding: '0.5rem 1.25rem', backgroundColor: '#f44336', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500' }}>
-          Logout
-        </button>
-      </div>
+     
     </div>
   )
 }
