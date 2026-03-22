@@ -14,6 +14,7 @@ import Blurt from './Blurt'
 import TeacherBrowse from './TeacherBrowse'
 import WordSnake from './WordSnake'
 import NavBar from './components/NavBar'
+import PronunciationExercise from './PronunciationExercise'
 import { TRACK_CYCLE } from './components/TeacherToolbar'
 
 function App() {
@@ -182,6 +183,16 @@ function StudentRoutes({ session, profile, handleLogout }) {
           defaultTab="play"
         />
       } />
+      <Route path="/listen" element={
+        <ExerciseList
+          userLevel={profile.level}
+          userTracks={profile.tracks || []}
+          defaultTab="listen"
+        />
+      } />
+      <Route path="/speak" element={
+        <PronunciationExercise profile={profile} />
+      } />
       <Route path="/progress" element={
         <Progress session={session} profile={profile} handleLogout={handleLogout} />
       } />
@@ -245,6 +256,23 @@ function TeacherRoutes({ session, profile, effectiveProfile, teacherTrack, globa
           onToggleLang={toggleLang}
           defaultTab="play"
         />
+      } />
+      <Route path="/listen" element={
+        <ExerciseList
+          userLevel={effectiveProfile.level}
+          userTracks={effectiveProfile.tracks || []}
+          isTeacher={true}
+          teacherTrack={teacherTrack}
+          onCycleTrack={cycleTrack}
+          onTeacherClick={() => navigate('/teacher')}
+          onBrowseClick={() => navigate('/teacher/browse')}
+          globalLang={globalLang}
+          onToggleLang={toggleLang}
+          defaultTab="listen"
+        />
+      } />
+      <Route path="/speak" element={
+        <PronunciationExercise profile={effectiveProfile} />
       } />
       <Route path="/exercises" element={<Navigate to="/learn" replace />} />
       <Route path="/progress" element={

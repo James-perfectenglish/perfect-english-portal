@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { TRACK_EMOJI, TRACK_LABEL } from './components/TeacherToolbar'
 import Breadcrumb from './components/Breadcrumb'
+import PronunciationExercise from './PronunciationExercise'
 
 // Exercises
 import TopicPracticeExercise from './TopicPracticeExercise'
@@ -63,10 +64,10 @@ const EXERCISE_ICONS = {
 }
 
 const TABS = [
-  { key: 'learn',    label: 'Learn'    },
-  { key: 'practice', label: 'Practice' },
-  { key: 'listen',   label: 'Listen'   },
-  { key: 'play',     label: 'Play'     },
+  { key: 'learn',    label: 'Learn'       },
+  { key: 'practice', label: 'Activities'  },
+  { key: 'listen',   label: 'Listen'      },
+  { key: 'speak',    label: 'Speak'       },
 ]
 
 const SPECIFIC_TRACKS = ['bathroom', 'hotels', 'spanish', 'business', 'law', 'sports']
@@ -87,7 +88,7 @@ function isForYouFn(exercise, userTracks) {
 
 // Map category to breadcrumb section label
 function getSectionLabel(category) {
-  if (category === 'play') return 'Play'
+  if (category === 'speak') return 'Speak'
   if (category === 'listen') return 'Listen'
   if (category === 'practice') return 'Practice'
   return 'Learn'
@@ -211,6 +212,11 @@ export default function ExerciseList({
         </>
       )
     }
+  }
+
+  // ── Speak tab — render PronunciationExercise inline ─────────────────────────
+  if (activeTab === 'speak') {
+    return <PronunciationExercise profile={{ level: userLevel, tracks: userTracks }} />
   }
 
   // ── Filter + sort for active tab ──────────────────────────────────────────

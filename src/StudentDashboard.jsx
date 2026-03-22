@@ -10,6 +10,7 @@ const LEVEL_GRADIENT = {
   B2: 'linear-gradient(135deg, #3498DB, #667eea)',
   C1: 'linear-gradient(135deg, #ed8936, #f6ad55)',
   C2: 'linear-gradient(135deg, #ed8936, #f6ad55)',
+  Spanish: 'linear-gradient(135deg, #e53e3e, #c53030)',
 }
 
 function computeStreak(dates) {
@@ -37,14 +38,17 @@ function getWeakTypes(typeBreakdown) {
 }
 
 export default function StudentDashboard({ profile, session }) {
-  const [streak, setStreak]             = useState(0)
-  const [questionsTotal, setQTotal]     = useState(0)
+  const [streak, setStreak]               = useState(0)
+  const [questionsTotal, setQTotal]       = useState(0)
   const [typeBreakdown, setTypeBreakdown] = useState({})
-  const [loading, setLoading]           = useState(true)
+  const [loading, setLoading]             = useState(true)
 
-  const firstName = profile.full_name?.split(' ')[0] || 'there'
-  const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const firstName     = profile.full_name?.split(' ')[0] || 'there'
+  const hour          = new Date().getHours()
+  const greeting      = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const profileLevel  = profile.level
+  const isSpanish     = profileLevel === 'Spanish' || (Array.isArray(profile.tracks) && profile.tracks.includes('spanish'))
+  const levelGradient = LEVEL_GRADIENT[profileLevel] || 'linear-gradient(135deg, #3498DB, #667eea)'
 
   useEffect(() => { fetchQuickData() }, [session])
 
@@ -83,10 +87,23 @@ export default function StudentDashboard({ profile, session }) {
     setLoading(false)
   }
 
-  const profileLevel = profile.level
-  const levelGradient = LEVEL_GRADIENT[profileLevel] || 'linear-gradient(135deg, #3498DB, #667eea)'
   const weakTypes = getWeakTypes(typeBreakdown)
   const weakParam = weakTypes.length > 0 ? `&weak=${weakTypes.join(',')}` : ''
+
+  // Card component
+  const QuickCard = ({ to, gradient, border, children }) => (
+    <Link to={to} style={{ textDecoration: 'none' }}>
+      <div style={{
+        background: gradient || 'white',
+        border: border || '1.5px solid #e8e8f0',
+        borderRadius: '14px', padding: '1rem',
+        height: '100%', boxSizing: 'border-box',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {children}
+      </div>
+    </Link>
+  )
 
   return (
     <div className="pep-page-content" style={{ maxWidth: '700px', margin: '0 auto', padding: '1.25rem 1rem 2rem' }}>
@@ -102,7 +119,7 @@ export default function StudentDashboard({ profile, session }) {
         </p>
       </div>
 
-      {/* WORD OF THE DAY — collapsible */}
+      {/* WORD OF THE DAY */}
       <WordOfTheDay profile={profile} collapsible={true} />
 
       {/* QUICK START */}
@@ -112,12 +129,9 @@ export default function StudentDashboard({ profile, session }) {
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
 
-          {/* Practise */}
+          {/* Row 1: Practise + Weak Spots */}
           <Link to="/practise" style={{ textDecoration: 'none' }}>
-            <div style={{
-              background: levelGradient, borderRadius: '14px', padding: '1rem',
-              color: 'white', height: '100%', boxSizing: 'border-box', position: 'relative', overflow: 'hidden'
-            }}>
+            <div style={{ background: levelGradient, borderRadius: '14px', padding: '1rem', color: 'white', height: '100%', boxSizing: 'border-box', position: 'relative', overflow: 'hidden' }}>
               {profileLevel && (
                 <div style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(255,255,255,0.25)', borderRadius: '20px', padding: '2px 8px', fontSize: '0.65rem', fontWeight: 700 }}>
                   Your level
@@ -125,41 +139,45 @@ export default function StudentDashboard({ profile, session }) {
               )}
               <div style={{ fontSize: '1.75rem', marginBottom: '0.4rem' }}>🎯</div>
               <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.2rem' }}>
-                {profileLevel ? `${profileLevel} Practice` : 'Practise'}
+                {isSpanish ? 'Spanish Practise' : profileLevel ? `${profileLevel} Practise` : 'Practise'}
               </div>
               <div style={{ fontSize: '0.76rem', opacity: 0.85 }}>20 questions at your level</div>
             </div>
           </Link>
 
-          {/* Weak Spots */}
           <Link to={`/practise?mode=weakspots${weakParam}`} style={{ textDecoration: 'none' }}>
-            <div style={{
-              background: 'white', border: '2px solid #e53e3e25',
-              borderRadius: '14px', padding: '1rem', height: '100%', boxSizing: 'border-box'
-            }}>
+            <div style={{ background: 'white', border: '2px solid #e53e3e25', borderRadius: '14px', padding: '1rem', height: '100%', boxSizing: 'border-box' }}>
               <div style={{ fontSize: '1.75rem', marginBottom: '0.4rem' }}>🔧</div>
               <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#2C3E50', marginBottom: '0.2rem' }}>Weak Spots</div>
               <div style={{ fontSize: '0.76rem', color: '#718096' }}>Focus on your toughest types</div>
             </div>
           </Link>
 
-          {/* Learn */}
-          <Link to="/learn" style={{ textDecoration: 'none' }}>
-            <div style={{ background: 'white', border: '1.5px solid #e8e8f0', borderRadius: '14px', padding: '1rem', height: '100%', boxSizing: 'border-box' }}>
-              <div style={{ fontSize: '1.75rem', marginBottom: '0.4rem' }}>📚</div>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#2C3E50', marginBottom: '0.2rem' }}>Learn</div>
-              <div style={{ fontSize: '0.76rem', color: '#718096' }}>Flashcards and topic exercises</div>
-            </div>
-          </Link>
+          {/* Row 2: Learn + Play */}
+          <QuickCard to="/learn">
+            <div style={{ fontSize: '1.75rem', marginBottom: '0.4rem' }}>📚</div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#2C3E50', marginBottom: '0.2rem' }}>Learn</div>
+            <div style={{ fontSize: '0.76rem', color: '#718096' }}>Flashcards and topic exercises</div>
+          </QuickCard>
 
-          {/* Play */}
-          <Link to="/play" style={{ textDecoration: 'none' }}>
-            <div style={{ background: 'white', border: '1.5px solid #e8e8f0', borderRadius: '14px', padding: '1rem', height: '100%', boxSizing: 'border-box' }}>
-              <div style={{ fontSize: '1.75rem', marginBottom: '0.4rem' }}>🎮</div>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#2C3E50', marginBottom: '0.2rem' }}>Play</div>
-              <div style={{ fontSize: '0.76rem', color: '#718096' }}>Blurt!, Word Snake & more</div>
-            </div>
-          </Link>
+          <QuickCard to="/play">
+            <div style={{ fontSize: '1.75rem', marginBottom: '0.4rem' }}>🎮</div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#2C3E50', marginBottom: '0.2rem' }}>Play</div>
+            <div style={{ fontSize: '0.76rem', color: '#718096' }}>Blurt!, Word Snake & more</div>
+          </QuickCard>
+
+          {/* Row 3: Listen + Speak */}
+          <QuickCard to="/listen">
+            <div style={{ fontSize: '1.75rem', marginBottom: '0.4rem' }}>🎧</div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#2C3E50', marginBottom: '0.2rem' }}>Listen</div>
+            <div style={{ fontSize: '0.76rem', color: '#718096' }}>Listening exercises & dictation</div>
+          </QuickCard>
+
+          <QuickCard to="/speak">
+            <div style={{ fontSize: '1.75rem', marginBottom: '0.4rem' }}>🎤</div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#2C3E50', marginBottom: '0.2rem' }}>Speak</div>
+            <div style={{ fontSize: '0.76rem', color: '#718096' }}>Pronunciation practice</div>
+          </QuickCard>
 
         </div>
       </div>
