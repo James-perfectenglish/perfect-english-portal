@@ -91,6 +91,7 @@ function isForYouFn(exercise, userTracks) {
 // Map category to breadcrumb section label
 function getSectionLabel(category) {
   if (category === 'speak') return 'Speak'
+  if (category === 'real_talk') return 'Activities'
   if (category === 'listen') return 'Listen'
   if (category === 'practice') return 'Practice'
   return 'Learn'
