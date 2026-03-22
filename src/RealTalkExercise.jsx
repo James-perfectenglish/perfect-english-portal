@@ -4,8 +4,9 @@ import { supabase } from './supabaseClient'
 const GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 
 const LEVELS = [
-  { key: 'b1b2', label: 'Intermediate', sublabel: 'B1 – B2', description: 'Workplace scenarios, customer service, and everyday professional situations.', colour: '#4299e1', colourLight: '#ebf8ff', dbLevels: ['B1', 'B2'], icon: '📘' },
-  { key: 'c1c2', label: 'Advanced',     sublabel: 'C1 – C2', description: 'Complex negotiations, difficult conversations, and high-stakes interactions.',  colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '🎓' },
+  { key: 'beginner',     label: 'Beginner',     sublabel: 'A1 – A2', description: 'Simple, everyday situations with clear and predictable language.',               colour: '#48bb78', colourLight: '#f0fff4', dbLevels: ['A1', 'A2'], icon: '🌱' },
+  { key: 'intermediate', label: 'Intermediate', sublabel: 'B1 – B2', description: 'Workplace scenarios, customer service, and everyday professional situations.', colour: '#4299e1', colourLight: '#ebf8ff', dbLevels: ['B1', 'B2'], icon: '📘' },
+  { key: 'advanced',     label: 'Advanced',     sublabel: 'C1 – C2', description: 'Complex negotiations, difficult conversations, and high-stakes interactions.',  colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '🎓' },
 ]
 
 const ENDING_STYLES = {
