@@ -56,7 +56,11 @@ export default function PronunciationExercise({ profile, onBack }) {
 
     if (data && data.length > 0) {
       const random = data[Math.floor(Math.random() * data.length)]
-      setExercise(random)
+      // Reconstruct full sentence: replace blank in sentence_template with answer
+      const fullSentence = random.sentence_template
+        ? random.sentence_template.replace(/_{3,}/g, random.answer)
+        : random.answer
+      setExercise({ ...random, displayText: fullSentence })
     }
     setLoadingExercise(false)
   }
@@ -126,7 +130,7 @@ export default function PronunciationExercise({ profile, onBack }) {
   async function markPronunciation(spokenText) {
     if (!exercise || !spokenText) return
     setIsMarking(true)
-    const target = exercise.answer
+    const target = exercise.displayText || exercise.answer
 
     try {
       const response = await fetch('/api/mark-pronunciation', {
@@ -269,32 +273,36 @@ export default function PronunciationExercise({ profile, onBack }) {
               )}
             </div>
 
-            {/* Step 2 — Record */}
+            {/* Step 2 — Record (push to talk) */}
             <div>
               <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1rem' }}>
                 Step 2 — Say it
               </div>
               <button
-                onClick={isRecording ? stopRecording : startRecording}
+                onPointerDown={(e) => { e.preventDefault(); if (!isPlaying && !loadingExercise && !isMarking) startRecording() }}
+                onPointerUp={(e) => { e.preventDefault(); if (isRecording) stopRecording() }}
+                onPointerLeave={(e) => { e.preventDefault(); if (isRecording) stopRecording() }}
                 disabled={isPlaying || loadingExercise || isMarking}
                 style={{
-                  width: '80px', height: '80px', borderRadius: '50%',
+                  width: '100px', height: '100px', borderRadius: '50%',
                   background: isRecording
                     ? 'linear-gradient(135deg, #e53e3e, #c53030)'
                     : 'linear-gradient(135deg, #48bb78, #38a169)',
                   border: 'none', cursor: (isPlaying || loadingExercise || isMarking) ? 'not-allowed' : 'pointer',
-                  fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   margin: '0 auto', transition: 'all 0.2s',
                   boxShadow: isRecording
-                    ? '0 0 0 10px rgba(229,62,62,0.15)'
+                    ? '0 0 0 14px rgba(229,62,62,0.2)'
                     : '0 4px 15px rgba(72,187,120,0.4)',
                   opacity: (isPlaying || loadingExercise || isMarking) ? 0.6 : 1,
+                  WebkitUserSelect: 'none', userSelect: 'none',
+                  touchAction: 'none',
                 }}
               >
                 {isMarking ? '🤖' : isRecording ? '⏹️' : '🎤'}
               </button>
-              <div style={{ fontSize: '0.8rem', color: '#718096', marginTop: '0.6rem' }}>
-                {isMarking ? 'Analysing your pronunciation...' : isRecording ? 'Listening — tap to stop' : 'Tap to record yourself'}
+              <div style={{ fontSize: '0.8rem', color: '#718096', marginTop: '0.75rem' }}>
+                {isMarking ? 'Analysing your pronunciation...' : isRecording ? 'Listening — release when done' : 'Hold while you speak, release to submit'}
               </div>
             </div>
 

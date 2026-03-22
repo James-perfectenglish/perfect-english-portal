@@ -11,49 +11,40 @@ export default async function handler(req, res) {
     ? `Eres un profesor de español dando feedback de pronunciación a un estudiante.
 
 Frase objetivo: "${target}"
-Lo que dijo el estudiante: "${spoken}"
+Lo que captó el reconocimiento de voz: "${spoken}"
 
-Compara lo que dijo el estudiante con la frase objetivo y da feedback específico y alentador sobre su pronunciación en español.
+IMPORTANTE: El reconocimiento de voz automático comete errores, especialmente con acentos. Si las palabras clave de la frase objetivo aparecen en lo que se captó (aunque haya palabras extra o errores menores), asume que el estudiante lo dijo correctamente y da feedback positivo.
 
-Considera:
-- ¿Usaron las palabras correctas en el orden correcto?
-- ¿Hay palabras que omitieron, añadieron o pronunciaron mal?
-- Señala cualquier patrón de pronunciación que valga la pena mejorar (terminaciones de palabras, sonidos vocálicos, habla conectada, acento de palabras)
-- Si lo dijeron correctamente, felicítalos y sugiere un refinamiento
+Solo marca como incorrecto si faltan palabras clave importantes o el orden es completamente diferente.
 
 Reglas:
 - Sé conciso — máximo 2-3 frases
 - Sé específico — nombra las palabras o sonidos reales
-- Sé alentador — esto es un estudiante, no un hablante nativo
+- Sé muy alentador — esto es un estudiante aprendiendo
 - Responde en español
 
 Responde SÓLO con un objeto JSON:
-{"valid": true, "feedback": "tu feedback"}  — si lo dijeron correctamente o casi correctamente
-{"valid": false, "feedback": "tu feedback"} — si hay errores significativos
-{"valid": null, "feedback": "tu feedback"}  — si no fue claro o no se pudo evaluar`
+{"valid": true, "feedback": "tu feedback"}  — si las palabras clave están presentes
+{"valid": false, "feedback": "tu feedback"} — solo si faltan palabras clave importantes
+{"valid": null, "feedback": "tu feedback"}  — si no se pudo evaluar`
     : `You are an English pronunciation coach giving feedback to a language learner.
 
 Target phrase: "${target}"
-What the student said: "${spoken}"
+What the speech recognition captured: "${spoken}"
 
-Compare what the student said to the target phrase and give specific, encouraging pronunciation feedback.
+IMPORTANT CONTEXT: You are receiving output from a speech recognition API, not a perfect transcript. Speech recognition makes mistakes, especially with connected speech, accents, and longer phrases. The student may have pronounced things correctly but the API transcribed them incorrectly.
 
-Consider:
-- Did they produce the right words in the right order?
-- Are there words they missed, added, or got wrong?
-- Note any pronunciation patterns worth improving (word endings, vowel sounds, connected speech, word stress)
-- If they said it correctly, praise them and suggest one refinement to aim for
-
-Rules:
-- Be concise — 2-3 sentences maximum
-- Be specific — name the actual words or sounds, not vague advice
-- Be encouraging — this is a learner, not a native speaker
-- If what they said is close but not perfect, treat it as a good attempt and guide them forward
+Your job:
+- If the KEY WORDS from the target phrase appear in what was captured (even with extra words, slightly wrong words nearby, or minor transcription errors), treat it as a successful attempt and give positive feedback
+- Only mark as incorrect if the core content words are clearly missing or the student said something completely different
+- Be very generous — it is far better to encourage a correct attempt than to penalise a transcription error
+- Give specific, constructive feedback on one aspect of pronunciation they can improve (stress, rhythm, a specific sound)
+- Keep it to 2-3 sentences
 
 Reply ONLY with a JSON object:
-{"valid": true, "feedback": "your feedback"}  — if they said it correctly or nearly correctly
-{"valid": false, "feedback": "your feedback"} — if there are significant errors
-{"valid": null, "feedback": "your feedback"}  — if it was unclear or couldn't be assessed`
+{"valid": true, "feedback": "your feedback"}  — if key words are present (be generous)
+{"valid": false, "feedback": "your feedback"} — only if core words are clearly absent
+{"valid": null, "feedback": "your feedback"}  — if it was completely unintelligible`
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
