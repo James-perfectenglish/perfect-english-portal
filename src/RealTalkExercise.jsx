@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
+import { LevelBadge } from './components/BadgePill'
 
 const GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 
@@ -262,8 +263,6 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
             {!listLoading && scenarioList.length > 0 && (
               <div style={{ display: 'grid', gap: '12px' }}>
                 {scenarioList.map(s => {
-                  const levelKey = s.level?.[0] || 'B'
-                  const levelStyle = { A: { bg: '#f0fff4', color: '#276749' }, B: { bg: '#ebf8ff', color: '#2b6cb0' }, C: { bg: '#fffaf0', color: '#c05621' } }[levelKey] || { bg: '#ebf8ff', color: '#2b6cb0' }
                   return (
                     <div
                       key={s.scenario_id}
@@ -278,7 +277,7 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
                       }
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 700, color: '#2d3748', fontSize: '1rem', marginBottom: '4px' }}>{s.scenario_title}</div>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: levelStyle.bg, color: levelStyle.color }}>{s.level}</span>
+                        <LevelBadge level={s.level} />
                       </div>
                       <div style={{ fontSize: '1.3rem', color: '#cbd5e0', flexShrink: 0 }}>→</div>
                     </div>
