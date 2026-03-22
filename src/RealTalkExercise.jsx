@@ -297,7 +297,7 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
                 {currentNode.ending_type === 'good'
                   ? 'Eva showed empathy and kept control of the conversation.'
                   : currentNode.ending_type === 'bad'
-                  ? 'Eva's wording increased the guest's frustration.'
+                  ? "Eva's wording increased the guest's frustration."
                   : 'Eva gave information, but Katie still felt unsupported.'}
               </div>
             </div>
