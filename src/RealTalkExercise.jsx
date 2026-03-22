@@ -30,6 +30,7 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
   const [scenarioId, setScenarioId]     = useState(null)
   const [history, setHistory]           = useState([])
   const [isPlaying, setIsPlaying]       = useState(false)
+  const [isPlayingChoice, setIsPlayingChoice] = useState(false)
   const [loading, setLoading]           = useState(true)
   const [choiceLoading, setChoiceLoading] = useState(false)
   const [nodesCache, setNodesCache]     = useState({})
@@ -95,10 +96,22 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
   }
 
   async function makeChoice(choice) {
-    if (choiceLoading) return
-    setChoiceLoading(true)
+    if (choiceLoading || isPlayingChoice) return
     if (audioRef.current) { audioRef.current.pause(); setIsPlaying(false) }
 
+    // If Eva's line has audio, play it first before advancing
+    if (choice.audio_url) {
+      setIsPlayingChoice(true)
+      await new Promise((resolve) => {
+        const audio = new Audio(choice.audio_url)
+        audioRef.current = audio
+        audio.onended = () => { setIsPlayingChoice(false); resolve() }
+        audio.onerror = () => { setIsPlayingChoice(false); resolve() }
+        audio.play().catch(() => { setIsPlayingChoice(false); resolve() })
+      })
+    }
+
+    setChoiceLoading(true)
     // Add current node + choice to history
     setHistory(h => [...h, { node: currentNode, choiceMade: choice.text }])
 
@@ -273,10 +286,19 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
 
           {/* Ending screen */}
           {currentNode.is_ending && endingStyle && (
-            <div style={{ background: endingStyle.bg, border: `1.5px solid ${endingStyle.border}`, borderRadius: '14px', padding: '1.1rem 1.25rem', marginBottom: '1rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '6px' }}>{endingStyle.emoji}</div>
-              <div style={{ fontSize: '0.85rem', color: endingStyle.color, fontWeight: 600 }}>
-                {currentNode.ending_type === 'good' ? 'Great outcome! You handled that well.' : currentNode.ending_type === 'bad' ? 'That could have gone better — try a different approach!' : 'A reasonable outcome. Could you do better?'}
+            <div style={{ background: endingStyle.bg, border: `1.5px solid ${endingStyle.border}`, borderRadius: '14px', padding: '1.1rem 1.25rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <span style={{ fontSize: '1.5rem' }}>{endingStyle.emoji}</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: endingStyle.color, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                  {currentNode.ending_type === 'good' ? 'Strong choice' : currentNode.ending_type === 'bad' ? 'Poor choice' : 'Possible, but weaker'}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.88rem', color: endingStyle.color, lineHeight: 1.55 }}>
+                {currentNode.ending_type === 'good'
+                  ? 'Eva showed empathy and kept control of the conversation.'
+                  : currentNode.ending_type === 'bad'
+                  ? 'Eva's wording increased the guest's frustration.'
+                  : 'Eva gave information, but Katie still felt unsupported.'}
               </div>
             </div>
           )}
@@ -285,22 +307,22 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
           {!currentNode.is_ending && choices.length > 0 && (
             <div>
               <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.65rem' }}>
-                👆 How do you respond?
+                {isPlayingChoice ? '🔊 Eva is speaking...' : '👆 How do you respond?'}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {choices.map((choice, i) => (
                   <button
                     key={i}
                     onClick={() => makeChoice(choice)}
-                    disabled={choiceLoading}
+                    disabled={choiceLoading || isPlayingChoice}
                     style={{
                       background: 'white', border: '1.5px solid #e2e8f0',
                       borderRadius: '12px', padding: '0.9rem 1.1rem',
-                      cursor: choiceLoading ? 'default' : 'pointer',
+                      cursor: (choiceLoading || isPlayingChoice) ? 'default' : 'pointer',
                       textAlign: 'left', fontSize: '0.92rem',
                       color: '#2d3748', lineHeight: 1.5,
                       transition: 'all 0.15s', width: '100%',
-                      opacity: choiceLoading ? 0.6 : 1,
+                      opacity: (choiceLoading || isPlayingChoice) ? 0.6 : 1,
                       fontWeight: 500,
                     }}
                   >
