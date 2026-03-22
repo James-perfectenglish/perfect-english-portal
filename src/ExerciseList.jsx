@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient'
 import { TRACK_EMOJI, TRACK_LABEL } from './components/TeacherToolbar'
 import Breadcrumb from './components/Breadcrumb'
 import PronunciationExercise from './PronunciationExercise'
+import RealTalkExercise from './RealTalkExercise'
 
 // Exercises
 import TopicPracticeExercise from './TopicPracticeExercise'
@@ -32,7 +33,7 @@ const ACTIVE_EXERCISES = new Set([
   'Borrás Flashcards', 'Borrás Memory Game',
   'Hotel Flashcards', 'Hotel Memory Game',
   'Odd One Out', 'Error Correction',
-  'Matching', 'Sentence Auction', 'Lyrics Mixer', 'Blurt!', 'Word Snake',
+  'Matching', 'Sentence Auction', 'Lyrics Mixer', 'Blurt!', 'Word Snake', 'Real Talk',
 ])
 
 const EXERCISE_ICONS = {
@@ -61,6 +62,7 @@ const EXERCISE_ICONS = {
   'Lyrics Mixer':              '🎤',
   'Blurt!':                    '⏱️',
   'Word Snake':                '🐍',
+  'Real Talk':                 '💬',
 }
 
 const TABS = [
@@ -203,6 +205,7 @@ export default function ExerciseList({
     else if (t === 'Error Correction')               exerciseComponent = <ErrorCorrection onComplete={back} onBack={back} />
     else if (t === 'Matching')                       exerciseComponent = <MatchingExercise onComplete={back} onBack={back} />
     else if (t === 'Sentence Auction')               exerciseComponent = <SentenceAuction onComplete={back} onBack={back} />
+    else if (t === 'Real Talk')                      exerciseComponent = <RealTalkExercise onBack={back} userTracks={userTracks} />
 
     if (exerciseComponent) {
       return (
