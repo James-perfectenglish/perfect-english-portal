@@ -141,7 +141,6 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
     const newCache = await loadNode(scenarioId, choice.next_node_key, nodesCache)
     setNodesCache(newCache)
     setChoiceLoading(false)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   function playAudio(url) {

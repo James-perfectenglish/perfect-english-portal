@@ -180,7 +180,6 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
     const gapQuestions = detailQuestions.filter(q => q.type === 'gap_fill');
     if (gapQuestions.length === 0) {
       setDetailSubmitted(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -215,7 +214,6 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
     setAiGapResults(resultsMap);
     setMarkingGapFills(false);
     setDetailSubmitted(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const moveToDetail = () => {
