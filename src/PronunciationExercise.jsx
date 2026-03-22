@@ -181,9 +181,11 @@ export default function PronunciationExercise({ profile }) {
 
     try {
       // Send to Whisper
+      const mimeType = blob.type || 'audio/webm'
+      console.log('Sending audio blob, type:', mimeType, 'size:', blob.size)
       const transcribeRes = await fetch(`/api/transcribe?language=${language}`, {
         method: 'POST',
-        headers: { 'Content-Type': blob.type || 'audio/webm' },
+        headers: { 'Content-Type': mimeType },
         body: blob,
       })
 
