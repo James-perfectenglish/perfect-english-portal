@@ -89,14 +89,31 @@ export default function PronunciationExercise({ profile, onBack }) {
     recognition.interimResults = false
     recognitionRef.current = recognition
 
+    let resultReceived = false
+
     recognition.onresult = (e) => {
+      resultReceived = true
       const text = e.results[0][0].transcript
       setTranscript(text)
       setIsRecording(false)
       markPronunciation(text)
     }
-    recognition.onerror = () => setIsRecording(false)
-    recognition.onend   = () => setIsRecording(false)
+
+    recognition.onerror = (e) => {
+      console.warn('Speech recognition error:', e.error)
+      setIsRecording(false)
+    }
+
+    // onend fires on iOS when stop() is called — if no result came through
+    // it means the recognition ended without catching speech (too short, silence, etc.)
+    recognition.onend = () => {
+      setIsRecording(false)
+      if (!resultReceived) {
+        // Nothing was captured — show a helpful nudge rather than silently failing
+        setFeedback({ valid: null, feedback: "We didn't catch that. Make sure you're speaking clearly and try again." })
+        setScreen('feedback')
+      }
+    }
 
     setIsRecording(true)
     recognition.start()
@@ -104,13 +121,12 @@ export default function PronunciationExercise({ profile, onBack }) {
 
   function stopRecording() {
     if (recognitionRef.current) recognitionRef.current.stop()
-    setIsRecording(false)
   }
 
   async function markPronunciation(spokenText) {
     if (!exercise || !spokenText) return
     setIsMarking(true)
-    const target = exercise.sentence_template || exercise.answer
+    const target = exercise.answer
 
     try {
       const response = await fetch('/api/mark-pronunciation', {
@@ -206,7 +222,7 @@ export default function PronunciationExercise({ profile, onBack }) {
   }
 
   // ── Exercise + Feedback screens ───────────────────────────────────────────
-  const target = exercise?.sentence_template || exercise?.answer || ''
+  const target = exercise?.answer || ''
 
   return (
     <div style={{ width: '100%', minHeight: '80vh', backgroundColor: '#f8f9fa', padding: '1rem', boxSizing: 'border-box' }}>
