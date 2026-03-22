@@ -41,6 +41,12 @@ export default function PronunciationExercise({ profile }) {
   const isSpanish = profile?.level === 'Spanish' || (Array.isArray(profile?.tracks) && profile.tracks.includes('spanish'))
 
   useEffect(() => {
+    // Spanish track students bypass level select
+    if (isSpanish) {
+      setSelectedLevel({ id: 'spanish', title: 'Spanish', subtitle: 'Español', levels: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], emoji: '🇪🇸', gradient: 'linear-gradient(135deg, #e53e3e, #c53030)' })
+      fetchExercise(['A1', 'A2', 'B1', 'B2', 'C1', 'C2'])
+      setScreen('exercise')
+    }
     return () => {
       if (audioRef.current) audioRef.current.pause()
       stopRecordingCleanup()
