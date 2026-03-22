@@ -167,7 +167,6 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
     if (q.type === 'gap_fill') {
       const aiResult = aiGapResults[q.id];
       if (aiResult !== undefined) return aiResult.valid;
-      // Fallback to string match if AI result not yet available
       const ua = (userAnswer || '').toLowerCase().trim();
       return ua === (q.correct_answer || '').toLowerCase().trim();
     }
@@ -204,7 +203,6 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
           const data = await res.json();
           return { id: q.id, valid: data.valid, reason: data.reason };
         } catch {
-          // On API failure, fall back to string match
           const ua = (detailAnswers[q.id] || '').toLowerCase().trim();
           const correct = ua === (q.correct_answer || '').toLowerCase().trim();
           return { id: q.id, valid: correct, reason: null };
@@ -336,7 +334,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
     if (!currentExercise?.image_url) return null;
     return (
       <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
-        <img src={currentExercise.image_url} alt={currentExercise.title} style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '12px', objectFit: 'cover', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }} />
+        <img src={currentExercise.image_url} alt={currentExercise.title} style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '12px', objectFit: 'cover', objectPosition: 'top', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }} />
       </div>
     );
   };
@@ -426,7 +424,8 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
                   onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
                   {ex.image_url
-? <img src={ex.image_url} alt="" style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', objectPosition: 'top', flexShrink: 0 }} />                    : <div style={{ width: '56px', height: '56px', borderRadius: '10px', background: selectedLevel.colourLight, border: `1px solid ${selectedLevel.colour}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>🎧</div>
+                    ? <img src={`${ex.image_url}?width=112&height=112&resize=cover`} alt="" style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', objectPosition: 'top', flexShrink: 0 }} />
+                    : <div style={{ width: '56px', height: '56px', borderRadius: '10px', background: selectedLevel.colourLight, border: `1px solid ${selectedLevel.colour}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>🎧</div>
                   }
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, color: '#2d3748', fontSize: '1rem', marginBottom: '2px' }}>{ex.title}</div>

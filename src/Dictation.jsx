@@ -192,7 +192,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
         <img
           src={currentExercise.image_url}
           alt={currentExercise.title}
-          style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '12px', objectFit: 'cover', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }}
+          style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '12px', objectFit: 'cover', objectPosition: 'top', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }}
         />
       </div>
     );
@@ -438,11 +438,11 @@ export default function Dictation({ onBack, userTracks = [] }) {
                   onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
                   {ex.image_url
-? <img src={ex.image_url} alt="" style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', objectPosition: 'top', flexShrink: 0 }} />                    : <div style={{ width: '56px', height: '56px', borderRadius: '10px', background: selectedLevel.colourLight, border: `1px solid ${selectedLevel.colour}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>⌨️</div>
+                    ? <img src={`${ex.image_url}?width=112&height=112&resize=cover`} alt="" style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', objectPosition: 'top', flexShrink: 0 }} />
+                    : <div style={{ width: '56px', height: '56px', borderRadius: '10px', background: selectedLevel.colourLight, border: `1px solid ${selectedLevel.colour}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>⌨️</div>
                   }
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, color: '#2d3748', fontSize: '1rem', marginBottom: '4px' }}>{ex.title}</div>
-                    {/* ── Exercise list badges (use BadgePill) ── */}
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       <LevelBadge level={ex.level} />
                       <ExcerptBadge excerptType={ex.excerpt_type} />
@@ -489,7 +489,6 @@ export default function Dictation({ onBack, userTracks = [] }) {
 
           {renderImage()}
 
-          {/* ── Badges (use BadgePill) ── */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.25rem' }}>
             <LevelBadge level={currentExercise.level} />
             <TopicBadge topic={currentExercise.topic} />
