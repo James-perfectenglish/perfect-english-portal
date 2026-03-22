@@ -46,7 +46,7 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
     setLoading(true)
     const { data } = await supabase
       .from('scenario_nodes')
-      .select('scenario_id, scenario_title, level, language, tracks')
+      .select('scenario_id, scenario_title, level, language, tracks, image_url')
       .eq('node_key', 'start')
       .order('scenario_title')
 
@@ -188,7 +188,10 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
                       transition: 'all 0.15s',
                     }}
                   >
-                    <div style={{ fontSize: '2.5rem', flexShrink: 0 }}>🎭</div>
+                    {s.image_url
+                      ? <img src={s.image_url} alt={s.scenario_title} style={{ width: '60px', height: '60px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} />
+                      : <div style={{ fontSize: '2.5rem', flexShrink: 0 }}>💬</div>
+                    }
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: '1rem', color: '#2d3748', marginBottom: '4px' }}>
                         {s.scenario_title}
@@ -197,9 +200,7 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
                         <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: levelStyle.bg, color: levelStyle.color }}>
                           {s.level}
                         </span>
-                        <span style={{ fontSize: '0.72rem', color: '#a0aec0' }}>
-                          {s.language === 'es' ? '🇪🇸 Spanish' : '🇬🇧 English'}
-                        </span>
+
                       </div>
                     </div>
                     <div style={{ fontSize: '1.2rem', color: '#cbd5e0' }}>→</div>
@@ -225,7 +226,10 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
 
           {/* Header */}
           <div style={{ background: GRADIENT, borderRadius: '16px', padding: '0.9rem 1.25rem', marginBottom: '1rem', color: 'white', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ fontSize: '1.5rem' }}>💬</div>
+            {currentNode.image_url
+              ? <img src={currentNode.image_url} alt={currentNode.scenario_title} style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />
+              : <div style={{ fontSize: '1.5rem' }}>💬</div>
+            }
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{currentNode.scenario_title}</div>
               <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Real Talk · {history.length === 0 ? 'Start' : `Step ${history.length + 1}`}</div>
