@@ -2,10 +2,36 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { target, spoken } = req.body
+  const { target, spoken, language = 'en' } = req.body
   if (!target || !spoken) return res.status(400).json({ error: 'Missing fields' })
 
-  const prompt = `You are an English pronunciation coach giving feedback to a language learner.
+  const isSpanish = language === 'es'
+
+  const prompt = isSpanish
+    ? `Eres un profesor de español dando feedback de pronunciación a un estudiante.
+
+Frase objetivo: "${target}"
+Lo que dijo el estudiante: "${spoken}"
+
+Compara lo que dijo el estudiante con la frase objetivo y da feedback específico y alentador sobre su pronunciación en español.
+
+Considera:
+- ¿Usaron las palabras correctas en el orden correcto?
+- ¿Hay palabras que omitieron, añadieron o pronunciaron mal?
+- Señala cualquier patrón de pronunciación que valga la pena mejorar (terminaciones de palabras, sonidos vocálicos, habla conectada, acento de palabras)
+- Si lo dijeron correctamente, felicítalos y sugiere un refinamiento
+
+Reglas:
+- Sé conciso — máximo 2-3 frases
+- Sé específico — nombra las palabras o sonidos reales
+- Sé alentador — esto es un estudiante, no un hablante nativo
+- Responde en español
+
+Responde SÓLO con un objeto JSON:
+{"valid": true, "feedback": "tu feedback"}  — si lo dijeron correctamente o casi correctamente
+{"valid": false, "feedback": "tu feedback"} — si hay errores significativos
+{"valid": null, "feedback": "tu feedback"}  — si no fue claro o no se pudo evaluar`
+    : `You are an English pronunciation coach giving feedback to a language learner.
 
 Target phrase: "${target}"
 What the student said: "${spoken}"
@@ -46,7 +72,7 @@ Reply ONLY with a JSON object:
 
     if (!response.ok) {
       console.error('Anthropic error:', await response.text())
-      return res.status(502).json({ valid: null, feedback: 'Could not analyse your recording. Please try again.' })
+      return res.status(502).json({ valid: null, feedback: isSpanish ? 'No se pudo analizar tu grabación. Inténtalo de nuevo.' : 'Could not analyse your recording. Please try again.' })
     }
 
     const data = await response.json()
@@ -56,6 +82,6 @@ Reply ONLY with a JSON object:
     return res.status(200).json(result)
   } catch (e) {
     console.error('mark-pronunciation error:', e)
-    return res.status(200).json({ valid: null, feedback: 'Could not analyse your recording. Please try again.' })
+    return res.status(200).json({ valid: null, feedback: isSpanish ? 'No se pudo analizar tu grabación. Inténtalo de nuevo.' : 'Could not analyse your recording. Please try again.' })
   }
 }

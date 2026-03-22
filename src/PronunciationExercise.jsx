@@ -84,7 +84,7 @@ export default function PronunciationExercise({ profile, onBack }) {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) return
     const recognition = new SR()
-    recognition.lang = 'en-GB'
+    recognition.lang = isSpanish ? 'es-ES' : 'en-GB'
     recognition.continuous = false
     recognition.interimResults = false
     recognitionRef.current = recognition
@@ -116,7 +116,7 @@ export default function PronunciationExercise({ profile, onBack }) {
       const response = await fetch('/api/mark-pronunciation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target, spoken: spokenText }),
+        body: JSON.stringify({ target, spoken: spokenText, language: isSpanish ? 'es' : 'en' }),
       })
       const result = response.ok ? await response.json() : null
       setFeedback(result || { valid: null, feedback: 'Could not analyse your recording — try again.' })
