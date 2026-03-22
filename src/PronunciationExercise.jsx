@@ -222,9 +222,27 @@ export default function PronunciationExercise({ profile }) {
       })
 
       const result = markRes.ok ? await markRes.json() : null
-      setFeedback(result || { valid: null, feedback: 'Could not analyse your recording — try again.' })
+      const finalResult = result || { valid: null, feedback: 'Could not analyse your recording — try again.' }
+      setFeedback(finalResult)
       setIsMarking(false)
       setScreen('feedback')
+
+      // Record session in DB
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user && exercise?.id) {
+          await supabase.from('pronunciation_sessions').insert({
+            student_id: user.id,
+            exercise_id: exercise.id,
+            spoken: spokenText,
+            is_correct: finalResult.valid === true,
+            ai_feedback: finalResult.feedback,
+            language,
+          })
+        }
+      } catch (dbErr) {
+        console.warn('Could not save pronunciation session:', dbErr)
+      }
 
     } catch (e) {
       console.error('transcribeAndMark error:', e)
