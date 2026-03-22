@@ -319,10 +319,10 @@ export default function PronunciationExercise({ profile }) {
                 onClick={playAudio}
                 disabled={isPlaying || loadingExercise || isRecording}
                 style={{
-                  width: '80px', height: '80px', borderRadius: '50%',
+                  width: '100px', height: '100px', borderRadius: '50%',
                   background: isPlaying ? '#e2e8f0' : GRADIENT,
                   border: 'none', cursor: (isPlaying || loadingExercise || isRecording) ? 'default' : 'pointer',
-                  fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   margin: '0 auto', boxShadow: isPlaying ? 'none' : '0 4px 15px rgba(102,126,234,0.4)',
                   transition: 'all 0.2s',
                 }}
