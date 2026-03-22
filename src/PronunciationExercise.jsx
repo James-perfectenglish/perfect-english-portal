@@ -18,8 +18,14 @@ function getLevelConfigForProfile(profileLevel) {
 }
 
 export default function PronunciationExercise({ profile }) {
-  const [screen, setScreen]               = useState('level_select')
-  const [selectedLevel, setSelectedLevel] = useState(null)
+  // Compute isSpanish before state so we can use it as initial values
+  const isSpanish = profile?.level === 'Spanish' || (Array.isArray(profile?.tracks) && profile.tracks.includes('spanish'))
+  const profileLevelConfig = getLevelConfigForProfile(profile?.level)
+
+  const SPANISH_LEVEL = { id: 'spanish', title: 'Spanish', subtitle: 'Español', levels: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], emoji: '🇪🇸', gradient: 'linear-gradient(135deg, #e53e3e, #c53030)' }
+
+  const [screen, setScreen]               = useState(isSpanish ? 'exercise' : 'level_select')
+  const [selectedLevel, setSelectedLevel] = useState(isSpanish ? SPANISH_LEVEL : null)
   const [exercise, setExercise]           = useState(null)
   const [isPlaying, setIsPlaying]         = useState(false)
   const [isRecording, setIsRecording]     = useState(false)
@@ -37,15 +43,10 @@ export default function PronunciationExercise({ profile }) {
   const timerRef       = useRef(null)
   const streamRef      = useRef(null)
 
-  const profileLevelConfig = getLevelConfigForProfile(profile?.level)
-  const isSpanish = profile?.level === 'Spanish' || (Array.isArray(profile?.tracks) && profile.tracks.includes('spanish'))
-
   useEffect(() => {
-    // Spanish track students bypass level select
+    // Spanish track: fetch exercise immediately on mount
     if (isSpanish) {
-      setSelectedLevel({ id: 'spanish', title: 'Spanish', subtitle: 'Español', levels: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], emoji: '🇪🇸', gradient: 'linear-gradient(135deg, #e53e3e, #c53030)' })
-      fetchExercise(['A1', 'A2', 'B1', 'B2', 'C1', 'C2'])
-      setScreen('exercise')
+      fetchExercise(['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], 'es')
     }
     return () => {
       if (audioRef.current) audioRef.current.pause()
@@ -64,29 +65,35 @@ export default function PronunciationExercise({ profile }) {
     }
   }
 
-  async function fetchExercise(levels) {
+  async function fetchExercise(levels, lang) {
     setLoadingExercise(true)
     setHasListened(false)
     setTranscript('')
     setFeedback(null)
 
-    const { data } = await supabase
+    const language = lang || (isSpanish ? 'es' : 'en')
+
+    let q = supabase
       .from('dictation_exercises')
       .select('id, title, answer, sentence_template, audio_url, level')
       .in('level', levels)
+      .eq('language', language)
       .not('audio_url', 'is', null)
       .not('sentence_template', 'is', null)
+
+    const { data } = await q
 
     if (data && data.length > 0) {
       const random = data[Math.floor(Math.random() * data.length)]
       const fullSentence = random.sentence_template.replace(/_{3,}/g, random.answer)
       setExercise({ ...random, displayText: fullSentence })
     } else {
-      // Fallback: try without sentence_template filter
+      // Fallback: without sentence_template filter
       const { data: all } = await supabase
         .from('dictation_exercises')
         .select('id, title, answer, sentence_template, audio_url, level')
         .in('level', levels)
+        .eq('language', language)
         .not('audio_url', 'is', null)
       if (all && all.length > 0) {
         const random = all[Math.floor(Math.random() * all.length)]
@@ -98,7 +105,7 @@ export default function PronunciationExercise({ profile }) {
 
   function selectLevel(level) {
     setSelectedLevel(level)
-    fetchExercise(level.levels)
+    fetchExercise(level.levels, 'en')
     setScreen('exercise')
   }
 
