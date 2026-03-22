@@ -17,50 +17,75 @@ function getLevelConfigForProfile(profileLevel) {
   return LEVEL_CONFIG[1]
 }
 
-export default function PronunciationExercise({ profile, onBack }) {
+export default function PronunciationExercise({ profile }) {
   const [screen, setScreen]               = useState('level_select')
   const [selectedLevel, setSelectedLevel] = useState(null)
   const [exercise, setExercise]           = useState(null)
   const [isPlaying, setIsPlaying]         = useState(false)
   const [isRecording, setIsRecording]     = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
+  const [isMarking, setIsMarking]         = useState(false)
   const [transcript, setTranscript]       = useState('')
   const [feedback, setFeedback]           = useState(null)
-  const [isMarking, setIsMarking]         = useState(false)
   const [loadingExercise, setLoadingExercise] = useState(false)
-  const [speechSupported, setSpeechSupported] = useState(true)
   const [hasListened, setHasListened]     = useState(false)
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
 
   const audioRef       = useRef(null)
-  const recognitionRef = useRef(null)
+  const mediaRecRef    = useRef(null)
+  const chunksRef      = useRef([])
+  const timerRef       = useRef(null)
+  const streamRef      = useRef(null)
 
   const profileLevelConfig = getLevelConfigForProfile(profile?.level)
   const isSpanish = profile?.level === 'Spanish' || (Array.isArray(profile?.tracks) && profile.tracks.includes('spanish'))
 
   useEffect(() => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) setSpeechSupported(false)
     return () => {
-      if (recognitionRef.current) recognitionRef.current.abort()
       if (audioRef.current) audioRef.current.pause()
+      stopRecordingCleanup()
     }
   }, [])
+
+  function stopRecordingCleanup() {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+    if (mediaRecRef.current && mediaRecRef.current.state !== 'inactive') {
+      mediaRecRef.current.stop()
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+    }
+  }
 
   async function fetchExercise(levels) {
     setLoadingExercise(true)
     setHasListened(false)
+    setTranscript('')
+    setFeedback(null)
+
     const { data } = await supabase
       .from('dictation_exercises')
       .select('id, title, answer, sentence_template, audio_url, level')
       .in('level', levels)
       .not('audio_url', 'is', null)
+      .not('sentence_template', 'is', null)
 
     if (data && data.length > 0) {
       const random = data[Math.floor(Math.random() * data.length)]
-      // Reconstruct full sentence: replace blank in sentence_template with answer
-      const fullSentence = random.sentence_template
-        ? random.sentence_template.replace(/_{3,}/g, random.answer)
-        : random.answer
+      const fullSentence = random.sentence_template.replace(/_{3,}/g, random.answer)
       setExercise({ ...random, displayText: fullSentence })
+    } else {
+      // Fallback: try without sentence_template filter
+      const { data: all } = await supabase
+        .from('dictation_exercises')
+        .select('id, title, answer, sentence_template, audio_url, level')
+        .in('level', levels)
+        .not('audio_url', 'is', null)
+      if (all && all.length > 0) {
+        const random = all[Math.floor(Math.random() * all.length)]
+        setExercise({ ...random, displayText: random.answer })
+      }
     }
     setLoadingExercise(false)
   }
@@ -69,8 +94,6 @@ export default function PronunciationExercise({ profile, onBack }) {
     setSelectedLevel(level)
     fetchExercise(level.levels)
     setScreen('exercise')
-    setTranscript('')
-    setFeedback(null)
   }
 
   function playAudio() {
@@ -84,68 +107,116 @@ export default function PronunciationExercise({ profile, onBack }) {
     audio.play()
   }
 
-  function startRecording() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) return
-    const recognition = new SR()
-    recognition.lang = isSpanish ? 'es-ES' : 'en-GB'
-    recognition.continuous = false
-    recognition.interimResults = false
-    recognitionRef.current = recognition
+  async function startRecording() {
+    if (isRecording || isTranscribing || isMarking || isPlaying) return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      chunksRef.current = []
 
-    let resultReceived = false
+      // Prefer webm, fall back to whatever the browser supports
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : ''
 
-    recognition.onresult = (e) => {
-      resultReceived = true
-      const text = e.results[0][0].transcript
-      setTranscript(text)
-      setIsRecording(false)
-      markPronunciation(text)
-    }
+      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : {})
+      mediaRecRef.current = rec
 
-    recognition.onerror = (e) => {
-      console.warn('Speech recognition error:', e.error)
-      setIsRecording(false)
-    }
-
-    // onend fires on iOS when stop() is called — if no result came through
-    // it means the recognition ended without catching speech (too short, silence, etc.)
-    recognition.onend = () => {
-      setIsRecording(false)
-      if (!resultReceived) {
-        // Nothing was captured — show a helpful nudge rather than silently failing
-        setFeedback({ valid: null, feedback: "We didn't catch that. Make sure you're speaking clearly and try again." })
-        setScreen('feedback')
+      rec.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunksRef.current.push(e.data)
       }
-    }
 
-    setIsRecording(true)
-    recognition.start()
+      rec.onstop = async () => {
+        stopRecordingCleanup()
+        setIsRecording(false)
+        setRecordingSeconds(0)
+
+        const blob = new Blob(chunksRef.current, { type: mimeType || 'audio/webm' })
+        if (blob.size < 1000) {
+          setFeedback({ valid: null, feedback: "We didn't catch anything — make sure your microphone is working and try again." })
+          setScreen('feedback')
+          return
+        }
+
+        setIsTranscribing(true)
+        await transcribeAndMark(blob)
+        setIsTranscribing(false)
+      }
+
+      rec.start(100) // collect data every 100ms
+      setIsRecording(true)
+      setRecordingSeconds(0)
+
+      // Timer for visual feedback
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds(s => {
+          // Auto-stop after 15 seconds
+          if (s >= 14) {
+            stopRecording()
+            return 0
+          }
+          return s + 1
+        })
+      }, 1000)
+
+    } catch (e) {
+      console.error('Microphone error:', e)
+      setFeedback({ valid: null, feedback: 'Could not access your microphone. Please check your browser permissions and try again.' })
+      setScreen('feedback')
+    }
   }
 
   function stopRecording() {
-    if (recognitionRef.current) recognitionRef.current.stop()
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+    if (mediaRecRef.current && mediaRecRef.current.state === 'recording') {
+      mediaRecRef.current.stop()
+    }
   }
 
-  async function markPronunciation(spokenText) {
-    if (!exercise || !spokenText) return
-    setIsMarking(true)
-    const target = exercise.displayText || exercise.answer
+  async function transcribeAndMark(blob) {
+    const target = exercise?.displayText || exercise?.answer || ''
+    const language = isSpanish ? 'es' : 'en'
 
     try {
-      const response = await fetch('/api/mark-pronunciation', {
+      // Send to Whisper
+      const transcribeRes = await fetch(`/api/transcribe?language=${language}`, {
+        method: 'POST',
+        headers: { 'Content-Type': blob.type || 'audio/webm' },
+        body: blob,
+      })
+
+      const transcribeData = transcribeRes.ok ? await transcribeRes.json() : null
+      const spokenText = transcribeData?.transcript?.trim() || ''
+
+      if (!spokenText) {
+        setFeedback({ valid: null, feedback: "We couldn't make out what you said. Try speaking a little more clearly and closer to your microphone." })
+        setScreen('feedback')
+        return
+      }
+
+      setTranscript(spokenText)
+      setIsMarking(true)
+
+      // Send to Claude for marking
+      const markRes = await fetch('/api/mark-pronunciation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target, spoken: spokenText, language: isSpanish ? 'es' : 'en' }),
+        body: JSON.stringify({ target, spoken: spokenText, language }),
       })
-      const result = response.ok ? await response.json() : null
-      setFeedback(result || { valid: null, feedback: 'Could not analyse your recording — try again.' })
-    } catch {
-      setFeedback({ valid: null, feedback: 'Could not analyse your recording — try again.' })
-    }
 
-    setIsMarking(false)
-    setScreen('feedback')
+      const result = markRes.ok ? await markRes.json() : null
+      setFeedback(result || { valid: null, feedback: 'Could not analyse your recording — try again.' })
+      setIsMarking(false)
+      setScreen('feedback')
+
+    } catch (e) {
+      console.error('transcribeAndMark error:', e)
+      setIsMarking(false)
+      setFeedback({ valid: null, feedback: 'Something went wrong — please try again.' })
+      setScreen('feedback')
+    }
   }
 
   function tryAgain() {
@@ -157,8 +228,6 @@ export default function PronunciationExercise({ profile, onBack }) {
 
   function nextSentence() {
     fetchExercise(selectedLevel.levels)
-    setTranscript('')
-    setFeedback(null)
     setScreen('exercise')
   }
 
@@ -174,31 +243,23 @@ export default function PronunciationExercise({ profile, onBack }) {
             Listen to a phrase, then record yourself saying it. Get personalised feedback on your pronunciation.
           </p>
 
-          {!speechSupported && (
-            <div style={{ background: '#fff5f5', border: '1px solid #fed7d7', borderRadius: '12px', padding: '1rem', marginBottom: '1.5rem', color: '#c53030', fontSize: '0.9rem', lineHeight: '1.5' }}>
-              🚫 Pronunciation drills need Chrome or Safari. Please switch browser to use this feature.
-            </div>
-          )}
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {LEVEL_CONFIG.map(level => {
               const isYourLevel = !isSpanish && level.id === profileLevelConfig.id
               return (
                 <button
                   key={level.id}
-                  onClick={() => speechSupported && selectLevel(level)}
-                  disabled={!speechSupported}
+                  onClick={() => selectLevel(level)}
                   style={{
                     display: 'flex', alignItems: 'center',
                     gap: 'clamp(0.75rem, 3vw, 1.25rem)',
                     padding: 'clamp(1rem, 3vw, 1.5rem)',
                     backgroundColor: 'white',
                     border: isYourLevel ? '2px solid #667eea' : '1px solid #e2e8f0',
-                    borderRadius: '16px', cursor: speechSupported ? 'pointer' : 'not-allowed',
+                    borderRadius: '16px', cursor: 'pointer',
                     textAlign: 'left', transition: 'all 0.2s',
                     boxShadow: isYourLevel ? '0 4px 16px rgba(102,126,234,0.25)' : `0 4px 12px ${level.shadow}`,
                     width: '100%', boxSizing: 'border-box', position: 'relative',
-                    opacity: speechSupported ? 1 : 0.5,
                   }}
                 >
                   {isYourLevel && (
@@ -225,20 +286,21 @@ export default function PronunciationExercise({ profile, onBack }) {
     )
   }
 
-  // ── Exercise + Feedback screens ───────────────────────────────────────────
-  const target = exercise?.answer || ''
+  // ── Exercise + Feedback ───────────────────────────────────────────────────
+  const displayText = exercise?.displayText || exercise?.answer || ''
+  const isProcessing = isTranscribing || isMarking
 
   return (
     <div style={{ width: '100%', minHeight: '80vh', backgroundColor: '#f8f9fa', padding: '1rem', boxSizing: 'border-box' }}>
       <div style={{ maxWidth: '700px', margin: '0 auto' }}>
 
-        {/* Header card */}
+        {/* Header */}
         <div style={{ background: GRADIENT, borderRadius: '16px', padding: '1.25rem 1.5rem', marginBottom: '1rem', color: 'white', textAlign: 'center' }}>
           <div style={{ fontSize: '0.75rem', opacity: 0.8, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' }}>
             🎤 {selectedLevel?.title} — Say this phrase
           </div>
-          <div style={{ fontSize: 'clamp(1.1rem, 4vw, 1.5rem)', fontWeight: '700', lineHeight: 1.4 }}>
-            {loadingExercise ? '...' : target}
+          <div style={{ fontSize: 'clamp(1.1rem, 4vw, 1.4rem)', fontWeight: '700', lineHeight: 1.5 }}>
+            {loadingExercise ? '...' : displayText}
           </div>
         </div>
 
@@ -253,11 +315,11 @@ export default function PronunciationExercise({ profile, onBack }) {
               </div>
               <button
                 onClick={playAudio}
-                disabled={isPlaying || loadingExercise}
+                disabled={isPlaying || loadingExercise || isRecording}
                 style={{
                   width: '80px', height: '80px', borderRadius: '50%',
                   background: isPlaying ? '#e2e8f0' : GRADIENT,
-                  border: 'none', cursor: isPlaying ? 'default' : 'pointer',
+                  border: 'none', cursor: (isPlaying || loadingExercise || isRecording) ? 'default' : 'pointer',
                   fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   margin: '0 auto', boxShadow: isPlaying ? 'none' : '0 4px 15px rgba(102,126,234,0.4)',
                   transition: 'all 0.2s',
@@ -268,47 +330,59 @@ export default function PronunciationExercise({ profile, onBack }) {
               <div style={{ fontSize: '0.8rem', color: '#718096', marginTop: '0.6rem' }}>
                 {isPlaying ? 'Playing...' : hasListened ? 'Tap to listen again' : 'Tap to hear the phrase'}
               </div>
-              {hasListened && (
+              {hasListened && !isRecording && (
                 <div style={{ fontSize: '0.75rem', color: '#48bb78', marginTop: '0.3rem', fontWeight: '600' }}>✓ Ready to record</div>
               )}
             </div>
 
-            {/* Step 2 — Record (push to talk) */}
+            {/* Step 2 — Record */}
             <div>
               <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1rem' }}>
                 Step 2 — Say it
               </div>
               <button
-                onPointerDown={(e) => { e.preventDefault(); if (!isPlaying && !loadingExercise && !isMarking) startRecording() }}
-                onPointerUp={(e) => { e.preventDefault(); if (isRecording) stopRecording() }}
-                onPointerLeave={(e) => { e.preventDefault(); if (isRecording) stopRecording() }}
-                disabled={isPlaying || loadingExercise || isMarking}
+                onClick={isRecording ? stopRecording : startRecording}
+                disabled={isPlaying || loadingExercise || isProcessing}
                 style={{
                   width: '100px', height: '100px', borderRadius: '50%',
                   background: isRecording
                     ? 'linear-gradient(135deg, #e53e3e, #c53030)'
+                    : isProcessing
+                    ? '#e2e8f0'
                     : 'linear-gradient(135deg, #48bb78, #38a169)',
-                  border: 'none', cursor: (isPlaying || loadingExercise || isMarking) ? 'not-allowed' : 'pointer',
+                  border: 'none',
+                  cursor: (isPlaying || loadingExercise || isProcessing) ? 'default' : 'pointer',
                   fontSize: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   margin: '0 auto', transition: 'all 0.2s',
                   boxShadow: isRecording
                     ? '0 0 0 14px rgba(229,62,62,0.2)'
+                    : isProcessing ? 'none'
                     : '0 4px 15px rgba(72,187,120,0.4)',
-                  opacity: (isPlaying || loadingExercise || isMarking) ? 0.6 : 1,
-                  WebkitUserSelect: 'none', userSelect: 'none',
-                  touchAction: 'none',
+                  opacity: (isPlaying || loadingExercise || isProcessing) ? 0.6 : 1,
                 }}
               >
-                {isMarking ? '🤖' : isRecording ? '⏹️' : '🎤'}
+                {isProcessing ? '⏳' : isRecording ? '⏹️' : '🎤'}
               </button>
-              <div style={{ fontSize: '0.8rem', color: '#718096', marginTop: '0.75rem' }}>
-                {isMarking ? 'Analysing your pronunciation...' : isRecording ? 'Listening — release when done' : 'Hold while you speak, release to submit'}
-              </div>
+              {isRecording && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  <div style={{ width: '120px', height: '4px', background: '#edf2f7', borderRadius: '99px', margin: '0 auto 0.5rem' }}>
+                    <div style={{ width: `${(recordingSeconds / 15) * 100}%`, height: '100%', background: '#e53e3e', borderRadius: '99px', transition: 'width 1s linear' }} />
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#e53e3e', fontWeight: '600' }}>Recording... tap to stop ({15 - recordingSeconds}s)</div>
+                </div>
+              )}
+              {!isRecording && !isProcessing && (
+                <div style={{ fontSize: '0.8rem', color: '#718096', marginTop: '0.75rem' }}>
+                  Tap to start recording, tap again to stop
+                </div>
+              )}
+              {isTranscribing && <div style={{ fontSize: '0.8rem', color: '#667eea', marginTop: '0.75rem', fontWeight: '600' }}>🎙 Transcribing your recording...</div>}
+              {isMarking && <div style={{ fontSize: '0.8rem', color: '#667eea', marginTop: '0.75rem', fontWeight: '600' }}>🤖 Analysing your pronunciation...</div>}
             </div>
 
             <button
               onClick={nextSentence}
-              disabled={loadingExercise}
+              disabled={loadingExercise || isRecording || isProcessing}
               style={{ marginTop: '2rem', background: 'none', border: 'none', color: '#cbd5e0', fontSize: '0.8rem', cursor: 'pointer' }}
             >
               Skip → try a different phrase
@@ -319,18 +393,14 @@ export default function PronunciationExercise({ profile, onBack }) {
         {/* Feedback screen */}
         {screen === 'feedback' && feedback && (
           <div style={{ background: 'white', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-
             {transcript && (
               <div style={{ marginBottom: '1rem' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>
-                  You said
-                </div>
+                <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>You said</div>
                 <div style={{ background: '#f7fafc', borderRadius: '10px', padding: '0.75rem 1rem', fontSize: '0.95rem', color: '#2d3748', fontStyle: 'italic', border: '1px solid #e2e8f0' }}>
                   "{transcript}"
                 </div>
               </div>
             )}
-
             <div style={{
               background: feedback.valid === true ? '#f0fff4' : feedback.valid === false ? '#fff5f5' : '#f7fafc',
               border: `1px solid ${feedback.valid === true ? '#c6f6d5' : feedback.valid === false ? '#fed7d7' : '#e2e8f0'}`,
@@ -341,27 +411,19 @@ export default function PronunciationExercise({ profile, onBack }) {
             }}>
               {feedback.valid === true && '✅ '}
               {feedback.valid === false && '💬 '}
-              {feedback.feedback || 'No feedback available.'}
+              {feedback.feedback}
             </div>
-
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                onClick={tryAgain}
-                style={{ flex: 1, padding: '0.85rem', borderRadius: '10px', background: 'none', border: '2px solid #667eea', color: '#667eea', fontWeight: '700', cursor: 'pointer', fontSize: '0.9rem' }}
-              >
+              <button onClick={tryAgain} style={{ flex: 1, padding: '0.85rem', borderRadius: '10px', background: 'none', border: '2px solid #667eea', color: '#667eea', fontWeight: '700', cursor: 'pointer', fontSize: '0.9rem' }}>
                 Try again ↩
               </button>
-              <button
-                onClick={nextSentence}
-                style={{ flex: 1, padding: '0.85rem', borderRadius: '10px', background: GRADIENT, border: 'none', color: 'white', fontWeight: '700', cursor: 'pointer', fontSize: '0.9rem' }}
-              >
+              <button onClick={nextSentence} style={{ flex: 1, padding: '0.85rem', borderRadius: '10px', background: GRADIENT, border: 'none', color: 'white', fontWeight: '700', cursor: 'pointer', fontSize: '0.9rem' }}>
                 Next phrase →
               </button>
             </div>
           </div>
         )}
 
-        {/* Back to level select */}
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>
           <button
             onClick={() => { setScreen('level_select'); setExercise(null); setTranscript(''); setFeedback(null) }}
