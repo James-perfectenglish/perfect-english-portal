@@ -25,6 +25,15 @@ const CHARACTER_COLOURS = {
   default:      { bg: '#f7fafc', border: '#e2e8f0', text: '#4a5568' },
 }
 
+function shuffle(arr) {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
 function getCharColour(character) {
   return CHARACTER_COLOURS[character?.toLowerCase()] || CHARACTER_COLOURS.default
 }
@@ -297,7 +306,7 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
   if (stage === 'play' && currentNode) {
     const charColour = getCharColour(currentNode.character)
     const endingStyle = currentNode.is_ending && currentNode.ending_type ? ENDING_STYLES[currentNode.ending_type] : null
-    const choices = currentNode.choices || []
+    const choices = shuffle(currentNode.choices || [])
 
     return (
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
