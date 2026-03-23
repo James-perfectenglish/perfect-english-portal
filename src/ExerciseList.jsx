@@ -70,6 +70,7 @@ const TABS = [
   { key: 'practice', label: 'Activities'  },
   { key: 'listen',   label: 'Listen'      },
   { key: 'speak',    label: 'Speak'       },
+  { key: 'play',     label: 'Play'        },
 ]
 
 const SPECIFIC_TRACKS = ['bathroom', 'hotels', 'spanish', 'business', 'law', 'sports']
