@@ -53,6 +53,7 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
   const [isPlayingChoice, setIsPlayingChoice] = useState(false)
   const [choiceLoading, setChoiceLoading] = useState(false)
   const [nodesCache, setNodesCache]     = useState({})
+  const [score, setScore]               = useState(0)
 
   const audioRef = useRef(null)
 
@@ -102,6 +103,7 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
     setScenarioImage(image || null)
     setHistory([])
     setNodesCache({})
+    setScore(0)
     setChoiceLoading(true)
     const cache = await loadNode(sid, 'start', {})
     setNodesCache(cache)
@@ -145,8 +147,11 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
       })
     }
 
+    // Track score: good=2, neutral=1, bad=0
+    const points = choice.quality === 'good' ? 2 : choice.quality === 'neutral' ? 1 : 0
+    setScore(s => s + points)
     setChoiceLoading(true)
-    setHistory(h => [...h, { node: currentNode, choiceMade: choice.text }])
+    setHistory(h => [...h, { node: currentNode, choiceMade: choice.text, choiceQuality: choice.quality, choiceFeedback: choice.feedback }])
     const newCache = await loadNode(scenarioId, choice.next_node_key, nodesCache)
     setNodesCache(newCache)
     setChoiceLoading(false)
@@ -345,11 +350,19 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
                         </div>
                         <div style={{ fontSize: '0.88rem', color: '#4a5568', lineHeight: 1.5 }}>{item.node.text}</div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
+                      <div style={{ textAlign: 'right', marginBottom: item.choiceFeedback ? '6px' : 0 }}>
                         <span style={{ display: 'inline-block', background: '#667eea15', border: '1px solid #667eea40', borderRadius: '10px', padding: '4px 12px', fontSize: '0.8rem', color: '#553c9a', fontWeight: 500 }}>
                           You said: "{item.choiceMade}"
                         </span>
                       </div>
+                      {item.choiceFeedback && (() => {
+                        const qStyle = item.choiceQuality === 'good' ? { bg: '#f0fff4', border: '#c6f6d5', color: '#276749', emoji: '✅' } : item.choiceQuality === 'neutral' ? { bg: '#fffaf0', border: '#fbd38d', color: '#744210', emoji: '💬' } : { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c', emoji: '⚠️' }
+                        return (
+                          <div style={{ background: qStyle.bg, border: `1px solid ${qStyle.border}`, borderRadius: '8px', padding: '6px 10px', fontSize: '0.8rem', color: qStyle.color, lineHeight: 1.5 }}>
+                            {qStyle.emoji} {item.choiceFeedback}
+                          </div>
+                        )
+                      })()}
                     </div>
                   )
                 })}
@@ -379,15 +392,27 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
             </div>
 
             {/* Ending feedback */}
-            {endingStyle && (
-              <div style={{ background: endingStyle.bg, border: `1.5px solid ${endingStyle.border}`, borderRadius: '12px', padding: '1.1rem 1.25rem', marginBottom: '1.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '1.3rem' }}>{endingStyle.emoji}</span>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: endingStyle.color, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{endingStyle.label}</span>
+            {endingStyle && (() => {
+              const maxScore = history.length * 2
+              return (
+                <div style={{ background: endingStyle.bg, border: `1.5px solid ${endingStyle.border}`, borderRadius: '12px', padding: '1.1rem 1.25rem', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.3rem' }}>{endingStyle.emoji}</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: endingStyle.color, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{endingStyle.label}</span>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.7)', borderRadius: '8px', padding: '4px 12px', textAlign: 'center' }}>
+                      <span style={{ fontSize: '1.2rem', fontWeight: 700, color: endingStyle.color }}>{score}</span>
+                      <span style={{ fontSize: '0.8rem', color: endingStyle.color, opacity: 0.8 }}>/{maxScore}</span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.9rem', color: endingStyle.color, lineHeight: 1.55, marginBottom: '6px' }}>{endingStyle.text}</div>
+                  <div style={{ fontSize: '0.8rem', color: endingStyle.color, opacity: 0.75 }}>
+                    {score === maxScore ? 'Perfect score — every choice was the strongest option.' : score >= maxScore * 0.67 ? 'Good overall — scroll up to see where you could improve.' : 'Room to improve — scroll up to review the feedback on each choice.'}
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.9rem', color: endingStyle.color, lineHeight: 1.55 }}>{endingStyle.text}</div>
-              </div>
-            )}
+              )
+            })()}
 
             {/* Choices */}
             {!currentNode.is_ending && choices.length > 0 && (
@@ -412,6 +437,24 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
                 </div>
               </div>
             )}
+
+            {/* Save session on ending */}
+            {currentNode.is_ending && (() => {
+              const maxScore = history.length * 2
+              supabase.auth.getUser().then(({ data: { user } }) => {
+                if (user && scenarioId) {
+                  supabase.from('real_talk_sessions').insert({
+                    student_id: user.id,
+                    scenario_id: scenarioId,
+                    scenario_title: scenarioTitle,
+                    score,
+                    max_score: maxScore,
+                    ending_type: currentNode.ending_type,
+                  }).catch(() => {})
+                }
+              })
+              return null
+            })()}
 
             {/* Ending buttons */}
             {currentNode.is_ending && (
