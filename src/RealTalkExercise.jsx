@@ -11,9 +11,9 @@ const LEVELS = [
 ]
 
 const ENDING_STYLES = {
-  good:    { bg: '#f0fff4', border: '#c6f6d5', color: '#276749', emoji: '🌟', label: 'STRONG CHOICE',        text: 'Eva showed empathy and kept control of the conversation.' },
-  neutral: { bg: '#fffaf0', border: '#fbd38d', color: '#744210', emoji: '🤝', label: 'POSSIBLE, BUT WEAKER', text: 'Eva gave information, but Katie still felt unsupported.' },
-  bad:     { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c', emoji: '😬', label: 'POOR CHOICE',          text: "Eva's wording increased the guest's frustration." },
+  good:    { bg: '#f0fff4', border: '#c6f6d5', color: '#276749', emoji: '🌟', label: 'STRONG CHOICE',        fallback: 'Strong overall — empathy and a clear solution throughout.' },
+  neutral: { bg: '#fffaf0', border: '#fbd38d', color: '#744210', emoji: '🤝', label: 'POSSIBLE, BUT WEAKER', fallback: 'Some good elements, but the guest still felt partially unsupported.' },
+  bad:     { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c', emoji: '😬', label: 'POOR CHOICE',          fallback: "The approach increased rather than reduced the guest's frustration." },
 }
 
 const CHARACTER_COLOURS = {
@@ -193,10 +193,11 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
 
   const renderImage = () => {
     if (!scenarioImage) return null
+    const optimised = scenarioImage.includes('?') ? scenarioImage : `${scenarioImage}?width=800&resize=contain`
     return (
       <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
         <img
-          src={scenarioImage}
+          src={optimised}
           alt={scenarioTitle}
           style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '12px', objectFit: 'cover', objectPosition: 'top', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }}
         />
@@ -285,7 +286,7 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
                       onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}
                     >
                       {s.image_url
-                        ? <img src={s.image_url} alt={s.scenario_title} style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', objectPosition: 'top', flexShrink: 0 }} />
+                        ? <img src={`${s.image_url}?width=112&height=112&resize=cover`} alt={s.scenario_title} style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', objectPosition: 'top', flexShrink: 0 }} />
                         : <div style={{ width: '56px', height: '56px', borderRadius: '10px', background: selectedLevel.colourLight, border: `1px solid ${selectedLevel.colour}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>💬</div>
                       }
                       <div style={{ flex: 1 }}>
@@ -406,7 +407,7 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
                       <span style={{ fontSize: '0.8rem', color: endingStyle.color, opacity: 0.8 }}>/{maxScore}</span>
                     </div>
                   </div>
-                  <div style={{ fontSize: '0.9rem', color: endingStyle.color, lineHeight: 1.55, marginBottom: '6px' }}>{endingStyle.text}</div>
+                  <div style={{ fontSize: '0.9rem', color: endingStyle.color, lineHeight: 1.55, marginBottom: '6px' }}>{currentNode.ending_feedback || endingStyle.fallback}</div>
                   <div style={{ fontSize: '0.8rem', color: endingStyle.color, opacity: 0.75 }}>
                     {score === maxScore ? 'Perfect score — every choice was the strongest option.' : score >= maxScore * 0.67 ? 'Good overall — scroll up to see where you could improve.' : 'Room to improve — scroll up to review the feedback on each choice.'}
                   </div>
