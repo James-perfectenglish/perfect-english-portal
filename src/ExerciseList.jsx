@@ -65,12 +65,12 @@ const EXERCISE_ICONS = {
   'Real Talk':                 '💬',
 }
 
-const TABS = [
-  { key: 'learn',    label: 'Learn'       },
-  { key: 'practice', label: 'Activities'  },
-  { key: 'listen',   label: 'Listen'      },
-  { key: 'speak',    label: 'Speak'       },
-  { key: 'play',     label: 'Play'        },
+const ALL_TABS = [
+  { key: 'learn',    label: 'Learn'      },
+  { key: 'practice', label: 'Activities' },
+  { key: 'listen',   label: 'Listen'     },
+  { key: 'speak',    label: 'Speak'      },
+  { key: 'play',     label: 'Play'       },
 ]
 
 const SPECIFIC_TRACKS = ['bathroom', 'hotels', 'spanish', 'business', 'law', 'sports']
@@ -89,12 +89,11 @@ function isForYouFn(exercise, userTracks) {
   return exTracks.some(t => SPECIFIC_TRACKS.includes(t) && userTracks.includes(t))
 }
 
-// Map category to breadcrumb section label
 function getSectionLabel(category) {
-  if (category === 'speak') return 'Speak'
+  if (category === 'speak')     return 'Speak'
   if (category === 'real_talk') return 'Activities'
-  if (category === 'listen') return 'Listen'
-  if (category === 'practice') return 'Practice'
+  if (category === 'listen')    return 'Listen'
+  if (category === 'practice')  return 'Practice'
   return 'Learn'
 }
 
@@ -120,6 +119,9 @@ export default function ExerciseList({
 
   const location = useLocation()
   const navigate = useNavigate()
+
+  // Play tab only visible to teachers — students access Play via bottom nav
+  const TABS = isTeacher ? ALL_TABS : ALL_TABS.filter(t => t.key !== 'play')
 
   useEffect(() => { setActiveExercise(null) }, [location.key])
   useEffect(() => { fetchAll() }, [userTracks])
@@ -219,7 +221,7 @@ export default function ExerciseList({
     }
   }
 
-  // ── Speak tab — render PronunciationExercise inline ─────────────────────────
+  // ── Speak tab — render PronunciationExercise inline ──────────────────────
   if (activeTab === 'speak') {
     return <PronunciationExercise profile={{ level: userLevel, tracks: userTracks }} />
   }
@@ -365,7 +367,7 @@ export default function ExerciseList({
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '0.75rem 1rem', scrollbarWidth: 'none' }}>
         {TABS.map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-           style={{ padding: '8px 18px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s', border: activeTab === tab.key ? '2px solid #667eea' : '2px solid #e2e8f0', background: activeTab === tab.key ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'white', color: activeTab === tab.key ? 'white' : '#4a5568', boxShadow: 'none' }}>
+            style={{ padding: '8px 18px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s', border: activeTab === tab.key ? '2px solid #667eea' : '2px solid #e2e8f0', background: activeTab === tab.key ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'white', color: activeTab === tab.key ? 'white' : '#4a5568', boxShadow: 'none' }}>
             {tab.label}
           </button>
         ))}

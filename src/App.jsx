@@ -14,6 +14,7 @@ import Blurt from './Blurt'
 import TeacherBrowse from './TeacherBrowse'
 import WordSnake from './WordSnake'
 import NavBar from './components/NavBar'
+import TeacherSidebar from './components/TeacherSidebar'
 import PronunciationExercise from './PronunciationExercise'
 import { TRACK_CYCLE } from './components/TeacherToolbar'
 
@@ -52,9 +53,45 @@ function buildEffectiveProfile(profile, teacherTrack) {
   return { ...profile, tracks: [teacherTrack] }
 }
 
+function PresentModeBar({ onExit }) {
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, #553C9A, #667eea)',
+      color: 'white',
+      padding: '6px 16px',
+      fontSize: '0.8rem',
+      fontWeight: 600,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      position: 'sticky',
+      top: 0,
+      zIndex: 2000,
+    }}>
+      <span>▶ Present Mode — students see this view</span>
+      <button
+        onClick={onExit}
+        style={{
+          background: 'rgba(255,255,255,0.2)',
+          border: 'none',
+          color: 'white',
+          borderRadius: '4px',
+          padding: '3px 10px',
+          fontSize: '0.78rem',
+          fontWeight: 600,
+          cursor: 'pointer',
+        }}
+      >
+        ✕ Exit
+      </button>
+    </div>
+  )
+}
+
 function Dashboard({ session }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [presentMode, setPresentMode] = useState(false)
   const [globalLang, setGlobalLang] = useState(
     () => localStorage.getItem('pep_teach_lang') || 'en'
   )
@@ -108,43 +145,77 @@ function Dashboard({ session }) {
   const isTeacher = profile?.is_teacher || false
   const effectiveProfile = isTeacher ? buildEffectiveProfile(profile, teacherTrack) : profile
 
-  // ── Teacher layout — uses old-style header ────────────────────────────────
+  // ── Teacher layout ────────────────────────────────────────────────────────
   if (isTeacher) {
-    return (
-      <div>
-        <header style={{ background: 'white', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', position: 'sticky', top: 0, zIndex: 1000, width: '100%' }}>
-          <div style={{ width: '100%', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
-            <a href="https://perfect-english.org" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-              <h1 style={{ fontSize: 'clamp(1.2rem, 4vw, 1.8rem)', fontWeight: '700', margin: 0 }}>
-                <span style={{ color: '#2C3E50' }}>Perfect</span>
-                <span style={{ color: '#3498DB' }}> English</span>
-              </h1>
-            </a>
-            <nav>
-              <ul style={{ listStyle: 'none', display: 'flex', gap: 'clamp(0.5rem, 3vw, 2rem)', margin: 0, padding: 0, alignItems: 'center' }}>
-                <li><a href="/" style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }} onClick={e => { e.preventDefault(); navigate('/') }}>Home</a></li>
-                <li><a href="/practise" style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }} onClick={e => { e.preventDefault(); navigate('/practise') }}>Practise</a></li>
-                <li><a href="/learn" style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }} onClick={e => { e.preventDefault(); navigate('/learn') }}>Exercises</a></li>
-              </ul>
-            </nav>
+
+    // Present Mode — show student view with purple bar
+    if (presentMode) {
+      return (
+        <div>
+          <PresentModeBar onExit={() => setPresentMode(false)} />
+          <NavBar isTeacher={false} />
+          <div className="pep-page-content">
+            <TeacherRoutes
+              session={session}
+              profile={profile}
+              effectiveProfile={effectiveProfile}
+              teacherTrack={teacherTrack}
+              globalLang={globalLang}
+              toggleLang={toggleLang}
+              cycleTrack={cycleTrack}
+              handleLogout={handleLogout}
+              navigate={navigate}
+            />
           </div>
-        </header>
-        <TeacherRoutes
-          session={session}
-          profile={profile}
-          effectiveProfile={effectiveProfile}
+        </div>
+      )
+    }
+
+    // Normal teacher view — sidebar + header + routes
+    return (
+      <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+        <TeacherSidebar
           teacherTrack={teacherTrack}
-          globalLang={globalLang}
-          toggleLang={toggleLang}
-          cycleTrack={cycleTrack}
-          handleLogout={handleLogout}
-          navigate={navigate}
+          onCycleTrack={cycleTrack}
+          onBrowseClick={() => navigate('/teacher/browse')}
+          onTeacherClick={() => navigate('/teacher')}
+          onPresentMode={() => setPresentMode(true)}
         />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <header style={{ background: 'white', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', position: 'sticky', top: 0, zIndex: 1000, width: '100%' }}>
+            <div style={{ width: '100%', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
+              <a href="https://perfect-english.org" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                <h1 style={{ fontSize: 'clamp(1.2rem, 4vw, 1.8rem)', fontWeight: '700', margin: 0 }}>
+                  <span style={{ color: '#2C3E50' }}>Perfect</span>
+                  <span style={{ color: '#3498DB' }}> English</span>
+                </h1>
+              </a>
+              <nav>
+                <ul style={{ listStyle: 'none', display: 'flex', gap: 'clamp(0.5rem, 3vw, 2rem)', margin: 0, padding: 0, alignItems: 'center' }}>
+                  <li><a href="/" style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }} onClick={e => { e.preventDefault(); navigate('/') }}>Home</a></li>
+                  <li><a href="/practise" style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }} onClick={e => { e.preventDefault(); navigate('/practise') }}>Practise</a></li>
+                  <li><a href="/learn" style={{ textDecoration: 'none', color: '#4a5568', fontWeight: '500', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }} onClick={e => { e.preventDefault(); navigate('/learn') }}>Exercises</a></li>
+                </ul>
+              </nav>
+            </div>
+          </header>
+          <TeacherRoutes
+            session={session}
+            profile={profile}
+            effectiveProfile={effectiveProfile}
+            teacherTrack={teacherTrack}
+            globalLang={globalLang}
+            toggleLang={toggleLang}
+            cycleTrack={cycleTrack}
+            handleLogout={handleLogout}
+            navigate={navigate}
+          />
+        </div>
       </div>
     )
   }
 
-  // ── Student layout — NavBar + student routes ──────────────────────────────
+  // ── Student layout ────────────────────────────────────────────────────────
   return (
     <div>
       <NavBar isTeacher={false} />
@@ -167,7 +238,6 @@ function StudentRoutes({ session, profile, handleLogout }) {
       <Route path="/practise" element={
         <PracticePage profile={profile} isTeacher={false} />
       } />
-      {/* /practice → /practise redirect for any old links */}
       <Route path="/practice" element={<Navigate to="/practise" replace />} />
       <Route path="/learn" element={
         <ExerciseList
@@ -199,9 +269,8 @@ function StudentRoutes({ session, profile, handleLogout }) {
       <Route path="/lyrics"    element={<LyricsExercise user={session.user} />} />
       <Route path="/blurt"     element={<Blurt user={session.user} />} />
       <Route path="/wordsnake" element={<WordSnake user={session.user} />} />
-      {/* Legacy /exercises redirect */}
       <Route path="/exercises" element={<Navigate to="/learn" replace />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*"          element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
@@ -211,10 +280,7 @@ function TeacherRoutes({ session, profile, effectiveProfile, teacherTrack, globa
   return (
     <Routes>
       <Route path="/" element={
-        <StudentDashboard
-          profile={effectiveProfile}
-          session={session}
-        />
+        <StudentDashboard profile={effectiveProfile} session={session} />
       } />
       <Route path="/practise" element={
         <PracticePage
