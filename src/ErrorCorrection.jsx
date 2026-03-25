@@ -21,6 +21,27 @@ const GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
 const QUESTIONS_PER_ROUND = 10;
 const normalise = (s) => s.toLowerCase().trim().replace(/\s+/g, ' ');
 
+// ── Levenshtein distance ──
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[m][n];
+}
+
+function isFuzzyWordMatch(student, correct) {
+  const s = normalise(student);
+  const c = normalise(correct);
+  if (s === c) return false; // exact match handled already
+  const dist = levenshtein(s, c);
+  if (dist === 1) return true;
+  if (dist === 2 && c.length >= 5) return true;
+  return false;
+}
+
 const findErrorIndex = (questionWords, correctAnswer) => {
   const correctWords = correctAnswer.trim().split(/\s+/);
   for (let i = 0; i < Math.max(questionWords.length, correctWords.length); i++) {
@@ -143,6 +164,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter, userT
     const isExactMatch = normalise(correctedSentence) === normalise(correctAnswer);
     const errorInfo = findErrorIndex(words, correctAnswer);
 
+    // ── Exact match ──
     if (isExactMatch) {
       setScore(s => s + 1);
       setFeedback({ type: 'pass', message: `✅ Correct! ${q.explanation || ''}`, errorIndex: selectedWordIndex, correctWord: cleanCorrection + trailingPunct });
@@ -150,12 +172,23 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter, userT
       return;
     }
 
+    // ── Wrong tile ──
     if (selectedWordIndex !== errorInfo.index) {
       setFeedback({ type: 'fail', message: `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${q.explanation || ''}`, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
       saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, false, false);
       return;
     }
 
+    // ── Right tile, fuzzy spelling match on the correction word ──
+    const correctWord = errorInfo.correctWord.replace(/[.,!?;:]+$/, '');
+    if (isFuzzyWordMatch(cleanCorrection, correctWord)) {
+      setScore(s => s + 1);
+      setFeedback({ type: 'fuzzy', message: `✅ Correct — watch your spelling! The answer was "${errorInfo.correctWord}". ${q.explanation || ''}`, errorIndex: selectedWordIndex, correctWord: errorInfo.correctWord });
+      saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, true, false);
+      return;
+    }
+
+    // ── Right tile, send to AI ──
     setIsChecking(true);
     const lang = getQuestionLanguage(q);
     const aiResult = await aiMarkCorrection(q.question, words[selectedWordIndex], correction.trim(), correctAnswer, lang);
@@ -203,7 +236,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter, userT
   const getWordTileStyle = (index) => {
     const base = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 16px)', margin: '4px 3px', borderRadius: '8px', fontSize: 'clamp(0.9rem, 3.2vw, 1.1rem)', fontWeight: '500', cursor: (feedback || isChecking) ? 'default' : 'pointer', transition: 'all 0.15s ease', userSelect: 'none', backgroundColor: 'white', border: '2px solid #e2e8f0', color: '#2d3748' };
     if (feedback) {
-      const isPass = feedback.type === 'pass' || feedback.type === 'soft-pass';
+      const isPass = feedback.type === 'pass' || feedback.type === 'soft-pass' || feedback.type === 'fuzzy';
       if (index === feedback.errorIndex && isPass) return { ...base, backgroundColor: '#f0fff4', border: '2px solid #48bb78', color: '#276749', textDecoration: 'line-through', textDecorationColor: '#c53030' };
       if (index === feedback.errorIndex && !isPass) return { ...base, backgroundColor: '#fff5f5', border: '2px solid #f56565', color: '#c53030', textDecoration: 'line-through', textDecorationColor: '#c53030' };
       if (index === selectedWordIndex && selectedWordIndex !== feedback.errorIndex) return { ...base, backgroundColor: '#fff5f5', border: '2px solid #f56565', color: '#c53030', opacity: 0.6 };
@@ -213,7 +246,12 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter, userT
     return base;
   };
 
-  const feedbackStyle = feedback ? { pass: { bg: '#f0fff4', border: '#c6f6d5', color: '#276749' }, 'soft-pass': { bg: '#fffbeb', border: '#fbd38d', color: '#744210' }, fail: { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c' } }[feedback.type] : null;
+  const feedbackStyle = feedback ? {
+    pass: { bg: '#f0fff4', border: '#c6f6d5', color: '#276749' },
+    fuzzy: { bg: '#fffbeb', border: '#fbd38d', color: '#744210' },
+    'soft-pass': { bg: '#fffbeb', border: '#fbd38d', color: '#744210' },
+    fail: { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c' }
+  }[feedback.type] : null;
 
   if (stage === 'level-select') {
     return (
@@ -293,7 +331,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter, userT
                 <AiMarkedBadge />
               </div>
               <div style={{ fontSize: '0.9rem', color: '#718096', marginBottom: '1rem', fontStyle: 'italic' }}>
-                {isChecking ? '🤖 Checking your answer...' : !feedback ? '👆 Tap the word that is wrong, then type the correction below.' : feedback.type === 'pass' ? 'Well done!' : feedback.type === 'soft-pass' ? 'Valid alternative — well spotted!' : 'See the correction below.'}
+                {isChecking ? '🤖 Checking your answer...' : !feedback ? '👆 Tap the word that is wrong, then type the correction below.' : feedback.type === 'pass' ? 'Well done!' : feedback.type === 'fuzzy' ? 'Correct — watch your spelling!' : feedback.type === 'soft-pass' ? 'Valid alternative — well spotted!' : 'See the correction below.'}
               </div>
               <div style={{ backgroundColor: '#F8FBFF', padding: '1.25rem', borderRadius: '10px', border: '1px solid #AED6F1', lineHeight: '2.4', marginBottom: '1.25rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
                 {questionWords.map((word, index) => (
