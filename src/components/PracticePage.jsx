@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import RandomPracticeExercise from './RandomPracticeExercise.jsx';
 import SurvivalMode from './SurvivalMode.jsx';
-import { TRACK_EMOJI, TRACK_LABEL } from './TeacherToolbar';
 import Breadcrumb from './Breadcrumb';
 
 const LEVEL_CONFIG = [
@@ -49,18 +48,6 @@ const SPANISH_CONFIG = {
   language: 'es',
 };
 
-const BTN = {
-  height: '34px',
-  borderRadius: '8px',
-  background: '#f0f0f5',
-  border: 'none',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: '#4a5568',
-};
-
 function getLevelConfigForProfile(profileLevel) {
   if (!profileLevel) return LEVEL_CONFIG[1];
   const l = profileLevel.toUpperCase();
@@ -69,16 +56,7 @@ function getLevelConfigForProfile(profileLevel) {
   return LEVEL_CONFIG[1];
 }
 
-export default function PracticePage({
-  profile,
-  isTeacher = false,
-  onTeacherClick,
-  onBrowseClick,
-  globalLang,
-  onToggleLang,
-  teacherTrack,
-  onCycleTrack,
-}) {
+export default function PracticePage({ profile, isTeacher = false }) {
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [survivalMode, setSurvivalMode] = useState(false);
   const [weakSpotsMode, setWeakSpotsMode] = useState(false);
@@ -137,32 +115,14 @@ export default function PracticePage({
 
   if (isSpanish) {
     return (
-      <div style={{ position: 'relative' }}>
-        {isTeacher && onCycleTrack && (
-          <div style={{ position: 'fixed', top: '70px', right: '1rem', zIndex: 500 }}>
-            <button
-              onClick={onCycleTrack}
-              title={`Track: ${TRACK_LABEL[teacherTrack] || 'English'} — click to cycle`}
-              style={{
-                height: '34px', width: '34px', borderRadius: '8px',
-                background: '#f0f0f5', border: 'none', cursor: 'pointer',
-                fontSize: '1.1rem', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
-              }}
-            >
-              {TRACK_EMOJI[teacherTrack] || '🇬🇧'}
-            </button>
-          </div>
-        )}
-        <RandomPracticeExercise
-          levels={SPANISH_CONFIG.levels}
-          levelTitle={SPANISH_CONFIG.levelTitle}
-          levelSubtitle={SPANISH_CONFIG.levelSubtitle}
-          gradient={SPANISH_CONFIG.gradient}
-          language={SPANISH_CONFIG.language}
-          onBack={null}
-        />
-      </div>
+      <RandomPracticeExercise
+        levels={SPANISH_CONFIG.levels}
+        levelTitle={SPANISH_CONFIG.levelTitle}
+        levelSubtitle={SPANISH_CONFIG.levelSubtitle}
+        gradient={SPANISH_CONFIG.gradient}
+        language={SPANISH_CONFIG.language}
+        onBack={null}
+      />
     );
   }
 
@@ -187,34 +147,9 @@ export default function PracticePage({
     <div style={{ width: '100%', minHeight: '80vh', backgroundColor: '#f8f9fa', padding: '1rem', boxSizing: 'border-box' }}>
       <div style={{ maxWidth: '700px', margin: '0 auto', textAlign: 'center' }}>
 
-        <div style={{ position: 'relative', marginBottom: '0.5rem' }}>
-          <h1 style={{ fontSize: 'clamp(1.8rem, 6vw, 2.5rem)', color: '#2C3E50', margin: 0, fontWeight: '700' }}>
-            Practise
-          </h1>
-          {isTeacher && (
-            <div style={{
-              position: 'absolute', top: '50%', right: 0,
-              transform: 'translateY(-50%)',
-              display: 'flex', gap: '6px', alignItems: 'center',
-            }}>
-              {onCycleTrack && (
-                <button onClick={onCycleTrack} title={`Track override: ${teacherTrack || 'en'} — click to cycle`} style={{ ...BTN, width: '34px', fontSize: '1.1rem' }}>
-                  {teacherTrack === 'spanish' ? '🇪🇸' : teacherTrack === 'bathroom' ? '🛁' : teacherTrack === 'hotels' ? '🏨' : teacherTrack === 'business' ? '💼' : '🇬🇧'}
-                </button>
-              )}
-              {onBrowseClick && (
-                <button onClick={onBrowseClick} title="Question browser" style={{ ...BTN, padding: '0 10px', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                  🔍 Browse
-                </button>
-              )}
-              {onTeacherClick && (
-                <button onClick={onTeacherClick} title="Teacher dashboard" style={{ ...BTN, width: '34px', fontSize: '1rem' }}>
-                  👨‍🏫
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+        <h1 style={{ fontSize: 'clamp(1.8rem, 6vw, 2.5rem)', color: '#2C3E50', margin: '0 0 0.5rem', fontWeight: '700' }}>
+          Practise
+        </h1>
 
         <p style={{ fontSize: 'clamp(1rem, 3vw, 1.15rem)', color: '#666', marginBottom: '2rem', lineHeight: '1.5' }}>
           Choose your level. 20 random questions, a variety of exercises. Let's go!

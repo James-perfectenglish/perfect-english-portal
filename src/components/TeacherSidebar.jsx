@@ -1,13 +1,12 @@
 import { useNavigate } from 'react-router-dom'
 import { TRACK_EMOJI, TRACK_LABEL } from './TeacherToolbar'
 
-const GAME_LINKS = [
-  { icon: '⏱️', label: 'Blurt!',            path: '/blurt'     },
-  { icon: '🐍', label: 'Word Snake',         path: '/wordsnake' },
-  { icon: '🎤', label: 'Lyrics Mixer',       path: '/lyrics'    },
-  { icon: '🏛️', label: 'Sentence Auction',  path: '/play'      },
-  { icon: '🧩', label: 'Borrás Memory Game', path: '/play'      },
-  { icon: '🎮', label: 'Hotel Memory Game',  path: '/play'      },
+const NAV_LINKS = [
+  { icon: '🏠', label: 'Home',     path: '/'         },
+  { icon: '🎯', label: 'Practise', path: '/practise' },
+  { icon: '📚', label: 'Learn',    path: '/learn'    },
+  { icon: '🎮', label: 'Play',     path: '/play'     },
+  { icon: '📊', label: 'Progress', path: '/progress' },
 ]
 
 function SbBtn({ icon, title, onClick, active, style: extraStyle = {} }) {
@@ -75,6 +74,18 @@ export default function TeacherSidebar({ teacherTrack, onCycleTrack, onBrowseCli
           zIndex: 100,
         }}
       >
+        {/* Nav links */}
+        {NAV_LINKS.map(link => (
+          <SbBtn
+            key={link.path}
+            icon={link.icon}
+            title={link.label}
+            onClick={() => navigate(link.path)}
+          />
+        ))}
+
+        <Divider />
+
         {/* Teacher tools */}
         <SbBtn
           icon={TRACK_EMOJI[teacherTrack] || '🇬🇧'}
@@ -84,18 +95,6 @@ export default function TeacherSidebar({ teacherTrack, onCycleTrack, onBrowseCli
         />
         <SbBtn icon="🔍" title="Browse questions"    onClick={onBrowseClick}  />
         <SbBtn icon="👨‍🏫" title="Teacher dashboard" onClick={onTeacherClick} />
-
-        <Divider />
-
-        {/* Games */}
-        {GAME_LINKS.map(g => (
-          <SbBtn
-            key={g.label}
-            icon={g.icon}
-            title={g.label}
-            onClick={() => navigate(g.path)}
-          />
-        ))}
 
         <Divider />
 

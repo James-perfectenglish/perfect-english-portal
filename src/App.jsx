@@ -148,23 +148,17 @@ function Dashboard({ session }) {
   // ── Teacher layout ────────────────────────────────────────────────────────
   if (isTeacher) {
 
-    // Present Mode — show student view with purple bar
+    // Present Mode — purple bar + student NavBar + routes, no teacher chrome
     if (presentMode) {
       return (
         <div>
           <PresentModeBar onExit={() => setPresentMode(false)} />
           <NavBar isTeacher={false} />
           <div className="pep-page-content">
-            <TeacherRoutes
+            <StudentRoutes
               session={session}
-              profile={profile}
-              effectiveProfile={effectiveProfile}
-              teacherTrack={teacherTrack}
-              globalLang={globalLang}
-              toggleLang={toggleLang}
-              cycleTrack={cycleTrack}
+              profile={effectiveProfile}
               handleLogout={handleLogout}
-              navigate={navigate}
             />
           </div>
         </div>
@@ -285,13 +279,7 @@ function TeacherRoutes({ session, profile, effectiveProfile, teacherTrack, globa
       <Route path="/practise" element={
         <PracticePage
           profile={effectiveProfile}
-          isTeacher={true}
-          teacherTrack={teacherTrack}
-          onCycleTrack={cycleTrack}
-          onTeacherClick={() => navigate('/teacher')}
-          onBrowseClick={() => navigate('/teacher/browse')}
-          globalLang={globalLang}
-          onToggleLang={toggleLang}
+          isTeacher={false}
         />
       } />
       <Route path="/practice" element={<Navigate to="/practise" replace />} />
@@ -300,12 +288,6 @@ function TeacherRoutes({ session, profile, effectiveProfile, teacherTrack, globa
           userLevel={effectiveProfile.level}
           userTracks={effectiveProfile.tracks || []}
           isTeacher={true}
-          teacherTrack={teacherTrack}
-          onCycleTrack={cycleTrack}
-          onTeacherClick={() => navigate('/teacher')}
-          onBrowseClick={() => navigate('/teacher/browse')}
-          globalLang={globalLang}
-          onToggleLang={toggleLang}
           defaultTab="learn"
         />
       } />
@@ -314,12 +296,6 @@ function TeacherRoutes({ session, profile, effectiveProfile, teacherTrack, globa
           userLevel={effectiveProfile.level}
           userTracks={effectiveProfile.tracks || []}
           isTeacher={true}
-          teacherTrack={teacherTrack}
-          onCycleTrack={cycleTrack}
-          onTeacherClick={() => navigate('/teacher')}
-          onBrowseClick={() => navigate('/teacher/browse')}
-          globalLang={globalLang}
-          onToggleLang={toggleLang}
           defaultTab="play"
         />
       } />
@@ -328,12 +304,6 @@ function TeacherRoutes({ session, profile, effectiveProfile, teacherTrack, globa
           userLevel={effectiveProfile.level}
           userTracks={effectiveProfile.tracks || []}
           isTeacher={true}
-          teacherTrack={teacherTrack}
-          onCycleTrack={cycleTrack}
-          onTeacherClick={() => navigate('/teacher')}
-          onBrowseClick={() => navigate('/teacher/browse')}
-          globalLang={globalLang}
-          onToggleLang={toggleLang}
           defaultTab="listen"
         />
       } />

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
-import { TRACK_EMOJI, TRACK_LABEL } from './components/TeacherToolbar'
 import Breadcrumb from './components/Breadcrumb'
 import PronunciationExercise from './PronunciationExercise'
 import RealTalkExercise from './RealTalkExercise'
@@ -101,12 +100,6 @@ export default function ExerciseList({
   userLevel,
   userTracks = [],
   isTeacher = false,
-  onTeacherClick,
-  onBrowseClick,
-  globalLang,
-  onToggleLang,
-  teacherTrack,
-  onCycleTrack,
   defaultTab,
 }) {
   const [exercises, setExercises]             = useState([])
@@ -331,36 +324,16 @@ export default function ExerciseList({
   return (
     <div style={{ maxWidth: '860px', margin: '0 auto', padding: '0 0 80px', minHeight: '60vh' }}>
 
-      {/* Controls */}
+      {/* Controls — just the title and list/grid toggle */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '1rem 1rem 0.5rem' }}>
         <div>
           <div style={{ fontSize: 'clamp(1.1rem, 4vw, 1.4rem)', fontWeight: 700, color: '#2d3748' }}>Exercises</div>
           <div style={{ fontSize: '0.78rem', color: '#718096', marginTop: '2px' }}>⭐️ For You exercises appear first</div>
         </div>
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0, marginTop: '2px' }}>
-          {isTeacher && onCycleTrack && (
-            <button onClick={onCycleTrack} title={`Track: ${TRACK_LABEL[teacherTrack] || 'English'} — click to cycle`}
-              style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {TRACK_EMOJI[teacherTrack] || '🇬🇧'}
-            </button>
-          )}
-          {isTeacher && onBrowseClick && (
-            <button onClick={onBrowseClick} title="Question browser"
-              style={{ height: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, color: '#4a5568', padding: '0 10px', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-              🔍 Browse
-            </button>
-          )}
-          {isTeacher && onTeacherClick && (
-            <button onClick={onTeacherClick} title="Teacher dashboard"
-              style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              👨‍🏫
-            </button>
-          )}
-          <button onClick={() => setIsListView(v => !v)}
-            style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#f0f0f5', borderRadius: '8px', padding: '5px 9px', cursor: 'pointer', border: 'none', fontSize: '0.72rem', fontWeight: 600, color: '#4a5568', whiteSpace: 'nowrap' }}>
-            {isListView ? '⊞ Grid' : '☰ List'}
-          </button>
-        </div>
+        <button onClick={() => setIsListView(v => !v)}
+          style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#f0f0f5', borderRadius: '8px', padding: '5px 9px', cursor: 'pointer', border: 'none', fontSize: '0.72rem', fontWeight: 600, color: '#4a5568', whiteSpace: 'nowrap', marginTop: '2px' }}>
+          {isListView ? '⊞ Grid' : '☰ List'}
+        </button>
       </div>
 
       {/* Tabs */}
