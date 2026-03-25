@@ -41,7 +41,7 @@ Mark this generously. Accept the answer if:
 
 Reject only if the student's answer is clearly wrong, shows they misheard something significant, or is unrelated to what was said.
 
-Respond with JSON only: { "valid": true/false, "reason": "brief explanation" }`
+Respond with JSON only: { "valid": true/false, "reason": "brief explanation addressed directly to the student using 'you' — never refer to 'the student' or use 'they'" }`
         }]
       })
     });
