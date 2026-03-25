@@ -148,12 +148,12 @@ function Dashboard({ session }) {
   // ── Teacher layout ────────────────────────────────────────────────────────
   if (isTeacher) {
 
-    // Present Mode — purple bar + student NavBar + routes, no teacher chrome
+    // Present Mode — purple bar + student NavBar (bottom only) + student routes
     if (presentMode) {
       return (
         <div>
           <PresentModeBar onExit={() => setPresentMode(false)} />
-          <NavBar isTeacher={false} />
+          <NavBar isTeacher={false} presentMode={true} />
           <div className="pep-page-content">
             <StudentRoutes
               session={session}
@@ -226,40 +226,14 @@ function Dashboard({ session }) {
 function StudentRoutes({ session, profile, handleLogout }) {
   return (
     <Routes>
-      <Route path="/" element={
-        <StudentDashboard profile={profile} session={session} />
-      } />
-      <Route path="/practise" element={
-        <PracticePage profile={profile} isTeacher={false} />
-      } />
+      <Route path="/" element={<StudentDashboard profile={profile} session={session} />} />
+      <Route path="/practise" element={<PracticePage profile={profile} isTeacher={false} />} />
       <Route path="/practice" element={<Navigate to="/practise" replace />} />
-      <Route path="/learn" element={
-        <ExerciseList
-          userLevel={profile.level}
-          userTracks={profile.tracks || []}
-          defaultTab="learn"
-        />
-      } />
-      <Route path="/play" element={
-        <ExerciseList
-          userLevel={profile.level}
-          userTracks={profile.tracks || []}
-          defaultTab="play"
-        />
-      } />
-      <Route path="/listen" element={
-        <ExerciseList
-          userLevel={profile.level}
-          userTracks={profile.tracks || []}
-          defaultTab="listen"
-        />
-      } />
-      <Route path="/speak" element={
-        <PronunciationExercise profile={profile} />
-      } />
-      <Route path="/progress" element={
-        <Progress session={session} profile={profile} handleLogout={handleLogout} />
-      } />
+      <Route path="/learn"    element={<ExerciseList userLevel={profile.level} userTracks={profile.tracks || []} defaultTab="learn" />} />
+      <Route path="/play"     element={<ExerciseList userLevel={profile.level} userTracks={profile.tracks || []} defaultTab="play" />} />
+      <Route path="/listen"   element={<ExerciseList userLevel={profile.level} userTracks={profile.tracks || []} defaultTab="listen" />} />
+      <Route path="/speak"    element={<PronunciationExercise profile={profile} />} />
+      <Route path="/progress" element={<Progress session={session} profile={profile} handleLogout={handleLogout} />} />
       <Route path="/lyrics"    element={<LyricsExercise user={session.user} />} />
       <Route path="/blurt"     element={<Blurt user={session.user} />} />
       <Route path="/wordsnake" element={<WordSnake user={session.user} />} />
@@ -273,69 +247,20 @@ function StudentRoutes({ session, profile, handleLogout }) {
 function TeacherRoutes({ session, profile, effectiveProfile, teacherTrack, globalLang, toggleLang, cycleTrack, handleLogout, navigate }) {
   return (
     <Routes>
-      <Route path="/" element={
-        <StudentDashboard profile={effectiveProfile} session={session} />
-      } />
-      <Route path="/practise" element={
-        <PracticePage
-          profile={effectiveProfile}
-          isTeacher={false}
-        />
-      } />
+      <Route path="/" element={<StudentDashboard profile={effectiveProfile} session={session} />} />
+      <Route path="/practise" element={<PracticePage profile={effectiveProfile} isTeacher={false} />} />
       <Route path="/practice" element={<Navigate to="/practise" replace />} />
-      <Route path="/learn" element={
-        <ExerciseList
-          userLevel={effectiveProfile.level}
-          userTracks={effectiveProfile.tracks || []}
-          isTeacher={true}
-          defaultTab="learn"
-        />
-      } />
-      <Route path="/play" element={
-        <ExerciseList
-          userLevel={effectiveProfile.level}
-          userTracks={effectiveProfile.tracks || []}
-          isTeacher={true}
-          defaultTab="play"
-        />
-      } />
-      <Route path="/listen" element={
-        <ExerciseList
-          userLevel={effectiveProfile.level}
-          userTracks={effectiveProfile.tracks || []}
-          isTeacher={true}
-          defaultTab="listen"
-        />
-      } />
-      <Route path="/speak" element={
-        <PronunciationExercise profile={effectiveProfile} />
-      } />
+      <Route path="/learn"    element={<ExerciseList userLevel={effectiveProfile.level} userTracks={effectiveProfile.tracks || []} isTeacher={true} defaultTab="learn" />} />
+      <Route path="/play"     element={<ExerciseList userLevel={effectiveProfile.level} userTracks={effectiveProfile.tracks || []} isTeacher={true} defaultTab="play" />} />
+      <Route path="/listen"   element={<ExerciseList userLevel={effectiveProfile.level} userTracks={effectiveProfile.tracks || []} isTeacher={true} defaultTab="listen" />} />
+      <Route path="/speak"    element={<PronunciationExercise profile={effectiveProfile} />} />
       <Route path="/exercises" element={<Navigate to="/learn" replace />} />
-      <Route path="/progress" element={
-        <Progress session={session} profile={profile} handleLogout={handleLogout} />
-      } />
+      <Route path="/progress"  element={<Progress session={session} profile={profile} handleLogout={handleLogout} />} />
       <Route path="/lyrics"    element={<LyricsExercise user={session.user} />} />
-      <Route path="/blurt"     element={
-        <Blurt user={session.user} profileOverride={teacherTrack !== 'en' ? effectiveProfile : null} />
-      } />
-      <Route path="/wordsnake" element={
-        <WordSnake user={session.user} profileOverride={teacherTrack !== 'en' ? effectiveProfile : null} />
-      } />
-      <Route path="/teacher" element={
-        <TeacherDashboard
-          profile={profile}
-          handleLogout={handleLogout}
-          globalLang={globalLang}
-          onToggleLang={toggleLang}
-          onBrowseClick={() => navigate('/teacher/browse')}
-          onHomeClick={() => navigate('/')}
-          teacherTrack={teacherTrack}
-          onCycleTrack={cycleTrack}
-        />
-      } />
-      <Route path="/teacher/browse" element={
-        <TeacherBrowse user={session.user} globalLang={globalLang} />
-      } />
+      <Route path="/blurt"     element={<Blurt user={session.user} profileOverride={teacherTrack !== 'en' ? effectiveProfile : null} />} />
+      <Route path="/wordsnake" element={<WordSnake user={session.user} profileOverride={teacherTrack !== 'en' ? effectiveProfile : null} />} />
+      <Route path="/teacher"   element={<TeacherDashboard profile={profile} handleLogout={handleLogout} />} />
+      <Route path="/teacher/browse" element={<TeacherBrowse user={session.user} globalLang={globalLang} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

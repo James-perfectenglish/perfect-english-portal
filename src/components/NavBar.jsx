@@ -21,7 +21,7 @@ function shouldShowDot() {
   } catch { return false }
 }
 
-export default function NavBar({ isTeacher }) {
+export default function NavBar({ isTeacher, presentMode = false }) {
   const location = useLocation()
   const [showDot, setShowDot] = useState(false)
 
@@ -45,7 +45,7 @@ export default function NavBar({ isTeacher }) {
 
   return (
     <>
-      {/* ── MOBILE: fixed bottom tab bar ── */}
+      {/* ── MOBILE / PRESENT MODE: fixed bottom tab bar ── */}
       <nav style={{
         display: 'flex',
         position: 'fixed',
@@ -56,7 +56,6 @@ export default function NavBar({ isTeacher }) {
         background: 'white',
         borderTop: '0.5px solid #e2e8f0',
         padding: '6px 0 max(4px, env(safe-area-inset-bottom))',
-        '@media (min-width: 768px)': { display: 'none' },
       }} className="pep-bottom-nav">
         {TABS.map(tab => {
           const active = isActive(tab.path)
@@ -108,78 +107,79 @@ export default function NavBar({ isTeacher }) {
         })}
       </nav>
 
-      {/* ── DESKTOP: top nav ── */}
-      <header style={{
-        background: 'white',
-        borderBottom: '0.5px solid #e2e8f0',
-        position: 'sticky',
-        top: 0,
-        zIndex: 1000,
-        width: '100%',
-      }} className="pep-top-nav">
-        <div style={{
-          maxWidth: '900px',
-          margin: '0 auto',
-          padding: '0 1rem',
-          display: 'flex',
-          alignItems: 'center',
-          height: '52px',
-          gap: '4px',
-        }}>
-          <a href="https://perfect-english.org" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', marginRight: '24px' }}>
-            <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>
-              <span style={{ color: '#2C3E50' }}>Perfect</span>
-              <span style={{ color: '#3498DB' }}> English</span>
-            </span>
-          </a>
-          {TABS.map(tab => {
-            const active = isActive(tab.path)
-            const isDot = tab.path === '/progress' && showDot
-            return (
-              <Link key={tab.path} to={tab.path} style={{
-                textDecoration: 'none',
-                padding: '0 12px',
-                height: '52px',
-                display: 'flex',
-                alignItems: 'center',
-                fontSize: '0.88rem',
-                fontWeight: active ? 600 : 500,
-                color: active ? '#667eea' : '#4a5568',
-                borderBottom: active ? '2px solid #667eea' : '2px solid transparent',
-                position: 'relative',
-                whiteSpace: 'nowrap',
-              }}>
-                {tab.label}
-                {isDot && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '10px',
-                    right: '6px',
-                    width: '6px',
-                    height: '6px',
-                    background: '#e53e3e',
-                    borderRadius: '50%',
-                    border: '1.5px solid white',
-                  }} />
-                )}
-              </Link>
-            )
-          })}
-        </div>
-      </header>
+      {/* ── DESKTOP: top nav — hidden in present mode ── */}
+      {!presentMode && (
+        <header style={{
+          background: 'white',
+          borderBottom: '0.5px solid #e2e8f0',
+          position: 'sticky',
+          top: 0,
+          zIndex: 1000,
+          width: '100%',
+        }} className="pep-top-nav">
+          <div style={{
+            maxWidth: '900px',
+            margin: '0 auto',
+            padding: '0 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            height: '52px',
+            gap: '4px',
+          }}>
+            <a href="https://perfect-english.org" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', marginRight: '24px' }}>
+              <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>
+                <span style={{ color: '#2C3E50' }}>Perfect</span>
+                <span style={{ color: '#3498DB' }}> English</span>
+              </span>
+            </a>
+            {TABS.map(tab => {
+              const active = isActive(tab.path)
+              const isDot = tab.path === '/progress' && showDot
+              return (
+                <Link key={tab.path} to={tab.path} style={{
+                  textDecoration: 'none',
+                  padding: '0 12px',
+                  height: '52px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontSize: '0.88rem',
+                  fontWeight: active ? 600 : 500,
+                  color: active ? '#667eea' : '#4a5568',
+                  borderBottom: active ? '2px solid #667eea' : '2px solid transparent',
+                  position: 'relative',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {tab.label}
+                  {isDot && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '10px',
+                      right: '6px',
+                      width: '6px',
+                      height: '6px',
+                      background: '#e53e3e',
+                      borderRadius: '50%',
+                      border: '1.5px solid white',
+                    }} />
+                  )}
+                </Link>
+              )
+            })}
+          </div>
+        </header>
+      )}
 
       {/* ── CSS to show/hide based on screen size ── */}
       <style>{`
         .pep-bottom-nav { display: flex; }
         .pep-top-nav { display: none; }
         @media (min-width: 768px) {
-          .pep-bottom-nav { display: none; }
-          .pep-top-nav { display: block; }
+          .pep-bottom-nav { display: ${presentMode ? 'flex' : 'none'}; }
+          .pep-top-nav { display: ${presentMode ? 'none' : 'block'}; }
         }
-        /* bottom padding so content isn't hidden behind tab bar */
         .pep-page-content { padding-bottom: 70px; }
         @media (min-width: 768px) {
-          .pep-page-content { padding-bottom: 0; }
+          .pep-page-content { padding-bottom: ${presentMode ? '70px' : '0'}; }
         }
       `}</style>
     </>

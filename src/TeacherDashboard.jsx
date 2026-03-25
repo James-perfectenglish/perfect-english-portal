@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
-import { TRACK_EMOJI, TRACK_LABEL } from './components/TeacherToolbar'
 
 const TYPE_INFO = {
   gap_fill:        { label: 'Gap Fill',        emoji: '✏️' },
@@ -59,7 +58,7 @@ function exportCSV(students) {
   URL.revokeObjectURL(url)
 }
 
-export default function TeacherDashboard({ profile, handleLogout, globalLang, onToggleLang, onBrowseClick, onHomeClick, teacherTrack = 'en', onCycleTrack }) {
+export default function TeacherDashboard({ profile, handleLogout }) {
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
   const [privateMode, setPrivateMode] = useState(false)
@@ -296,24 +295,6 @@ export default function TeacherDashboard({ profile, handleLogout, globalLang, on
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {onCycleTrack && (
-            <button onClick={onCycleTrack} title={`Track: ${TRACK_LABEL[teacherTrack]} — click to cycle`}
-              style={{ height: '34px', width: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {TRACK_EMOJI[teacherTrack] || '🇬🇧'}
-            </button>
-          )}
-          {onBrowseClick && (
-            <button onClick={onBrowseClick}
-              style={{ height: '34px', padding: '0 10px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, color: '#2d3748', whiteSpace: 'nowrap' }}>
-              🔍 Browse
-            </button>
-          )}
-          {onHomeClick && (
-            <button onClick={onHomeClick} title="Home"
-              style={{ height: '34px', width: '34px', borderRadius: '8px', background: '#f0f0f5', border: 'none', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              🏠
-            </button>
-          )}
           <div style={{ width: '1px', height: '24px', background: '#e2e8f0', margin: '0 2px' }} />
           <button onClick={() => setPrivateMode(m => !m)}
             style={{ height: '34px', padding: '0 10px', borderRadius: '8px', border: `2px solid ${privateMode ? '#667eea' : '#e2e8f0'}`, background: privateMode ? '#667eea' : 'white', color: privateMode ? 'white' : '#718096', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
@@ -497,7 +478,6 @@ export default function TeacherDashboard({ profile, handleLogout, globalLang, on
                         <span style={{ fontSize: '0.75rem', color: '#a0aec0' }}>{new Date(word.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                         <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: '#718096', fontWeight: '600' }}>{correctCount}/{subs.length} correct</span>
                       </div>
-
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         {subs.map(sub => {
                           const studentProfile = wotdProfileMap[sub.student_id]
