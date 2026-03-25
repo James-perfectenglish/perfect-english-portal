@@ -473,6 +473,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
     const isSoftPass   = feedback?.type === 'soft-pass';
     const borderColour = !feedback ? '#e2e8f0' : isCorrect ? '#48bb78' : '#f56565';
     const bgColour     = !feedback ? 'white' : isCorrect ? '#f0fff4' : '#fff5f5';
+    const hasTemplate  = currentExercise.sentence_template && currentExercise.sentence_template.includes('_');
 
     return (
       <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
@@ -495,7 +496,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
             <AiMarkedBadge />
           </div>
 
-          <p style={{ color: '#718096', fontSize: '0.95rem', marginTop: 0, marginBottom: currentExercise.sentence_template ? '0.75rem' : '1.25rem', fontStyle: 'italic' }}>
+          <p style={{ color: '#718096', fontSize: '0.95rem', marginTop: 0, marginBottom: hasTemplate ? '0.75rem' : '1.25rem', fontStyle: 'italic' }}>
             {currentExercise.excerpt_type === 'word'
               ? 'Listen and type the one or two words you hear that complete the sentence.'
               : currentExercise.excerpt_type === 'phrase'
@@ -503,7 +504,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
               : 'Listen and type the complete sentence you hear.'}
           </p>
 
-          {currentExercise.sentence_template && (
+          {hasTemplate && (
             <div style={{ background: '#F8FBFF', border: '1px solid #AED6F1', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1.25rem', fontSize: '1rem', color: '#2d3748', lineHeight: 1.8 }}>
               {currentExercise.sentence_template}
             </div>
