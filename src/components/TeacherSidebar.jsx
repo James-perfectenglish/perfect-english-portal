@@ -53,25 +53,32 @@ export default function TeacherSidebar({ teacherTrack, onCycleTrack, onBrowseCli
   return (
     <>
       <style>{`
-        .teacher-sidebar { display: none !important; }
+        .teacher-sidebar {
+          display: none !important;
+        }
         @media (min-width: 768px) {
-          .teacher-sidebar { display: flex !important; }
+          .teacher-sidebar {
+            display: flex !important;
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            width: 48px;
+            z-index: 100;
+          }
+          .teacher-main-content {
+            margin-left: 48px;
+          }
         }
       `}</style>
       <div
         className="teacher-sidebar"
         style={{
-          width: '48px',
-          flexShrink: 0,
           background: 'white',
           borderRight: '0.5px solid #e2e8f0',
-          position: 'sticky',
-          top: 0,
-          height: '100vh',
           flexDirection: 'column',
           alignItems: 'center',
           padding: '12px 0',
-          zIndex: 100,
         }}
       >
         {/* Nav links */}

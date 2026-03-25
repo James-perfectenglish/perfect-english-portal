@@ -5,7 +5,6 @@ import Breadcrumb from './components/Breadcrumb'
 import PronunciationExercise from './PronunciationExercise'
 import RealTalkExercise from './RealTalkExercise'
 
-// Exercises
 import TopicPracticeExercise from './TopicPracticeExercise'
 import SentenceBuilding from './SentenceBuilding'
 import ListeningExercise from './ListeningExercise'
@@ -64,12 +63,12 @@ const EXERCISE_ICONS = {
   'Real Talk':                 '💬',
 }
 
-const ALL_TABS = [
+// Play removed from tabs — students use bottom nav, teachers use sidebar
+const TABS = [
   { key: 'learn',    label: 'Learn'      },
   { key: 'practice', label: 'Activities' },
   { key: 'listen',   label: 'Listen'     },
   { key: 'speak',    label: 'Speak'      },
-  { key: 'play',     label: 'Play'       },
 ]
 
 const SPECIFIC_TRACKS = ['bathroom', 'hotels', 'spanish', 'business', 'law', 'sports']
@@ -112,9 +111,6 @@ export default function ExerciseList({
 
   const location = useLocation()
   const navigate = useNavigate()
-
-  // Play tab only visible to teachers — students access Play via bottom nav
-  const TABS = isTeacher ? ALL_TABS : ALL_TABS.filter(t => t.key !== 'play')
 
   useEffect(() => { setActiveExercise(null) }, [location.key])
   useEffect(() => { fetchAll() }, [userTracks])
@@ -182,7 +178,6 @@ export default function ExerciseList({
   if (activeExercise) {
     const t = activeExercise.title
     const sectionLabel = getSectionLabel(activeExercise.category)
-
     const isSpanishTrack = userTracks.includes('spanish')
     const listeningTracks = isSpanishTrack ? userTracks : [...new Set([...userTracks, 'general'])]
 
@@ -214,12 +209,10 @@ export default function ExerciseList({
     }
   }
 
-  // ── Speak tab — render PronunciationExercise inline ──────────────────────
   if (activeTab === 'speak') {
     return <PronunciationExercise profile={{ level: userLevel, tracks: userTracks }} />
   }
 
-  // ── Filter + sort for active tab ──────────────────────────────────────────
   const tabExercises = exercises
     .filter(e => shouldShowExercise(e, userTracks))
     .filter(e => (e.category || 'practice') === activeTab)
@@ -228,7 +221,6 @@ export default function ExerciseList({
   const generalList = tabExercises.filter(e => !isForYouFn(e, userTracks))
   const hasBoth     = forYouList.length > 0 && generalList.length > 0
 
-  // ── Sub-components ────────────────────────────────────────────────────────
   const LevelBadge = ({ level }) => {
     const key = level?.[0] || 'B'
     const styles = { A: { background: '#f0fff4', color: '#276749' }, B: { background: '#ebf8ff', color: '#2b6cb0' }, C: { background: '#fffaf0', color: '#c05621' } }
@@ -320,11 +312,9 @@ export default function ExerciseList({
     )
   }
 
-  // ── Main render ───────────────────────────────────────────────────────────
   return (
     <div style={{ maxWidth: '860px', margin: '0 auto', padding: '0 0 80px', minHeight: '60vh' }}>
 
-      {/* Controls — just the title and list/grid toggle */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '1rem 1rem 0.5rem' }}>
         <div>
           <div style={{ fontSize: 'clamp(1.1rem, 4vw, 1.4rem)', fontWeight: 700, color: '#2d3748' }}>Exercises</div>
@@ -336,7 +326,6 @@ export default function ExerciseList({
         </button>
       </div>
 
-      {/* Tabs */}
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '0.75rem 1rem', scrollbarWidth: 'none' }}>
         {TABS.map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
@@ -346,7 +335,6 @@ export default function ExerciseList({
         ))}
       </div>
 
-      {/* Exercise content */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#718096' }}>Loading exercises...</div>
       ) : tabExercises.length === 0 ? (

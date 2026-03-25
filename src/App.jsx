@@ -111,19 +111,12 @@ function Dashboard({ session }) {
 
   const handleLogout = async () => { await supabase.auth.signOut() }
 
-  const toggleLang = () => {
-    const next = globalLang === 'en' ? 'es' : 'en'
-    setGlobalLang(next)
-    localStorage.setItem('pep_teach_lang', next)
-  }
-
   const cycleTrack = () => {
     const idx = TRACK_CYCLE.indexOf(teacherTrack)
     const next = TRACK_CYCLE[(idx + 1) % TRACK_CYCLE.length]
     setTeacherTrack(next)
     localStorage.setItem('pep_teacher_track', next)
     const lang = next === 'spanish' ? 'es' : 'en'
-    setGlobalLang(lang)
     localStorage.setItem('pep_teach_lang', lang)
   }
 
@@ -165,9 +158,9 @@ function Dashboard({ session }) {
       )
     }
 
-    // Normal teacher view — sidebar + header + routes
+    // Normal teacher view — fixed sidebar + header + routes
     return (
-      <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+      <div>
         <TeacherSidebar
           teacherTrack={teacherTrack}
           onCycleTrack={cycleTrack}
@@ -175,7 +168,7 @@ function Dashboard({ session }) {
           onTeacherClick={() => navigate('/teacher')}
           onPresentMode={() => setPresentMode(true)}
         />
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="teacher-main-content">
           <header style={{ background: 'white', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', position: 'sticky', top: 0, zIndex: 1000, width: '100%' }}>
             <div style={{ width: '100%', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
               <a href="https://perfect-english.org" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
@@ -198,8 +191,7 @@ function Dashboard({ session }) {
             profile={profile}
             effectiveProfile={effectiveProfile}
             teacherTrack={teacherTrack}
-            globalLang={globalLang}
-            toggleLang={toggleLang}
+            globalLang={localStorage.getItem('pep_teach_lang') || 'en'}
             cycleTrack={cycleTrack}
             handleLogout={handleLogout}
             navigate={navigate}
@@ -244,7 +236,7 @@ function StudentRoutes({ session, profile, handleLogout }) {
 }
 
 // ── Teacher routes ────────────────────────────────────────────────────────────
-function TeacherRoutes({ session, profile, effectiveProfile, teacherTrack, globalLang, toggleLang, cycleTrack, handleLogout, navigate }) {
+function TeacherRoutes({ session, profile, effectiveProfile, teacherTrack, globalLang, cycleTrack, handleLogout, navigate }) {
   return (
     <Routes>
       <Route path="/" element={<StudentDashboard profile={effectiveProfile} session={session} />} />
