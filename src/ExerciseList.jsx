@@ -365,7 +365,7 @@ export default function ExerciseList({
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '0.75rem 1rem', scrollbarWidth: 'none' }}>
         {TABS.map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            style={{ padding: '8px 18px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s', border: activeTab === tab.key ? '2px solid transparent' : '2px solid #e2e8f0', background: activeTab === tab.key ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'white', color: activeTab === tab.key ? 'white' : '#4a5568', boxShadow: 'none' }}>
+           style={{ padding: '8px 18px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s', border: activeTab === tab.key ? '2px solid #667eea' : '2px solid #e2e8f0', background: activeTab === tab.key ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'white', color: activeTab === tab.key ? 'white' : '#4a5568', boxShadow: 'none' }}>
             {tab.label}
           </button>
         ))}
