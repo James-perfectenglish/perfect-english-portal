@@ -32,6 +32,7 @@ const ACTIVE_EXERCISES = new Set([
   'Hotel Flashcards', 'Hotel Memory Game',
   'Odd One Out', 'Error Correction',
   'Matching', 'Sentence Auction', 'Lyrics Mixer', 'Blurt!', 'Word Snake', 'Real Talk',
+  'Travel 🧳', 'Sport ⚽️',
 ])
 
 const EXERCISE_ICONS = {
@@ -61,8 +62,8 @@ const EXERCISE_ICONS = {
   'Blurt!':                    '⏱️',
   'Word Snake':                '🐍',
   'Real Talk':                 '💬',
-  'Travel 🧳':                  '🧳',
-  'Sport ⚽️':                   '⚽️',
+  'Travel 🧳':                 '🧳',
+  'Sport ⚽️':                  '⚽️',
 }
 
 // Play removed from tabs — students use bottom nav, teachers use sidebar
