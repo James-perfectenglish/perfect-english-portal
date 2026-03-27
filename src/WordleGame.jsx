@@ -213,7 +213,7 @@ export default function WordleGame({ onBack }) {
     if (!sentenceInput.trim() || sentenceChecking) return
     setSentenceChecking(true)
     try {
-      const res = await fetch('/api/mark-wordle-sentence', {
+      const res = await fetch('/api/mark-sentence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ word: word.toLowerCase(), sentence: sentenceInput.trim(), language }),
