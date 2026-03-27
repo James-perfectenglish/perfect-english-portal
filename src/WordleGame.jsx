@@ -1,20 +1,27 @@
 import { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
 const WORD_LENGTH  = 5
 const MAX_GUESSES  = 6
 const GRADIENT     = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 
-const KEYBOARD_ROWS = [
+const EN_KEYBOARD_ROWS = [
   ['Q','W','E','R','T','Y','U','I','O','P'],
   ['A','S','D','F','G','H','J','K','L'],
   ['ENTER','Z','X','C','V','B','N','M','⌫'],
 ]
 
+const ES_KEYBOARD_ROWS = [
+  ['Q','W','E','R','T','Y','U','I','O','P'],
+  ['A','S','D','F','G','H','J','K','L','Ñ'],
+  ['ENTER','Z','X','C','V','B','N','M','⌫'],
+]
+
 const COLOURS = {
-  correct: '#538d4e',
-  present: '#b59f3b',
-  absent:  '#3a3a3c',
+  correct: '#534AB7',
+  present: '#7F77DD',
+  absent:  '#888780',
 }
 
 const WIN_MESSAGES = [
@@ -45,7 +52,8 @@ function computeLetterStates(guesses, word) {
 }
 
 export default function WordleGame({ onBack }) {
-  const [isSpanish, setIsSpanish] = useState(false)
+  const location  = useLocation()
+  const [isSpanish, setIsSpanish] = useState(location.state?.isSpanish || false)
   const language = isSpanish ? 'es' : 'en'
 
   const [mode, setMode]           = useState('daily')
@@ -86,10 +94,11 @@ export default function WordleGame({ onBack }) {
   async function initDaily() {
     setMode('daily')
 
-    // Detect language from profile — more reliable than location.state
+    // language: use location.state if set (teacher track simulation),
+    // otherwise detect from real profile tracks
     const { data: { user } } = await supabase.auth.getUser()
-    let lang = 'en'
-    if (user) {
+    let lang = location.state?.isSpanish ? 'es' : 'en'
+    if (lang === 'en' && user) {
       const { data: prof } = await supabase.from('profiles').select('tracks').eq('id', user.id).single()
       if ((prof?.tracks || []).includes('spanish')) { setIsSpanish(true); lang = 'es' }
     }
@@ -152,14 +161,14 @@ export default function WordleGame({ onBack }) {
     const key = e.key.toUpperCase()
     if (key === 'ENTER')           submitGuess()
     else if (key === 'BACKSPACE')  setCurrent(c => c.slice(0, -1))
-    else if (/^[A-Z]$/.test(key)) setCurrent(c => c.length < WORD_LENGTH ? c + key : c)
+    else if (/^[A-ZÑÁÉÍÓÚ]$/.test(key) || key === 'Ñ') setCurrent(c => c.length < WORD_LENGTH ? c + key : c)
   }
 
   function handleVirtualKey(key) {
     if (stateRef.current.gameState !== 'playing') return
     if (key === 'ENTER')  submitGuess()
     else if (key === '⌫') setCurrent(c => c.slice(0, -1))
-    else                  setCurrent(c => c.length < WORD_LENGTH ? c + key : c)
+    else if (/^[A-ZÑÁÉÍÓÚ]$/.test(key) || key === 'Ñ') setCurrent(c => c.length < WORD_LENGTH ? c + key : c)
   }
 
   async function submitGuess() {
@@ -343,7 +352,7 @@ export default function WordleGame({ onBack }) {
             ))}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', alignItems: 'center', marginBottom: '1rem' }}>
-            {KEYBOARD_ROWS.map((row, i) => (
+            {(isSpanish ? ES_KEYBOARD_ROWS : EN_KEYBOARD_ROWS).map((row, i) => (
               <div key={i} style={{ display: 'flex', gap: '4px' }}>
                 {row.map(key => {
                   const state = letterStates[key]
@@ -354,9 +363,12 @@ export default function WordleGame({ onBack }) {
                   else if (state === 'absent')  { bg = COLOURS.absent;  color = 'white' }
                   return (
                     <button key={key} onClick={() => handleVirtualKey(key)} style={{
-                      width: isWide ? '60px' : '34px', height: '52px', background: bg, color,
-                      border: 'none', borderRadius: '4px', fontSize: isWide ? '0.62rem' : '0.9rem',
-                      fontWeight: 700, cursor: 'pointer', userSelect: 'none', transition: 'background 0.2s ease',
+                      width: isWide ? '60px' : key === 'Ñ' ? '30px' : '34px', height: '52px',
+                      background: bg, color, border: 'none', borderRadius: '4px',
+                      fontSize: isWide ? '0.62rem' : '0.9rem', fontWeight: 700,
+                      cursor: 'pointer', userSelect: 'none', transition: 'background 0.2s ease',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      lineHeight: 1, padding: 0,
                     }}>
                       {key}
                     </button>
@@ -376,8 +388,8 @@ export default function WordleGame({ onBack }) {
           </div>
           <div style={{ fontSize: '0.82rem', color: '#718096', marginBottom: '10px' }}>
             {isSpanish
-              ? `Escribe una frase usando "${word.toLowerCase()}"`
-              : `Write a sentence using "${word.toLowerCase()}"`}
+              ? `Usa la palabra "${word.toLowerCase()}" en una frase. Si no sabes lo que significa, ¡inténtalo igualmente!`
+              : `Use the word "${word.toLowerCase()}" in a sentence. Not sure what it means? Have a go anyway!`}
           </div>
           <textarea
             ref={inputRef}
