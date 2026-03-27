@@ -61,6 +61,8 @@ const EXERCISE_ICONS = {
   'Blurt!':                    '⏱️',
   'Word Snake':                '🐍',
   'Real Talk':                 '💬',
+  'Travel 🧳':                  '🧳',
+  'Sport ⚽️':                   '⚽️',
 }
 
 // Play removed from tabs — students use bottom nav, teachers use sidebar
