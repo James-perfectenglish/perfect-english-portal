@@ -33,6 +33,14 @@ function latestOf(...dates) {
   return valid.reduce((best, d) => new Date(d) > new Date(best) ? d : best)
 }
 
+function getMondayISO() {
+  const d = new Date()
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  const mon = new Date(d); mon.setDate(diff); mon.setHours(0, 0, 0, 0)
+  return mon.toISOString()
+}
+
 function exportCSV(students) {
   const headers = ['Name', 'Level', 'Questions Answered', 'Accuracy %', 'Test ✅', 'Listen ✅', 'Dict ✅', 'Topic ✅', 'Best Type', 'Worst Type', 'Last Active']
   const rows = students.map(s => [
@@ -70,8 +78,10 @@ export default function TeacherDashboard({ profile, handleLogout }) {
   const [wotdOpen, setWotdOpen] = useState(true)
   const [wotdFilter, setWotdFilter] = useState('all')
   const [wotdProfileMap, setWotdProfileMap] = useState({})
+  const [wordleLeaderboard, setWordleLeaderboard] = useState([])
+  const [wordleLeaderboardOpen, setWordleLeaderboardOpen] = useState(true)
 
-  useEffect(() => { fetchAllData(); fetchWotdData() }, [])
+  useEffect(() => { fetchAllData(); fetchWotdData(); fetchWordleLeaderboard() }, [])
 
   async function fetchAllData() {
     const { data: profiles } = await supabase
@@ -234,6 +244,41 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       setWotdWords(Object.values(wordMap).sort((a, b) => new Date(b.date) - new Date(a.date)))
     }
     setWotdLoading(false)
+  }
+
+  async function fetchWordleLeaderboard() {
+    const monday = getMondayISO()
+    const { data: stars } = await supabase
+      .from('wordle_stars')
+      .select('student_id, type')
+      .gte('awarded_at', monday)
+
+    if (!stars || stars.length === 0) return
+
+    const studentIds = [...new Set(stars.map(s => s.student_id))]
+    const { data: profiles } = await supabase
+      .from('profiles').select('id, full_name, level').in('id', studentIds)
+    const profileMap = {}
+    if (profiles) profiles.forEach(p => { profileMap[p.id] = p })
+
+    const totals = {}
+    stars.forEach(s => {
+      if (!totals[s.student_id]) totals[s.student_id] = { solve: 0, sentence: 0 }
+      totals[s.student_id][s.type]++
+    })
+
+    const leaderboard = Object.entries(totals)
+      .map(([id, counts]) => ({
+        id,
+        name: profileMap[id]?.full_name || 'Unknown',
+        level: profileMap[id]?.level || '—',
+        solve: counts.solve || 0,
+        sentence: counts.sentence || 0,
+        total: (counts.solve || 0) + (counts.sentence || 0),
+      }))
+      .sort((a, b) => b.total - a.total)
+
+    setWordleLeaderboard(leaderboard)
   }
 
   function handleSort(key) {
@@ -421,6 +466,61 @@ export default function TeacherDashboard({ profile, handleLogout }) {
           {students.length === 0 && <p style={{ textAlign: 'center', color: '#a0aec0', padding: '2rem' }}>No student data yet.</p>}
         </div>
       )}
+
+      {/* WORDLE WEEKLY LEADERBOARD */}
+      <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden', marginBottom: '1rem' }}>
+        <div onClick={() => setWordleLeaderboardOpen(o => !o)}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', cursor: 'pointer', borderBottom: wordleLeaderboardOpen ? '1px solid #e2e8f0' : 'none', background: '#fafafa' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.1rem' }}>⭐️</span>
+            <div>
+              <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: 0 }}>Wordle — Weekly Stars</h2>
+              <p style={{ fontSize: '0.75rem', color: '#718096', margin: 0 }}>
+                {wordleLeaderboard.length > 0
+                  ? `${wordleLeaderboard.length} student${wordleLeaderboard.length !== 1 ? 's' : ''} this week`
+                  : 'No stars yet this week'}
+              </p>
+            </div>
+          </div>
+          <div style={{ background: wordleLeaderboardOpen ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#e2e8f0', borderRadius: '8px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
+            {wordleLeaderboardOpen ? '🟩' : '🔒'}
+          </div>
+        </div>
+        {wordleLeaderboardOpen && (
+          <div style={{ padding: '1.25rem' }}>
+            {wordleLeaderboard.length === 0 ? (
+              <p style={{ color: '#a0aec0', textAlign: 'center', padding: '1rem', margin: 0 }}>No Wordle stars earned this week yet.</p>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                    <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', color: '#718096', fontWeight: 600 }}>#</th>
+                    <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', color: '#718096', fontWeight: 600 }}>Student</th>
+                    <th style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: '#718096', fontWeight: 600 }}>Solve ⭐️</th>
+                    <th style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: '#718096', fontWeight: 600 }}>Sentence ⭐️</th>
+                    <th style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: '#718096', fontWeight: 600 }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {wordleLeaderboard.map((s, i) => (
+                    <tr key={s.id} style={{ borderBottom: '1px solid #f0f0f0', background: i === 0 ? '#fffbeb' : i % 2 === 0 ? 'white' : '#fafafa' }}>
+                      <td style={{ padding: '0.6rem 0.75rem', fontWeight: 700, color: i === 0 ? '#f59e0b' : '#718096' }}>
+                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                      </td>
+                      <td style={{ padding: '0.6rem 0.75rem', fontWeight: 600, color: '#2C3E50' }}>{s.name}</td>
+                      <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', color: '#4a5568' }}>{s.solve || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', color: '#4a5568' }}>{s.sentence || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', fontWeight: 700, color: '#2C3E50' }}>
+                        {Array(Math.min(s.total, 7)).fill('⭐️').join('')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* WORD OF THE DAY SUBMISSIONS */}
       <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>

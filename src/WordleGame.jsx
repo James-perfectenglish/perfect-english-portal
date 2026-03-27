@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
-const WORD_LENGTH = 5
-const MAX_GUESSES = 6
-const GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+const WORD_LENGTH  = 5
+const MAX_GUESSES  = 6
+const GRADIENT     = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 
 const KEYBOARD_ROWS = [
   ['Q','W','E','R','T','Y','U','I','O','P'],
@@ -14,7 +15,7 @@ const KEYBOARD_ROWS = [
 const COLOURS = {
   correct: '#538d4e',
   present: '#b59f3b',
-  absent:  '#787c7e',
+  absent:  '#3a3a3c',
 }
 
 const WIN_MESSAGES = [
@@ -45,33 +46,52 @@ function computeLetterStates(guesses, word) {
 }
 
 export default function WordleGame({ onBack }) {
+  const location  = useLocation()
+  const isSpanish = location.state?.isSpanish || false
+  const language  = isSpanish ? 'es' : 'en'
+
+  const [mode, setMode]           = useState('daily')
   const [word, setWord]           = useState('')
   const [guesses, setGuesses]     = useState([])
   const [current, setCurrent]     = useState('')
   const [gameState, setGameState] = useState('loading')
   const [message, setMessage]     = useState('')
   const [shaking, setShaking]     = useState(false)
+  const [locked, setLocked]       = useState(false)
 
-  // Ref so keyboard handler always reads fresh state without re-registering
+  const [sentenceDone, setSentenceDone]         = useState(false)
+  const [sentenceInput, setSentenceInput]       = useState('')
+  const [sentenceChecking, setSentenceChecking] = useState(false)
+  const [sentenceFeedback, setSentenceFeedback] = useState(null)
+
+  const [solveStar, setSolveStar]     = useState(false)
+  const [sentenceStar, setSentenceStar] = useState(false)
+
+  const today    = new Date().toISOString().slice(0, 10)
   const stateRef = useRef({ word: '', guesses: [], current: '', gameState: 'loading' })
-  useEffect(() => {
-    stateRef.current = { word, guesses, current, gameState }
-  })
+  const inputRef = useRef(null)
 
-  const today = new Date().toISOString().slice(0, 10)
+  useEffect(() => { stateRef.current = { word, guesses, current, gameState } })
 
   useEffect(() => {
-    init()
+    initDaily()
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  async function init() {
+  useEffect(() => {
+    if ((gameState === 'won' || gameState === 'lost') && !sentenceDone) {
+      setTimeout(() => inputRef.current?.focus(), 300)
+    }
+  }, [gameState, sentenceDone])
+
+  async function initDaily() {
+    setMode('daily')
     const { data: wordRow } = await supabase
-      .from('wordle_words').select('word').eq('play_date', today).single()
+      .from('wordle_words').select('word')
+      .eq('play_date', today).eq('language', language).single()
 
     if (!wordRow) { setGameState('noword'); return }
-
     const w = wordRow.word.toUpperCase()
     setWord(w)
 
@@ -84,12 +104,15 @@ export default function WordleGame({ onBack }) {
       if (session) {
         const g = session.guesses || []
         setGuesses(g)
+        setSentenceDone(session.sentence_done || false)
+        setSolveStar(session.solve_star || false)
+        setSentenceStar(session.sentence_star || false)
         if (session.solved) {
           setGameState('won')
           setMessage(WIN_MESSAGES[g.length - 1] || 'Well done!')
         } else if (g.length >= MAX_GUESSES) {
           setGameState('lost')
-          setMessage(`The word was ${w}`)
+          setMessage(isSpanish ? `La palabra era ${w}` : `The word was ${w}`)
         } else {
           setGameState('playing')
         }
@@ -99,12 +122,30 @@ export default function WordleGame({ onBack }) {
     setGameState('playing')
   }
 
+  async function startPractice() {
+    setGameState('loading')
+    setGuesses([]); setCurrent(''); setMessage('')
+    setSentenceDone(false); setSentenceInput(''); setSentenceFeedback(null)
+    setSolveStar(false); setSentenceStar(false)
+    setMode('practice')
+
+    const { data } = await supabase
+      .from('wordle_words').select('word')
+      .eq('language', language)
+      .or(`play_date.is.null,play_date.lt.${today}`)
+
+    if (!data || data.length === 0) { setGameState('noword'); return }
+    const pool = data.map(r => r.word.toUpperCase())
+    setWord(pool[Math.floor(Math.random() * pool.length)])
+    setGameState('playing')
+  }
+
   function handleKeyDown(e) {
     const { gameState } = stateRef.current
     if (gameState !== 'playing') return
     const key = e.key.toUpperCase()
-    if (key === 'ENTER')     submitGuess()
-    else if (key === 'BACKSPACE') setCurrent(c => c.slice(0, -1))
+    if (key === 'ENTER')           submitGuess()
+    else if (key === 'BACKSPACE')  setCurrent(c => c.slice(0, -1))
     else if (/^[A-Z]$/.test(key)) setCurrent(c => c.length < WORD_LENGTH ? c + key : c)
   }
 
@@ -117,15 +158,16 @@ export default function WordleGame({ onBack }) {
 
   async function submitGuess() {
     const { current, word, guesses, gameState } = stateRef.current
-    if (gameState !== 'playing') return
+    if (gameState !== 'playing' || locked) return
 
     if (current.length < WORD_LENGTH) {
       setShaking(true)
-      setMessage('Not enough letters')
+      setMessage(isSpanish ? 'Faltan letras' : 'Not enough letters')
       setTimeout(() => { setShaking(false); setMessage('') }, 800)
       return
     }
 
+    setLocked(true)
     const newGuesses = [...guesses, current]
     const won  = current === word
     const lost = !won && newGuesses.length >= MAX_GUESSES
@@ -134,67 +176,116 @@ export default function WordleGame({ onBack }) {
     setCurrent('')
 
     if (won) {
+      const earnedSolve = newGuesses.length <= 5
       setMessage(WIN_MESSAGES[newGuesses.length - 1] || 'Well done!')
       setGameState('won')
+      if (earnedSolve) setSolveStar(true)
+      await saveSession(newGuesses, true, false, false, earnedSolve, false)
+      if (earnedSolve) await insertStar('solve', word, mode === 'practice')
     } else if (lost) {
-      setMessage(`The word was ${word}`)
+      setMessage(isSpanish ? `La palabra era ${word}` : `The word was ${word}`)
       setGameState('lost')
+      await saveSession(newGuesses, false, false, false, false, false)
     }
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      await supabase.from('wordle_sessions').upsert({
-        student_id: user.id, play_date: today,
-        guesses: newGuesses, solved: won,
-        completed_at: new Date().toISOString(),
-      }, { onConflict: 'student_id,play_date' })
-    }
+    setLocked(false)
   }
 
-  const letterStates   = computeLetterStates(guesses, word)
-  const activeRowIndex = guesses.length
+  async function saveSession(g, solved, sentDone, sentStar, solStar) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user || mode === 'practice') return
+    await supabase.from('wordle_sessions').upsert({
+      student_id: user.id, play_date: today,
+      guesses: g, solved,
+      sentence_done: sentDone, solve_star: solStar, sentence_star: sentStar,
+      completed_at: new Date().toISOString(),
+    }, { onConflict: 'student_id,play_date' })
+  }
 
-  // ── Loading ───────────────────────────────────────
+  async function insertStar(type, w, isPractice) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('wordle_stars').insert({
+      student_id: user.id, type, word: w.toLowerCase(), language, is_practice: isPractice,
+    })
+  }
+
+  async function submitSentence() {
+    if (!sentenceInput.trim() || sentenceChecking) return
+    setSentenceChecking(true)
+    try {
+      const res = await fetch('/api/mark-wordle-sentence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word: word.toLowerCase(), sentence: sentenceInput.trim(), language }),
+      })
+      const data = await res.json()
+      setSentenceFeedback(data)
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase.from('wordle_sentences').insert({
+          student_id: user.id, word: word.toLowerCase(), language,
+          sentence: sentenceInput.trim(), is_correct: data.valid,
+          ai_feedback: data.reason, is_practice: mode === 'practice',
+        })
+      }
+      if (data.valid) {
+        setSentenceStar(true)
+        await insertStar('sentence', word, mode === 'practice')
+      }
+      await saveSession(guesses, gameState === 'won', true, data.valid, solveStar)
+    } catch {
+      setSentenceFeedback({ valid: true, reason: isSpanish ? '¡Bien hecho!' : 'Good effort!' })
+      setSentenceStar(true)
+      await saveSession(guesses, gameState === 'won', true, true, solveStar)
+    }
+    setSentenceDone(true)
+    setSentenceChecking(false)
+  }
+
+  const letterStates = computeLetterStates(guesses, word)
+  const gameOver     = gameState === 'won' || gameState === 'lost'
+  const totalStars   = (solveStar ? 1 : 0) + (sentenceStar ? 1 : 0)
+
   if (gameState === 'loading') return (
     <div style={{ textAlign: 'center', padding: '4rem', color: '#718096' }}>
-      Loading today's puzzle...
+      {isSpanish ? 'Cargando...' : 'Loading today\'s puzzle...'}
     </div>
   )
 
-  // ── No word for today ─────────────────────────────
   if (gameState === 'noword') return (
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
     <div style={{ maxWidth: '500px', margin: '0 auto', padding: '2rem', textAlign: 'center' }}>
       <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🟩</div>
-      <h2 style={{ color: '#2d3748' }}>No puzzle today</h2>
-      <p style={{ color: '#718096' }}>Check back tomorrow!</p>
-      {onBack && (
-        <button onClick={onBack} style={{ padding: '10px 24px', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-          ← Back
-        </button>
-      )}
+      <h2 style={{ color: '#2d3748' }}>{isSpanish ? 'Sin puzzle hoy' : 'No puzzle today'}</h2>
+      <p style={{ color: '#718096' }}>{isSpanish ? '¡Vuelve mañana!' : 'Check back tomorrow!'}</p>
+      {onBack && <button onClick={onBack} style={{ padding: '10px 24px', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>← Back</button>}
     </div>
     </div>
   )
 
-  // ── Main game ─────────────────────────────────────
   return (
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
-    <div style={{ maxWidth: '500px', margin: '0 auto', padding: '1rem 1rem 2rem' }}>
+    <div style={{ maxWidth: '500px', margin: '0 auto', padding: '1rem 1rem 3rem' }}>
 
       {/* Header */}
-      <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.5rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.25rem' }}>
-        <h1 style={{ margin: 0, fontSize: '2rem', letterSpacing: '6px', fontWeight: 800 }}>WORDLE</h1>
-        <p style={{ margin: '6px 0 0', opacity: 0.85, fontSize: '0.88rem' }}>
-          Guess today's 5-letter word in 6 tries
+      <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          <h1 style={{ margin: 0, fontSize: '1.7rem', letterSpacing: '6px', fontWeight: 800 }}>WORDLE</h1>
+          {isSpanish && <span style={{ fontSize: '1.2rem' }}>🇪🇸</span>}
+        </div>
+        <p style={{ margin: '4px 0 0', opacity: 0.85, fontSize: '0.82rem' }}>
+          {mode === 'practice'
+            ? (isSpanish ? 'Modo práctica' : 'Practice mode')
+            : (isSpanish ? 'Adivina la palabra de hoy en 6 intentos' : 'Guess today\'s 5-letter word in 6 tries')}
         </p>
       </div>
 
-      {/* Message bar */}
+      {/* Message */}
       {message && (
         <div style={{
-          textAlign: 'center', marginBottom: '1rem', padding: '10px 20px',
-          borderRadius: '8px', fontWeight: 700, fontSize: '1rem',
+          textAlign: 'center', marginBottom: '0.75rem', padding: '9px 16px', borderRadius: '8px',
+          fontWeight: 700, fontSize: '0.95rem',
           background: gameState === 'won' ? '#f0fff4' : gameState === 'lost' ? '#fff5f5' : '#2d3748',
           color:      gameState === 'won' ? '#276749' : gameState === 'lost' ? '#c53030' : 'white',
           border:     gameState === 'won' ? '1px solid #c6f6d5' : gameState === 'lost' ? '1px solid #fed7d7' : 'none',
@@ -204,39 +295,27 @@ export default function WordleGame({ onBack }) {
       )}
 
       {/* Grid */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '1.25rem', alignItems: 'center' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '1rem', alignItems: 'center' }}>
         {Array.from({ length: MAX_GUESSES }).map((_, rowIdx) => {
           const isRevealed = rowIdx < guesses.length
-          const isActive   = rowIdx === activeRowIndex && gameState === 'playing'
+          const isActive   = rowIdx === guesses.length && gameState === 'playing'
           const guess      = guesses[rowIdx] || ''
           const letters    = isActive ? current : guess
-
           return (
-            <div key={rowIdx} style={{
-              display: 'flex', gap: '6px',
-              animation: isActive && shaking ? 'shake 0.5s ease' : 'none',
-            }}>
+            <div key={rowIdx} style={{ display: 'flex', gap: '5px', animation: isActive && shaking ? 'shake 0.5s ease' : 'none' }}>
               {Array.from({ length: WORD_LENGTH }).map((_, colIdx) => {
                 const letter = letters[colIdx] || ''
                 let bg = 'white', border = '#d3d6da', color = '#2d3748'
-
                 if (isRevealed && letter) {
                   const result = getTileResult(guess, word, colIdx)
                   bg = COLOURS[result]; border = COLOURS[result]; color = 'white'
-                } else if (isActive && letter) {
-                  border = '#878a8c'
-                }
-
+                } else if (isActive && letter) { border = '#878a8c' }
                 return (
                   <div key={colIdx} style={{
-                    width: '58px', height: '58px',
-                    border: `2px solid ${border}`, borderRadius: '4px',
+                    width: '56px', height: '56px', border: `2px solid ${border}`, borderRadius: '4px',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '1.6rem', fontWeight: 800, color, background: bg,
-                    transition: isRevealed
-                      ? `background 0.1s ease ${colIdx * 0.12}s, border-color 0.1s ease ${colIdx * 0.12}s, color 0.1s ease ${colIdx * 0.12}s`
-                      : 'none',
-                    userSelect: 'none',
+                    fontSize: '1.5rem', fontWeight: 800, color, background: bg, userSelect: 'none',
+                    transition: isRevealed ? `background 0.1s ease ${colIdx * 0.12}s, border-color 0.1s ease ${colIdx * 0.12}s, color 0.1s ease ${colIdx * 0.12}s` : 'none',
                   }}>
                     {letter}
                   </div>
@@ -247,64 +326,124 @@ export default function WordleGame({ onBack }) {
         })}
       </div>
 
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginBottom: '1rem', fontSize: '0.72rem', color: '#718096', flexWrap: 'wrap' }}>
-        {[['correct','Correct position'],['present','Wrong position'],['absent','Not in word']].map(([k, label]) => (
-          <span key={k} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <span style={{ display: 'inline-block', width: '14px', height: '14px', background: COLOURS[k], borderRadius: '3px', flexShrink: 0 }} />
-            {label}
-          </span>
-        ))}
-      </div>
-
       {/* Keyboard */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center', marginBottom: '1.5rem' }}>
-        {KEYBOARD_ROWS.map((row, i) => (
-          <div key={i} style={{ display: 'flex', gap: '5px' }}>
-            {row.map(key => {
-              const state  = letterStates[key]
-              const isWide = key === 'ENTER' || key === '⌫'
-              let bg = '#d3d6da', color = '#2d3748'
-              if (state === 'correct') { bg = COLOURS.correct; color = 'white' }
-              else if (state === 'present') { bg = COLOURS.present; color = 'white' }
-              else if (state === 'absent')  { bg = COLOURS.absent;  color = 'white' }
-              return (
-                <button key={key} onClick={() => handleVirtualKey(key)} style={{
-                  width: isWide ? '64px' : '38px', height: '56px',
-                  background: bg, color, border: 'none', borderRadius: '4px',
-                  fontSize: isWide ? '0.68rem' : '0.95rem', fontWeight: 700,
-                  cursor: 'pointer', userSelect: 'none',
-                  transition: 'background 0.2s ease',
-                }}>
-                  {key}
-                </button>
-              )
-            })}
+      {gameState === 'playing' && (
+        <>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+            {[['#538d4e','Correct'], ['#b59f3b','Wrong position'], ['#3a3a3c','Not in word']].map(([c, l]) => (
+              <span key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: '#718096' }}>
+                <span style={{ display: 'inline-block', width: '12px', height: '12px', background: c, borderRadius: '2px' }} />{l}
+              </span>
+            ))}
           </div>
-        ))}
-      </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', alignItems: 'center', marginBottom: '1rem' }}>
+            {KEYBOARD_ROWS.map((row, i) => (
+              <div key={i} style={{ display: 'flex', gap: '4px' }}>
+                {row.map(key => {
+                  const state = letterStates[key]
+                  const isWide = key === 'ENTER' || key === '⌫'
+                  let bg = '#d3d6da', color = '#2d3748'
+                  if (state === 'correct') { bg = COLOURS.correct; color = 'white' }
+                  else if (state === 'present') { bg = COLOURS.present; color = 'white' }
+                  else if (state === 'absent')  { bg = COLOURS.absent;  color = 'white' }
+                  return (
+                    <button key={key} onClick={() => handleVirtualKey(key)} style={{
+                      width: isWide ? '60px' : '34px', height: '52px', background: bg, color,
+                      border: 'none', borderRadius: '4px', fontSize: isWide ? '0.62rem' : '0.9rem',
+                      fontWeight: 700, cursor: 'pointer', userSelect: 'none', transition: 'background 0.2s ease',
+                    }}>
+                      {key}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
-      {/* Footer */}
-      {onBack && (
-        <div style={{ textAlign: 'center' }}>
-          {gameState !== 'playing' && (
-            <p style={{ color: '#718096', fontSize: '0.88rem', marginBottom: '12px' }}>
-              Come back tomorrow for a new word! 🟩
-            </p>
-          )}
-          <button onClick={onBack} style={{
-            padding: '10px 24px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.95rem',
-            background: gameState !== 'playing' ? GRADIENT : 'transparent',
-            color:      gameState !== 'playing' ? 'white' : '#718096',
-            border:     gameState !== 'playing' ? 'none' : '1px solid #e2e8f0',
-          }}>
-            ← Back
+      {/* Sentence challenge */}
+      {gameOver && !sentenceDone && (
+        <div style={{ background: 'white', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', marginBottom: '1rem' }}>
+          <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#2d3748', marginBottom: '4px' }}>
+            {isSpanish ? '✍️ ¡Ahora úsala en una frase!' : '✍️ Now use it in a sentence!'}
+          </div>
+          <div style={{ fontSize: '0.82rem', color: '#718096', marginBottom: '10px' }}>
+            {isSpanish
+              ? `Escribe una frase usando "${word.toLowerCase()}"`
+              : `Write a sentence using "${word.toLowerCase()}"`}
+          </div>
+          <textarea
+            ref={inputRef}
+            value={sentenceInput}
+            onChange={e => setSentenceInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitSentence() } }}
+            placeholder={isSpanish ? 'Escribe tu frase aquí...' : 'Type your sentence here...'}
+            rows={2}
+            style={{ width: '100%', padding: '0.75rem', fontSize: '0.95rem', border: '2px solid #667eea', borderRadius: '8px', boxSizing: 'border-box', resize: 'none', fontFamily: 'inherit', backgroundColor: '#f7f7ff' }}
+          />
+          <div style={{ fontSize: '0.72rem', color: '#a0aec0', margin: '4px 0 8px', textAlign: 'right' }}>
+            {isSpanish ? 'Gana ⭐️ por una buena frase' : 'Earn ⭐️ for a good sentence'}
+          </div>
+          <button onClick={submitSentence} disabled={!sentenceInput.trim() || sentenceChecking}
+            style={{
+              width: '100%', padding: '0.75rem',
+              background: sentenceInput.trim() && !sentenceChecking ? GRADIENT : '#cbd5e0',
+              color: 'white', border: 'none', borderRadius: '8px',
+              fontWeight: 700, fontSize: '0.95rem',
+              cursor: sentenceInput.trim() && !sentenceChecking ? 'pointer' : 'not-allowed',
+            }}>
+            {sentenceChecking ? (isSpanish ? '🤖 Comprobando...' : '🤖 Checking...') : (isSpanish ? 'Comprobar frase' : 'Check my sentence')}
           </button>
         </div>
       )}
 
-    </div>
+      {/* Sentence feedback + stars + buttons */}
+      {gameOver && sentenceDone && (
+        <div style={{ background: 'white', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', marginBottom: '1rem' }}>
+          {sentenceFeedback && (
+            <div style={{
+              padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1rem',
+              background: sentenceFeedback.valid ? '#f0fff4' : '#fff5f5',
+              border: `1px solid ${sentenceFeedback.valid ? '#c6f6d5' : '#fed7d7'}`,
+              color: sentenceFeedback.valid ? '#276749' : '#9b2c2c',
+              fontSize: '0.9rem', lineHeight: 1.5,
+            }}>
+              {sentenceFeedback.valid ? '✅ ' : '❌ '}{sentenceFeedback.reason}
+            </div>
+          )}
 
+          {totalStars > 0 ? (
+            <div style={{ textAlign: 'center', marginBottom: '1rem', padding: '0.75rem', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '2px' }}>{Array(totalStars).fill('⭐️').join(' ')}</div>
+              <div style={{ fontSize: '0.78rem', color: '#92400e', fontWeight: 600 }}>
+                {solveStar && sentenceStar
+                  ? (isSpanish ? '¡Palabra encontrada + frase correcta!' : 'Word found + great sentence!')
+                  : solveStar
+                  ? (isSpanish ? '¡Palabra encontrada en ≤5 intentos!' : 'Word found in 5 or fewer guesses!')
+                  : (isSpanish ? '¡Frase correcta!' : 'Great sentence!')}
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', color: '#a0aec0', fontSize: '0.85rem', marginBottom: '1rem' }}>
+              {isSpanish ? 'Sin estrellas esta vez — ¡sigue intentando! 💪' : 'No stars this time — keep going! 💪'}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button onClick={startPractice} style={{ padding: '0.75rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
+              🎮 {isSpanish ? 'Jugar otra vez (práctica)' : 'Play again (practice)'}
+            </button>
+            {onBack && (
+              <button onClick={onBack} style={{ padding: '0.75rem', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '8px', fontWeight: 500, cursor: 'pointer', fontSize: '0.9rem' }}>
+                ← {isSpanish ? 'Volver' : 'Back'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+    </div>
     <style>{`
       @keyframes shake {
         0%,100% { transform: translateX(0) }

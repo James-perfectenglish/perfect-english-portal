@@ -28,6 +28,16 @@ const TOPIC_LABELS = {
   work_and_study:          'Work & Study',
   daily_life:              'Daily Life',
   spanish:                 'Spanish',
+  travel:                  'Travel',
+  sport:                   'Sport',
+}
+
+function getMondayISO() {
+  const d = new Date()
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  const mon = new Date(d); mon.setDate(diff); mon.setHours(0, 0, 0, 0)
+  return mon.toISOString()
 }
 
 function toPercent(score, answers) {
@@ -77,6 +87,7 @@ export default function Progress({ session, profile, handleLogout }) {
   const [daysStudied, setDaysStudied]   = useState(0)
   const [streak, setStreak]             = useState(0)
   const [listeningCompleted, setListeningCompleted] = useState(0)
+  const [wordleStars, setWordleStars]   = useState({ total: 0, thisWeek: 0 })
   const [loading, setLoading]           = useState(true)
 
   useEffect(() => { fetchData() }, [session])
@@ -178,6 +189,17 @@ export default function Progress({ session, profile, handleLogout }) {
       setTopicProgress(topicList)
     }
 
+    // Wordle stars
+    const { data: allStars } = await supabase
+      .from('wordle_stars').select('awarded_at').eq('student_id', userId)
+    if (allStars && allStars.length > 0) {
+      const monday = new Date(getMondayISO())
+      setWordleStars({
+        total: allStars.length,
+        thisWeek: allStars.filter(s => new Date(s.awarded_at) >= monday).length,
+      })
+    }
+
     setLoading(false)
   }
 
@@ -185,9 +207,19 @@ export default function Progress({ session, profile, handleLogout }) {
     return <div style={{ textAlign: 'center', padding: '3rem', color: '#667eea' }}>Loading your progress...</div>
   }
 
-  const hasData = stats && stats.total > 0
+  const hasData    = stats && stats.total > 0
   const hasAttempts = attempts.length > 0
-  const recent = attempts.slice(-10)
+  const recent     = attempts.slice(-10)
+
+  const statCards = [
+    { emoji: '📊', label: 'Questions Answered', value: hasData ? stats.total.toLocaleString() : '—' },
+    { emoji: '🎯', label: 'Overall Accuracy',   value: hasData ? `${stats.accuracy}%` : '—' },
+    { emoji: '🏆', label: 'Lessons Passed',     value: hasAttempts ? lessonsPassed : '—' },
+    { emoji: '🎧', label: 'Listening Done',     value: listeningCompleted > 0 ? listeningCompleted : '—' },
+    { emoji: '📅', label: 'Days Studied',       value: hasAttempts ? daysStudied : '—' },
+    ...(streak > 0 ? [{ emoji: '🔥', label: 'Day Streak', value: streak, highlight: streak >= 7 }] : []),
+    ...(wordleStars.total > 0 ? [{ emoji: '⭐️', label: 'Wordle Stars', value: wordleStars.total, sub: `${wordleStars.thisWeek} this week`, highlight2: true }] : []),
+  ]
 
   return (
     <div className="pep-page-content" style={{ maxWidth: '900px', margin: '0 auto', padding: '1.25rem 1rem 2rem' }}>
@@ -197,24 +229,18 @@ export default function Progress({ session, profile, handleLogout }) {
 
       {/* STAT CARDS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
-        {[
-          { emoji: '📊', label: 'Questions Answered', value: hasData ? stats.total.toLocaleString() : '—' },
-          { emoji: '🎯', label: 'Overall Accuracy',   value: hasData ? `${stats.accuracy}%` : '—' },
-          { emoji: '🏆', label: 'Lessons Passed',     value: hasAttempts ? lessonsPassed : '—' },
-          { emoji: '🎧', label: 'Listening Done',     value: listeningCompleted > 0 ? listeningCompleted : '—' },
-          { emoji: '📅', label: 'Days Studied',       value: hasAttempts ? daysStudied : '—' },
-          ...(streak > 0 ? [{ emoji: '🔥', label: 'Day Streak', value: streak, highlight: streak >= 7 }] : []),
-        ].map(({ emoji, label, value, highlight }) => (
+        {statCards.map(({ emoji, label, value, highlight, highlight2, sub }) => (
           <div key={label} style={{
-            background: highlight ? 'linear-gradient(135deg, #fffaf0, #fff5e0)' : 'white',
+            background: highlight ? 'linear-gradient(135deg, #fffaf0, #fff5e0)' : highlight2 ? 'linear-gradient(135deg, #fffbeb, #fef3c7)' : 'white',
             borderRadius: '12px', padding: '1rem',
             boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-            borderTop: `3px solid ${highlight ? '#ed8936' : '#667eea'}`,
+            borderTop: `3px solid ${highlight ? '#ed8936' : highlight2 ? '#f59e0b' : '#667eea'}`,
             textAlign: 'center'
           }}>
             <div style={{ fontSize: '1.4rem', marginBottom: '0.2rem' }}>{emoji}</div>
             <div style={{ fontSize: 'clamp(1.25rem, 3vw, 1.75rem)', fontWeight: '700', color: '#2C3E50', lineHeight: 1.1 }}>{value}</div>
             <div style={{ fontSize: '0.72rem', color: '#718096', marginTop: '0.2rem', lineHeight: 1.3 }}>{label}</div>
+            {sub && <div style={{ fontSize: '0.68rem', color: '#a0aec0', marginTop: '2px' }}>{sub}</div>}
           </div>
         ))}
       </div>
@@ -249,6 +275,27 @@ export default function Progress({ session, profile, handleLogout }) {
               </div>
             ))}
           </div>
+        </Section>
+      )}
+
+      {/* WORDLE STATS */}
+      {wordleStars.total > 0 && (
+        <Section title="🟩 Wordle" subtitle="Your Wordle star breakdown">
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '120px', background: '#fffbeb', borderRadius: '10px', padding: '0.75rem', textAlign: 'center', border: '1px solid #fde68a' }}>
+              <div style={{ fontSize: '1.5rem' }}>⭐️</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#92400e' }}>{wordleStars.total}</div>
+              <div style={{ fontSize: '0.72rem', color: '#a0aec0' }}>All time</div>
+            </div>
+            <div style={{ flex: 1, minWidth: '120px', background: '#f0fff4', borderRadius: '10px', padding: '0.75rem', textAlign: 'center', border: '1px solid #c6f6d5' }}>
+              <div style={{ fontSize: '1.5rem' }}>📅</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#276749' }}>{wordleStars.thisWeek}</div>
+              <div style={{ fontSize: '0.72rem', color: '#a0aec0' }}>This week</div>
+            </div>
+          </div>
+          <p style={{ fontSize: '0.78rem', color: '#718096', margin: '0.75rem 0 0' }}>
+            Earn ⭐️ by solving the daily word in 5 or fewer guesses, and a second ⭐️ for writing a correct sentence.
+          </p>
         </Section>
       )}
 
@@ -300,8 +347,6 @@ export default function Progress({ session, profile, handleLogout }) {
           <p style={{ margin: 0 }}>No data yet — complete some practice sessions and your progress will appear here.</p>
         </div>
       )}
-
-     
     </div>
   )
 }

@@ -169,7 +169,7 @@ export default function ExerciseList({
     if (exercise.title === 'Lyrics Mixer') { navigate('/lyrics');    return }
     if (exercise.type === 'blurt')         { navigate('/blurt');     return }
     if (exercise.title === 'Word Snake')   { navigate('/wordsnake'); return }
-    if (exercise.title === 'Wordle 🟩')       { navigate('/wordle');       return }
+    if (exercise.title === 'Wordle 🟩')       { navigate('/wordle', { state: { isSpanish: userTracks.includes('spanish') } }); return }
     if (exercise.title === 'Connections 🔗') { navigate('/connections'); return }
     setActiveExercise(exercise)
   }
