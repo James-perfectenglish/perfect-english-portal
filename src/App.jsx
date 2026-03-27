@@ -13,6 +13,8 @@ import LyricsExercise from './LyricsExercise'
 import Blurt from './Blurt'
 import TeacherBrowse from './TeacherBrowse'
 import WordSnake from './WordSnake'
+import WordleGame from './WordleGame'
+import ConnectionsGame from './ConnectionsGame'
 import NavBar from './components/NavBar'
 import TeacherSidebar from './components/TeacherSidebar'
 import PronunciationExercise from './PronunciationExercise'
@@ -216,6 +218,7 @@ function Dashboard({ session }) {
 
 // ── Student routes ────────────────────────────────────────────────────────────
 function StudentRoutes({ session, profile, handleLogout }) {
+  const navigate = useNavigate()
   return (
     <Routes>
       <Route path="/" element={<StudentDashboard profile={profile} session={session} />} />
@@ -226,9 +229,11 @@ function StudentRoutes({ session, profile, handleLogout }) {
       <Route path="/listen"   element={<ExerciseList userLevel={profile.level} userTracks={profile.tracks || []} defaultTab="listen" />} />
       <Route path="/speak"    element={<PronunciationExercise profile={profile} />} />
       <Route path="/progress" element={<Progress session={session} profile={profile} handleLogout={handleLogout} />} />
-      <Route path="/lyrics"    element={<LyricsExercise user={session.user} />} />
-      <Route path="/blurt"     element={<Blurt user={session.user} />} />
-      <Route path="/wordsnake" element={<WordSnake user={session.user} />} />
+      <Route path="/lyrics"       element={<LyricsExercise user={session.user} />} />
+      <Route path="/blurt"        element={<Blurt user={session.user} />} />
+      <Route path="/wordsnake"    element={<WordSnake user={session.user} />} />
+      <Route path="/wordle"       element={<WordleGame onBack={() => navigate(-1)} />} />
+      <Route path="/connections"  element={<ConnectionsGame onBack={() => navigate(-1)} />} />
       <Route path="/exercises" element={<Navigate to="/learn" replace />} />
       <Route path="*"          element={<Navigate to="/" replace />} />
     </Routes>
@@ -237,6 +242,7 @@ function StudentRoutes({ session, profile, handleLogout }) {
 
 // ── Teacher routes ────────────────────────────────────────────────────────────
 function TeacherRoutes({ session, profile, effectiveProfile, teacherTrack, globalLang, cycleTrack, handleLogout, navigate }) {
+  const nav = useNavigate()
   return (
     <Routes>
       <Route path="/" element={<StudentDashboard profile={effectiveProfile} session={session} />} />
@@ -251,6 +257,8 @@ function TeacherRoutes({ session, profile, effectiveProfile, teacherTrack, globa
       <Route path="/lyrics"    element={<LyricsExercise user={session.user} />} />
       <Route path="/blurt"     element={<Blurt user={session.user} profileOverride={teacherTrack !== 'en' ? effectiveProfile : null} />} />
       <Route path="/wordsnake" element={<WordSnake user={session.user} profileOverride={teacherTrack !== 'en' ? effectiveProfile : null} />} />
+      <Route path="/wordle"       element={<WordleGame onBack={() => nav(-1)} />} />
+      <Route path="/connections"  element={<ConnectionsGame onBack={() => nav(-1)} />} />
       <Route path="/teacher"   element={<TeacherDashboard profile={profile} handleLogout={handleLogout} />} />
       <Route path="/teacher/browse" element={<TeacherBrowse user={session.user} globalLang={globalLang} />} />
       <Route path="*" element={<Navigate to="/" replace />} />

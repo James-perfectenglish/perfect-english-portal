@@ -32,7 +32,7 @@ const ACTIVE_EXERCISES = new Set([
   'Hotel Flashcards', 'Hotel Memory Game',
   'Odd One Out', 'Error Correction',
   'Matching', 'Sentence Auction', 'Lyrics Mixer', 'Blurt!', 'Word Snake', 'Real Talk',
-  'Travel 🧳', 'Sport ⚽️',
+  'Travel 🧳', 'Sport ⚽️', 'Wordle 🟩', 'Connections 🔗',
 ])
 
 const EXERCISE_ICONS = {
@@ -64,6 +64,8 @@ const EXERCISE_ICONS = {
   'Real Talk':                 '💬',
   'Travel 🧳':                 '🧳',
   'Sport ⚽️':                  '⚽️',
+  'Wordle 🟩':                 '🟩',
+  'Connections 🔗':            '🔗',
 }
 
 // Play removed from tabs — students use bottom nav, teachers use sidebar
@@ -167,6 +169,8 @@ export default function ExerciseList({
     if (exercise.title === 'Lyrics Mixer') { navigate('/lyrics');    return }
     if (exercise.type === 'blurt')         { navigate('/blurt');     return }
     if (exercise.title === 'Word Snake')   { navigate('/wordsnake'); return }
+    if (exercise.title === 'Wordle 🟩')       { navigate('/wordle');       return }
+    if (exercise.title === 'Connections 🔗') { navigate('/connections'); return }
     setActiveExercise(exercise)
   }
 
