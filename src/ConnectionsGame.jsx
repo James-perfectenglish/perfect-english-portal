@@ -226,14 +226,15 @@ export default function ConnectionsGame({ onBack }) {
 
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        await supabase.from('wordle_sentences').insert({
+        await supabase.from('sentence_challenges').insert({
           student_id:  user.id,
+          exercise:    'connections',
           word:        chosenWord.toLowerCase(),
           language:    'en',
           sentence:    sentenceInput.trim(),
           is_correct:  data.valid,
           ai_feedback: data.reason || data.feedback,
-          is_practice: false,
+          is_practice: mode === 'practice',
         })
       }
       if (data.valid) {

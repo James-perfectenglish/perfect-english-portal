@@ -238,8 +238,8 @@ export default function WordleGame({ onBack }) {
 
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        await supabase.from('wordle_sentences').insert({
-          student_id: user.id, word: word.toLowerCase(), language,
+        await supabase.from('sentence_challenges').insert({
+          student_id: user.id, exercise: 'wordle', word: word.toLowerCase(), language,
           sentence: sentenceInput.trim(), is_correct: data.valid,
           ai_feedback: data.reason, is_practice: mode === 'practice',
         })
