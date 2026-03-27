@@ -345,7 +345,7 @@ export default function WordleGame({ onBack }) {
       {gameState === 'playing' && (
         <>
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
-            {[['#538d4e','Correct'], ['#b59f3b','Wrong position'], ['#3a3a3c','Not in word']].map(([c, l]) => (
+            {[['#534AB7','Correct'], ['#7F77DD','Wrong position'], ['#888780','Not in word']].map(([c, l]) => (
               <span key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: '#718096' }}>
                 <span style={{ display: 'inline-block', width: '12px', height: '12px', background: c, borderRadius: '2px' }} />{l}
               </span>
