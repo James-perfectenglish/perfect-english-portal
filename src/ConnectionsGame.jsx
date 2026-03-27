@@ -33,6 +33,8 @@ export default function ConnectionsGame({ onBack }) {
   const [shaking, setShaking]         = useState(false)
   const [locked, setLocked]           = useState(false)
   const [allWords, setAllWords]       = useState([])
+  const [mode, setMode]               = useState('daily')
+  const [practiceTitle, setPracticeTitle] = useState('')
 
   // Sentence challenge
   const [sentenceDone, setSentenceDone]         = useState(false)
@@ -124,10 +126,9 @@ export default function ConnectionsGame({ onBack }) {
       if (won) {
         setGameState('won')
         setMessage('Brilliant! You got them all! 🎉')
-        setSolveStar(true)
-        await insertStar('solve')
+        if (mode === 'daily') { setSolveStar(true); await insertStar('solve') }
       }
-      await saveSession(newSolved, mistakes, won, won, won, false, false)
+      if (mode === 'daily') await saveSession(newSolved, mistakes, won, won, won, false, false)
       setLocked(false)
     } else {
       const rankCounts = {}
@@ -151,7 +152,7 @@ export default function ConnectionsGame({ onBack }) {
         setLocked(false)
       }, 600)
 
-      await saveSession(solvedRanks, newMistakes, newMistakes >= MAX_MISTAKES, false, false, false, false)
+      if (mode === 'daily') await saveSession(solvedRanks, newMistakes, newMistakes >= MAX_MISTAKES, false, false, false, false)
     }
   }
 
@@ -170,6 +171,37 @@ export default function ConnectionsGame({ onBack }) {
       sentence_star: sentStar,
       completed_at:  completed ? new Date().toISOString() : null,
     }, { onConflict: 'student_id,play_date' })
+  }
+
+  async function startPractice() {
+    setGameState('loading')
+    setGroups([]); setTiles([]); setSelected(new Set())
+    setSolvedRanks(new Set()); setMistakes(0)
+    setMessage(''); setAllWords([])
+    setSentenceDone(false); setChosenWord(null)
+    setSentenceInput(''); setSentenceFeedback(null)
+    setSolveStar(false); setSentenceStar(false)
+    setMode('practice')
+
+    const { data: puzzles } = await supabase
+      .from('connections_puzzles').select('id, title, play_date')
+      .lt('play_date', today)
+
+    if (!puzzles || puzzles.length === 0) { setGameState('noword'); return }
+
+    const puzzle = puzzles[Math.floor(Math.random() * puzzles.length)]
+    setPracticeTitle(puzzle.title || puzzle.play_date)
+
+    const { data: grps } = await supabase
+      .from('connections_groups').select('*').eq('puzzle_id', puzzle.id).order('colour_rank')
+
+    if (!grps || grps.length === 0) { setGameState('noword'); return }
+
+    setGroups(grps)
+    const allTiles = grps.flatMap(g => g.words.map(w => ({ word: w, rank: g.colour_rank })))
+    setAllWords(allTiles.map(t => t.word))
+    setTiles(shuffleArray(allTiles))
+    setGameState('playing')
   }
 
   async function insertStar(type) {
@@ -206,13 +238,13 @@ export default function ConnectionsGame({ onBack }) {
       }
       if (data.valid) {
         setSentenceStar(true)
-        await insertStar('sentence')
+        if (mode === 'daily') await insertStar('sentence')
       }
-      await saveSession(new Set([1,2,3,4]), mistakes, true, gameState === 'won', solveStar, true, data.valid)
+      if (mode === 'daily') await saveSession(new Set([1,2,3,4]), mistakes, true, gameState === 'won', solveStar, true, data.valid)
     } catch {
       setSentenceFeedback({ valid: true, reason: 'Good effort!' })
       setSentenceStar(true)
-      await saveSession(new Set([1,2,3,4]), mistakes, true, gameState === 'won', solveStar, true, true)
+      if (mode === 'daily') await saveSession(new Set([1,2,3,4]), mistakes, true, gameState === 'won', solveStar, true, true)
     }
     setSentenceDone(true)
     setSentenceChecking(false)
@@ -248,7 +280,9 @@ export default function ConnectionsGame({ onBack }) {
       {/* Header */}
       <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.7rem', fontWeight: 800, letterSpacing: '2px' }}>CONNECTIONS</h1>
-        <p style={{ margin: '4px 0 0', opacity: 0.85, fontSize: '0.82rem' }}>Group the 16 words into 4 categories</p>
+        <p style={{ margin: '4px 0 0', opacity: 0.85, fontSize: '0.82rem' }}>
+          {mode === 'practice' ? `Practice: ${practiceTitle}` : 'Group the 16 words into 4 categories'}
+        </p>
       </div>
 
       {/* Mistakes */}
@@ -410,9 +444,9 @@ export default function ConnectionsGame({ onBack }) {
           {sentenceFeedback && (
             <div style={{
               padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1rem',
-              background: sentenceFeedback.valid ? '#EEEDFE' : '#fff5f5',
-              border: `1px solid ${sentenceFeedback.valid ? '#CECBF6' : '#fed7d7'}`,
-              color: sentenceFeedback.valid ? '#3C3489' : '#9b2c2c',
+              background: sentenceFeedback.valid ? '#f0fff4' : '#fff5f5',
+              border: `1px solid ${sentenceFeedback.valid ? '#c6f6d5' : '#fed7d7'}`,
+              color: sentenceFeedback.valid ? '#276749' : '#9b2c2c',
               fontSize: '0.9rem', lineHeight: 1.5,
             }}>
               {sentenceFeedback.valid ? '✅ ' : '❌ '}{sentenceFeedback.reason || sentenceFeedback.feedback}
@@ -433,11 +467,12 @@ export default function ConnectionsGame({ onBack }) {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <p style={{ color: '#718096', fontSize: '0.82rem', textAlign: 'center', margin: '0 0 4px' }}>
-              Come back tomorrow for a new puzzle! 🔗
-            </p>
+            {mode === 'daily' && <p style={{ color: '#718096', fontSize: '0.82rem', textAlign: 'center', margin: '0 0 4px' }}>Come back tomorrow for a new puzzle! 🔗</p>}
+            <button onClick={startPractice} style={{ padding: '0.75rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
+              🎮 Play again (practice)
+            </button>
             {onBack && (
-              <button onClick={onBack} style={{ padding: '0.75rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
+              <button onClick={onBack} style={{ padding: '0.75rem', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '8px', fontWeight: 500, cursor: 'pointer', fontSize: '0.9rem' }}>
                 ← Back
               </button>
             )}
