@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
 const WORD_LENGTH  = 5
@@ -46,9 +45,8 @@ function computeLetterStates(guesses, word) {
 }
 
 export default function WordleGame({ onBack }) {
-  const location  = useLocation()
-  const isSpanish = location.state?.isSpanish || false
-  const language  = isSpanish ? 'es' : 'en'
+  const [isSpanish, setIsSpanish] = useState(false)
+  const language = isSpanish ? 'es' : 'en'
 
   const [mode, setMode]           = useState('daily')
   const [word, setWord]           = useState('')
@@ -87,15 +85,23 @@ export default function WordleGame({ onBack }) {
 
   async function initDaily() {
     setMode('daily')
+
+    // Detect language from profile — more reliable than location.state
+    const { data: { user } } = await supabase.auth.getUser()
+    let lang = 'en'
+    if (user) {
+      const { data: prof } = await supabase.from('profiles').select('tracks').eq('id', user.id).single()
+      if ((prof?.tracks || []).includes('spanish')) { setIsSpanish(true); lang = 'es' }
+    }
+
     const { data: wordRow } = await supabase
       .from('wordle_words').select('word')
-      .eq('play_date', today).eq('language', language).single()
+      .eq('play_date', today).eq('language', lang).single()
 
     if (!wordRow) { setGameState('noword'); return }
     const w = wordRow.word.toUpperCase()
     setWord(w)
 
-    const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: session } = await supabase
         .from('wordle_sessions').select('*')
