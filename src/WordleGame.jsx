@@ -19,9 +19,9 @@ const ES_KEYBOARD_ROWS = [
 ]
 
 const COLOURS = {
-  correct: '#534AB7',
-  present: '#7F77DD',
-  absent:  '#888780',
+  correct: '#538d4e',
+  present: '#b59f3b',
+  absent:  '#787c7e',
 }
 
 const WIN_MESSAGES = [
@@ -73,6 +73,7 @@ export default function WordleGame({ onBack }) {
   const [solveStar, setSolveStar]     = useState(false)
   const [sentenceStar, setSentenceStar] = useState(false)
 
+  const [showHelp, setShowHelp] = useState(false)
   const today    = new Date().toISOString().slice(0, 10)
   const stateRef = useRef({ word: '', guesses: [], current: '', gameState: 'loading' })
   const inputRef = useRef(null)
@@ -284,7 +285,7 @@ export default function WordleGame({ onBack }) {
     <div style={{ maxWidth: '500px', margin: '0 auto', padding: '1rem 1rem 3rem' }}>
 
       {/* Header */}
-      <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem' }}>
+      <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem', position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
           <h1 style={{ margin: 0, fontSize: '1.7rem', letterSpacing: '6px', fontWeight: 800 }}>WORDLE</h1>
           {isSpanish && <span style={{ fontSize: '1.2rem' }}>🇪🇸</span>}
@@ -345,7 +346,7 @@ export default function WordleGame({ onBack }) {
       {gameState === 'playing' && (
         <>
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
-            {[['#534AB7','Correct'], ['#7F77DD','Wrong position'], ['#888780','Not in word']].map(([c, l]) => (
+            {[['#538d4e','Correct'], ['#b59f3b','Wrong position'], ['#787c7e','Not in word']].map(([c, l]) => (
               <span key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: '#718096' }}>
                 <span style={{ display: 'inline-block', width: '12px', height: '12px', background: c, borderRadius: '2px' }} />{l}
               </span>

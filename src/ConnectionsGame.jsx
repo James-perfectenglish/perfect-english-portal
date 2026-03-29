@@ -5,10 +5,10 @@ const GRADIENT     = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 const MAX_MISTAKES = 4
 
 const RANK_STYLE = {
-  1: { bg: '#EEEDFE', text: '#3C3489', border: '#CECBF6' },
-  2: { bg: '#AFA9EC', text: '#26215C', border: '#7F77DD' },
-  3: { bg: '#7F77DD', text: '#fff',    border: '#534AB7' },
-  4: { bg: '#534AB7', text: '#fff',    border: '#3C3489' },
+  1: { bg: '#f9df6d', text: '#2d2000', border: '#e6c840' },
+  2: { bg: '#a0c35a', text: '#1a2d00', border: '#7aaa2a' },
+  3: { bg: '#b0c4ef', text: '#0a1f4d', border: '#7a9de0' },
+  4: { bg: '#ba81c5', text: '#2d0040', border: '#9a55a8' },
 }
 
 const DIFFICULTY = ['Easiest', 'Medium', 'Tricky', 'Hardest']
@@ -47,6 +47,7 @@ export default function ConnectionsGame({ onBack }) {
   const [solveStar, setSolveStar]       = useState(false)
   const [sentenceStar, setSentenceStar] = useState(false)
 
+  const [showHelp, setShowHelp] = useState(false)
   const today = new Date().toISOString().slice(0, 10)
 
   useEffect(() => { init() }, [])
@@ -279,7 +280,7 @@ export default function ConnectionsGame({ onBack }) {
     <div style={{ maxWidth: '500px', margin: '0 auto', padding: '1rem 1rem 3rem' }}>
 
       {/* Header */}
-      <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem' }}>
+      <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem', position: 'relative' }}>
         <h1 style={{ margin: 0, fontSize: '1.7rem', fontWeight: 800, letterSpacing: '2px' }}>CONNECTIONS</h1>
         <p style={{ margin: '4px 0 0', opacity: 0.85, fontSize: '0.82rem' }}>
           {mode === 'practice' ? `Practice: ${practiceTitle}` : 'Group the 16 words into 4 categories'}
@@ -290,7 +291,7 @@ export default function ConnectionsGame({ onBack }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '0.75rem' }}>
         <span style={{ fontSize: '0.82rem', color: '#718096', fontWeight: 500 }}>Mistakes remaining:</span>
         {Array.from({ length: MAX_MISTAKES }).map((_, i) => (
-          <div key={i} style={{ width: '14px', height: '14px', borderRadius: '50%', background: i < (MAX_MISTAKES - mistakes) ? '#534AB7' : '#e2e8f0', transition: 'background 0.3s ease' }} />
+          <div key={i} style={{ width: '14px', height: '14px', borderRadius: '50%', background: i < (MAX_MISTAKES - mistakes) ? '#2d3748' : '#e2e8f0', transition: 'background 0.3s ease' }} />
         ))}
       </div>
 
@@ -299,9 +300,9 @@ export default function ConnectionsGame({ onBack }) {
         <div style={{
           textAlign: 'center', marginBottom: '0.75rem', padding: '8px 16px', borderRadius: '8px',
           fontWeight: 700, fontSize: '0.95rem',
-          background: gameState === 'won' ? '#EEEDFE' : gameState === 'lost' ? '#fff5f5' : '#fffbeb',
-          color:      gameState === 'won' ? '#3C3489' : gameState === 'lost' ? '#c53030' : '#92400e',
-          border:     gameState === 'won' ? '1px solid #CECBF6' : gameState === 'lost' ? '1px solid #fed7d7' : '1px solid #fde68a',
+          background: gameState === 'won' ? '#f0fff4' : gameState === 'lost' ? '#fff5f5' : '#fffbeb',
+          color:      gameState === 'won' ? '#276749' : gameState === 'lost' ? '#c53030' : '#92400e',
+          border:     gameState === 'won' ? '1px solid #c6f6d5' : gameState === 'lost' ? '1px solid #fed7d7' : '1px solid #fde68a',
         }}>
           {message}
         </div>
@@ -338,9 +339,9 @@ export default function ConnectionsGame({ onBack }) {
               <div key={word} onClick={() => toggleTile(word)} style={{
                 height: '64px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: isSel ? '#534AB7' : 'white',
+                background: isSel ? '#2d3748' : 'white',
                 color:      isSel ? 'white'   : '#2d3748',
-                border:     `2px solid ${isSel ? '#534AB7' : '#e2e8f0'}`,
+                border:     `2px solid ${isSel ? '#2d3748' : '#e2e8f0'}`,
                 borderRadius: '8px', fontWeight: 700,
                 fontSize: 'clamp(0.55rem, 2.2vw, 0.82rem)',
                 cursor: 'pointer', userSelect: 'none',
@@ -367,7 +368,7 @@ export default function ConnectionsGame({ onBack }) {
           <button onClick={submitGuess} disabled={selected.size !== 4 || locked}
             style={{ padding: '10px 24px', borderRadius: '999px', fontWeight: 700, fontSize: '0.88rem',
               cursor: selected.size === 4 ? 'pointer' : 'not-allowed', border: 'none',
-              background: selected.size === 4 ? '#534AB7' : '#e2e8f0',
+              background: selected.size === 4 ? '#2d3748' : '#e2e8f0',
               color: selected.size === 4 ? 'white' : '#a0aec0',
               transition: 'all 0.15s' }}>
             Submit
@@ -391,8 +392,8 @@ export default function ConnectionsGame({ onBack }) {
                 background: 'white', border: '2px solid #534AB7', color: '#534AB7',
                 cursor: 'pointer', transition: 'all 0.12s ease',
               }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#534AB7'; e.currentTarget.style.color = 'white' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = '#534AB7' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#2d3748'; e.currentTarget.style.color = 'white' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = '#2d3748' }}
               >
                 {w}
               </button>
