@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
 const GRADIENT     = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
@@ -22,7 +23,9 @@ function shuffleArray(arr) {
   return a
 }
 
-export default function ConnectionsGame({ onBack }) {
+export default function ConnectionsGame({ onBack, userProfile }) {
+  const location = useLocation()
+
   const [groups, setGroups]           = useState([])
   const [tiles, setTiles]             = useState([])
   const [selected, setSelected]       = useState(new Set())
@@ -35,6 +38,7 @@ export default function ConnectionsGame({ onBack }) {
   const [allWords, setAllWords]       = useState([])
   const [mode, setMode]               = useState('daily')
   const [practiceTitle, setPracticeTitle] = useState('')
+  const [language, setLanguage]       = useState('en')
 
   // Sentence challenge
   const [sentenceDone, setSentenceDone]         = useState(false)
@@ -47,14 +51,27 @@ export default function ConnectionsGame({ onBack }) {
   const [solveStar, setSolveStar]       = useState(false)
   const [sentenceStar, setSentenceStar] = useState(false)
 
-  const [showHelp, setShowHelp] = useState(false)
   const today = new Date().toISOString().slice(0, 10)
 
-  useEffect(() => { init() }, [])
+  useEffect(() => { initDaily() }, [])
 
-  async function init() {
+  function detectLanguage() {
+    if (location.state?.isSpanish) return 'es'
+    const tracks = userProfile?.tracks || []
+    if (tracks.includes('spanish') || userProfile?.level === 'Spanish') return 'es'
+    return 'en'
+  }
+
+  async function initDaily() {
+    const lang = detectLanguage()
+    setLanguage(lang)
+
     const { data: puzzle } = await supabase
-      .from('connections_puzzles').select('id').eq('play_date', today).single()
+      .from('connections_puzzles')
+      .select('id')
+      .eq('play_date', today)
+      .eq('language', lang)
+      .single()
 
     if (!puzzle) { setGameState('noword'); return }
 
@@ -185,7 +202,9 @@ export default function ConnectionsGame({ onBack }) {
     setMode('practice')
 
     const { data: puzzles } = await supabase
-      .from('connections_puzzles').select('id, title, play_date')
+      .from('connections_puzzles')
+      .select('id, title, play_date')
+      .eq('language', language)
       .lt('play_date', today)
 
     if (!puzzles || puzzles.length === 0) { setGameState('noword'); return }
@@ -209,7 +228,7 @@ export default function ConnectionsGame({ onBack }) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     await supabase.from('wordle_stars').insert({
-      student_id: user.id, type, word: today, language: 'en', is_practice: false,
+      student_id: user.id, type, word: today, language, is_practice: false,
     })
   }
 
@@ -220,7 +239,7 @@ export default function ConnectionsGame({ onBack }) {
       const res = await fetch('/api/mark-sentence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: chosenWord.toLowerCase(), sentence: sentenceInput.trim(), language: 'en' }),
+        body: JSON.stringify({ word: chosenWord.toLowerCase(), sentence: sentenceInput.trim(), language }),
       })
       const data = await res.json()
       setSentenceFeedback(data)
@@ -231,7 +250,7 @@ export default function ConnectionsGame({ onBack }) {
           student_id:  user.id,
           exercise:    'connections',
           word:        chosenWord.toLowerCase(),
-          language:    'en',
+          language,
           sentence:    sentenceInput.trim(),
           is_correct:  data.valid,
           ai_feedback: data.reason || data.feedback,
@@ -259,7 +278,9 @@ export default function ConnectionsGame({ onBack }) {
 
   // ── Loading ───────────────────────────────────────
   if (gameState === 'loading') return (
-    <div style={{ textAlign: 'center', padding: '4rem', color: '#718096' }}>Loading today's puzzle...</div>
+    <div style={{ textAlign: 'center', padding: '4rem', color: '#718096' }}>
+      {language === 'es' ? 'Cargando el puzzle de hoy...' : 'Loading today\'s puzzle...'}
+    </div>
   )
 
   // ── No puzzle ─────────────────────────────────────
@@ -267,8 +288,8 @@ export default function ConnectionsGame({ onBack }) {
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
     <div style={{ maxWidth: '500px', margin: '0 auto', padding: '2rem', textAlign: 'center' }}>
       <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔗</div>
-      <h2 style={{ color: '#2d3748' }}>No puzzle today</h2>
-      <p style={{ color: '#718096' }}>Check back tomorrow!</p>
+      <h2 style={{ color: '#2d3748' }}>{language === 'es' ? 'No hay puzzle hoy' : 'No puzzle today'}</h2>
+      <p style={{ color: '#718096' }}>{language === 'es' ? '¡Vuelve mañana!' : 'Check back tomorrow!'}</p>
       {onBack && <button onClick={onBack} style={{ padding: '10px 24px', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>← Back</button>}
     </div>
     </div>
@@ -280,16 +301,20 @@ export default function ConnectionsGame({ onBack }) {
     <div style={{ maxWidth: '500px', margin: '0 auto', padding: '1rem 1rem 3rem' }}>
 
       {/* Header */}
-      <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem', position: 'relative' }}>
+      <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.7rem', fontWeight: 800, letterSpacing: '2px' }}>CONNECTIONS</h1>
         <p style={{ margin: '4px 0 0', opacity: 0.85, fontSize: '0.82rem' }}>
-          {mode === 'practice' ? `Practice: ${practiceTitle}` : 'Group the 16 words into 4 categories'}
+          {mode === 'practice'
+            ? `${language === 'es' ? 'Práctica' : 'Practice'}: ${practiceTitle}`
+            : language === 'es' ? 'Agrupa las 16 palabras en 4 categorías' : 'Group the 16 words into 4 categories'}
         </p>
       </div>
 
       {/* Mistakes */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '0.75rem' }}>
-        <span style={{ fontSize: '0.82rem', color: '#718096', fontWeight: 500 }}>Mistakes remaining:</span>
+        <span style={{ fontSize: '0.82rem', color: '#718096', fontWeight: 500 }}>
+          {language === 'es' ? 'Errores restantes:' : 'Mistakes remaining:'}
+        </span>
         {Array.from({ length: MAX_MISTAKES }).map((_, i) => (
           <div key={i} style={{ width: '14px', height: '14px', borderRadius: '50%', background: i < (MAX_MISTAKES - mistakes) ? '#2d3748' : '#e2e8f0', transition: 'background 0.3s ease' }} />
         ))}
@@ -363,7 +388,7 @@ export default function ConnectionsGame({ onBack }) {
               cursor: selected.size > 0 ? 'pointer' : 'not-allowed',
               border: '2px solid #e2e8f0', background: 'white',
               color: selected.size > 0 ? '#2d3748' : '#a0aec0' }}>
-            Deselect all
+            {language === 'es' ? 'Deseleccionar' : 'Deselect all'}
           </button>
           <button onClick={submitGuess} disabled={selected.size !== 4 || locked}
             style={{ padding: '10px 24px', borderRadius: '999px', fontWeight: 700, fontSize: '0.88rem',
@@ -371,7 +396,7 @@ export default function ConnectionsGame({ onBack }) {
               background: selected.size === 4 ? '#2d3748' : '#e2e8f0',
               color: selected.size === 4 ? 'white' : '#a0aec0',
               transition: 'all 0.15s' }}>
-            Submit
+            {language === 'es' ? 'Enviar' : 'Submit'}
           </button>
         </div>
       )}
@@ -380,10 +405,12 @@ export default function ConnectionsGame({ onBack }) {
       {gameOver && !sentenceDone && !chosenWord && (
         <div style={{ background: 'white', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', marginBottom: '1rem' }}>
           <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#2d3748', marginBottom: '4px' }}>
-            ✍️ Now use one of the words in a sentence!
+            ✍️ {language === 'es' ? '¡Usa una de las palabras en una frase!' : 'Now use one of the words in a sentence!'}
           </div>
           <div style={{ fontSize: '0.82rem', color: '#718096', marginBottom: '12px' }}>
-            Pick any word from today's puzzle. Not sure what it means? Have a go anyway!
+            {language === 'es'
+              ? 'Elige cualquier palabra del puzzle de hoy. ¿No estás seguro del significado? ¡Inténtalo de todas formas!'
+              : 'Pick any word from today\'s puzzle. Not sure what it means? Have a go anyway!'}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {allWords.map(w => (
@@ -393,7 +420,7 @@ export default function ConnectionsGame({ onBack }) {
                 cursor: 'pointer', transition: 'all 0.12s ease',
               }}
                 onMouseEnter={e => { e.currentTarget.style.background = '#2d3748'; e.currentTarget.style.color = 'white' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = '#2d3748' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = '#534AB7' }}
               >
                 {w}
               </button>
@@ -406,27 +433,31 @@ export default function ConnectionsGame({ onBack }) {
       {gameOver && !sentenceDone && chosenWord && (
         <div style={{ background: 'white', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', marginBottom: '1rem' }}>
           <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#2d3748', marginBottom: '4px' }}>
-            ✍️ Use <span style={{ color: '#534AB7' }}>{chosenWord}</span> in a sentence
+            ✍️ {language === 'es' ? 'Usa' : 'Use'} <span style={{ color: '#534AB7' }}>{chosenWord}</span> {language === 'es' ? 'en una frase' : 'in a sentence'}
           </div>
           <div style={{ fontSize: '0.82rem', color: '#718096', marginBottom: '10px' }}>
-            Not sure what it means? Have a go — the feedback will tell you!
+            {language === 'es'
+              ? '¿No sabes qué significa? ¡Inténtalo — el feedback te lo explicará!'
+              : 'Not sure what it means? Have a go — the feedback will tell you!'}
           </div>
           <textarea
             value={sentenceInput}
             onChange={e => setSentenceInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitSentence() } }}
-            placeholder={`Write your sentence using "${chosenWord.toLowerCase()}"...`}
+            placeholder={language === 'es'
+              ? `Escribe tu frase usando "${chosenWord.toLowerCase()}"...`
+              : `Write your sentence using "${chosenWord.toLowerCase()}"...`}
             rows={2}
             style={{ width: '100%', padding: '0.75rem', fontSize: '0.95rem', border: '2px solid #667eea', borderRadius: '8px', boxSizing: 'border-box', resize: 'none', fontFamily: 'inherit', backgroundColor: '#f7f7ff' }}
             autoFocus
           />
           <div style={{ fontSize: '0.72rem', color: '#a0aec0', margin: '4px 0 8px', textAlign: 'right' }}>
-            Earn ⭐️ for a good sentence
+            {language === 'es' ? 'Gana ⭐️ con una buena frase' : 'Earn ⭐️ for a good sentence'}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => { setChosenWord(null); setSentenceInput('') }}
               style={{ padding: '0.75rem 1rem', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '8px', fontWeight: 500, cursor: 'pointer', fontSize: '0.88rem' }}>
-              ← Change word
+              ← {language === 'es' ? 'Cambiar palabra' : 'Change word'}
             </button>
             <button onClick={submitSentence} disabled={!sentenceInput.trim() || sentenceChecking}
               style={{ flex: 1, padding: '0.75rem',
@@ -434,7 +465,9 @@ export default function ConnectionsGame({ onBack }) {
                 color: 'white', border: 'none', borderRadius: '8px',
                 fontWeight: 700, fontSize: '0.95rem',
                 cursor: sentenceInput.trim() && !sentenceChecking ? 'pointer' : 'not-allowed' }}>
-              {sentenceChecking ? '🤖 Checking...' : 'Check my sentence'}
+              {sentenceChecking
+                ? '🤖 ' + (language === 'es' ? 'Comprobando...' : 'Checking...')
+                : language === 'es' ? 'Comprobar mi frase' : 'Check my sentence'}
             </button>
           </div>
         </div>
@@ -459,19 +492,27 @@ export default function ConnectionsGame({ onBack }) {
             <div style={{ textAlign: 'center', marginBottom: '1rem', padding: '0.75rem', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
               <div style={{ fontSize: '2rem', marginBottom: '2px' }}>{Array(totalStars).fill('⭐️').join(' ')}</div>
               <div style={{ fontSize: '0.78rem', color: '#92400e', fontWeight: 600 }}>
-                {solveStar && sentenceStar ? 'Puzzle solved + great sentence!' : solveStar ? 'Puzzle solved!' : 'Great sentence!'}
+                {solveStar && sentenceStar
+                  ? (language === 'es' ? '¡Puzzle resuelto + frase perfecta!' : 'Puzzle solved + great sentence!')
+                  : solveStar
+                  ? (language === 'es' ? '¡Puzzle resuelto!' : 'Puzzle solved!')
+                  : (language === 'es' ? '¡Frase estupenda!' : 'Great sentence!')}
               </div>
             </div>
           ) : (
             <div style={{ textAlign: 'center', color: '#a0aec0', fontSize: '0.85rem', marginBottom: '1rem' }}>
-              No stars this time — keep going! 💪
+              {language === 'es' ? 'Sin estrellas esta vez — ¡sigue intentándolo! 💪' : 'No stars this time — keep going! 💪'}
             </div>
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {mode === 'daily' && <p style={{ color: '#718096', fontSize: '0.82rem', textAlign: 'center', margin: '0 0 4px' }}>Come back tomorrow for a new puzzle! 🔗</p>}
+            {mode === 'daily' && (
+              <p style={{ color: '#718096', fontSize: '0.82rem', textAlign: 'center', margin: '0 0 4px' }}>
+                {language === 'es' ? '¡Vuelve mañana para un nuevo puzzle! 🔗' : 'Come back tomorrow for a new puzzle! 🔗'}
+              </p>
+            )}
             <button onClick={startPractice} style={{ padding: '0.75rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
-              🎮 Play again (practice)
+              🎮 {language === 'es' ? 'Jugar de nuevo (práctica)' : 'Play again (practice)'}
             </button>
             {onBack && (
               <button onClick={onBack} style={{ padding: '0.75rem', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '8px', fontWeight: 500, cursor: 'pointer', fontSize: '0.9rem' }}>
