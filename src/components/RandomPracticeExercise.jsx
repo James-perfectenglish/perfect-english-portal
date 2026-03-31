@@ -628,11 +628,11 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         <div style={{ backgroundColor: headerBg, color: 'white', padding: '0.6rem 1rem', fontWeight: '700', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)' }}>{headerText}</div>
         <div style={{ backgroundColor: bgColor, padding: '1rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem', alignItems: 'flex-start' }}>
-            <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px' }}>Your answer:</span>
+            <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px', flexShrink: 0 }}>Your answer:</span>
             <span style={{ fontWeight: '600', color: isCorrect ? '#276749' : '#c53030', wordBreak: 'break-word' }}>{feedback.studentAnswer || '(no answer)'}</span>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'flex-start' }}>
-            <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px' }}>Correct answer:</span>
+            <span style={{ fontWeight: '600', color: '#4a5568', whiteSpace: 'nowrap', minWidth: '110px', flexShrink: 0 }}>Correct answer:</span>
             <span style={{ fontWeight: '700', color: '#276749', wordBreak: 'break-word' }}>{feedback.correctAnswer}</span>
           </div>
           {isFuzzy && (
