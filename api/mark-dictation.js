@@ -33,7 +33,9 @@ Student's answer: "${studentAnswer}"
 Rules:
 1. Ignore differences in capitalisation and punctuation.
 2. Accept minor spelling mistakes if the intended word is obvious (e.g. "recieve" for "receive").
-3. The student may omit degree modifiers — words that intensify, amplify or quantify an adjective, adverb or comparative, but do not change the core meaning. As long as the core content word is present in the correct grammatical form, the answer is acceptable. Example: "busy" is acceptable for "very busy"; "raining" is acceptable for "raining heavily"; "with greater care" is acceptable for "with far greater care"; "a challenge" is acceptable for "quite a challenge".
+3. The student may omit modifying words that describe, intensify, or qualify — but do not constitute the core of the answer. This includes degree modifiers ("very", "far", "quite", "rather") AND attributive adjectives on short phrases. As long as the core noun, verb, or key content word is present in the correct form, the answer is acceptable. Mark valid but include a brief note about the full phrase.
+Examples: "busy" is acceptable for "very busy"; "raining" is acceptable for "raining heavily"; "compromise" is acceptable for "sensible compromise"; "solution" is acceptable for "practical solution"; "approach" is acceptable for "cautious approach".
+Exception: do NOT apply this rule if the adjective fundamentally changes the meaning or is the main teaching point (e.g. "wrong" in "wrong answer", or a colour/number that is the specific target word).
 4. The core content word must be in the correct form. Example: "rain" is NOT acceptable for "raining heavily" — the form is wrong.
 5. A modifier alone without the core word is NOT acceptable. Example: "heavily" alone is not acceptable for "raining heavily".
 ${excerptType === 'sentence' ? '6. For full sentences, all key words must be present. Missing a whole clause or phrase is not acceptable.' : ''}
