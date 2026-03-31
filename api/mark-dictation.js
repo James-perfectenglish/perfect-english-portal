@@ -10,6 +10,26 @@ export default async function handler(req, res) {
 
   const isSpanish = language === 'es';
 
+  // For phrase/word excerpts: if the student's answer is a subset of the
+  // correct answer words, accept it. Handles "compromise" ⊂ "sensible compromise",
+  // "swimming" ⊂ "swimming happily" etc. NOT applied to full sentences.
+  if (excerptType !== 'sentence') {
+    const norm = (s) => s.toLowerCase().trim().replace(/[.,!?;:'"]/g, '');
+    const studentWords = norm(studentAnswer).split(/\s+/).filter(Boolean);
+    const correctWords = norm(correctAnswer).split(/\s+/).filter(Boolean);
+    if (
+      studentWords.length > 0 &&
+      studentWords.length < correctWords.length &&
+      studentWords.every(w => correctWords.includes(w))
+    ) {
+      const omitted = correctWords.filter(w => !studentWords.includes(w)).join(' ');
+      return res.status(200).json({
+        valid: true,
+        reason: `Good — you got the key word! The full answer was "${correctAnswer}" (you missed: ${omitted}).`,
+      });
+    }
+  }
+
   const prompt = isSpanish
     ? `Estás comprobando un ejercicio de dictado en español.
 
