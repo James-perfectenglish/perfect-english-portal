@@ -33,7 +33,7 @@ Student's answer: "${studentAnswer}"
 Rules:
 1. Ignore differences in capitalisation and punctuation.
 2. Accept minor spelling mistakes if the intended word is obvious (e.g. "recieve" for "receive").
-3. The student may omit optional modifiers (intensifiers, adverbs of degree) such as "very", "quite", "heavily", "really" — as long as the core content word is present in the correct grammatical form. Example: "busy" is acceptable for "very busy". "raining" is acceptable for "raining heavily".
+3. The student may omit degree modifiers — words that intensify, amplify or quantify an adjective, adverb or comparative, but do not change the core meaning. As long as the core content word is present in the correct grammatical form, the answer is acceptable. Example: "busy" is acceptable for "very busy"; "raining" is acceptable for "raining heavily"; "with greater care" is acceptable for "with far greater care"; "a challenge" is acceptable for "quite a challenge".
 4. The core content word must be in the correct form. Example: "rain" is NOT acceptable for "raining heavily" — the form is wrong.
 5. A modifier alone without the core word is NOT acceptable. Example: "heavily" alone is not acceptable for "raining heavily".
 ${excerptType === 'sentence' ? '6. For full sentences, all key words must be present. Missing a whole clause or phrase is not acceptable.' : ''}

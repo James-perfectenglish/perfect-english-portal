@@ -29,17 +29,24 @@ Responde con exactamente un objeto JSON y nada más:
 {"valid": true, "reason": "una frase corta explicando por qué es correcta"}
 o
 {"valid": false, "reason": "una frase corta explicando por qué no es correcta"}`
-    : `You are marking a sentence building exercise.
+    : `You are marking a sentence building exercise for adult language learners.
 
 Model answer: "${correctAnswer}"
 Student's answer: "${studentAnswer}"
 
-The student arranged word tiles to build a sentence. Is the student's answer grammatically correct and does it convey the same meaning as the model answer, even if the word order differs?
-Accept valid word order variations (e.g. adverb or time phrase placement) as long as the sentence is grammatically correct English with the same meaning.
-Answer NO if the sentence is grammatically wrong, changes the meaning, or is incomplete.
+The student arranged word tiles to build a sentence. Apply these rules:
+
+RULE 1 — Accept grammatically correct answers. If the student's sentence is grammatically correct English and makes sense, mark it valid — even if some words from the model answer are missing.
+
+RULE 2 — Accept word order variations. Adverb placement, time phrase position, and similar variations are fine as long as the sentence is natural English.
+
+RULE 3 — Simplified but correct. If the student's sentence is grammatically correct but omits some words (making it a slight simplification of the model), still mark it valid. Include a short note in the reason field pointing out what was simplified.
+Example: model="The project is unlikely to be completed on time unless additional funding is approved", student="The project is unlikely to be completed unless additional funding is approved" → valid=true, reason="Correct! Note: 'on time' was omitted — the full sentence specifies the deadline."
+
+Only mark INVALID if the sentence is grammatically wrong, unnatural, or completely changes the core meaning.
 
 Reply with exactly one JSON object and nothing else:
-{"valid": true, "reason": "one short sentence explaining why it works"}
+{"valid": true, "reason": "short encouraging note — mention the simplification if Rule 3 applies"}
 or
 {"valid": false, "reason": "one short sentence explaining why it does not work"}`;
 

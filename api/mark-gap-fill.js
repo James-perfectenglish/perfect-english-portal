@@ -49,10 +49,12 @@ Example: model="beyond their control", student="beyond their power" → valid=tr
 
 Mark it INVALID only if it is clearly grammatically wrong, makes no sense, or is obviously the wrong register (e.g. slang in a formal sentence).
 
+FEEDBACK: Be encouraging. Keep feedback concise but as detailed as the complexity of the answer warrants.
+
 Reply with exactly one JSON object and nothing else:
-{"valid": true, "reason": "one short sentence — encouraging, and mentioning the fixed phrase if Rule 3 applies"}
+{"valid": true, "reason": "encouraging note — mention the fixed phrase if Rule 3 applies"}
 or
-{"valid": false, "reason": "one short sentence explaining why it does not work"}`;
+{"valid": false, "reason": "short explanation of why it does not work"}`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {

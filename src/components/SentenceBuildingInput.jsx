@@ -92,7 +92,7 @@ export default function SentenceBuildingInput({
     setIsChecking(true);
     const aiResult = await aiMarkSentence(correctSentences[0] || '', userAnswer, language);
     setIsChecking(false);
-    if (aiResult?.valid) { if (onResult) onResult(true, true, userAnswer); return true; }
+    if (aiResult?.valid) { if (onResult) onResult(true, true, userAnswer, aiResult.reason || ''); return true; }
     if (onResult) onResult(false, false, userAnswer);
     return false;
   };
