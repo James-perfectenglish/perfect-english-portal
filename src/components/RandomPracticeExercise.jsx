@@ -126,11 +126,11 @@ const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement,
   } catch (e) { console.error('AI correction marking error:', e); return null; }
 };
 
-const aiMarkDictation = async (correctAnswer, studentAnswer) => {
+const aiMarkDictation = async (correctAnswer, studentAnswer, excerptType = 'phrase') => {
   try {
     const response = await fetch('/api/mark-dictation', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ correctAnswer, studentAnswer }),
+      body: JSON.stringify({ correctAnswer, studentAnswer, excerptType }),
     });
     if (!response.ok) return null;
     const result = await response.json();
@@ -427,7 +427,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     }
     if (!isCorrect) {
       setIsChecking(true);
-      const aiResult = await aiMarkDictation(correct, answer);
+      const aiResult = await aiMarkDictation(correct, answer, cq.excerpt_type || 'phrase');
       setIsChecking(false);
       if (aiResult?.valid) {
         isCorrect = true; isSoftPass = true; feedbackType = 'soft-pass';

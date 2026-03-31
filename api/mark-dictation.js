@@ -38,7 +38,7 @@ Examples: "busy" is acceptable for "very busy"; "raining" is acceptable for "rai
 Exception: do NOT apply this rule if the adjective fundamentally changes the meaning or is the main teaching point (e.g. "wrong" in "wrong answer", or a colour/number that is the specific target word).
 4. The core content word must be in the correct form. Example: "rain" is NOT acceptable for "raining heavily" — the form is wrong.
 5. A modifier alone without the core word is NOT acceptable. Example: "heavily" alone is not acceptable for "raining heavily".
-${excerptType === 'sentence' ? '6. For full sentences, all key words must be present. Missing a whole clause or phrase is not acceptable.' : ''}
+${excerptType === 'sentence' ? '6. For full sentences, all key words must be present — but Rule 3 still applies: degree modifiers and attributive adjectives may still be omitted even in full sentences.' : ''}
 
 Reply ONLY with a JSON object:
 {"valid": true, "reason": "one short sentence"}
