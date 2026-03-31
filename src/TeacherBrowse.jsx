@@ -323,7 +323,7 @@ function InteractiveQuestion({ item: q }) {
     if (!isCorrect) {
       setIsChecking(true);
       try {
-        const res  = await fetch('/api/mark-dictation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ correctAnswer: correct, studentAnswer: answer, excerptType: q.excerpt_type || 'phrase' }) });
+        const res  = await fetch('/api/mark-dictation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ correctAnswer: correct, studentAnswer: answer, excerptType: q.excerpt_type || 'phrase', acceptableAlternatives: q.acceptable_alternatives || [] }) });
         const data = await res.json();
         if (data?.valid) { isCorrect = true; feedbackType = 'soft-pass'; }
       } catch(e) {}

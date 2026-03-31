@@ -2,7 +2,7 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { correctAnswer, studentAnswer, excerptType = 'sentence', language = 'en' } = req.body;
+  const { correctAnswer, studentAnswer, excerptType = 'sentence', language = 'en', acceptableAlternatives = [] } = req.body;
 
   if (!correctAnswer || !studentAnswer) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -10,22 +10,13 @@ export default async function handler(req, res) {
 
   const isSpanish = language === 'es';
 
-  // For phrase/word excerpts: if the student's answer is a subset of the
-  // correct answer words, accept it. Handles "compromise" ⊂ "sensible compromise",
-  // "swimming" ⊂ "swimming happily" etc. NOT applied to full sentences.
-  if (excerptType !== 'sentence') {
-    const norm = (s) => s.toLowerCase().trim().replace(/[.,!?;:'"]/g, '');
-    const studentWords = norm(studentAnswer).split(/\s+/).filter(Boolean);
-    const correctWords = norm(correctAnswer).split(/\s+/).filter(Boolean);
-    if (
-      studentWords.length > 0 &&
-      studentWords.length < correctWords.length &&
-      studentWords.every(w => correctWords.includes(w))
-    ) {
-      const omitted = correctWords.filter(w => !studentWords.includes(w)).join(' ');
+  // Check acceptable_alternatives from DB — exact match, case-insensitive.
+  if (acceptableAlternatives && acceptableAlternatives.length > 0) {
+    const normStudent = studentAnswer.toLowerCase().trim().replace(/[.,!?;:'"]/g, '');
+    if (acceptableAlternatives.map(a => a.toLowerCase().trim()).includes(normStudent)) {
       return res.status(200).json({
         valid: true,
-        reason: `Good — you got the key word! The full answer was "${correctAnswer}" (you missed: ${omitted}).`,
+        reason: `Good — the full answer was "${correctAnswer}" but that works!`,
       });
     }
   }
