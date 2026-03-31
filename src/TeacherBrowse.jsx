@@ -323,9 +323,9 @@ function InteractiveQuestion({ item: q }) {
     if (!isCorrect) {
       setIsChecking(true);
       try {
-        const res  = await fetch('/api/mark-dictation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ correctAnswer: correct, studentAnswer: answer }) });
+        const res  = await fetch('/api/mark-dictation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ correctAnswer: correct, studentAnswer: answer, excerptType: q.excerpt_type || 'phrase' }) });
         const data = await res.json();
-        if (data?.accepted) { isCorrect = true; feedbackType = 'soft-pass'; }
+        if (data?.valid) { isCorrect = true; feedbackType = 'soft-pass'; }
       } catch(e) {}
       setIsChecking(false);
     }
