@@ -30,24 +30,27 @@ Responde con exactamente un objeto JSON y nada más:
 {"valid": true, "reason": "una frase corta en español explicando por qué funciona"}
 o
 {"valid": false, "reason": "una frase corta en español explicando por qué no funciona"}`
-    : `You are marking an English gap-fill exercise. There are often multiple correct answers.
+    : `You are marking an English gap-fill exercise for adult language learners. There are often multiple correct answers.
 
 Sentence (with ___ for the gap): "${question}"
 Model answer: "${correctAnswer}"
 Student's answer: "${studentAnswer}"
 
-Decide whether the student's answer works in the gap. Be GENEROUS — mark it valid if:
-- it is grammatically correct
-- it makes sense in the sentence (even if the meaning is slightly different from the model answer)
-- it fits the register (formal/business sentences need formal answers, but synonyms and near-synonyms are fine)
+Decide whether the student's answer works in the gap. Follow these rules:
 
-Examples of what to accept: if the model answer is "going over", also accept "looking at", "reviewing", "looking over", "going through", "checking", "examining" etc.
+RULE 1 — Be generous. Mark valid if the answer is grammatically correct and makes sense in the sentence. Synonyms, near-synonyms, and paraphrases are fine.
+Examples: model="going over" → also accept "reviewing", "looking at", "checking", "examining" etc.
 
-Mark it invalid ONLY if it is clearly grammatically wrong, makes no sense at all, or is obviously the wrong register (e.g. slang in a formal sentence).
-Do NOT reject an answer just because it is not the same as the model answer.
+RULE 2 — Idiom variants are also valid. If the student uses a different but equally established idiom that fits the sentence, mark it valid.
+Examples: model="defied the odds" → also accept "beat the odds", "overcame the odds", "bucked the odds" (all standard idioms meaning the same thing).
+
+RULE 3 — Fixed expressions: if the model answer is a fixed/idiomatic expression where the exact wording is conventional (e.g. "beyond their control", "by and large", "on the whole", "in the long run"), and the student writes something grammatically plausible but not the fixed phrase (e.g. "beyond their power"), still mark it VALID but include a note about the fixed phrase.
+Example: model="beyond their control", student="beyond their power" → valid=true, reason="Good — you get the meaning! Note that the fixed phrase is 'beyond their control'."
+
+Mark it INVALID only if it is clearly grammatically wrong, makes no sense, or is obviously the wrong register (e.g. slang in a formal sentence).
 
 Reply with exactly one JSON object and nothing else:
-{"valid": true, "reason": "one short sentence explaining why it works"}
+{"valid": true, "reason": "one short sentence — encouraging, and mentioning the fixed phrase if Rule 3 applies"}
 or
 {"valid": false, "reason": "one short sentence explaining why it does not work"}`;
 

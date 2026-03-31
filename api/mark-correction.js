@@ -7,7 +7,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en' } = req.body;
+  const { originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en', level = 'B1' } = req.body;
 
   if (!originalSentence || !errorWord || !studentReplacement || !correctAnswerSentence) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -31,7 +31,7 @@ Responde con exactamente un objeto JSON y nada más:
 {"valid": true, "reason": "una frase corta en español explicando por qué funciona"}
 o
 {"valid": false, "reason": "una frase corta en español explicando por qué no funciona"}`
-    : `You are marking an English error correction exercise.
+    : `You are marking an English error correction exercise for an adult learner at level ${level}.
 
 Original sentence (contains one error): "${originalSentence}"
 The error word is: "${errorWord}"
@@ -42,10 +42,15 @@ Decide: is the student's replacement grammatically correct AND does it fix the e
 Only answer YES if their word genuinely works as a valid correction, even if different from the model answer.
 Answer NO if it is grammatically wrong, changes the meaning inappropriately, or does not fix the error.
 
+FEEDBACK LENGTH — match the student's level:
+- A1/A2: maximum 1 sentence. Simple words only. Do not explain grammar rules.
+- B1/B2: 1-2 sentences. A brief reason is fine.
+- C1/C2: up to 2-3 sentences. Can include grammar terminology if relevant.
+
 Reply with exactly one JSON object and nothing else:
-{"valid": true, "reason": "one short sentence explaining why it works"}
+{"valid": true, "reason": "short encouraging sentence"}
 or
-{"valid": false, "reason": "one short sentence explaining why it does not work"}`;
+{"valid": false, "reason": "short explanation at the right level"}`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {

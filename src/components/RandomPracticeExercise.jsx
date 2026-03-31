@@ -113,11 +113,11 @@ const aiMarkGapFill = async (question, correctAnswer, studentAnswer, language = 
   } catch (e) { console.error('AI gap fill marking error:', e); return null; }
 };
 
-const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en') => {
+const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en', level = 'B1') => {
   try {
     const response = await fetch('/api/mark-correction', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ originalSentence, errorWord, studentReplacement, correctAnswerSentence, language }),
+      body: JSON.stringify({ originalSentence, errorWord, studentReplacement, correctAnswerSentence, language, level }),
     });
     if (!response.ok) return null;
     const result = await response.json();
@@ -429,7 +429,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setIsChecking(true);
       const aiResult = await aiMarkDictation(correct, answer);
       setIsChecking(false);
-      if (aiResult?.accepted) {
+      if (aiResult?.valid) {
         isCorrect = true; isSoftPass = true; feedbackType = 'soft-pass';
       }
     }
@@ -492,7 +492,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
     setIsChecking(true);
     const lang = getQuestionLanguage(cq);
-    const aiResult = await aiMarkCorrection(cq.question, words[ecSelectedWordIndex], ecCorrection.trim(), correctAnswer, lang);
+    const aiResult = await aiMarkCorrection(cq.question, words[ecSelectedWordIndex], ecCorrection.trim(), correctAnswer, lang, cq.level);
     setIsChecking(false);
 
     if (aiResult?.valid) {
