@@ -216,21 +216,30 @@ or
 }
 
 // ── SHARED AI CALLER ─────────────────────────────────────────────────────────
+const TIMEOUT_MS = 12000;
 async function callAI(prompt, maxTokens, res, label) {
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: maxTokens,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    let response;
+    try {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: maxTokens,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
     if (!response.ok) {
       console.error(`${label} Anthropic error:`, await response.text());
       return res.status(502).json({ error: 'AI service error', valid: null });
@@ -239,13 +248,16 @@ async function callAI(prompt, maxTokens, res, label) {
     const text = data.content?.find(b => b.type === 'text')?.text || '';
     const clean = text.replace(/```json|```/g, '').trim();
     const result = JSON.parse(clean);
-    // Normalise feedback/reason fields for sentence handler callers
     return res.status(200).json({
       valid: result.valid,
       feedback: result.feedback || result.reason || '',
       reason: result.reason || result.feedback || '',
     });
   } catch (e) {
+    if (e.name === 'AbortError') {
+      console.error(`${label} timed out after ${TIMEOUT_MS}ms`);
+      return res.status(200).json({ valid: null, reason: '', feedback: '' });
+    }
     console.error(`${label} error:`, e);
     return res.status(200).json({ valid: null, reason: '', feedback: '' });
   }
