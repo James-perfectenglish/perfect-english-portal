@@ -118,10 +118,10 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
     if (!sentence.trim() || isMarking || !word) return
     setIsMarking(true)
     try {
-      const response = await fetch('/api/mark-sentence', {
+      const response = await fetch('/api/mark-free', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          word: word.word, partOfSpeech: word.part_of_speech,
+          type: 'sentence', word: word.word, partOfSpeech: word.part_of_speech,
           definition: word.definition, studentSentence: sentence.trim(), language: word.language
         })
       })

@@ -54,12 +54,12 @@ const findErrorIndex = (questionWords, correctAnswer) => {
 
 const getQuestionLanguage = (question) => question?.topic === 'spanish' || question?.language === 'es' ? 'es' : 'en';
 
-const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en') => {
+const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en', level = 'B1') => {
   try {
-    const response = await fetch('/api/mark-correction', {
+    const response = await fetch('/api/mark-free', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ originalSentence, errorWord, studentReplacement, correctAnswerSentence, language })
+      body: JSON.stringify({ type: 'correction', originalSentence, errorWord, studentReplacement, correctAnswerSentence, language, level })
     });
     if (!response.ok) return null;
     const result = await response.json();

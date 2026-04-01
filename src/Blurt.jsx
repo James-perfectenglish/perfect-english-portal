@@ -180,10 +180,11 @@ export default function Blurt({ user, profileOverride = null }) {
     const cat = selectedRef.current;
     if (!cat) return;
     try {
-      const res = await fetch('/api/mark-blurt', {
+      const res = await fetch('/api/mark-game', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          type: 'blurt',
           categoryName: cat.name,
           scoringInstructions: cat.scoring_instructions,
           hasPenalty: cat.has_penalty,

@@ -299,7 +299,7 @@ function InteractiveQuestion({ item: q }) {
       if (!isCorrect) {
         setIsChecking(true);
         try {
-          const res  = await fetch('/api/mark-gap-fill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q.question, correctAnswer, studentAnswer: userAnswer.trim(), language: _qLang(q) }) });
+          const res  = await fetch('/api/mark-gap', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'gap_fill', question: q.question, correctAnswer, studentAnswer: userAnswer.trim(), language: _qLang(q) }) });
           const data = await res.json();
           if (data?.valid) { isCorrect = true; feedbackType = 'soft-pass'; if (data.reason) explanation = data.reason + ' ' + explanation; }
         } catch(e) {}
@@ -323,7 +323,7 @@ function InteractiveQuestion({ item: q }) {
     if (!isCorrect) {
       setIsChecking(true);
       try {
-        const res  = await fetch('/api/mark-dictation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ correctAnswer: correct, studentAnswer: answer, excerptType: q.excerpt_type || 'phrase', acceptableAlternatives: q.acceptable_alternatives || [] }) });
+        const res  = await fetch('/api/mark-gap', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'dictation', correctAnswer: correct, studentAnswer: answer, excerptType: q.excerpt_type || 'phrase', acceptableAlternatives: q.acceptable_alternatives || [] }) });
         const data = await res.json();
         if (data?.valid) { isCorrect = true; feedbackType = 'soft-pass'; }
       } catch(e) {}
@@ -364,7 +364,7 @@ function InteractiveQuestion({ item: q }) {
     setIsChecking(true);
     let aiResult = null;
     try {
-      const res = await fetch('/api/mark-correction', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ originalSentence: q.question, errorWord: words[ecSelectedWordIndex], studentReplacement: ecCorrection.trim(), correctAnswerSentence: correctAnswer, language: _qLang(q) }) });
+      const res = await fetch('/api/mark-free', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'correction', originalSentence: q.question, errorWord: words[ecSelectedWordIndex], studentReplacement: ecCorrection.trim(), correctAnswerSentence: correctAnswer, language: _qLang(q), level: q.level }) });
       aiResult = await res.json();
     } catch(e) {}
     setIsChecking(false);

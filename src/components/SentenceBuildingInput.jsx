@@ -5,7 +5,7 @@ function normalizeAnswer(words) { let result = words.map(w => w.text).join(' ');
 
 const aiMarkSentence = async (correctAnswer, studentAnswer, language = 'en') => {
   try {
-    const response = await fetch('/api/mark-word-order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ correctAnswer, studentAnswer, language }) });
+    const response = await fetch('/api/mark-free', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'word_order', correctAnswer, studentAnswer, language }) });
     if (!response.ok) return null;
     const result = await response.json();
     if (result.valid === null) return null;

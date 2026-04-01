@@ -259,14 +259,16 @@ export default function Dictation({ onBack, userTracks = [] }) {
     if (resultType === 'incorrect') {
       setIsChecking(true);
       try {
-        const response = await fetch('/api/mark-dictation', {
+        const response = await fetch('/api/mark-gap', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            type: 'dictation',
             correctAnswer: correct,
             studentAnswer: student,
             excerptType: currentExercise.excerpt_type,
             language: currentExercise.language || 'en',
+            acceptableAlternatives: currentExercise.acceptable_alternatives || [],
           }),
         });
         if (response.ok) {

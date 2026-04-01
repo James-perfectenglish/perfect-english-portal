@@ -189,10 +189,11 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
     const results = await Promise.all(
       gapQuestions.map(async (q) => {
         try {
-          const res = await fetch('/api/mark-listening-gap', {
+          const res = await fetch('/api/mark-gap', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+              type: 'listening',
               student_answer: detailAnswers[q.id] || '',
               correct_answer: q.correct_answer,
               question: q.question,

@@ -102,9 +102,9 @@ const getQuestionLanguage = (question) => question?.topic === 'spanish' || quest
 
 const aiMarkGapFill = async (question, correctAnswer, studentAnswer, language = 'en') => {
   try {
-    const response = await fetch('/api/mark-gap-fill', {
+    const response = await fetch('/api/mark-gap', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, correctAnswer, studentAnswer, language }),
+      body: JSON.stringify({ type: 'gap_fill', question, correctAnswer, studentAnswer, language }),
     });
     if (!response.ok) return null;
     const result = await response.json();
@@ -115,9 +115,9 @@ const aiMarkGapFill = async (question, correctAnswer, studentAnswer, language = 
 
 const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en', level = 'B1') => {
   try {
-    const response = await fetch('/api/mark-correction', {
+    const response = await fetch('/api/mark-free', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ originalSentence, errorWord, studentReplacement, correctAnswerSentence, language, level }),
+      body: JSON.stringify({ type: 'correction', originalSentence, errorWord, studentReplacement, correctAnswerSentence, language, level }),
     });
     if (!response.ok) return null;
     const result = await response.json();
@@ -128,9 +128,9 @@ const aiMarkCorrection = async (originalSentence, errorWord, studentReplacement,
 
 const aiMarkDictation = async (correctAnswer, studentAnswer, excerptType = 'phrase', acceptableAlternatives = []) => {
   try {
-    const response = await fetch('/api/mark-dictation', {
+    const response = await fetch('/api/mark-gap', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ correctAnswer, studentAnswer, excerptType, acceptableAlternatives }),
+      body: JSON.stringify({ type: 'dictation', correctAnswer, studentAnswer, excerptType, acceptableAlternatives }),
     });
     if (!response.ok) return null;
     const result = await response.json();

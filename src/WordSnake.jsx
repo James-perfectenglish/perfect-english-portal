@@ -376,9 +376,9 @@ export default function WordSnake({ user, profileOverride = null }) {
     else setChecking(true);
 
     try {
-      const res    = await fetch('/api/validate-word-snake', {
+      const res    = await fetch('/api/mark-game', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word, category_name: cat.name, ai_prompt: cat.ai_prompt }),
+        body: JSON.stringify({ type: 'word_snake', word, category_name: cat.name, ai_prompt: cat.ai_prompt }),
       });
       const result = await res.json();
 
