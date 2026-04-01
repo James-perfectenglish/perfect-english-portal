@@ -47,7 +47,7 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
   const [community, setCommunity]   = useState([])
   const [expanded, setExpanded]     = useState(!collapsible)
 
-  const isSpanish = Array.isArray(profile?.tracks) && profile.tracks.includes('spanish')
+  const isSpanish = (Array.isArray(profile?.tracks) && profile.tracks.includes('spanish')) || profile?.level === 'Spanish'
   const bucket    = levelBucket(profile?.level)
   const today     = new Date().toISOString().split('T')[0]
 

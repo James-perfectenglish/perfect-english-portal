@@ -236,10 +236,10 @@ export default function ConnectionsGame({ onBack, userProfile }) {
     if (!sentenceInput.trim() || sentenceChecking || !chosenWord) return
     setSentenceChecking(true)
     try {
-      const res = await fetch('/api/mark-sentence', {
+      const res = await fetch('/api/mark-free', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: chosenWord.toLowerCase(), sentence: sentenceInput.trim(), language }),
+        body: JSON.stringify({ type: 'sentence', word: chosenWord.toLowerCase(), sentence: sentenceInput.trim(), language }),
       })
       const data = await res.json()
       setSentenceFeedback(data)

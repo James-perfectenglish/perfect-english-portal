@@ -233,7 +233,7 @@ function StudentRoutes({ session, profile, handleLogout }) {
       <Route path="/blurt"        element={<Blurt user={session.user} />} />
       <Route path="/wordsnake"    element={<WordSnake user={session.user} />} />
       <Route path="/wordle"       element={<WordleGame onBack={() => navigate(-1)} />} />
-      <Route path="/connections"  element={<ConnectionsGame onBack={() => navigate(-1)} />} />
+      <Route path="/connections"  element={<ConnectionsGame onBack={() => navigate(-1)} userProfile={profile} />} />
       <Route path="/exercises" element={<Navigate to="/learn" replace />} />
       <Route path="*"          element={<Navigate to="/" replace />} />
     </Routes>
@@ -258,7 +258,7 @@ function TeacherRoutes({ session, profile, effectiveProfile, teacherTrack, globa
       <Route path="/blurt"     element={<Blurt user={session.user} profileOverride={teacherTrack !== 'en' ? effectiveProfile : null} />} />
       <Route path="/wordsnake" element={<WordSnake user={session.user} profileOverride={teacherTrack !== 'en' ? effectiveProfile : null} />} />
       <Route path="/wordle"       element={<WordleGame onBack={() => nav(-1)} />} />
-      <Route path="/connections"  element={<ConnectionsGame onBack={() => nav(-1)} />} />
+      <Route path="/connections"  element={<ConnectionsGame onBack={() => nav(-1)} userProfile={effectiveProfile} />} />
       <Route path="/teacher"   element={<TeacherDashboard profile={profile} handleLogout={handleLogout} />} />
       <Route path="/teacher/browse" element={<TeacherBrowse user={session.user} globalLang={globalLang} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
