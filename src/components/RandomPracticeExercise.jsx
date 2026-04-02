@@ -764,6 +764,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   };
 
   return (
+    <>
     <div style={{ width: '100%', minHeight: '100vh', backgroundColor: '#f8f9fa', boxSizing: 'border-box' }}>
       <div style={{ padding: '1rem', width: '100%', boxSizing: 'border-box' }}>
 
@@ -1088,7 +1089,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       </div>
     </div>
 
-
     {showChallenge && challengeWord && (
       <SentenceChallenge
         word={challengeWord}
@@ -1096,5 +1096,6 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         onClose={handleChallengeClose}
       />
     )}
+    </>
   );
 }
