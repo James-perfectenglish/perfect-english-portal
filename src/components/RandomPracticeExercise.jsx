@@ -1082,6 +1082,5 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       </div>
     </div>
 
-    {/* Sentence Challenge overlay — component coming soon */}
   );
 }
