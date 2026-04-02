@@ -244,7 +244,7 @@ export default function SentenceChallenge({ word, language = 'en', onClose }) {
               color: earnedStar ? '#276749' : '#c53030',
               fontSize: '0.95rem', lineHeight: 1.6, fontWeight: '500',
             }}>
-              {earnedStar ? '✅ ' : '❌ '}{result.feedback || result.reason}
+              {earnedStar ? '✅ ' : '❌ '}{result.feedback || result.reason || (earnedStar ? (isSpanish ? '¡Bien hecho!' : 'Well done!') : (isSpanish ? '¡Inténtalo de nuevo!' : 'Try again!'))}
             </div>
             <button onClick={() => { stopRecordingCleanup(); onClose(earnedStar); }}
               style={{ width: '100%', padding: '1rem', borderRadius: '10px', background: PG, color: 'white', border: 'none', fontSize: '1rem', cursor: 'pointer', fontWeight: '700' }}>

@@ -23,9 +23,10 @@ Pregunta (con ___ para el hueco): "${question}"
 Respuesta correcta del modelo: "${correctAnswer}"
 Respuesta del alumno: "${studentAnswer}"
 
-¿Es la respuesta del alumno gramaticalmente correcta y adecuada para este contexto, aunque sea diferente a la respuesta del modelo?
-Responde SÍ sólo si funciona de verdad en el hueco — misma forma verbal, concordancia correcta, significado apropiado.
-Responde NO si es incorrecta, tiene errores gramaticales o cambia el significado.
+¿Es la respuesta del alumno gramaticalmente correcta y tiene sentido en el hueco, aunque sea diferente a la respuesta del modelo?
+Sé generoso/a: acepta sinónimos, palabras alternativas que funcionen en el hueco, y variantes que expresen un significado similar.
+Por ejemplo, si el modelo es "aunque" y el alumno escribe "pero", ambas son conjunciones que crean contraste y son gramaticalmente correctas — acéptalo.
+Responde NO solo si es claramente incorrecta gramaticalmente o no tiene ningún sentido en el contexto.
 
 Responde con exactamente un objeto JSON y nada más:
 {"valid": true, "reason": "una frase corta en español explicando por qué funciona"}

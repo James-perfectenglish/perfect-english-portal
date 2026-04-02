@@ -133,9 +133,11 @@ function getChallengeWord(question) {
   if (!question || question.type === 'matching') return null;
   const sourceText = question.correct_answer || '';
   if (!sourceText) return null;
-  const words = sourceText.split(/\s+/).map(w => w.replace(/[.,!?;:'\'"()]/g, '').toLowerCase()).filter(Boolean);
-  const candidates = words.filter(w => w.length > 3 && !STOP_WORDS.has(w));
-  if (candidates.length === 0) return words.find(w => w.length > 2) || null;
+  // Preserve original capitalisation for proper nouns
+  const rawWords = sourceText.split(/\s+/).map(w => w.replace(/[.,!?;:'\'"()]/g, '')).filter(Boolean);
+  const words = rawWords.map(w => w.toLowerCase());
+  const candidates = rawWords.filter((w, i) => words[i].length > 3 && !STOP_WORDS.has(words[i]));
+  if (candidates.length === 0) return rawWords.find((w, i) => words[i].length > 2) || null;
   // Prefer longest candidate — most likely to be the key vocabulary item
   return candidates.sort((a, b) => b.length - a.length)[0] || null;
 }
@@ -1049,7 +1051,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
               <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', marginBottom: '1.5rem', color: '#666' }}>
                 {scorePercent >= 90 ? '🌟 Outstanding work!' : scorePercent >= 75 ? '👍 Great job!' : scorePercent >= 50 ? '👌 Good effort!' : '💪 Keep practicing!'}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: bestScore !== null ? '1fr 1fr 1fr' : '1fr', gap: '1rem', marginBottom: '2rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: bestScore !== null ? 'repeat(3, minmax(0, 1fr))' : '1fr', gap: '0.5rem', marginBottom: '2rem' }}>
                 <div style={{ background: displayGradient, borderRadius: '12px', padding: '1.25rem 1rem', color: 'white' }}>
                   <div style={{ fontSize: '0.8rem', fontWeight: '600', opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.4rem' }}>This attempt</div>
                   <div style={{ fontSize: 'clamp(2rem, 8vw, 2.5rem)', fontWeight: '700', lineHeight: 1.1 }}>{score}/{questions.length}</div>

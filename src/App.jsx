@@ -232,7 +232,7 @@ function StudentRoutes({ session, profile, handleLogout }) {
       <Route path="/lyrics"       element={<LyricsExercise user={session.user} />} />
       <Route path="/blurt"        element={<Blurt user={session.user} />} />
       <Route path="/wordsnake"    element={<WordSnake user={session.user} />} />
-      <Route path="/wordle"       element={<WordleGame onBack={() => navigate(-1)} />} />
+      <Route path="/wordle"       element={<WordleGame onBack={() => navigate(-1)} profile={profile} />} />
       <Route path="/connections"  element={<ConnectionsGame onBack={() => navigate(-1)} userProfile={profile} />} />
       <Route path="/exercises" element={<Navigate to="/learn" replace />} />
       <Route path="*"          element={<Navigate to="/" replace />} />

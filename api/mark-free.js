@@ -39,10 +39,12 @@ Evalúa con rigor:
 - ¿Es gramaticalmente correcta?
 - ¿Usa "${word}" de forma apropiada y con sentido?
 
-Acepta frases creativas o sencillas siempre que sean gramaticalmente correctas. No aceptes frases con errores gramaticales importantes.
-Sé cálido/a pero exigente — esto es un ejercicio, no un juego.
+Acepta frases creativas o sencillas.
+Si el único error es de género (el/la, un/una), márcalo como válido (valid=true) pero menciona el error con amabilidad en el feedback.
+Si hay errores gramaticales más importantes (tiempo verbal incorrecto, estructura rota), márcalo como inválido.
+Sé cálido/a y alentador/a — esto es un ejercicio de aprendizaje.
 
-JSON: {"valid": true, "feedback": "una frase cálida"} o {"valid": false, "feedback": "corrección amable y clara"}`
+JSON: {"valid": true, "feedback": "feedback cálido, menciona cualquier detalle menor"} o {"valid": false, "feedback": "corrección amable y clara"}`
       : `You are an English teacher marking a sentence challenge exercise.
 
 The student was asked to write a sentence using the word: "${word}"

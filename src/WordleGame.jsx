@@ -100,8 +100,9 @@ export default function WordleGame({ onBack }) {
     const { data: { user } } = await supabase.auth.getUser()
     let lang = location.state?.isSpanish ? 'es' : 'en'
     if (lang === 'en' && user) {
-      const { data: prof } = await supabase.from('profiles').select('tracks').eq('id', user.id).single()
-      if ((prof?.tracks || []).includes('spanish')) { setIsSpanish(true); lang = 'es' }
+      const { data: prof } = await supabase.from('profiles').select('tracks, level').eq('id', user.id).single()
+      const isSpanishProfile = (prof?.tracks || []).map(t => t.toLowerCase()).includes('spanish') || prof?.level === 'Spanish'
+      if (isSpanishProfile) { setIsSpanish(true); lang = 'es' }
     }
 
     const { data: wordRow } = await supabase
