@@ -217,9 +217,24 @@ if (typeof document !== 'undefined' && !document.getElementById(TB_STYLE_ID)) {
 
 const _isFuzzy = (studentAnswer, correctAnswers) => {
   for (const correct of correctAnswers) {
-    const dist = levenshtein(studentAnswer, correct);
-    if (dist === 1) return true;
-    if (dist === 2 && correct.length >= 6) return true;
+    if (!correct.includes(' ') && !studentAnswer.includes(' ')) {
+      const dist = levenshtein(studentAnswer, correct);
+      if (dist === 1) return true;
+      if (dist === 2 && correct.length >= 6) return true;
+      continue;
+    }
+    const sWords = studentAnswer.split(/\s+/);
+    const cWords = correct.split(/\s+/);
+    if (sWords.length !== cWords.length) continue;
+    let diffs = 0, diffOk = true;
+    for (let i = 0; i < cWords.length; i++) {
+      const d = levenshtein(sWords[i] || '', cWords[i] || '');
+      if (d > 0) {
+        diffs++;
+        if (cWords[i].length < 5 || d > 2) diffOk = false;
+      }
+    }
+    if (diffs === 1 && diffOk) return true;
   }
   return false;
 };

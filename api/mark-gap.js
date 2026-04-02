@@ -37,9 +37,11 @@ Sentence (with ___ for the gap): "${question}"
 Model answer: "${correctAnswer}"
 Student's answer: "${studentAnswer}"
 
-RULE 1 — Be generous. Mark valid if grammatically correct and makes sense. Synonyms and paraphrases are fine.
-RULE 2 — Idiom variants are valid. "beat the odds" = "defied the odds" etc.
-RULE 3 — Fixed expressions: give the point but note the correct fixed phrase in the reason.
+RULE 1 — Be generous. Mark valid if grammatically correct and makes sense in the gap.
+RULE 2 — Synonyms and vocabulary alternatives are always valid — e.g. "rent" = "hire", "purchase" = "buy".
+RULE 3 — British/American English variants are always valid — "hire/rent", "autumn/fall", "lift/elevator", etc.
+RULE 4 — Idiom variants are valid. "beat the odds" = "defied the odds" etc.
+RULE 5 — Fixed expressions: give the point but note the correct fixed phrase in the reason.
 Example: model="beyond their control", student="beyond their power" → valid=true, reason="Good — the fixed phrase is 'beyond their control'."
 
 Mark INVALID only if clearly wrong grammar, nonsensical, or badly wrong register.
@@ -107,7 +109,7 @@ Student's answer: "${studentAnswer}"
 1. Ignore capitalisation and punctuation differences.
 2. Accept minor spelling mistakes if the intended word is obvious.
 3. The student may omit degree modifiers or attributive adjectives (e.g. "busy" for "very busy", "compromise" for "sensible compromise") as long as the core word is present in the correct form. Note the full phrase in your reason.
-4. The core word must be in the correct form — "rain" is NOT acceptable for "raining heavily".
+4. The core word must be in the correct form (e.g. verb tense, noun form must match).
 5. A modifier alone without the core word is NOT acceptable.
 ${excerptType === 'sentence' ? '6. For full sentences, all key words must be present — but rule 3 still applies.' : ''}
 

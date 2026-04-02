@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import SentenceBuildingInput from './SentenceBuildingInput';
 import MatchingPairs from './MatchingPairs';
+// SentenceChallenge import — component in progress, stub prevents build errors
 import { LevelBadge, TypeBadge, AiMarkedBadge, TopicBadge } from './BadgePill';
 
 // ── Question mix per round (easy to tweak!) ──
@@ -78,9 +79,27 @@ function levenshtein(a, b) {
 
 function isFuzzyMatch(studentAnswer, correctAnswers) {
   for (const correct of correctAnswers) {
-    const dist = levenshtein(studentAnswer, correct);
-    if (dist === 1) return true;
-    if (dist === 2 && correct.length >= 6) return true;
+    // Single-word answers: standard fuzzy (typo detection)
+    if (!correct.includes(' ') && !studentAnswer.includes(' ')) {
+      const dist = levenshtein(studentAnswer, correct);
+      if (dist === 1) return true;
+      if (dist === 2 && correct.length >= 6) return true;
+      continue;
+    }
+    // Multi-word: only fuzzy if exactly one word differs AND that word is long enough to be a typo
+    // This prevents "have got" passing for "has got" (grammar error, not typo)
+    const sWords = studentAnswer.split(/\s+/);
+    const cWords = correct.split(/\s+/);
+    if (sWords.length !== cWords.length) continue;
+    let diffs = 0, diffOk = true;
+    for (let i = 0; i < cWords.length; i++) {
+      const d = levenshtein(sWords[i] || '', cWords[i] || '');
+      if (d > 0) {
+        diffs++;
+        if (cWords[i].length < 5 || d > 2) diffOk = false;
+      }
+    }
+    if (diffs === 1 && diffOk) return true;
   }
   return false;
 }
@@ -99,6 +118,27 @@ const findErrorIndex = (questionWords, correctAnswer) => {
 };
 
 const getQuestionLanguage = (question) => question?.topic === 'spanish' || question?.language === 'es' ? 'es' : 'en';
+
+// ── Extract a meaningful word from the answered question for the sentence challenge ──
+const STOP_WORDS = new Set([
+  'a','an','the','in','on','at','to','for','of','and','or','but','is','are','was','were',
+  'be','been','have','has','had','do','does','did','will','would','could','should','may',
+  'might','must','can','it','he','she','they','we','i','you','my','his','her','their',
+  'our','your','its','this','that','these','those','not','no','so','as','by','up','out',
+  'off','if','than','then','with','from','into','about','over','after','before','just',
+  'very','too','also','back','more','some','all','one','two','its','got',
+]);
+
+function getChallengeWord(question) {
+  if (!question || question.type === 'matching') return null;
+  const sourceText = question.correct_answer || '';
+  if (!sourceText) return null;
+  const words = sourceText.split(/\s+/).map(w => w.replace(/[.,!?;:'\'"()]/g, '').toLowerCase()).filter(Boolean);
+  const candidates = words.filter(w => w.length > 3 && !STOP_WORDS.has(w));
+  if (candidates.length === 0) return words.find(w => w.length > 2) || null;
+  // Prefer longest candidate — most likely to be the key vocabulary item
+  return candidates.sort((a, b) => b.length - a.length)[0] || null;
+}
 
 const aiMarkGapFill = async (question, correctAnswer, studentAnswer, language = 'en') => {
   try {
@@ -177,6 +217,11 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const [matchingDone, setMatchingDone] = useState(false);
   const audioRef = useRef(null);
   const [audioPlayed, setAudioPlayed] = useState(false);
+
+  // ── Sentence challenge ──
+  const [challengePositions, setChallengePositions] = useState(new Set());
+  const [showChallenge, setShowChallenge] = useState(false);
+  const [challengeWord, setChallengeWord] = useState('');
 
   useEffect(() => { window.scrollTo(0, 0); }, [stage]);
 
@@ -341,6 +386,19 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         return;
       }
 
+      // Pick 2 random positions for sentence challenge (avoid last question)
+      const totalQs = allQuestions.length;
+      const positions = new Set();
+      const eligible = allQuestions
+        .map((_, i) => i)
+        .filter((_, i) => allQuestions[i]?.type !== 'matching');
+      const shuffledEligible = shuffleArray(eligible);
+      for (const idx of shuffledEligible) {
+        if (positions.size >= 2) break;
+        positions.add(idx);
+      }
+      setChallengePositions(positions);
+
       setQuestions(allQuestions);
       setStage('playing');
       setCurrentQuestionIndex(0);
@@ -356,6 +414,8 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setShowHint(false);
       setIsChecking(false);
       setAudioPlayed(false);
+      setShowChallenge(false);
+      setChallengeWord('');
     } catch (error) {
       console.error('Error fetching questions:', error);
       alert('Failed to load questions. Please try again.');
@@ -424,6 +484,13 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     }
     if (!isCorrect && isFuzzyMatch(normaliseDictation(answer), [normaliseDictation(correct)])) {
       isCorrect = true; feedbackType = 'fuzzy';
+    }
+    // Check acceptable_alternatives locally before hitting the API
+    if (!isCorrect && Array.isArray(cq.acceptable_alternatives) && cq.acceptable_alternatives.length > 0) {
+      const norm = s => s.toLowerCase().trim().replace(/[.,!?;:'"]/g, '');
+      if (cq.acceptable_alternatives.map(norm).includes(norm(answer))) {
+        isCorrect = true; feedbackType = 'soft-pass';
+      }
     }
     if (!isCorrect) {
       setIsChecking(true);
@@ -533,11 +600,21 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const handleMatchingResult = (isCorrect, wrongAttempts) => {
     const cq = questions[currentQuestionIndex];
     setMatchingDone(true);
-    const msg = isCorrect
-      ? `✅ Perfect matching! ${cq.explanation || ''}`
-      : `👍 All matched! You had ${wrongAttempts} wrong attempt${wrongAttempts !== 1 ? 's' : ''}. ${cq.explanation || ''}`;
-    setFeedback({ message: msg, type: isCorrect ? 'correct' : 'incorrect', isCorrect });
-    if (isCorrect) setScore(s => s + 1);
+    // Leniency: 0 wrong = perfect (star), 1–2 wrong = soft pass (no star), 3+ = fail
+    const leniencyPass = !isCorrect && wrongAttempts <= 2;
+    let msg, type;
+    if (isCorrect) {
+      msg = `✅ Perfect matching! ${cq.explanation || ''}`;
+      type = 'correct';
+    } else if (leniencyPass) {
+      msg = `✅ All matched! Watch a couple of those — try to be more decisive next time. ${cq.explanation || ''}`;
+      type = 'soft-pass';
+    } else {
+      msg = `❌ All matched — but ${wrongAttempts} wrong attempt${wrongAttempts !== 1 ? 's' : ''} along the way. Review those pairs! ${cq.explanation || ''}`;
+      type = 'incorrect';
+    }
+    setFeedback({ message: msg, type, isCorrect: isCorrect || leniencyPass });
+    if (isCorrect) setScore(s => s + 1); // No star for leniency pass
     saveAnswer(cq, isCorrect ? 'all_matched_clean' : `${wrongAttempts}_wrong`, isCorrect);
   };
 
@@ -554,8 +631,12 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     };
   };
 
-  const nextQuestion = () => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
+  // ── Advance to next question (called after challenge closes, or directly if no challenge) ──
+  const advanceQuestion = (bonusScore = 0) => {
+    if (bonusScore) {
+      scoreRef.current = scoreRef.current + bonusScore;
+      setScore(s => s + bonusScore);
+    }
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setUserAnswer('');
@@ -572,6 +653,19 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     } else {
       finishExercise();
     }
+  };
+
+  const nextQuestion = () => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    // Sentence challenge: disabled until SentenceChallenge component is built
+    // challengePositions and showChallenge state are ready — just needs the overlay
+    advanceQuestion();
+  };
+
+  const handleChallengeClose = (earnedStar) => {
+    setShowChallenge(false);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    advanceQuestion(earnedStar ? 1 : 0);
   };
 
   const retry = () => { startExercise(); };
@@ -987,5 +1081,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
       </div>
     </div>
+
+    {/* Sentence Challenge overlay — component coming soon */}
   );
 }

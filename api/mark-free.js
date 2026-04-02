@@ -12,12 +12,14 @@ export default async function handler(req, res) {
 
 // ── SENTENCE (WOTD + Wordle) ──────────────────────────────────────────────────
 async function handleSentence(req, res) {
-  const { word, partOfSpeech, definition, studentSentence, sentence, language } = req.body
+  const { word, partOfSpeech, definition, studentSentence, sentence, language, context } = req.body
 
-  // Wordle mode: called with { word, sentence, language }
-  // WOTD mode:   called with { word, partOfSpeech, definition, studentSentence, language }
-  const isWordle    = !definition
-  const thesentence = isWordle ? sentence : studentSentence
+  // Challenge mode: called with { word, sentence, context: 'challenge', language }
+  // Wordle mode:    called with { word, sentence, language }
+  // WOTD mode:      called with { word, partOfSpeech, definition, studentSentence, language }
+  const isChallenge = context === 'challenge'
+  const isWordle    = !definition && !isChallenge
+  const thesentence = (isWordle || isChallenge) ? sentence : studentSentence
   const isSpanish   = language === 'es'
 
   if (!word || !thesentence) {
@@ -25,6 +27,40 @@ async function handleSentence(req, res) {
   }
 
   let prompt
+
+  if (isChallenge) {
+    prompt = isSpanish
+      ? `Eres un profesor de español corrigiendo un reto de frase. El alumno debe escribir una frase en español usando la palabra "${word}".
+
+Frase del alumno: "${thesentence}"
+
+Evalúa con rigor:
+- ¿La frase está en español?
+- ¿Es gramaticalmente correcta?
+- ¿Usa "${word}" de forma apropiada y con sentido?
+
+Acepta frases creativas o sencillas siempre que sean gramaticalmente correctas. No aceptes frases con errores gramaticales importantes.
+Sé cálido/a pero exigente — esto es un ejercicio, no un juego.
+
+JSON: {"valid": true, "feedback": "una frase cálida"} o {"valid": false, "feedback": "corrección amable y clara"}`
+      : `You are an English teacher marking a sentence challenge exercise.
+
+The student was asked to write a sentence using the word: "${word}"
+Their sentence: "${thesentence}"
+
+Mark strictly for:
+1. Grammatical correctness — errors in tense, subject-verb agreement, articles, or word form = invalid
+2. Appropriate use of "${word}" — the word must be used naturally and meaningfully
+
+Accept creative or simple sentences if grammatically correct. Do NOT accept sentences with significant grammar errors — this is a learning exercise, not a game.
+Be warm and encouraging even when incorrect. Keep feedback to 1-2 sentences.
+
+Reply ONLY with JSON:
+{"valid": true, "feedback": "warm praise + brief note on why it works"}
+or
+{"valid": false, "feedback": "kind correction — what was wrong and how to fix it"}`
+    return callAI(prompt, 150, res, 'mark-free.challenge')
+  }
 
   if (isWordle) {
     prompt = isSpanish
@@ -92,24 +128,32 @@ or
 {"valid": false, "feedback": "one kind sentence explaining the issue and how to improve"}`
   }
 
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 12000)
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 150,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    })
+    let response
+    try {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 150,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+        signal: controller.signal,
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
 
     if (!response.ok) {
       console.error('Anthropic API error:', await response.text())
-      return res.status(502).json({ error: 'AI service error', valid: null })
+      return res.status(502).json({ error: 'AI service error', valid: null, feedback: '', reason: '' })
     }
 
     const data = await response.json()
@@ -126,8 +170,7 @@ or
 
   } catch (e) {
     console.error('mark-sentence error:', e)
-    const fallback = isSpanish ? '¡Buen intento!' : 'Good effort!'
-    return res.status(200).json({ valid: true, feedback: fallback, reason: fallback })
+    return res.status(200).json({ valid: null, feedback: '', reason: '' })
   }
 }
 
@@ -143,31 +186,42 @@ async function handleWordOrder(req, res) {
 Respuesta modelo: "${correctAnswer}"
 Respuesta del alumno: "${studentAnswer}"
 
-El alumno ha ordenado palabras para construir una frase. ¿Es gramaticalmente correcta y tiene el mismo significado, aunque el orden sea diferente?
-Acepta variaciones válidas en el orden de palabras siempre que la frase sea correcta en español y el significado sea el mismo.
-Responde NO si es incorrecta gramaticalmente, cambia el significado, o está incompleta.
+El alumno ha ordenado palabras para construir una frase. Acéptala si:
+- Es gramaticalmente correcta en español
+- Tiene el mismo significado o muy parecido a la respuesta modelo
+
+ACEPTA aunque el alumno use vocabulario diferente pero equivalente, diferente orden de palabras, o una frase más simple pero correcta.
+RECHAZA solo si hay un error gramatical claro o el significado es muy diferente.
 
 JSON:
-{"valid": true, "reason": "una frase corta"}
+{"valid": true, "reason": "una frase corta alentadora"}
 o
-{"valid": false, "reason": "una frase corta"}`
+{"valid": false, "reason": "una frase corta explicando por qué"}`
     : `You are marking a sentence building exercise for adult language learners.
 
 Model answer: "${correctAnswer}"
 Student's answer: "${studentAnswer}"
 
-RULE 1 — Accept grammatically correct answers even if some words are missing.
-RULE 2 — Accept valid word order variations (adverb placement, time phrases etc).
-RULE 3 — If grammatically correct but simplified, mark valid and note what was omitted.
-Example: model has "on time" but student omits it → valid=true, reason="Correct! Note: 'on time' was omitted — the full sentence specifies the deadline."
+Accept the student's answer if:
+- It is grammatically correct English
+- It expresses the same or very similar meaning to the model answer
 
-Mark INVALID only if grammatically wrong, unnatural, or changes the core meaning.
+ACCEPT even if the student uses:
+- Different but equivalent vocabulary (e.g. "clean" instead of "brush", "always forget" instead of "keep forgetting", "get" instead of "become")
+- British or American English variants
+- Different but valid word order or sentence structure
+- A simpler version with the same core meaning
+
+REJECT only if there is a clear grammar error OR the meaning is significantly different from the model answer.
+
+If valid but uses different vocabulary, briefly note the model answer in your reason.
+Keep reason to one short sentence.
 
 JSON:
 {"valid": true, "reason": "short encouraging note"}
 or
-{"valid": false, "reason": "one short sentence"}`;
-  return callAI(prompt, 120, res, 'mark-free.word_order');
+{"valid": false, "reason": "one short sentence explaining why"}`;
+  return callAI(prompt, 150, res, 'mark-free.word_order');
 }
 
 // ── ERROR CORRECTION ──────────────────────────────────────────────────────────

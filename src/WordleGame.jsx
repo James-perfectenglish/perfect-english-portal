@@ -251,9 +251,7 @@ export default function WordleGame({ onBack }) {
       }
       await saveSession(guesses, gameState === 'won', true, data.valid, solveStar)
     } catch {
-      setSentenceFeedback({ valid: true, reason: isSpanish ? '¡Bien hecho!' : 'Good effort!' })
-      setSentenceStar(true)
-      await saveSession(guesses, gameState === 'won', true, true, solveStar)
+      setSentenceFeedback({ valid: null, reason: isSpanish ? 'No pudimos comprobar tu frase — ¡inténtalo de nuevo!' : 'Could not check your sentence right now — try again.' })
     }
     setSentenceDone(true)
     setSentenceChecking(false)

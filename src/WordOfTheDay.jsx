@@ -125,15 +125,16 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
           definition: word.definition, studentSentence: sentence.trim(), language: word.language
         })
       })
-      const result = response.ok ? await response.json() : { valid: null, feedback: '' }
+      const result = response.ok ? await response.json() : { valid: null, feedback: '', reason: '' }
       const isCorrect = result.valid === true
-      setFeedback({ valid: result.valid, message: result.feedback || (isCorrect ? 'Great sentence!' : 'Try again — read the definition carefully.') })
+      const feedbackText = result.feedback || result.reason || (isCorrect ? 'Great sentence!' : 'Try again — read the definition carefully.')
+      setFeedback({ valid: result.valid, message: feedbackText })
       if (word.id && !word.id?.toString().startsWith('qb_')) {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
           const { data: saved } = await supabase
             .from('word_of_the_day_submissions')
-            .insert({ student_id: user.id, word_id: word.id, sentence: sentence.trim(), is_correct: isCorrect, is_soft_pass: false, ai_feedback: result.feedback })
+            .insert({ student_id: user.id, word_id: word.id, sentence: sentence.trim(), is_correct: isCorrect, is_soft_pass: false, ai_feedback: feedbackText })
             .select().single()
           if (saved) { setSubmission(saved); fetchCommunity(word.id) }
         }
