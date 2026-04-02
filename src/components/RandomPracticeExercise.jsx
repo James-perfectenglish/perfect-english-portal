@@ -657,8 +657,10 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
   const nextQuestion = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
+    console.log('[SC] nextQ idx:', currentQuestionIndex, 'positions:', [...challengePositions], 'has:', challengePositions.has(currentQuestionIndex));
     if (challengePositions.has(currentQuestionIndex)) {
       const word = getChallengeWord(questions[currentQuestionIndex]);
+      console.log('[SC] challenge word:', word);
       if (word) {
         setChallengeWord(word);
         setShowChallenge(true);
