@@ -197,30 +197,36 @@ JSON:
 {"valid": true, "reason": "una frase corta alentadora"}
 o
 {"valid": false, "reason": "una frase corta explicando por qué"}`
-    : `You are marking a sentence building exercise for adult language learners.
+    : `You are an experienced English teacher marking a sentence-building translation exercise. Mark as a good teacher would — fair, encouraging, and linguistically aware.
 
 Model answer: "${correctAnswer}"
 Student's answer: "${studentAnswer}"
 
-Accept the student's answer if:
-- It is grammatically correct English
-- It expresses the same or very similar meaning to the model answer
+Step 1 — Is the student's sentence grammatically correct English? If not, it is invalid.
+Step 2 — Does it express the same or very similar meaning to the model answer?
+Step 3 — For translation exercises, check collocations: some phrases have fixed English equivalents that are different from a word-for-word translation.
 
-ACCEPT even if the student uses:
-- Different but equivalent vocabulary (e.g. "clean" instead of "brush", "always forget" instead of "keep forgetting", "get" instead of "become")
-- British or American English variants
-- Different but valid word order or sentence structure
-- A simpler version with the same core meaning
+ACCEPT (valid=true) if:
+- Grammatically correct and same core meaning, even with different vocabulary or structure
+- Example: model="keep forgetting", student="always forget" → valid (same meaning, both natural)
+- Example: model="brush my teeth", student="clean my teeth" → valid (natural synonym)
+- A simpler version that omits optional words but keeps the core meaning — note what was omitted
 
-REJECT only if there is a clear grammar error OR the meaning is significantly different from the model answer.
+AMBER — still valid=true, but add a note if:
+- The student omits an important word (e.g. "daily" from "daily routine") — accept but note it
+- The student uses a word that is grammatically correct but not the natural collocation — accept but explain the more natural phrasing
 
-If valid but uses different vocabulary, briefly note the model answer in your reason.
-Keep reason to one short sentence.
+REJECT (valid=false) if:
+- There is a clear grammar error
+- The meaning is significantly different
+- The student uses a false friend or wrong collocation that changes the natural meaning. Example: model="a day off", student="a free day" → invalid ("free day" is not a natural English collocation in this context; "day off" is the fixed expression)
+
+FEEDBACK: Plain English only — no grammar labels, no syntactic categories (never write SVOC, SVO, etc.), no jargon. One short sentence. Warm and direct.
 
 JSON:
-{"valid": true, "reason": "short encouraging note"}
+{"valid": true, "reason": "short encouraging note, mention model answer if vocabulary differs"}
 or
-{"valid": false, "reason": "one short sentence explaining why"}`;
+{"valid": false, "reason": "one kind sentence explaining why"}`;
   return callAI(prompt, 150, res, 'mark-free.word_order');
 }
 
@@ -255,6 +261,7 @@ Model answer: "${correctAnswerSentence}"
 
 Is the student's replacement grammatically correct AND does it fix the error?
 Answer YES if it genuinely works as a valid correction, even if different from the model answer.
+Answer AMBER if the student's word is clearly a typo of the correct answer (e.g. "foir" for "for") — the intended correction is right but misspelled. Mark valid=true and note the spelling in your reason.
 Answer NO if grammatically wrong, changes the meaning inappropriately, or doesn't fix the error.
 
 FEEDBACK LENGTH by level:

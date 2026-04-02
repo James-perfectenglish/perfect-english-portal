@@ -220,6 +220,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
   // ── Sentence challenge ──
   const [challengePositions, setChallengePositions] = useState(new Set());
+  const challengePositionsRef = useRef(new Set());
   const [showChallenge, setShowChallenge] = useState(false);
   const [challengeWord, setChallengeWord] = useState('');
 
@@ -397,6 +398,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         if (positions.size >= 2) break;
         positions.add(idx);
       }
+      challengePositionsRef.current = positions;
       setChallengePositions(positions);
 
       setQuestions(allQuestions);
@@ -657,10 +659,8 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
   const nextQuestion = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-    console.log('[SC] nextQ idx:', currentQuestionIndex, 'positions:', [...challengePositions], 'has:', challengePositions.has(currentQuestionIndex));
-    if (challengePositions.has(currentQuestionIndex)) {
+    if (challengePositionsRef.current.has(currentQuestionIndex)) {
       const word = getChallengeWord(questions[currentQuestionIndex]);
-      console.log('[SC] challenge word:', word);
       if (word) {
         setChallengeWord(word);
         setShowChallenge(true);
