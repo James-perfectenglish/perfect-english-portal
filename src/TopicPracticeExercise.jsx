@@ -245,7 +245,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     const fuzzy = dist === 1 || (dist === 2 && correctNorm.length >= 6) || alts.some(a => { const d = levenshtein(norm, normalise(a)); return d === 1 || (d === 2 && normalise(a).length >= 6) })
     if (fuzzy) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'fuzzy' }); addR(true); setIsChecking(false); return }
     try {
-      const res = await fetch('/api/mark-gap-fill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q.question, correctAnswer: q.correct_answer, studentAnswer: answer, acceptableAlternatives: alts, informalAccepted: informal }) })
+      const res = await fetch('/api/mark-gap', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'gap_fill', question: q.question, correctAnswer: q.correct_answer, studentAnswer: answer, acceptableAlternatives: alts, informalAccepted: informal }) })
       const data = await res.json()
       setFeedback({ isCorrect: data.valid, correct: q.correct_answer, type: 'ai', note: data.reason })
       addR(data.valid)

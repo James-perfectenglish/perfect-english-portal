@@ -54,6 +54,8 @@ Mark strictly for:
 1. Grammatical correctness — errors in tense, subject-verb agreement, articles, or word form = invalid
 2. Appropriate use of "${word}" — the word must be used naturally and meaningfully
 
+CRITICAL — PARTS OF SPEECH: Many English words function correctly as multiple parts of speech (e.g. "whisper", "smile", "walk", "love" are all valid as both verb and noun). Do NOT penalise a student for using a word in a different grammatical role from the one it was presented as, provided the usage is correct English. Award the mark for any valid, grammatically correct use of the word.
+
 Accept creative or simple sentences if grammatically correct. Do NOT accept sentences with significant grammar errors — this is a learning exercise, not a game.
 Be warm and encouraging even when incorrect. Keep feedback to 1-2 sentences.
 
@@ -119,6 +121,8 @@ Definition: "${definition}"
 Student's sentence: "${thesentence}"
 
 The student must write a sentence that correctly uses this word in a way that demonstrates they understand its meaning.
+
+IMPORTANT — PARTS OF SPEECH: Many English words are valid as multiple parts of speech (e.g. "whisper", "smile", "walk" work as both verb and noun). Do NOT penalise the student for using the word in a different grammatical role from the listed part of speech, provided the usage is correct English and shows understanding of the word's meaning.
 
 Assess: Is the sentence grammatically correct? Does it use the word appropriately and in a way consistent with the definition?
 
