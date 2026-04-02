@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { LevelBadge, TopicBadge, AiMarkedBadge, ExcerptBadge } from './components/BadgePill';
+import SentenceChallenge from './components/SentenceChallenge';
 
 const LEVELS = [
   {
@@ -112,6 +113,11 @@ export default function Dictation({ onBack, userTracks = [] }) {
   const [isChecking, setIsChecking]     = useState(false);
   const [hasPlayed, setHasPlayed]       = useState(false);
 
+  // ── Sentence challenge ──
+  const [showChallenge, setShowChallenge] = useState(false);
+  const [challengeWord, setChallengeWord] = useState('');
+  const challengeFiredRef = useRef(false);
+
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying]       = useState(false);
   const [currentTime, setCurrentTime]   = useState(0);
@@ -181,6 +187,8 @@ export default function Dictation({ onBack, userTracks = [] }) {
     setDuration(0);
     setPlaybackSpeed(1.0);
     setHasPlayed(false);
+    setShowChallenge(false);
+    challengeFiredRef.current = false;
     setStage('exercise');
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
@@ -302,6 +310,16 @@ export default function Dictation({ onBack, userTracks = [] }) {
       });
       setCompletedIds(prev => new Set([...prev, currentExercise.id]));
     } catch (e) { console.error('Error saving dictation session:', e); }
+  };
+
+  const handleMoreExercises = () => {
+    if (!challengeFiredRef.current && feedback?.isCorrect && currentExercise?.answer) {
+      challengeFiredRef.current = true;
+      setChallengeWord(currentExercise.answer);
+      setShowChallenge(true);
+      return;
+    }
+    backToExerciseList();
   };
 
   const tryAgain = () => {
@@ -587,7 +605,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
                   Try Again ↩
                 </button>
               )}
-              <button onClick={backToExerciseList} style={{ flex: 1, padding: '0.9rem', background: isCorrect ? GRADIENT : 'transparent', color: isCorrect ? 'white' : '#667eea', border: isCorrect ? 'none' : '2px solid #667eea', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '1rem' }}>
+              <button onClick={isCorrect ? handleMoreExercises : backToExerciseList} style={{ flex: 1, padding: '0.9rem', background: isCorrect ? GRADIENT : 'transparent', color: isCorrect ? 'white' : '#667eea', border: isCorrect ? 'none' : '2px solid #667eea', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '1rem' }}>
                 {isCorrect ? 'More Exercises →' : 'Skip'}
               </button>
             </div>
@@ -598,6 +616,14 @@ export default function Dictation({ onBack, userTracks = [] }) {
           <button onClick={backToLevelSelect} style={{ padding: '8px 20px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', fontSize: '0.9rem' }}>← Change Level</button>
         </div>
       </div>
+
+      {showChallenge && (
+        <SentenceChallenge
+          word={challengeWord}
+          language={currentExercise?.language || 'en'}
+          onClose={() => { setShowChallenge(false); backToExerciseList(); }}
+        />
+      )}
       </div>
     );
   }

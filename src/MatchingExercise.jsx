@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import MatchingPairs from './components/MatchingPairs';
+import SentenceChallenge from './components/SentenceChallenge';
 import { LevelBadge, TopicBadge } from './components/BadgePill';
 
 function shuffleArray(arr) {
@@ -33,6 +34,16 @@ const LEVELS = [
 const GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
 const QUESTIONS_PER_ROUND = 8;
 
+// ── Sentence challenge: pick a text-type word from a matching pair ──
+function getMatchingChallengeWord(q) {
+  if (!q) return null;
+  const pairs = Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]');
+  for (const pair of pairs) {
+    if (pair.left?.type === 'text' && pair.left?.content) return pair.left.content.trim();
+  }
+  return null;
+}
+
 function buildQuestionList(data) {
   const sequenced = data.filter(q => q.sequence_group);
   const free = data.filter(q => !q.sequence_group);
@@ -55,6 +66,12 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter, user
   const [score, setScore] = useState(0);
   const [questionResult, setQuestionResult] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
+
+  // ── Sentence challenge ──
+  const [showChallenge, setShowChallenge] = useState(false);
+  const [challengeWord, setChallengeWord] = useState('');
+  const challengePositionRef = useRef(null);
+  const challengeFiredRef = useRef(false);
 
   const isSpanish = userTracks.includes('spanish') || userProfile?.level === 'Spanish' || (userProfile?.tracks || []).includes('spanish');
 
@@ -113,6 +130,13 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter, user
     if (error) { console.error('Matching fetch error:', error); setStage('playing'); return; }
     const ordered = data && data.length > 0 ? buildQuestionList(data) : [];
     setQuestions(ordered);
+    // Pick 1 random challenge position
+    const eligibleIdx = ordered.map((_, i) => i).filter(i => i > 0 && i < ordered.length - 1);
+    challengePositionRef.current = eligibleIdx.length > 0
+      ? eligibleIdx[Math.floor(Math.random() * eligibleIdx.length)]
+      : (ordered.length > 1 ? 1 : null);
+    challengeFiredRef.current = false;
+    setShowChallenge(false);
     setCurrentQ(0); setScore(0); setQuestionResult(null);
     setStage('playing');
   };
@@ -137,12 +161,30 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter, user
     saveAnswer(questions[currentQ], isCorrect, wrongAttempts);
   };
 
-  const nextQuestion = () => {
+  const doAdvanceMatch = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     const nextIdx = currentQ + 1;
     setQuestionResult(null);
     if (nextIdx >= questions.length) { setStage('finished'); }
     else { setCurrentQ(nextIdx); }
+  };
+
+  const nextQuestion = () => {
+    if (
+      !challengeFiredRef.current &&
+      challengePositionRef.current !== null &&
+      currentQ === challengePositionRef.current &&
+      questionResult?.isCorrect
+    ) {
+      const word = getMatchingChallengeWord(questions[currentQ]);
+      if (word) {
+        challengeFiredRef.current = true;
+        setChallengeWord(word);
+        setShowChallenge(true);
+        return;
+      }
+    }
+    doAdvanceMatch();
   };
 
   const backToLevelSelect = () => {
@@ -290,6 +332,14 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter, user
         )}
       </div>
     </div>
+
+    {showChallenge && (
+      <SentenceChallenge
+        word={challengeWord}
+        language={isSpanish ? 'es' : 'en'}
+        onClose={() => { setShowChallenge(false); doAdvanceMatch(); }}
+      />
+    )}
     </div>
   );
 }

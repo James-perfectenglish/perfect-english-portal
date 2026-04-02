@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
+import SentenceChallenge from './components/SentenceChallenge'
 
 const LEVEL_CONFIG = [
   { id: 'beginner',     title: 'Beginner',     subtitle: 'A1 / A2', levels: ['A1', 'A2'], emoji: '🌱', gradient: 'linear-gradient(135deg, #43b581, #2ecc71)', shadow: 'rgba(46, 204, 113, 0.3)' },
@@ -23,6 +24,10 @@ export default function PronunciationExercise({ profile }) {
   const profileLevelConfig = getLevelConfigForProfile(profile?.level)
 
   const SPANISH_LEVEL = { id: 'spanish', title: 'Spanish', subtitle: 'Español', levels: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], emoji: '🇪🇸', gradient: 'linear-gradient(135deg, #e53e3e, #c53030)' }
+
+  const [showChallenge, setShowChallenge] = useState(false)
+  const [challengeWord, setChallengeWord] = useState('')
+  const challengeFiredRef = useRef(false)
 
   const [screen, setScreen]               = useState(isSpanish ? 'exercise' : 'level_select')
   const [selectedLevel, setSelectedLevel] = useState(isSpanish ? SPANISH_LEVEL : null)
@@ -70,6 +75,8 @@ export default function PronunciationExercise({ profile }) {
     setHasListened(false)
     setTranscript('')
     setFeedback(null)
+    setShowChallenge(false)
+    challengeFiredRef.current = false
 
     const language = lang || (isSpanish ? 'es' : 'en')
 
@@ -257,6 +264,16 @@ export default function PronunciationExercise({ profile }) {
     setFeedback(null)
     setHasListened(false)
     setScreen('exercise')
+  }
+
+  function handleNextPhrase() {
+    if (!challengeFiredRef.current && feedback?.valid === true && exercise?.answer) {
+      challengeFiredRef.current = true
+      setChallengeWord(exercise.answer)
+      setShowChallenge(true)
+      return
+    }
+    nextSentence()
   }
 
   function nextSentence() {
@@ -450,7 +467,7 @@ export default function PronunciationExercise({ profile }) {
               <button onClick={tryAgain} style={{ flex: 1, padding: '0.85rem', borderRadius: '10px', background: 'none', border: '2px solid #667eea', color: '#667eea', fontWeight: '700', cursor: 'pointer', fontSize: '0.9rem' }}>
                 Try again ↩
               </button>
-              <button onClick={nextSentence} style={{ flex: 1, padding: '0.85rem', borderRadius: '10px', background: GRADIENT, border: 'none', color: 'white', fontWeight: '700', cursor: 'pointer', fontSize: '0.9rem' }}>
+              <button onClick={handleNextPhrase} style={{ flex: 1, padding: '0.85rem', borderRadius: '10px', background: GRADIENT, border: 'none', color: 'white', fontWeight: '700', cursor: 'pointer', fontSize: '0.9rem' }}>
                 Next phrase →
               </button>
             </div>

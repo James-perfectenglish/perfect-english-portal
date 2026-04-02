@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import { LevelBadge, TypeBadge, AiMarkedBadge, TagBadges } from './components/BadgePill'
+import SentenceChallenge from './components/SentenceChallenge'
 
 function shuffleArray(arr) {
   const shuffled = [...arr]
@@ -89,6 +90,26 @@ function getSuggestedLevel(userLevel) {
   return 'intermediate'
 }
 
+// ── Sentence challenge helpers ──
+const STOP_WORDS_TP = new Set([
+  'a','an','the','in','on','at','to','for','of','and','or','but','is','are','was','were',
+  'be','been','have','has','had','do','does','did','will','would','could','should','may',
+  'might','must','can','it','he','she','they','we','i','you','my','his','her','their',
+  'our','your','its','this','that','these','those','not','no','so','as','by','up','out',
+  'off','if','than','then','with','from','into','about','over','after','before','just',
+  'very','too','also','back','more','some','all','one','two','got',
+])
+function getChallengeWordTP(question) {
+  if (!question) return null
+  const sourceText = question.correct_answer || ''
+  if (!sourceText) return null
+  const rawWords = sourceText.split(/\s+/).map(w => w.replace(/[.,!?;:'"()]/g, '')).filter(Boolean)
+  const words = rawWords.map(w => w.toLowerCase())
+  const candidates = rawWords.filter((w, i) => words[i].length > 3 && !STOP_WORDS_TP.has(words[i]))
+  if (candidates.length === 0) return rawWords.find((w, i) => words[i].length > 2) || null
+  return candidates.sort((a, b) => b.length - a.length)[0] || null
+}
+
 export default function TopicPracticeExercise({ exercise, userLevel, onBack, onComplete }) {
   const [stage, setStage]               = useState('level-select')
   const [selectedLevel, setSelectedLevel] = useState(null)
@@ -103,6 +124,12 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   const [results, setResults]           = useState([])
   const [sessionSaved, setSessionSaved] = useState(false)
   const inputRef = useRef(null)
+
+  // ── Sentence challenge ──
+  const [showChallenge, setShowChallenge] = useState(false)
+  const [challengeWord, setChallengeWord] = useState('')
+  const challengePositionRef = useRef(null)
+  const challengeFiredRef = useRef(false)
 
   const passMark    = exercise.passing_score || 7
   const totalTarget = 10
@@ -163,6 +190,15 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
 
     const prepared = selected.map(q => q.type === 'multiple_choice' ? { ...q, shuffledOptions: shuffleArray(parseJsonb(q.options)) } : q)
     setQuestions(prepared)
+    // Pick 1 random challenge position (skip first and last, skip matching type)
+    const eligibleIdx = prepared
+      .map((q, i) => i)
+      .filter(i => prepared[i]?.type !== 'matching' && i > 0 && i < prepared.length - 1)
+    challengePositionRef.current = eligibleIdx.length > 0
+      ? eligibleIdx[Math.floor(Math.random() * eligibleIdx.length)]
+      : null
+    challengeFiredRef.current = false
+    setShowChallenge(false)
     setStage('playing')
     setTimeout(() => inputRef.current?.focus(), 100)
   }
@@ -171,6 +207,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     window.scrollTo({ top: 0, behavior: 'instant' })
     setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0)
     setFeedback(null); setUserAnswer(''); setSelectedOption(null)
+    setShowChallenge(false); challengeFiredRef.current = false
     setStage('level-select'); fetchCounts()
   }
 
@@ -218,7 +255,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     setIsChecking(false)
   }
 
-  const nextQuestion = async () => {
+  const doAdvance = async () => {
     window.scrollTo({ top: 0, behavior: 'instant' })
     if (currentQ + 1 >= questions.length) {
       if (!sessionSaved) {
@@ -233,6 +270,24 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     }
     setCurrentQ(c => c + 1); setFeedback(null); setUserAnswer(''); setSelectedOption(null)
     setTimeout(() => inputRef.current?.focus(), 100)
+  }
+
+  const nextQuestion = async () => {
+    if (
+      !challengeFiredRef.current &&
+      challengePositionRef.current !== null &&
+      currentQ === challengePositionRef.current &&
+      feedback?.isCorrect
+    ) {
+      const word = getChallengeWordTP(questions[currentQ])
+      if (word) {
+        challengeFiredRef.current = true
+        setChallengeWord(word)
+        setShowChallenge(true)
+        return
+      }
+    }
+    doAdvance()
   }
 
   const handleKeyDown = (e) => { if (e.key === 'Enter') { if (feedback) nextQuestion(); else checkAnswer() } }
@@ -474,6 +529,14 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
             </div>
           )
         })()}
+
+      {showChallenge && (
+        <SentenceChallenge
+          word={challengeWord}
+          language={exercise?.topic === 'spanish' ? 'es' : 'en'}
+          onClose={() => { setShowChallenge(false); doAdvance() }}
+        />
+      )}
 
       </div>
     </div>

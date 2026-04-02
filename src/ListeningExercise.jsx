@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { LevelBadge } from './components/BadgePill';
+import SentenceChallenge from './components/SentenceChallenge';
 
 const LEVELS = [
   { key: 'beginner',     label: 'Beginner',     sublabel: 'B1 – B2', description: 'Short, clear conversations and announcements with everyday vocabulary.', colour: '#48bb78', colourLight: '#f0fff4', dbLevels: ['A1', 'A2'], icon: '🌱' },
@@ -36,6 +37,11 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
   const [showTranscript, setShowTranscript] = useState(false);
   const [markingGapFills, setMarkingGapFills] = useState(false);
   const [aiGapResults, setAiGapResults]     = useState({});
+
+  // ── Sentence challenge ──
+  const [showChallenge, setShowChallenge] = useState(false);
+  const [challengeWord, setChallengeWord] = useState('');
+  const challengeFiredRef = useRef(false);
 
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying]       = useState(false);
@@ -93,6 +99,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
     setGistAnswers({}); setDetailAnswers({}); setGapInputs({});
     setGistSubmitted(false); setDetailSubmitted(false); setShowTranscript(false);
     setMarkingGapFills(false); setAiGapResults({});
+    setShowChallenge(false); challengeFiredRef.current = false;
     setIsPlaying(false); setCurrentTime(0); setDuration(0); setPlaybackSpeed(1.0);
     setExerciseStage('intro');
     setStage('exercise');
@@ -225,10 +232,24 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
-  const moveToReview = () => {
+  const doMoveToReview = () => {
     saveListeningSession('review');
     setExerciseStage('review');
     window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
+  const moveToReview = () => {
+    if (!challengeFiredRef.current) {
+      const gapQ = detailQuestions.find(q => q.type === 'gap_fill');
+      const word = gapQ?.correct_answer || detailQuestions[0]?.correct_answer || '';
+      if (word.trim()) {
+        challengeFiredRef.current = true;
+        setChallengeWord(word.trim());
+        setShowChallenge(true);
+        return;
+      }
+    }
+    doMoveToReview();
   };
 
   const totalQuestions = gistQuestions.length + detailQuestions.length;
@@ -532,6 +553,14 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
           )}
         </div>
       </div>
+
+      {showChallenge && (
+        <SentenceChallenge
+          word={challengeWord}
+          language="en"
+          onClose={() => { setShowChallenge(false); doMoveToReview(); }}
+        />
+      )}
       </div>
     );
   }
