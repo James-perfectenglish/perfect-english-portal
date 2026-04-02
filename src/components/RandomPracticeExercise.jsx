@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import SentenceBuildingInput from './SentenceBuildingInput';
 import MatchingPairs from './MatchingPairs';
-// SentenceChallenge import — component in progress, stub prevents build errors
+import SentenceChallenge from './SentenceChallenge';
 import { LevelBadge, TypeBadge, AiMarkedBadge, TopicBadge } from './BadgePill';
 
 // ── Question mix per round (easy to tweak!) ──
@@ -657,8 +657,14 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
   const nextQuestion = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-    // Sentence challenge: disabled until SentenceChallenge component is built
-    // challengePositions and showChallenge state are ready — just needs the overlay
+    if (challengePositions.has(currentQuestionIndex)) {
+      const word = getChallengeWord(questions[currentQuestionIndex]);
+      if (word) {
+        setChallengeWord(word);
+        setShowChallenge(true);
+        return;
+      }
+    }
     advanceQuestion();
   };
 
@@ -1082,5 +1088,13 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       </div>
     </div>
 
+
+    {showChallenge && challengeWord && (
+      <SentenceChallenge
+        word={challengeWord}
+        language={isSpanish ? 'es' : 'en'}
+        onClose={handleChallengeClose}
+      />
+    )}
   );
 }
