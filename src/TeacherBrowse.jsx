@@ -1206,9 +1206,14 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
 
     // ── WOTD ─────────────────────────────────────────────────────────────────
     if (f.source === 'wotd') {
-      let q = supabase.from('word_of_the_day').select('*').order('date');
-      if (f.dateFrom) q = q.gte('date', f.dateFrom);
-      if (f.dateTo)   q = q.lte('date', f.dateTo);
+      // Default to current month if no date range set — prevents 200-row limit cutting off recent entries
+      const _n = new Date();
+      const _y = _n.getFullYear(), _m = String(_n.getMonth() + 1).padStart(2, '0');
+      const _defaultFrom = `${_y}-${_m}-01`;
+      const _defaultTo   = new Date(_y, _n.getMonth() + 1, 0).toISOString().slice(0, 10);
+      let q = supabase.from('word_of_the_day').select('*').order('date')
+        .gte('date', f.dateFrom || _defaultFrom)
+        .lte('date', f.dateTo   || _defaultTo);
       const { data: rows } = await q.limit(200);
       const byDate = {};
       (rows || []).forEach(r => { if (!byDate[r.date]) byDate[r.date] = []; byDate[r.date].push(r); });
