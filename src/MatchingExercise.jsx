@@ -337,6 +337,7 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter, user
       <SentenceChallenge
         word={challengeWord}
         language={isSpanish ? 'es' : 'en'}
+        exercise="matching"
         onClose={() => { setShowChallenge(false); doAdvanceMatch(); }}
       />
     )}

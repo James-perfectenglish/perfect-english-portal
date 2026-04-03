@@ -621,6 +621,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
         <SentenceChallenge
           word={challengeWord}
           language={currentExercise?.language || 'en'}
+          exercise="dictation"
           onClose={() => { setShowChallenge(false); backToExerciseList(); }}
         />
       )}

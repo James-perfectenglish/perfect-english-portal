@@ -1097,6 +1097,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       <SentenceChallenge
         word={challengeWord}
         language={isSpanish ? 'es' : 'en'}
+        exercise="rpe"
         onClose={handleChallengeClose}
       />
     )}

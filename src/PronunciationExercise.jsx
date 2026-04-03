@@ -341,6 +341,7 @@ export default function PronunciationExercise({ profile }) {
   const isProcessing = isTranscribing || isMarking
 
   return (
+    <>
     <div style={{ width: '100%', minHeight: '80vh', backgroundColor: '#f8f9fa', padding: '1rem', boxSizing: 'border-box' }}>
       <div style={{ maxWidth: '700px', margin: '0 auto' }}>
 
@@ -484,5 +485,15 @@ export default function PronunciationExercise({ profile }) {
         </div>
       </div>
     </div>
+
+    {showChallenge && (
+      <SentenceChallenge
+        word={challengeWord}
+        language={isSpanish ? 'es' : 'en'}
+        exercise="pronunciation"
+        onClose={() => { setShowChallenge(false); nextSentence(); }}
+      />
+    )}
+    </>
   )
 }

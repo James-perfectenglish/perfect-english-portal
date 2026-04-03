@@ -558,6 +558,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
         <SentenceChallenge
           word={challengeWord}
           language="en"
+          exercise="listening"
           onClose={() => { setShowChallenge(false); doMoveToReview(); }}
         />
       )}

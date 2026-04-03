@@ -534,6 +534,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
         <SentenceChallenge
           word={challengeWord}
           language={exercise?.topic === 'spanish' ? 'es' : 'en'}
+          exercise="topic_practice"
           onClose={() => { setShowChallenge(false); doAdvance() }}
         />
       )}

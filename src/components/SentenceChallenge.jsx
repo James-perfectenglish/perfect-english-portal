@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react';
+import { supabase } from '../supabaseClient';
 
 // Recording logic mirrors PronunciationExercise.jsx — cross-browser/iOS compatible.
 // Do not refactor the recording section without testing on both Chrome and Safari/iOS.
 
-export default function SentenceChallenge({ word, language = 'en', onClose }) {
+export default function SentenceChallenge({ word, language = 'en', exercise = 'challenge', onClose }) {
   const isSpanish = language === 'es';
 
   const [mode, setMode]                         = useState('type');
@@ -75,7 +76,7 @@ export default function SentenceChallenge({ word, language = 'en', onClose }) {
     } catch (e) { console.error('Transcribe error:', e); setPhase('input'); }
   }
 
-  async function markSentence(sentence) {
+  async function markSentence(sentence, inputMethod = 'text') {
     setIsMarking(true);
     try {
       const res = await fetch('/api/mark-free', {
@@ -83,8 +84,28 @@ export default function SentenceChallenge({ word, language = 'en', onClose }) {
         body: JSON.stringify({ type: 'sentence', context: 'challenge', word, sentence, language }),
       });
       const data = res.ok ? await res.json() : null;
-      setResult(data || { valid: false, feedback: isSpanish ? 'No se pudo comprobar.' : 'Could not check — try again.' });
+      const result = data || { valid: false, feedback: isSpanish ? 'No se pudo comprobar.' : 'Could not check — try again.' };
+      setResult(result);
       setPhase('result');
+      // Save to DB
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from('sentence_challenges').insert({
+            student_id:   user.id,
+            exercise,
+            word,
+            sentence,
+            language,
+            is_correct:   result.valid === true,
+            ai_feedback:  result.feedback || result.reason || '',
+            is_practice:  false,
+            input_method: inputMethod,
+          });
+        }
+      } catch (dbErr) {
+        console.warn('SentenceChallenge: could not save to DB:', dbErr);
+      }
     } catch (e) {
       setResult({ valid: false, feedback: isSpanish ? 'No se pudo comprobar.' : 'Could not check — try again.' });
       setPhase('result');
@@ -218,7 +239,7 @@ export default function SentenceChallenge({ word, language = 'en', onClose }) {
               style={{ width: '100%', padding: '0.85rem', fontSize: '1rem', border: '2px solid #667eea', borderRadius: '10px', boxSizing: 'border-box', resize: 'none', fontFamily: 'inherit', backgroundColor: '#f7f7ff', marginBottom: '0.75rem' }}
               autoFocus
             />
-            <button onClick={() => markSentence(editedTranscript.trim())} disabled={!editedTranscript.trim() || isMarking}
+            <button onClick={() => markSentence(editedTranscript.trim(), 'voice')} disabled={!editedTranscript.trim() || isMarking}
               style={{ width: '100%', padding: '0.9rem', borderRadius: '10px', background: editedTranscript.trim() && !isMarking ? PG : '#cbd5e0', color: 'white', border: 'none', fontSize: '1rem', cursor: editedTranscript.trim() ? 'pointer' : 'not-allowed', fontWeight: '700', marginBottom: '0.6rem' }}>
               {isMarking ? '🤖 ' + (isSpanish ? 'Comprobando...' : 'Checking...') : (isSpanish ? 'Comprobar →' : 'Check →')}
             </button>
