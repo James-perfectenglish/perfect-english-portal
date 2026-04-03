@@ -28,6 +28,27 @@ const SOURCE_META = {
   dictation:     { emoji: '⌨️', color: '#48bb78' },
 };
 
+// Connections colour ranks
+const RANK_STYLE = {
+  1: { bg: '#f9df6d', text: '#2d2000', border: '#e6c840', label: 'Easiest' },
+  2: { bg: '#a0c35a', text: '#1a2d00', border: '#7aaa2a', label: 'Medium' },
+  3: { bg: '#b0c4ef', text: '#0a1f4d', border: '#7a9de0', label: 'Tricky' },
+  4: { bg: '#ba81c5', text: '#2d0040', border: '#9a55a8', label: 'Hardest' },
+};
+
+// Wordle keyboard layouts and tile colours
+const EN_KB = [
+  ['Q','W','E','R','T','Y','U','I','O','P'],
+  ['A','S','D','F','G','H','J','K','L'],
+  ['ENTER','Z','X','C','V','B','N','M','⌫'],
+];
+const ES_KB = [
+  ['Q','W','E','R','T','Y','U','I','O','P'],
+  ['A','S','D','F','G','H','J','K','L','Ñ'],
+  ['ENTER','Z','X','C','V','B','N','M','⌫'],
+];
+const WC = { correct: '#538d4e', present: '#b59f3b', absent: '#787c7e' };
+
 const NEW_COUNT = 50;
 
 const ALL_TAGS = [
@@ -75,6 +96,12 @@ function levenshtein(a, b) {
     for (let j = 1; j <= n; j++)
       dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
   return dp[m][n];
+}
+
+function fmtDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function Badge({ color = '#718096', children, style = {} }) {
@@ -211,6 +238,13 @@ if (typeof document !== 'undefined' && !document.getElementById(TB_STYLE_ID)) {
       outline: none !important;
       -webkit-tap-highlight-color: transparent !important;
     }
+    @keyframes tb-shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-8px); }
+      40% { transform: translateX(8px); }
+      60% { transform: translateX(-6px); }
+      80% { transform: translateX(6px); }
+    }
   `;
   document.head.appendChild(_s);
 }
@@ -280,7 +314,6 @@ function InteractiveQuestion({ item: q }) {
   const [auctionPicks,        setAuctionPicks]        = useState({});
   const audioRef = useRef(null);
 
-  // Shuffle MC options once per question, preserving order for the life of this render
   const shuffledOptions = useMemo(
     () => q.type === 'multiple_choice'
       ? shuffle(Array.isArray(q.options) ? q.options : [])
@@ -728,6 +761,341 @@ function InteractiveQuestion({ item: q }) {
   );
 }
 
+// ─── Connections Focus Overlay ────────────────────────────────────────────────
+function ConnectionsFocus({ groups, title, playDate, onClose }) {
+  const MAX_MISTAKES = 4;
+  const initialTiles = () => shuffle(groups.flatMap(g => g.words.map(w => ({ word: w, rank: g.colour_rank }))));
+
+  const [tiles,       setTiles]       = useState(initialTiles);
+  const [selected,    setSelected]    = useState(new Set());
+  const [solvedRanks, setSolvedRanks] = useState(new Set());
+  const [mistakes,    setMistakes]    = useState(0);
+  const [gameState,   setGameState]   = useState('playing');
+  const [message,     setMessage]     = useState('');
+  const [shaking,     setShaking]     = useState(false);
+  const [locked,      setLocked]      = useState(false);
+
+  function toggleTile(word) {
+    if (gameState !== 'playing' || locked) return;
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(word)) { next.delete(word); return next; }
+      if (next.size >= 4) return prev;
+      next.add(word);
+      return next;
+    });
+  }
+
+  function submitGuess() {
+    if (selected.size !== 4 || locked) return;
+    setLocked(true);
+    const selArr = [...selected];
+    const ranks = selArr.map(w => groups.find(g => g.words.includes(w))?.colour_rank);
+    const allSame = ranks.every(r => r === ranks[0]);
+
+    if (allSame) {
+      const rank = ranks[0];
+      const newSolved = new Set([...solvedRanks, rank]);
+      setSolvedRanks(newSolved);
+      setSelected(new Set());
+      if (newSolved.size === 4) {
+        setGameState('won');
+        setMessage('Solved! 🎉');
+      } else {
+        setMessage(`✅ ${RANK_STYLE[rank].label} group found!`);
+        setTimeout(() => setMessage(''), 2000);
+      }
+      setLocked(false);
+    } else {
+      const rankCounts = {};
+      ranks.forEach(r => { rankCounts[r] = (rankCounts[r] || 0) + 1; });
+      const maxCount = Math.max(...Object.values(rankCounts));
+      const newMistakes = mistakes + 1;
+      setMistakes(newMistakes);
+      setShaking(true);
+      setTimeout(() => { setShaking(false); setLocked(false); }, 600);
+      setMessage(maxCount === 3 ? 'One away! 🤔' : 'Not quite — try again');
+      setTimeout(() => setMessage(''), 2000);
+      if (newMistakes >= MAX_MISTAKES) {
+        setSolvedRanks(new Set([1, 2, 3, 4]));
+        setGameState('lost');
+        setMessage('Hard luck! Here are the answers.');
+      }
+    }
+  }
+
+  function resetGame() {
+    setTiles(initialTiles());
+    setSelected(new Set());
+    setSolvedRanks(new Set());
+    setMistakes(0);
+    setGameState('playing');
+    setMessage('');
+    setLocked(false);
+  }
+
+  const mistakeDots = Array.from({ length: MAX_MISTAKES }, (_, i) => (
+    <span key={i} style={{ fontSize: 14, color: i < mistakes ? '#cbd5e0' : '#667eea' }}>
+      {i < mistakes ? '○' : '●'}
+    </span>
+  ));
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#f8f9fa', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+      {/* Header */}
+      <div style={{ background: 'white', borderBottom: '1px solid #e2e8f0', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, flexWrap: 'wrap' }}>
+        <div>
+          <span style={{ fontWeight: 700, fontSize: 16 }}>🟨 {title}</span>
+          {playDate && <span style={{ color: '#718096', fontSize: 13, marginLeft: 8 }}>{fmtDate(playDate)}</span>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+          <span style={{ display: 'flex', gap: 4 }}>{mistakeDots}</span>
+          <button onClick={resetGame} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13 }}>↺ Reset</button>
+          <button onClick={onClose} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13 }}>✕ Close</button>
+        </div>
+      </div>
+
+      {/* Game area */}
+      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '2rem 1rem' }}>
+        <div style={{ width: '100%', maxWidth: 580 }}>
+          {/* Solved / revealed groups */}
+          {[1, 2, 3, 4].filter(r => solvedRanks.has(r)).map(rank => {
+            const grp = groups.find(g => g.colour_rank === rank);
+            if (!grp) return null;
+            const s = RANK_STYLE[rank];
+            return (
+              <div key={rank} style={{ background: s.bg, border: `2px solid ${s.border}`, borderRadius: 10, padding: '12px 16px', marginBottom: 8, textAlign: 'center' }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: s.text, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>{grp.category}</div>
+                <div style={{ fontSize: 14, color: s.text, fontWeight: 600 }}>{grp.words.join('  ·  ')}</div>
+              </div>
+            );
+          })}
+
+          {/* Unsolved tiles */}
+          {gameState === 'playing' && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
+                {tiles.filter(t => !solvedRanks.has(t.rank)).map(({ word }) => {
+                  const isSel = selected.has(word);
+                  return (
+                    <button
+                      key={word}
+                      onClick={() => toggleTile(word)}
+                      style={{
+                        padding: '14px 4px', borderRadius: 8,
+                        border: `2px solid ${isSel ? '#667eea' : '#e2e8f0'}`,
+                        background: isSel ? '#667eea' : 'white',
+                        color: isSel ? 'white' : '#2d3748',
+                        fontWeight: 700, fontSize: 'clamp(11px, 2.5vw, 14px)',
+                        cursor: 'pointer', textAlign: 'center', lineHeight: 1.3,
+                        animation: shaking && isSel ? 'tb-shake 0.5s' : 'none',
+                        transition: 'background 0.15s, border-color 0.15s',
+                      }}
+                    >{word}</button>
+                  );
+                })}
+              </div>
+
+              {message && (
+                <div style={{ textAlign: 'center', fontWeight: 600, color: '#4a5568', marginBottom: 12, fontSize: 15 }}>{message}</div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                <button
+                  onClick={() => {
+                    const unsolved = tiles.filter(t => !solvedRanks.has(t.rank));
+                    const sel = unsolved.filter(t => selected.has(t.word));
+                    const unsel = shuffle(unsolved.filter(t => !selected.has(t.word)));
+                    setTiles([...sel, ...unsel]);
+                  }}
+                  style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer', fontSize: 14 }}
+                >Shuffle</button>
+                <button
+                  onClick={() => setSelected(new Set())}
+                  style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer', fontSize: 14 }}
+                >Deselect</button>
+                <button
+                  onClick={submitGuess}
+                  disabled={selected.size !== 4}
+                  style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: selected.size === 4 ? '#2d3748' : '#e2e8f0', color: selected.size === 4 ? 'white' : '#a0aec0', cursor: selected.size === 4 ? 'pointer' : 'default', fontSize: 14, fontWeight: 700 }}
+                >Submit</button>
+              </div>
+            </>
+          )}
+
+          {(gameState === 'won' || gameState === 'lost') && (
+            <div style={{ textAlign: 'center', marginTop: 24 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>{message}</div>
+              <button onClick={resetGame} style={{ padding: '10px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 15 }}>↺ Play Again</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Wordle Focus Overlay ─────────────────────────────────────────────────────
+function WordleFocus({ word, language, playDate, onClose }) {
+  const WORD = word.toUpperCase();
+  const KB   = language === 'es' ? ES_KB : EN_KB;
+
+  const [guesses,   setGuesses]   = useState([]);
+  const [current,   setCurrent]   = useState('');
+  const [gameState, setGameState] = useState('playing');
+  const [message,   setMessage]   = useState('');
+  const [shaking,   setShaking]   = useState(false);
+
+  const currentRef  = useRef(current);
+  const guessesRef  = useRef(guesses);
+  const gameStRef   = useRef(gameState);
+  useEffect(() => { currentRef.current = current; }, [current]);
+  useEffect(() => { guessesRef.current = guesses; }, [guesses]);
+  useEffect(() => { gameStRef.current = gameState; }, [gameState]);
+
+  function getTileResult(guess, col) {
+    const letter = guess[col];
+    if (letter === WORD[col]) return 'correct';
+    if (WORD.includes(letter)) return 'present';
+    return 'absent';
+  }
+
+  function getLetterStates() {
+    const priority = { correct: 3, present: 2, absent: 1 };
+    const states = {};
+    guesses.forEach(g => {
+      for (let i = 0; i < 5; i++) {
+        const letter = g[i];
+        const result = getTileResult(g, i);
+        if (!states[letter] || priority[result] > priority[states[letter]]) states[letter] = result;
+      }
+    });
+    return states;
+  }
+
+  function submitGuess() {
+    const cur = currentRef.current;
+    if (cur.length < 5) {
+      setMessage('Not enough letters');
+      setShaking(true);
+      setTimeout(() => { setShaking(false); setMessage(''); }, 1000);
+      return;
+    }
+    const newGuesses = [...guessesRef.current, cur];
+    setGuesses(newGuesses);
+    setCurrent('');
+    if (cur === WORD) {
+      setGameState('won');
+      const msgs = ['Genius! 🧠', 'Magnificent! ✨', 'Impressive! 🌟', 'Splendid! 👏', 'Great! 🎉', 'Phew! 😅'];
+      setMessage(msgs[newGuesses.length - 1] || 'Well done!');
+    } else if (newGuesses.length >= 6) {
+      setGameState('lost');
+      setMessage(`The word was ${WORD}`);
+    }
+  }
+
+  function handleKey(key) {
+    if (gameStRef.current !== 'playing') return;
+    if (key === '⌫' || key === 'BACKSPACE') { setCurrent(c => c.slice(0, -1)); return; }
+    if (key === 'ENTER') { submitGuess(); return; }
+    if (/^[A-ZÁÉÍÓÚÑÜ]$/.test(key) && currentRef.current.length < 5) setCurrent(c => c + key);
+  }
+
+  useEffect(() => {
+    const handler = (e) => {
+      const k = e.key.toUpperCase();
+      if (k === 'BACKSPACE') { handleKey('BACKSPACE'); return; }
+      if (k === 'ENTER') { handleKey('ENTER'); return; }
+      if (/^[A-ZÁÉÍÓÚÑÜ]$/.test(k)) handleKey(k);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const letterStates = getLetterStates();
+
+  function resetGame() {
+    setGuesses([]); setCurrent(''); setGameState('playing'); setMessage(''); setShaking(false);
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#f8f9fa', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ background: 'white', borderBottom: '1px solid #e2e8f0', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, flexWrap: 'wrap' }}>
+        <div>
+          <span style={{ fontWeight: 700, fontSize: 16 }}>🟩 Wordle</span>
+          {playDate && <span style={{ color: '#718096', fontSize: 13, marginLeft: 8 }}>{fmtDate(playDate)}</span>}
+          <span style={{ marginLeft: 8, fontSize: 13 }}>{language === 'es' ? '🇪🇸' : '🇬🇧'}</span>
+        </div>
+        {/* Show answer for teacher reference */}
+        <div style={{ background: '#f0fff4', border: '1px solid #48bb78', borderRadius: 6, padding: '3px 10px', fontSize: 13, fontWeight: 700, color: '#276749', letterSpacing: 2 }}>
+          {WORD}
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <button onClick={resetGame} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13 }}>↺ Reset</button>
+          <button onClick={onClose} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13 }}>✕ Close</button>
+        </div>
+      </div>
+
+      {/* Game area */}
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem 1rem', gap: '1rem' }}>
+        {/* Grid */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {Array.from({ length: 6 }, (_, row) => {
+            const isCurrentRow = row === guesses.length && gameState === 'playing';
+            const guess = row < guesses.length ? guesses[row] : (isCurrentRow ? current : '');
+            const isSubmitted = row < guesses.length;
+            return (
+              <div key={row} style={{ display: 'flex', gap: 5, animation: shaking && isCurrentRow ? 'tb-shake 0.5s' : 'none' }}>
+                {Array.from({ length: 5 }, (_, col) => {
+                  const letter = guess[col] || '';
+                  const result = isSubmitted ? getTileResult(guess, col) : null;
+                  const bg = result ? WC[result] : letter ? '#e2e8f0' : '#f7fafc';
+                  const color = result ? 'white' : '#2d3748';
+                  const border = result ? 'transparent' : letter ? '#a0aec0' : '#e2e8f0';
+                  return (
+                    <div key={col} style={{ width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${border}`, borderRadius: 6, background: bg, color, fontWeight: 700, fontSize: 22, textTransform: 'uppercase', transition: 'background 0.3s' }}>
+                      {letter}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+
+        {message && (
+          <div style={{ fontWeight: 700, fontSize: 16, color: gameState === 'lost' ? '#c53030' : '#2d3748', textAlign: 'center', padding: '8px 16px', background: 'white', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+            {message}
+          </div>
+        )}
+
+        {/* Keyboard */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+          {KB.map((row, ri) => (
+            <div key={ri} style={{ display: 'flex', gap: 5 }}>
+              {row.map(key => {
+                const state = letterStates[key];
+                const bg    = state ? WC[state] : '#d3d6da';
+                const color = state ? 'white' : '#2d3748';
+                const isWide = key === 'ENTER' || key === '⌫';
+                return (
+                  <button
+                    key={key}
+                    onClick={() => handleKey(key)}
+                    style={{ padding: isWide ? '14px 8px' : '14px 0', width: isWide ? 58 : 38, borderRadius: 6, border: 'none', background: bg, color, fontWeight: 700, fontSize: isWide ? 11 : 14, cursor: 'pointer', transition: 'background 0.2s' }}
+                  >{key}</button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Exercise Focus Mode ──────────────────────────────────────────────────────
 function FocusMode({ items, index, onChangeIndex, previewMode, setPreviewMode, onExit }) {
   const item = items[index];
   if (!item) return null;
@@ -755,25 +1123,38 @@ function FocusMode({ items, index, onChangeIndex, previewMode, setPreviewMode, o
   );
 }
 
+// ─── Main TeacherBrowse Component ─────────────────────────────────────────────
+const CONTENT_SOURCES = ['connections', 'wotd', 'wordle'];
+const EXERCISE_SOURCES = ['all', 'question_bank', 'listening', 'dictation'];
+
 export default function TeacherBrowse({ user, globalLang = 'en' }) {
-  const [filters, setFilters] = useState({ source: 'all', levels: [], types: [], tags: [], topic: '', lang: 'en', qFrom: '', qTo: '', newOnly: false });
-  const [maxQNumber,    setMaxQNumber]    = useState(null);
-  const [results,       setResults]       = useState([]);
-  const [loading,       setLoading]       = useState(false);
-  const [hasSearched,   setHasSearched]   = useState(false);
-  const [selected,      setSelected]      = useState(new Set());
-  const [previewItem,   setPreviewItem]   = useState(null);
-  const [previewMode,   setPreviewMode]   = useState('student');
-  const [focusMode,     setFocusMode]     = useState(false);
-  const [focusIndex,    setFocusIndex]    = useState(0);
-  const [sets,          setSets]          = useState(loadSets);
-  const [activeSet,     setActiveSet]     = useState(null);
-  const [showSetsPanel, setShowSetsPanel] = useState(false);
-  const [addToSetId,    setAddToSetId]    = useState('');
-  const [newSetName,    setNewSetName]    = useState('');
-  const [typeOpen,      setTypeOpen]      = useState(false);
-  const [tagOpen,       setTagOpen]       = useState(false);
-  const [tagFilter,     setTagFilter]     = useState('');
+  const [filters, setFilters] = useState({
+    source: 'all', levels: [], types: [], tags: [], topic: '', lang: 'en',
+    qFrom: '', qTo: '', newOnly: false, dateFrom: '', dateTo: '',
+  });
+  const [maxQNumber,         setMaxQNumber]         = useState(null);
+  const [results,            setResults]            = useState([]);
+  const [loading,            setLoading]            = useState(false);
+  const [hasSearched,        setHasSearched]        = useState(false);
+  const [selected,           setSelected]           = useState(new Set());
+  const [previewItem,        setPreviewItem]        = useState(null);
+  const [previewMode,        setPreviewMode]        = useState('student');
+  const [focusMode,          setFocusMode]          = useState(false);
+  const [focusIndex,         setFocusIndex]         = useState(0);
+  const [sets,               setSets]               = useState(loadSets);
+  const [activeSet,          setActiveSet]          = useState(null);
+  const [showSetsPanel,      setShowSetsPanel]      = useState(false);
+  const [addToSetId,         setAddToSetId]         = useState('');
+  const [newSetName,         setNewSetName]         = useState('');
+  const [typeOpen,           setTypeOpen]           = useState(false);
+  const [tagOpen,            setTagOpen]            = useState(false);
+  const [tagFilter,          setTagFilter]          = useState('');
+  // Content type overlays
+  const [connectionsFocus,   setConnectionsFocus]   = useState(null); // { groups, title, playDate }
+  const [wordleFocus,        setWordleFocus]        = useState(null); // { word, language, playDate }
+  const [wotdExpanded,       setWotdExpanded]       = useState(new Set());
+
+  const isContentSource = CONTENT_SOURCES.includes(filters.source);
 
   const setFilter   = (k, v) => setFilters(f => ({ ...f, [k]: v }));
   const toggleLevel = (lv) => setFilter('levels', filters.levels.includes(lv) ? filters.levels.filter(l => l !== lv) : [...filters.levels, lv]);
@@ -784,6 +1165,16 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
     ? ALL_TAGS.filter(t => t.toLowerCase().includes(tagFilter.toLowerCase()))
     : ALL_TAGS;
 
+  // Quick date helpers
+  function setMonth(offset) {
+    const d = new Date();
+    d.setMonth(d.getMonth() + offset);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const last = new Date(y, d.getMonth() + 1, 0).getDate();
+    setFilters(f => ({ ...f, dateFrom: `${y}-${m}-01`, dateTo: `${y}-${m}-${last}` }));
+  }
+
   useEffect(() => {
     supabase.from('question_bank').select('question_number').order('question_number', { ascending: false }).limit(1).single()
       .then(({ data }) => { if (data) setMaxQNumber(data.question_number); });
@@ -791,7 +1182,62 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
 
   const search = useCallback(async (overrideFilters) => {
     const f = overrideFilters || filters;
-    setLoading(true); setHasSearched(true); setActiveSet(null); setPreviewItem(null); setSelected(new Set());
+    setLoading(true); setHasSearched(true); setActiveSet(null); setPreviewItem(null);
+    setSelected(new Set()); setWotdExpanded(new Set());
+
+    // ── Connections ──────────────────────────────────────────────────────────
+    if (f.source === 'connections') {
+      let q = supabase.from('connections_puzzles').select('id, play_date, title, language').order('play_date');
+      if (f.lang !== 'both') q = q.eq('language', f.lang);
+      if (f.dateFrom) q = q.gte('play_date', f.dateFrom);
+      if (f.dateTo)   q = q.lte('play_date', f.dateTo);
+      const { data: puzzles } = await q.limit(60);
+      if (!puzzles || puzzles.length === 0) { setResults([]); setLoading(false); return; }
+      const ids = puzzles.map(p => p.id);
+      const { data: groups } = await supabase.from('connections_groups').select('*').in('puzzle_id', ids).order('colour_rank');
+      const items = puzzles.map(p => ({
+        ...p,
+        _source: 'connections',
+        _rowKey: `con_${p.id}`,
+        groups: (groups || []).filter(g => g.puzzle_id === p.id),
+      }));
+      setResults(items); setLoading(false); return;
+    }
+
+    // ── WOTD ─────────────────────────────────────────────────────────────────
+    if (f.source === 'wotd') {
+      let q = supabase.from('word_of_the_day').select('*').order('date');
+      if (f.dateFrom) q = q.gte('date', f.dateFrom);
+      if (f.dateTo)   q = q.lte('date', f.dateTo);
+      const { data: rows } = await q.limit(200);
+      const byDate = {};
+      (rows || []).forEach(r => { if (!byDate[r.date]) byDate[r.date] = []; byDate[r.date].push(r); });
+      const items = Object.entries(byDate)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, entries]) => ({
+          _source: 'wotd', _rowKey: `wotd_${date}`, date,
+          entries: entries.sort((a, b) => {
+            const order = { 'A1/A2': 0, 'B1/B2': 1, 'C1/C2': 2 };
+            if (a.language === 'es') return 3;
+            if (b.language === 'es') return -3;
+            return (order[a.level] ?? 9) - (order[b.level] ?? 9);
+          }),
+        }));
+      setResults(items); setLoading(false); return;
+    }
+
+    // ── Wordle ────────────────────────────────────────────────────────────────
+    if (f.source === 'wordle') {
+      let q = supabase.from('wordle_words').select('*').order('play_date');
+      if (f.lang !== 'both') q = q.eq('language', f.lang);
+      if (f.dateFrom) q = q.gte('play_date', f.dateFrom);
+      if (f.dateTo)   q = q.lte('play_date', f.dateTo);
+      const { data: rows } = await q.limit(200);
+      const items = (rows || []).map(r => ({ ...r, _source: 'wordle', _rowKey: `wdl_${r.id}` }));
+      setResults(items); setLoading(false); return;
+    }
+
+    // ── Exercises (existing logic) ────────────────────────────────────────────
     const newThreshold = maxQNumber != null ? maxQNumber - NEW_COUNT + 1 : null;
     const all = [];
     if (f.source === 'all' || f.source === 'question_bank') {
@@ -844,8 +1290,29 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
   const toggleSelect   = (key) => setSelected(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
   const selectAll      = () => setSelected(new Set(results.map(r => r._rowKey)));
   const clearSelection = () => setSelected(new Set());
-  const focusItems     = selected.size > 0 ? results.filter(r => selected.has(r._rowKey)) : results;
-  const enterFocus     = (startIndex = 0) => { setFocusIndex(startIndex); setFocusMode(true); };
+
+  // Only exercise items go into focus mode
+  const exerciseResults = results.filter(r => !CONTENT_SOURCES.includes(r._source));
+  const focusItems = selected.size > 0
+    ? exerciseResults.filter(r => selected.has(r._rowKey))
+    : exerciseResults;
+  const enterFocus = (startIndex = 0) => { setFocusIndex(startIndex); setFocusMode(true); };
+
+  function handleItemClick(item, exerciseIdx) {
+    if (item._source === 'connections') {
+      setConnectionsFocus({ groups: item.groups, title: item.title, playDate: item.play_date });
+    } else if (item._source === 'wordle') {
+      setWordleFocus({ word: item.word, language: item.language, playDate: item.play_date });
+    } else if (item._source === 'wotd') {
+      setWotdExpanded(prev => {
+        const next = new Set(prev);
+        next.has(item.date) ? next.delete(item.date) : next.add(item.date);
+        return next;
+      });
+    } else {
+      enterFocus(exerciseIdx);
+    }
+  }
 
   const saveSelectionToSet = (targetId, name) => {
     const newItems = results.filter(r => selected.has(r._rowKey)).map(r => ({ source: r._source, id: r.id, label: r._source === 'question_bank' ? `Q${r.question_number}: ${(r.question || '').slice(0, 55)}` : (r.title || r.id) }));
@@ -866,8 +1333,10 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
     setSets(updated); storeSets(updated); setResults(prev => prev.filter(r => r.id !== itemId));
   };
 
+  // ── Sidebar ──────────────────────────────────────────────────────────────────
   const sidebar = (
     <div style={{ width: 220, flexShrink: 0, background: 'white', borderRadius: 12, padding: '1.1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.07)', alignSelf: 'flex-start', position: 'sticky', top: 12 }}>
+
       <FilterSection label="My Sets">
         <button onClick={() => setShowSetsPanel(v => !v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 9px', borderRadius: 7, border: `1px solid ${showSetsPanel ? '#667eea' : '#e2e8f0'}`, background: showSetsPanel ? '#f0f4ff' : 'white', color: showSetsPanel ? '#667eea' : '#4a5568', cursor: 'pointer', fontSize: 13, fontWeight: showSetsPanel ? 700 : 500 }}>
           📂 {sets.length === 0 ? 'No sets yet' : `${sets.length} set${sets.length !== 1 ? 's' : ''}`}
@@ -888,14 +1357,25 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
         )}
       </FilterSection>
 
-      <div style={{ borderTop: '1px solid #f0f0f0', margin: '2px 0 14px' }} />
+      <div style={{ borderTop: '1px solid #f0f0f0', margin: '2px 0 10px' }} />
 
-      <FilterSection label="Source">
-        {[['all', '🗂️ All'], ['question_bank', '❓ Questions'], ['listening', '🎧 Listening'], ['dictation', '⌨️ Dictation']].map(([val, lbl]) => (
-          <button key={val} onClick={() => setFilter('source', val)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '5px 8px', borderRadius: 6, border: 'none', background: filters.source === val ? '#667eea' : 'transparent', color: filters.source === val ? 'white' : '#4a5568', cursor: 'pointer', marginBottom: 1, fontSize: 13 }}>{lbl}</button>
-        ))}
-      </FilterSection>
+      {/* Exercises group */}
+      <div style={{ fontSize: 9, fontWeight: 700, color: '#a0aec0', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>Exercises</div>
+      {[['all', '🗂️ All exercises'], ['question_bank', '❓ Questions'], ['listening', '🎧 Listening'], ['dictation', '⌨️ Dictation']].map(([val, lbl]) => (
+        <button key={val} onClick={() => setFilter('source', val)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '5px 8px', borderRadius: 6, border: 'none', background: filters.source === val ? '#667eea' : 'transparent', color: filters.source === val ? 'white' : '#4a5568', cursor: 'pointer', marginBottom: 1, fontSize: 13 }}>{lbl}</button>
+      ))}
 
+      <div style={{ borderTop: '1px solid #f0f0f0', margin: '8px 0 6px' }} />
+
+      {/* Content group */}
+      <div style={{ fontSize: 9, fontWeight: 700, color: '#a0aec0', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>Content</div>
+      {[['connections', '🟨 Connections'], ['wotd', '📖 Word of the Day'], ['wordle', '🟩 Wordle']].map(([val, lbl]) => (
+        <button key={val} onClick={() => setFilter('source', val)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '5px 8px', borderRadius: 6, border: 'none', background: filters.source === val ? '#667eea' : 'transparent', color: filters.source === val ? 'white' : '#4a5568', cursor: 'pointer', marginBottom: 1, fontSize: 13 }}>{lbl}</button>
+      ))}
+
+      <div style={{ borderTop: '1px solid #f0f0f0', margin: '8px 0 10px' }} />
+
+      {/* Language — always shown */}
       <FilterSection label="Language">
         <div style={{ display: 'flex', gap: 4 }}>
           {[['en', '🇬🇧'], ['es', '🇪🇸'], ['both', '🌐']].map(([val, lbl]) => (
@@ -904,66 +1384,96 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
         </div>
       </FilterSection>
 
-      <FilterSection label="Level">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {LEVELS.map(lv => (
-            <button key={lv} onClick={() => toggleLevel(lv)} style={{ padding: '3px 9px', borderRadius: 6, border: '1px solid #e2e8f0', background: filters.levels.includes(lv) ? LEVEL_COLORS[lv] : 'white', color: filters.levels.includes(lv) ? 'white' : '#4a5568', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>{lv}</button>
-          ))}
-        </div>
-      </FilterSection>
-
-      {(filters.source === 'all' || filters.source === 'question_bank') && (
-        <FilterSection label={`Type${filters.types.length ? ` (${filters.types.length})` : ''}`} collapsible open={typeOpen} onToggle={() => setTypeOpen(v => !v)}>
-          {Object.entries(TYPE_INFO).map(([key, { emoji, label }]) => (
-            <button key={key} onClick={() => toggleType(key)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 7px', borderRadius: 6, border: 'none', background: filters.types.includes(key) ? '#edf2ff' : 'transparent', color: filters.types.includes(key) ? '#667eea' : '#4a5568', cursor: 'pointer', marginBottom: 1, fontSize: 12 }}>
-              {filters.types.includes(key) ? '✓' : '○'} {emoji} {label}
-            </button>
-          ))}
-        </FilterSection>
-      )}
-
-      {(filters.source === 'all' || filters.source === 'question_bank') && (
-        <FilterSection label={`Tag${filters.tags.length ? ` (${filters.tags.length})` : ''}`} collapsible open={tagOpen} onToggle={() => setTagOpen(v => !v)}>
-          <input value={tagFilter} onChange={e => setTagFilter(e.target.value)} placeholder="Filter tags…" style={{ width: '100%', padding: '4px 7px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', marginBottom: 5 }} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 220, overflowY: 'auto' }}>
-            {visibleTags.map(tag => (
-              <button key={tag} onClick={() => toggleTag(tag)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '3px 7px', borderRadius: 6, border: filters.tags.includes(tag) ? '1px solid #CBD5E0' : 'none', background: filters.tags.includes(tag) ? '#EDF2F7' : 'transparent', color: filters.tags.includes(tag) ? '#2d3748' : '#4a5568', cursor: 'pointer', fontSize: 11, fontWeight: filters.tags.includes(tag) ? 700 : 400 }}>
-                {filters.tags.includes(tag) ? '✓' : '○'} {tag}
-              </button>
+      {/* Content sources: date range */}
+      {isContentSource && (
+        <FilterSection label="Date range">
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+            {[['This month', 0], ['Next month', 1], ['Last month', -1]].map(([lbl, offset]) => (
+              <button key={lbl} onClick={() => setMonth(offset)} style={{ padding: '3px 7px', borderRadius: 6, border: '1px solid #e2e8f0', background: 'white', color: '#667eea', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>{lbl}</button>
             ))}
-            {visibleTags.length === 0 && <span style={{ fontSize: 11, color: '#a0aec0', padding: '3px 7px' }}>No tags match</span>}
           </div>
+          <input
+            type="date" value={filters.dateFrom} onChange={e => setFilter('dateFrom', e.target.value)}
+            style={{ width: '100%', padding: '5px 7px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', marginBottom: 4 }}
+          />
+          <input
+            type="date" value={filters.dateTo} onChange={e => setFilter('dateTo', e.target.value)}
+            style={{ width: '100%', padding: '5px 7px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }}
+          />
         </FilterSection>
       )}
 
-      <FilterSection label="Keyword search">
-        <input value={filters.topic} onChange={e => setFilter('topic', e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="e.g. conditional, would have" style={{ width: '100%', padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
-      </FilterSection>
+      {/* Exercise-only filters */}
+      {!isContentSource && (
+        <>
+          <FilterSection label="Level">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {LEVELS.map(lv => (
+                <button key={lv} onClick={() => toggleLevel(lv)} style={{ padding: '3px 9px', borderRadius: 6, border: '1px solid #e2e8f0', background: filters.levels.includes(lv) ? LEVEL_COLORS[lv] : 'white', color: filters.levels.includes(lv) ? 'white' : '#4a5568', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>{lv}</button>
+              ))}
+            </div>
+          </FilterSection>
 
-      {(filters.source === 'all' || filters.source === 'question_bank') && (
-        <FilterSection label="Q number range">
-          <input value={filters.qFrom} onChange={e => setFilter('qFrom', e.target.value)} placeholder="From" style={{ width: '100%', padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', marginBottom: 5 }} />
-          <input value={filters.qTo}   onChange={e => setFilter('qTo', e.target.value)}   placeholder="To"   style={{ width: '100%', padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
-        </FilterSection>
-      )}
+          {(filters.source === 'all' || filters.source === 'question_bank') && (
+            <FilterSection label={`Type${filters.types.length ? ` (${filters.types.length})` : ''}`} collapsible open={typeOpen} onToggle={() => setTypeOpen(v => !v)}>
+              {Object.entries(TYPE_INFO).map(([key, { emoji, label }]) => (
+                <button key={key} onClick={() => toggleType(key)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 7px', borderRadius: 6, border: 'none', background: filters.types.includes(key) ? '#edf2ff' : 'transparent', color: filters.types.includes(key) ? '#667eea' : '#4a5568', cursor: 'pointer', marginBottom: 1, fontSize: 12 }}>
+                  {filters.types.includes(key) ? '✓' : '○'} {emoji} {label}
+                </button>
+              ))}
+            </FilterSection>
+          )}
 
-      {(filters.source === 'all' || filters.source === 'question_bank') && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14 }}>
-          <input type="checkbox" id="newOnly" checked={filters.newOnly} onChange={e => setFilter('newOnly', e.target.checked)} style={{ accentColor: '#667eea', width: 15, height: 15 }} />
-          <label htmlFor="newOnly" style={{ fontSize: 12, cursor: 'pointer', color: '#4a5568' }}>
-            New only{maxQNumber != null && <span style={{ color: '#a0aec0' }}> (last {NEW_COUNT})</span>}
-          </label>
-        </div>
+          {(filters.source === 'all' || filters.source === 'question_bank') && (
+            <FilterSection label={`Tag${filters.tags.length ? ` (${filters.tags.length})` : ''}`} collapsible open={tagOpen} onToggle={() => setTagOpen(v => !v)}>
+              <input value={tagFilter} onChange={e => setTagFilter(e.target.value)} placeholder="Filter tags…" style={{ width: '100%', padding: '4px 7px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', marginBottom: 5 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 220, overflowY: 'auto' }}>
+                {visibleTags.map(tag => (
+                  <button key={tag} onClick={() => toggleTag(tag)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '3px 7px', borderRadius: 6, border: filters.tags.includes(tag) ? '1px solid #CBD5E0' : 'none', background: filters.tags.includes(tag) ? '#EDF2F7' : 'transparent', color: filters.tags.includes(tag) ? '#2d3748' : '#4a5568', cursor: 'pointer', fontSize: 11, fontWeight: filters.tags.includes(tag) ? 700 : 400 }}>
+                    {filters.tags.includes(tag) ? '✓' : '○'} {tag}
+                  </button>
+                ))}
+                {visibleTags.length === 0 && <span style={{ fontSize: 11, color: '#a0aec0', padding: '3px 7px' }}>No tags match</span>}
+              </div>
+            </FilterSection>
+          )}
+
+          <FilterSection label="Keyword search">
+            <input value={filters.topic} onChange={e => setFilter('topic', e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="e.g. conditional, would have" style={{ width: '100%', padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+          </FilterSection>
+
+          {(filters.source === 'all' || filters.source === 'question_bank') && (
+            <FilterSection label="Q number range">
+              <input value={filters.qFrom} onChange={e => setFilter('qFrom', e.target.value)} placeholder="From" style={{ width: '100%', padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', marginBottom: 5 }} />
+              <input value={filters.qTo}   onChange={e => setFilter('qTo', e.target.value)}   placeholder="To"   style={{ width: '100%', padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+            </FilterSection>
+          )}
+
+          {(filters.source === 'all' || filters.source === 'question_bank') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14 }}>
+              <input type="checkbox" id="newOnly" checked={filters.newOnly} onChange={e => setFilter('newOnly', e.target.checked)} style={{ accentColor: '#667eea', width: 15, height: 15 }} />
+              <label htmlFor="newOnly" style={{ fontSize: 12, cursor: 'pointer', color: '#4a5568' }}>
+                New only{maxQNumber != null && <span style={{ color: '#a0aec0' }}> (last {NEW_COUNT})</span>}
+              </label>
+            </div>
+          )}
+        </>
       )}
 
       <button onClick={() => search()} disabled={loading} style={{ width: '100%', padding: '9px', background: '#667eea', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
         {loading ? '…' : '🔍 Search'}
       </button>
-      <button onClick={() => { setFilters({ source: 'all', levels: [], types: [], tags: [], topic: '', lang: 'en', qFrom: '', qTo: '', newOnly: false }); setResults([]); setHasSearched(false); setActiveSet(null); setSelected(new Set()); setTagFilter(''); }} style={{ width: '100%', padding: '7px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, cursor: 'pointer', marginTop: 5 }}>
-        Clear all
+      <button onClick={() => {
+        setFilters({ source: filters.source, levels: [], types: [], tags: [], topic: '', lang: 'en', qFrom: '', qTo: '', newOnly: false, dateFrom: '', dateTo: '' });
+        setResults([]); setHasSearched(false); setActiveSet(null); setSelected(new Set()); setTagFilter('');
+      }} style={{ width: '100%', padding: '7px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, cursor: 'pointer', marginTop: 5 }}>
+        Clear
       </button>
     </div>
   );
+
+  // ── Results List ─────────────────────────────────────────────────────────────
+  let exerciseIdx = -1; // track index within exercise results only
 
   const resultsList = (
     <div style={{ flex: 1, minWidth: 0 }}>
@@ -973,10 +1483,11 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
           <button onClick={() => { setActiveSet(null); setResults([]); setHasSearched(false); }} style={{ background: 'none', border: 'none', color: '#718096', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
         </div>
       )}
+
       {hasSearched && !loading && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 600, color: '#4a5568', fontSize: 13 }}>{results.length} result{results.length !== 1 ? 's' : ''}</span>
-          {results.length > 0 && (
+          {results.length > 0 && !isContentSource && (
             <>
               <button onClick={selectAll} style={{ fontSize: 12, color: '#667eea', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Select all</button>
               {selected.size > 0 && (
@@ -985,14 +1496,17 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
                   <span style={{ background: '#667eea', color: 'white', borderRadius: 12, padding: '2px 10px', fontSize: 12, fontWeight: 600 }}>{selected.size} selected</span>
                 </>
               )}
-              <button onClick={() => enterFocus(0)} style={{ marginLeft: 'auto', padding: '4px 12px', borderRadius: 7, border: '1px solid #667eea', background: 'white', color: '#667eea', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-                {selected.size > 0 ? `⛶ Focus (${selected.size})` : '⛶ Focus all'}
-              </button>
+              {exerciseResults.length > 0 && (
+                <button onClick={() => enterFocus(0)} style={{ marginLeft: 'auto', padding: '4px 12px', borderRadius: 7, border: '1px solid #667eea', background: 'white', color: '#667eea', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                  {selected.size > 0 ? `⛶ Focus (${selected.size})` : '⛶ Focus all'}
+                </button>
+              )}
             </>
           )}
         </div>
       )}
-      {selected.size > 0 && (
+
+      {selected.size > 0 && !isContentSource && (
         <div style={{ background: '#f0f4ff', border: '1px solid #c3d1f7', borderRadius: 10, padding: '9px 12px', marginBottom: 10, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 7 }}>
           <span style={{ fontWeight: 600, color: '#4a5568', fontSize: 13 }}>💾 Save {selected.size} item{selected.size !== 1 ? 's' : ''}:</span>
           <select value={addToSetId} onChange={e => setAddToSetId(e.target.value)} style={{ padding: '4px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, background: 'white' }}>
@@ -1008,17 +1522,113 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
           )}
         </div>
       )}
+
       {loading && <div style={{ textAlign: 'center', padding: '3rem', color: '#718096' }}>Searching…</div>}
       {!loading && hasSearched && results.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: '#718096' }}><div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>No results — try adjusting the filters.</div>}
       {!loading && !hasSearched && <div style={{ textAlign: 'center', padding: '3rem', color: '#718096' }}><div style={{ fontSize: 28, marginBottom: 8 }}>👆</div>Set your filters and hit Search, or open a saved set.</div>}
-      {!loading && results.map((item, idx) => {
+
+      {!loading && results.map((item) => {
+        // ── Connections item ────────────────────────────────────────────────
+        if (item._source === 'connections') {
+          return (
+            <div
+              key={item._rowKey}
+              onClick={() => handleItemClick(item, -1)}
+              style={{ padding: '10px 14px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 5, cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ background: '#f9df6d', color: '#2d2000', borderRadius: 5, padding: '2px 7px', fontSize: 12, fontWeight: 700 }}>🟨 Connections</span>
+                <span style={{ fontSize: 13, color: '#718096' }}>{fmtDate(item.play_date)}</span>
+                <span style={{ marginLeft: 'auto', fontSize: 13, color: '#667eea', fontWeight: 700 }}>▶ Play</span>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#2d3748', marginBottom: 6 }}>{item.title}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {item.groups.map(g => {
+                  const s = RANK_STYLE[g.colour_rank];
+                  return (
+                    <div key={g.colour_rank} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.bg, border: `1px solid ${s.border}`, flexShrink: 0 }} />
+                      <span style={{ fontSize: 11, color: '#718096', flex: '0 0 60px', fontWeight: 600 }}>{s.label}</span>
+                      <span style={{ fontSize: 12, color: '#4a5568' }}>{g.words.join(' · ')}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+
+        // ── WOTD item ───────────────────────────────────────────────────────
+        if (item._source === 'wotd') {
+          const expanded = wotdExpanded.has(item.date);
+          const enWords = item.entries.filter(e => e.language === 'en');
+          const esWords = item.entries.filter(e => e.language === 'es');
+          return (
+            <div
+              key={item._rowKey}
+              style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 5, overflow: 'hidden' }}
+            >
+              {/* Collapsed header */}
+              <div
+                onClick={() => handleItemClick(item, -1)}
+                style={{ padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+              >
+                <span style={{ background: '#EDE9FE', color: '#553C9A', borderRadius: 5, padding: '2px 7px', fontSize: 12, fontWeight: 700 }}>📖 WOTD</span>
+                <span style={{ fontSize: 13, color: '#718096' }}>{fmtDate(item.date)}</span>
+                <span style={{ fontSize: 12, color: '#4a5568', marginLeft: 4 }}>
+                  {item.entries.map(e => e.word).join(' · ')}
+                </span>
+                <span style={{ marginLeft: 'auto', color: '#a0aec0', fontSize: 12 }}>{expanded ? '▲' : '▼'}</span>
+              </div>
+              {/* Expanded detail */}
+              {expanded && (
+                <div style={{ padding: '0 14px 14px', borderTop: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 10 }}>
+                  {[...enWords, ...esWords].map((e, i) => (
+                    <div key={i} style={{ background: '#f8f9fa', borderRadius: 8, padding: '10px 12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <span style={{ background: e.language === 'es' ? '#f6ad55' : LEVEL_COLORS[e.level?.split('/')[0]] || '#667eea', color: 'white', borderRadius: 5, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>
+                          {e.language === 'es' ? '🇪🇸 ES' : e.level}
+                        </span>
+                        <span style={{ fontWeight: 700, fontSize: 15 }}>{e.word}</span>
+                        {e.part_of_speech && <span style={{ fontSize: 12, color: '#718096', fontStyle: 'italic' }}>{e.part_of_speech}</span>}
+                      </div>
+                      <div style={{ fontSize: 13, color: '#4a5568', marginBottom: 4 }}>{e.definition}</div>
+                      {e.example_sentence && <div style={{ fontSize: 13, color: '#718096', fontStyle: 'italic' }}>"{e.example_sentence}"</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // ── Wordle item ─────────────────────────────────────────────────────
+        if (item._source === 'wordle') {
+          return (
+            <div
+              key={item._rowKey}
+              onClick={() => handleItemClick(item, -1)}
+              style={{ padding: '10px 14px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 5, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
+            >
+              <span style={{ background: '#c6f6d5', color: '#276749', borderRadius: 5, padding: '2px 7px', fontSize: 12, fontWeight: 700 }}>🟩 Wordle</span>
+              <span style={{ fontSize: 13, color: '#718096' }}>{fmtDate(item.play_date)}</span>
+              <span style={{ fontSize: 13 }}>{item.language === 'es' ? '🇪🇸' : '🇬🇧'}</span>
+              <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: 2, color: '#2d3748' }}>{item.word?.toUpperCase()}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 13, color: '#667eea', fontWeight: 700 }}>▶ Play</span>
+            </div>
+          );
+        }
+
+        // ── Exercise item (existing) ─────────────────────────────────────────
+        exerciseIdx++;
+        const thisExerciseIdx = exerciseIdx;
         const isSel   = selected.has(item._rowKey);
         const srcMeta = SOURCE_META[item._source];
         const title   = item._source === 'question_bank' ? (item.question || '').slice(0, 110) : (item.title || '');
         const sub     = item._source === 'question_bank' ? `Q${item.question_number} · ${TYPE_INFO[item.type]?.label || item.type}` : (item.description || item.answer || '').slice(0, 70);
         const itemTags = item._source === 'question_bank' && item.tags && item.tags.length > 0 ? item.tags : [];
         return (
-          <div key={item._rowKey} onClick={() => enterFocus(idx)} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '9px 11px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 5, cursor: 'pointer' }}>
+          <div key={item._rowKey} onClick={() => handleItemClick(item, thisExerciseIdx)} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '9px 11px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 5, cursor: 'pointer' }}>
             <div onClick={e => { e.stopPropagation(); toggleSelect(item._rowKey); }} style={{ flexShrink: 0, width: 18, height: 18, border: `2px solid ${isSel ? '#667eea' : '#cbd5e0'}`, borderRadius: 4, background: isSel ? '#667eea' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 11, marginTop: 2 }}>
               {isSel && '✓'}
             </div>
@@ -1039,7 +1649,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
                 </div>
               )}
             </div>
-            <button onClick={e => { e.stopPropagation(); enterFocus(idx); }} title="Open in focus mode" style={{ flexShrink: 0, background: 'none', border: 'none', color: '#a0aec0', cursor: 'pointer', fontSize: 15, padding: '1px 5px', lineHeight: 1 }}>⛶</button>
+            <button onClick={e => { e.stopPropagation(); handleItemClick(item, thisExerciseIdx); }} title="Open in focus mode" style={{ flexShrink: 0, background: 'none', border: 'none', color: '#a0aec0', cursor: 'pointer', fontSize: 15, padding: '1px 5px', lineHeight: 1 }}>⛶</button>
             {activeSet && <button onClick={e => { e.stopPropagation(); removeFromActiveSet(item.id); }} style={{ flexShrink: 0, background: 'none', border: 'none', color: '#e53e3e', cursor: 'pointer', fontSize: 17, padding: '1px 5px', lineHeight: 1 }}>×</button>}
           </div>
         );
@@ -1056,7 +1666,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
           ))}
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button onClick={() => { const idx = results.findIndex(r => r._rowKey === previewItem._rowKey); enterFocus(idx >= 0 ? idx : 0); }} title="Expand to focus mode" style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, color: '#667eea', cursor: 'pointer', fontSize: 14, padding: '2px 8px' }}>⛶</button>
+          <button onClick={() => { const idx = exerciseResults.findIndex(r => r._rowKey === previewItem._rowKey); enterFocus(idx >= 0 ? idx : 0); }} title="Expand to focus mode" style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, color: '#667eea', cursor: 'pointer', fontSize: 14, padding: '2px 8px' }}>⛶</button>
           <button onClick={() => setPreviewItem(null)} style={{ background: 'none', border: 'none', color: '#a0aec0', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
         </div>
       </div>
@@ -1068,7 +1678,28 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f9fa' }}>
-      {focusMode && <FocusMode items={focusItems} index={focusIndex} onChangeIndex={setFocusIndex} previewMode={previewMode} setPreviewMode={setPreviewMode} onExit={() => setFocusMode(false)} />}
+      {/* Exercise focus mode */}
+      {focusMode && (
+        <FocusMode items={focusItems} index={focusIndex} onChangeIndex={setFocusIndex} previewMode={previewMode} setPreviewMode={setPreviewMode} onExit={() => setFocusMode(false)} />
+      )}
+      {/* Connections game overlay */}
+      {connectionsFocus && (
+        <ConnectionsFocus
+          groups={connectionsFocus.groups}
+          title={connectionsFocus.title}
+          playDate={connectionsFocus.playDate}
+          onClose={() => setConnectionsFocus(null)}
+        />
+      )}
+      {/* Wordle game overlay */}
+      {wordleFocus && (
+        <WordleFocus
+          word={wordleFocus.word}
+          language={wordleFocus.language}
+          playDate={wordleFocus.playDate}
+          onClose={() => setWordleFocus(null)}
+        />
+      )}
       <div style={{ maxWidth: 1300, margin: '0 auto', padding: '12px 1rem 2rem', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         {sidebar}
         {resultsList}
