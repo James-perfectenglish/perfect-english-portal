@@ -226,7 +226,8 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   const checkMC = (q, sel) => {
     const norm = normalise(sel)
     const alts = parseJsonb(q.acceptable_alternatives)
-    const isCorrect = normalise(q.correct_answer) === norm || alts.some(a => normalise(a) === norm)
+    const altNorms = alts.map(a => normalise(typeof a === 'object' ? a.answer : a))
+    const isCorrect = normalise(q.correct_answer) === norm || altNorms.includes(norm)
     setFeedback({ isCorrect, correct: q.correct_answer, type: 'mc' })
     setResults(prev => [...prev, { question: q, isCorrect }])
     if (isCorrect) setScore(s => s + 1)
@@ -236,13 +237,16 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     setIsChecking(true)
     const norm = normalise(answer), correctNorm = normalise(q.correct_answer)
     const alts = parseJsonb(q.acceptable_alternatives), informal = parseJsonb(q.informal_accepted)
+    // acceptable_alternatives can be [{answer, feedback}] objects or plain strings
+    const altNorms = alts.map(a => normalise(typeof a === 'object' ? a.answer : a))
+    const altFeedback = (norm) => { const match = alts.find(a => normalise(typeof a === 'object' ? a.answer : a) === norm); return match?.feedback || null }
     const addR = (ok) => { setResults(prev => [...prev, { question: q, isCorrect: ok }]); if (ok) setScore(s => s + 1) }
 
     if (norm === correctNorm) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'exact' }); addR(true); setIsChecking(false); return }
-    if (alts.some(a => normalise(a) === norm)) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'alternative' }); addR(true); setIsChecking(false); return }
+    if (altNorms.includes(norm)) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'alternative', note: altFeedback(norm) }); addR(true); setIsChecking(false); return }
     if (informal.some(a => normalise(a) === norm)) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'informal', note: q.informal_feedback }); addR(true); setIsChecking(false); return }
     const dist = levenshtein(norm, correctNorm)
-    const fuzzy = dist === 1 || (dist === 2 && correctNorm.length >= 6) || alts.some(a => { const d = levenshtein(norm, normalise(a)); return d === 1 || (d === 2 && normalise(a).length >= 6) })
+    const fuzzy = dist === 1 || (dist === 2 && correctNorm.length >= 6) || altNorms.some(an => { const d = levenshtein(norm, an); return d === 1 || (d === 2 && an.length >= 6) })
     if (fuzzy) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'fuzzy' }); addR(true); setIsChecking(false); return }
     try {
       const res = await fetch('/api/mark-gap', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'gap_fill', question: q.question, correctAnswer: q.correct_answer, studentAnswer: answer, acceptableAlternatives: alts, informalAccepted: informal }) })
@@ -479,7 +483,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
                     {feedback.isCorrect && feedback.type === 'fuzzy' && (
                       <div style={{ fontSize: '0.85rem', marginTop: '0.25rem', color: '#c05621' }}>⚠️ Watch your spelling!</div>
                     )}
-                    {/* AI reason */}
+                    {/* AI reason or alternative feedback */}
                     {feedback.note && feedback.type !== 'fuzzy' && (
                       <div style={{ fontSize: '0.85rem', marginTop: '0.25rem', opacity: 0.85 }}>{feedback.note}</div>
                     )}
