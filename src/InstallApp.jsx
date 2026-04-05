@@ -131,6 +131,13 @@ export default function InstallApp() {
       <div style={{ width: '100%', maxWidth: 480, textAlign: 'center', color: '#718096', fontSize: 13, marginTop: 4 }}>
         {c.note}
       </div>
+
+      <a
+        href="/"
+        style={{ display: 'block', width: '100%', maxWidth: 480, marginTop: 24, padding: '14px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', borderRadius: 12, textAlign: 'center', fontWeight: 700, fontSize: 16, textDecoration: 'none', boxShadow: '0 2px 8px rgba(102,126,234,0.35)' }}
+      >
+        {lang === 'en' ? 'Open the app →' : 'Abrir la aplicación →'}
+      </a>
     </div>
   )
 }

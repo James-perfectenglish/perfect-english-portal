@@ -2,6 +2,36 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
 
 const TURNSTILE_SITE_KEY = '0x4AAAAAAChUFyqzDKDJIHBT'
+const INSTALL_BANNER_KEY = 'pe_install_banner_dismissed'
+
+function InstallBanner() {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    // Only show if not previously dismissed AND not already running as installed PWA
+    const dismissed = localStorage.getItem(INSTALL_BANNER_KEY)
+    const isInstalled = window.matchMedia('(display-mode: standalone)').matches
+    if (!dismissed && !isInstalled) setVisible(true)
+  }, [])
+
+  const dismiss = () => {
+    localStorage.setItem(INSTALL_BANNER_KEY, '1')
+    setVisible(false)
+  }
+
+  if (!visible) return null
+
+  return (
+    <div style={{ background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 10, padding: '10px 14px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+      <img src="/icon-192x192.png" alt="" style={{ width: 32, height: 32, borderRadius: 7, flexShrink: 0 }} />
+      <div style={{ flex: 1, fontSize: 13, color: '#3730a3', lineHeight: 1.4 }}>
+        Add this app to your home screen for the best experience.
+        {' '}<a href="/install" style={{ color: '#4f46e5', fontWeight: 700, textDecoration: 'none' }}>How to install →</a>
+      </div>
+      <button onClick={dismiss} style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>✕</button>
+    </div>
+  )
+}
 
 function Login() {
   const [email, setEmail] = useState('')
@@ -68,6 +98,7 @@ function Login() {
 
   return (
     <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px' }}>
+      <InstallBanner />
       <h1 style={{ fontSize: '2rem', marginBottom: '2rem', color: '#2C3E50' }}>
         Login to Perfect <span style={{ color: '#3498DB' }}>English</span>
       </h1>
