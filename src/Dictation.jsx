@@ -60,15 +60,6 @@ function levenshtein(a, b) {
 
 const normalise = (s) => s.toLowerCase().trim().replace(/[.,!?;:'"()]/g, '').replace(/\s+/g, ' ');
 
-const capsOrPunctOnly = (student, correct) => {
-  const normStudent = normalise(student);
-  const normCorrect = normalise(correct);
-  if (normStudent !== normCorrect) return { caps: false, punct: false };
-  const hasCaps  = student.toLowerCase().trim() !== correct.toLowerCase().trim() && normStudent === normCorrect;
-  const hasPunct = student.replace(/\s+/g, ' ').trim() !== correct.replace(/\s+/g, ' ').trim();
-  return { caps: hasCaps, punct: hasPunct };
-};
-
 function isFuzzyMatch(studentNorm, correctNorm) {
   if (correctNorm.split(' ').length <= 2) {
     const dist = levenshtein(studentNorm, correctNorm);
@@ -253,11 +244,6 @@ export default function Dictation({ onBack, userTracks = [] }) {
 
     if (resultType === 'incorrect' && normStudent === normCorrect) {
       resultType = 'correct';
-      const { caps, punct } = capsOrPunctOnly(student, correct);
-      if (caps)  nudge = `💡 Almost perfect — remember that capitalisation matters in English.`;
-      if (punct) nudge = nudge
-        ? nudge + ' Also check your punctuation.'
-        : `💡 Almost perfect — watch your punctuation next time.`;
     }
 
     if (resultType === 'incorrect' && isFuzzyMatch(normStudent, normCorrect)) {
@@ -312,10 +298,21 @@ export default function Dictation({ onBack, userTracks = [] }) {
     } catch (e) { console.error('Error saving dictation session:', e); }
   };
 
+  const CHALLENGE_STOP_WORDS = new Set(['a','an','the','and','but','or','so','in','on','at','to','for','of','with','by','from','up','as','is','was','are','were','be','been','has','had','have','it','its','this','that','i','he','she','they','we','you','what','how','when','where','who','which','not','do','did','can','could','would','will','my','his','her','their','our','its']);
+
+  const getDictationChallengeWord = (answer) => {
+    const words = answer.trim().split(/\s+/);
+    if (words.length <= 5) return answer; // short phrase — fine to use whole thing
+    // C-level: answer is a full sentence — extract most meaningful word
+    const meaningful = words.filter(w => w.length >= 4 && !CHALLENGE_STOP_WORDS.has(w.toLowerCase().replace(/[.,!?;:'"]/g, '')));
+    const pool = meaningful.length > 0 ? meaningful : words;
+    return pool.reduce((a, b) => b.length > a.length ? b : a).replace(/[.,!?;:'"]/g, '');
+  };
+
   const handleMoreExercises = () => {
     if (!challengeFiredRef.current && feedback?.isCorrect && currentExercise?.answer) {
       challengeFiredRef.current = true;
-      setChallengeWord(currentExercise.answer);
+      setChallengeWord(getDictationChallengeWord(currentExercise.answer));
       setShowChallenge(true);
       return;
     }
