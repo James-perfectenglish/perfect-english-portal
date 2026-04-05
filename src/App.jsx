@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import Login from './Login'
+import InstallApp from './InstallApp'
 import Signup from './Signup'
 import Admin from './Admin'
 import ExerciseList from './ExerciseList'
@@ -40,9 +41,10 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login"  element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/admin"  element={<Admin />} />
+        <Route path="/login"   element={<Login />} />
+        <Route path="/signup"  element={<Signup />} />
+        <Route path="/admin"   element={<Admin />} />
+        <Route path="/install" element={<InstallApp />} />
         <Route path="/*"      element={session ? <Dashboard session={session} /> : <Navigate to="/login" />} />
       </Routes>
     </BrowserRouter>
