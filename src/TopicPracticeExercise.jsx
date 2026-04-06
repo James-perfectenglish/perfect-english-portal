@@ -135,18 +135,63 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   const totalTarget = 10
   const suggested   = getSuggestedLevel(userLevel)
 
-  useState(() => { fetchCounts() }, [])
+  const isSpanishTP = exercise.topic === 'spanish'
+
+  useState(() => {
+    if (isSpanishTP) {
+      // Spanish TP: skip level select, go straight to loading
+      setStage('loading')
+      fetchQuestionsSpanish()
+    } else {
+      fetchCounts()
+    }
+  }, [])
 
   async function fetchCounts() {
     let query = supabase.from('question_bank').select('level').eq('topic', exercise.topic).is('sequence_group', null)
-    if (exercise.topic === 'spanish') query = query.eq('language', 'es')
-    else query = query.in('language', ['en', 'both'])
+    query = query.in('language', ['en', 'both'])
     const { data } = await query
     if (data) {
       const counts = {}
       LEVELS.forEach(lv => { counts[lv.key] = data.filter(q => lv.dbLevels.includes(q.level)).length })
       setQuestionCounts(counts)
     }
+  }
+
+  async function fetchQuestionsSpanish() {
+    setCurrentQ(0); setScore(0); setResults([]); setFeedback(null)
+    setUserAnswer(''); setSelectedOption(null); setSessionSaved(false)
+
+    const { data, error } = await supabase
+      .from('question_bank')
+      .select('*')
+      .eq('topic', 'spanish')
+      .eq('language', 'es')
+      .in('type', ['multiple_choice', 'gap_fill'])
+      .is('sequence_group', null)
+
+    if (error || !data || data.length === 0) { setStage('playing'); setQuestions([]); return }
+
+    const mc = shuffleArray(data.filter(q => q.type === 'multiple_choice'))
+    const gf = shuffleArray(data.filter(q => q.type === 'gap_fill'))
+    // Aim for 5+5; if either type is short, fill from the other
+    let mcSlice = mc.slice(0, 5)
+    let gfSlice = gf.slice(0, 5)
+    if (mcSlice.length + gfSlice.length < totalTarget) {
+      const used = new Set([...mcSlice, ...gfSlice])
+      const spare = shuffleArray(data.filter(q => !used.has(q)))
+      const needed = totalTarget - mcSlice.length - gfSlice.length
+      gfSlice = [...gfSlice, ...spare.slice(0, needed)]
+    }
+    const selected = shuffleArray([...mcSlice, ...gfSlice])
+    const prepared = selected.map(q => q.type === 'multiple_choice' ? { ...q, shuffledOptions: shuffleArray(parseJsonb(q.options)) } : q)
+    setQuestions(prepared)
+    const eligibleIdx = prepared.map((q, i) => i).filter(i => i > 0 && i < prepared.length - 1)
+    challengePositionsRef.current = eligibleIdx.length > 0 ? [eligibleIdx[Math.floor(Math.random() * eligibleIdx.length)]] : []
+    challengeFiredRef.current = false
+    setShowChallenge(false)
+    setStage('playing')
+    setTimeout(() => inputRef.current?.focus(), 100)
   }
 
   const selectLevel = (level) => {
@@ -161,8 +206,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     setUserAnswer(''); setSelectedOption(null); setSessionSaved(false)
 
     let query = supabase.from('question_bank').select('*').eq('topic', exercise.topic).in('level', level.dbLevels).is('sequence_group', null)
-    if (exercise.topic === 'spanish') query = query.eq('language', 'es')
-    else query = query.in('language', ['en', 'both'])
+    query = query.in('language', ['en', 'both'])
     const { data, error } = await query
 
     if (error || !data || data.length === 0) { setStage('playing'); setQuestions([]); return }
@@ -208,12 +252,15 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0)
     setFeedback(null); setUserAnswer(''); setSelectedOption(null)
     setShowChallenge(false); challengeFiredRef.current = false; challengePositionsRef.current = []
-    setStage('level-select'); fetchCounts()
+    if (isSpanishTP) { setStage('loading'); fetchQuestionsSpanish() }
+    else { setStage('level-select'); fetchCounts() }
   }
 
   const restartExercise = () => {
     window.scrollTo({ top: 0, behavior: 'instant' })
-    setStage('loading'); fetchQuestions(selectedLevel)
+    setStage('loading')
+    if (isSpanishTP) fetchQuestionsSpanish()
+    else fetchQuestions(selectedLevel)
   }
 
   const checkAnswer = async () => {
