@@ -1052,15 +1052,15 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 {scorePercent >= 90 ? '🌟 Outstanding work!' : scorePercent >= 75 ? '👍 Great job!' : scorePercent >= 50 ? '👌 Good effort!' : '💪 Keep practicing!'}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: bestScore !== null ? 'repeat(3, minmax(0, 1fr))' : '1fr', gap: '0.5rem', marginBottom: '2rem' }}>
-                <div style={{ background: displayGradient, borderRadius: '12px', padding: '1.25rem 1rem', color: 'white' }}>
+                <div style={{ background: displayGradient, borderRadius: '12px', padding: '1rem 0.4rem', color: 'white' }}>
                   <div style={{ fontSize: '0.8rem', fontWeight: '600', opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.4rem' }}>This attempt</div>
-                  <div style={{ fontSize: 'clamp(2rem, 8vw, 2.5rem)', fontWeight: '700', lineHeight: 1.1 }}>{score}/{questions.length}</div>
+                  <div style={{ fontSize: 'clamp(1.5rem, 6vw, 2.2rem)', fontWeight: '700', lineHeight: 1.1 }}>{score}/{questions.length}</div>
                   <div style={{ fontSize: '0.85rem', opacity: 0.85, marginTop: '0.25rem' }}>{Math.round(scorePercent)}%</div>
                 </div>
                 {bestScore !== null && (
-                  <div style={{ background: score >= bestScore ? '#f0fff4' : '#f7fafc', border: score >= bestScore ? '2px solid #48bb78' : '2px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem 1rem' }}>
+                  <div style={{ background: score >= bestScore ? '#f0fff4' : '#f7fafc', border: score >= bestScore ? '2px solid #48bb78' : '2px solid #e2e8f0', borderRadius: '12px', padding: '1rem 0.4rem' }}>
                     <div style={{ fontSize: '0.8rem', fontWeight: '600', color: '#718096', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.4rem' }}>Best</div>
-                    <div style={{ fontSize: 'clamp(2rem, 8vw, 2.5rem)', fontWeight: '700', color: '#2C3E50', lineHeight: 1.1 }}>{bestScore}/{questions.length}</div>
+                    <div style={{ fontSize: 'clamp(1.5rem, 6vw, 2.2rem)', fontWeight: '700', color: '#2C3E50', lineHeight: 1.1 }}>{bestScore}/{questions.length}</div>
                     {score >= bestScore && score > 0 && (
                       <div style={{ fontSize: '0.85rem', color: '#48bb78', fontWeight: '600', marginTop: '0.25rem' }}>
                         {score > bestScore ? '🎉 New best!' : '🏆 Matched!'}
@@ -1069,9 +1069,9 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   </div>
                 )}
                 {averageScore !== null && (
-                  <div style={{ background: '#f7fafc', border: '2px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem 1rem' }}>
+                  <div style={{ background: '#f7fafc', border: '2px solid #e2e8f0', borderRadius: '12px', padding: '1rem 0.4rem' }}>
                     <div style={{ fontSize: '0.8rem', fontWeight: '600', color: '#718096', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.4rem' }}>Average</div>
-                    <div style={{ fontSize: 'clamp(2rem, 8vw, 2.5rem)', fontWeight: '700', color: '#2C3E50', lineHeight: 1.1 }}>{averageScore}</div>
+                    <div style={{ fontSize: 'clamp(1.5rem, 6vw, 2.2rem)', fontWeight: '700', color: '#2C3E50', lineHeight: 1.1 }}>{averageScore}</div>
                     <div style={{ fontSize: '0.85rem', color: '#718096', marginTop: '0.25rem' }}>out of {questions.length}</div>
                   </div>
                 )}

@@ -47,6 +47,9 @@ const SPEED_OPTIONS = [
 
 const GRADIENT = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
 
+const IconPlay  = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/></svg>;
+const IconPause = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><rect x="5" y="3" width="5" height="18" rx="1"/><rect x="14" y="3" width="5" height="18" rx="1"/></svg>;
+
 // ── Levenshtein distance ──
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
@@ -223,6 +226,15 @@ export default function Dictation({ onBack, userTracks = [] }) {
     if (audioRef.current) audioRef.current.playbackRate = newSpeed;
   };
 
+  const handleProgressClick = (e) => {
+    if (!audioRef.current || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percent = Math.max(0, Math.min(1, x / rect.width));
+    audioRef.current.currentTime = percent * duration;
+    setCurrentTime(percent * duration);
+  };
+
   const handleAudioEnded    = () => setIsPlaying(false);
   const handleTimeUpdate    = () => { if (audioRef.current) setCurrentTime(audioRef.current.currentTime); };
   const handleLoadedMetadata = () => { if (audioRef.current) setDuration(audioRef.current.duration); };
@@ -349,11 +361,14 @@ export default function Dictation({ onBack, userTracks = [] }) {
       <div style={{ background: '#f7fafc', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.25rem', border: '1px solid #e2e8f0' }}>
         <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#667eea', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{stageLabel}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button onClick={togglePlay} style={{ width: '48px', height: '48px', borderRadius: '50%', background: GRADIENT, color: 'white', border: 'none', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            {isPlaying ? '⏸' : '▶'}
+          <button onClick={togglePlay} style={{ width: '48px', height: '48px', borderRadius: '50%', background: GRADIENT, color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {isPlaying ? <IconPause /> : <IconPlay />}
           </button>
           <div style={{ flex: 1 }}>
-            <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden', marginBottom: '6px' }}>
+            <div
+              onClick={handleProgressClick}
+              style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden', marginBottom: '6px', cursor: 'pointer' }}
+            >
               <div style={{ width: `${progressPercent}%`, height: '100%', background: GRADIENT, borderRadius: '3px', transition: 'width 0.3s' }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#718096' }}>

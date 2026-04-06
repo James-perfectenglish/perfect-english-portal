@@ -190,14 +190,14 @@ export default function SentenceChallenge({ word, language = 'en', exercise = 'c
               <div style={{ textAlign: 'center' }}>
                 {!isRecording && !isTranscribing && (
                   <button onClick={startRecording}
-                    style={{ width: '80px', height: '80px', borderRadius: '50%', background: PG, color: 'white', border: 'none', fontSize: '2rem', cursor: 'pointer', boxShadow: '0 4px 16px rgba(102,126,234,0.4)', marginBottom: '0.75rem' }}>
+                    style={{ width: '80px', height: '80px', borderRadius: '50%', background: PG, color: 'white', border: 'none', fontSize: '2rem', cursor: 'pointer', boxShadow: '0 4px 16px rgba(102,126,234,0.4)', margin: '0 auto 0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     🎙️
                   </button>
                 )}
                 {isRecording && (
                   <>
                     <button onClick={stopRecording}
-                      style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#f56565', color: 'white', border: 'none', fontSize: '2rem', cursor: 'pointer', boxShadow: '0 4px 16px rgba(245,101,101,0.4)', marginBottom: '0.75rem' }}>
+                      style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#f56565', color: 'white', border: 'none', fontSize: '2rem', cursor: 'pointer', boxShadow: '0 4px 16px rgba(245,101,101,0.4)', margin: '0 auto 0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       ⏹
                     </button>
                     <div style={{ color: '#f56565', fontWeight: '600', fontSize: '0.9rem' }}>

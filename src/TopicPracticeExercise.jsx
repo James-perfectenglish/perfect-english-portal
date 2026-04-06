@@ -128,7 +128,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   // ── Sentence challenge ──
   const [showChallenge, setShowChallenge] = useState(false)
   const [challengeWord, setChallengeWord] = useState('')
-  const challengePositionRef = useRef(null)
+  const challengePositionsRef = useRef([])
   const challengeFiredRef = useRef(false)
 
   const passMark    = exercise.passing_score || 7
@@ -194,9 +194,9 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     const eligibleIdx = prepared
       .map((q, i) => i)
       .filter(i => prepared[i]?.type !== 'matching' && i > 0 && i < prepared.length - 1)
-    challengePositionRef.current = eligibleIdx.length > 0
-      ? eligibleIdx[Math.floor(Math.random() * eligibleIdx.length)]
-      : null
+    challengePositionsRef.current = eligibleIdx.length > 0
+      ? [eligibleIdx[Math.floor(Math.random() * eligibleIdx.length)]]
+      : []
     challengeFiredRef.current = false
     setShowChallenge(false)
     setStage('playing')
@@ -207,7 +207,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     window.scrollTo({ top: 0, behavior: 'instant' })
     setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0)
     setFeedback(null); setUserAnswer(''); setSelectedOption(null)
-    setShowChallenge(false); challengeFiredRef.current = false
+    setShowChallenge(false); challengeFiredRef.current = false; challengePositionsRef.current = []
     setStage('level-select'); fetchCounts()
   }
 
@@ -279,9 +279,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   const nextQuestion = async () => {
     if (
       !challengeFiredRef.current &&
-      challengePositionRef.current !== null &&
-      currentQ === challengePositionRef.current &&
-      feedback?.isCorrect
+      challengePositionsRef.current.includes(currentQ)
     ) {
       const word = getChallengeWordTP(questions[currentQ])
       if (word) {

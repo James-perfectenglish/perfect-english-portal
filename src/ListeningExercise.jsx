@@ -15,8 +15,8 @@ const SPEED_OPTIONS = [
   { label: 'Faster', value: 1.1 }
 ];
 
-const IconPlay  = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>;
-const IconPause = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><rect x="5" y="3" width="4" height="18" rx="1"/><rect x="15" y="3" width="4" height="18" rx="1"/></svg>;
+const IconPlay  = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/></svg>;
+const IconPause = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><rect x="5" y="3" width="5" height="18" rx="1"/><rect x="14" y="3" width="5" height="18" rx="1"/></svg>;
 
 export default function ListeningExercise({ onBack, userTracks = [] }) {
   const [stage, setStage]               = useState('level-select');
