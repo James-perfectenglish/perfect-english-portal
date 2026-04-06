@@ -45,7 +45,9 @@ RULE 1 — Multiple verbs can be correct: if the student's verb is grammatically
 RULE 2 — Synonyms and vocabulary alternatives are valid if they fit the sentence naturally.
 RULE 3 — British/American English variants are always valid (hire/rent, autumn/fall, etc.).
 RULE 4 — Idiom and expression variants are valid if meaning is preserved.
-RULE 5 — Collocations and dependent prepositions: if the student's word would require a different preposition or structure from what appears in the sentence, mark it amber (valid=true) but explain the mismatch. Example: model="impediment to", student="problem" → valid=true, reason="Good try — but 'problem' collocates with 'for', not 'to'. The natural phrase is 'an impediment to' or 'a problem for'."
+RULE 5 — Dependent prepositions and collocations: treat these two sub-cases differently.
+  5a. If the GAP itself is a preposition and the student fills it with a DIFFERENT preposition: mark valid=false unless the student's preposition creates a genuinely natural, established collocation that a native speaker would use in this exact sentence. "Keen for joining" is NOT an established collocation — "keen on" is the fixed phrase. "Interested in" not "interested on". When in doubt, mark invalid and explain the correct fixed phrase.
+  5b. If the student's CONTENT WORD (noun, verb, adjective) would require a different preposition from what appears in the sentence: mark valid=true (amber) and explain the mismatch. Example: model="impediment to", student="problem" → valid=true, reason="Good try — 'problem' collocates with 'for', not 'to'. The natural phrase is 'an impediment to' or 'a problem for'."
 RULE 6 — Fixed expressions: if the student's answer is close but the fixed expression differs, mark valid=true and note the fixed phrase.
 
 Mark INVALID only if the answer is clearly wrong grammar, nonsensical, or changes the meaning significantly.

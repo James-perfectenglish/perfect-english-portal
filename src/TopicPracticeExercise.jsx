@@ -99,6 +99,16 @@ const STOP_WORDS_TP = new Set([
   'off','if','than','then','with','from','into','about','over','after','before','just',
   'very','too','also','back','more','some','all','one','two','got',
 ])
+
+// Spanish stop words — avoid picking metalanguage about the exercise
+const STOP_WORDS_ES = new Set([
+  'cuál','cuáles','qué','cómo','dónde','cuándo','una','uno','los','las','del',
+  'para','con','esta','este','estos','estas','elige','frase','frases','correcta',
+  'correcto','correctas','correctos','significa','elige','entre','opción',
+  'opciones','cuál','cual','estas','estos','verbo','frase','palabra','oración',
+  'uso','ejemplo','respuesta','forma','diferencia','orden','expresión',
+])
+
 function getChallengeWordTP(question) {
   if (!question) return null
   const sourceText = question.correct_answer || ''
@@ -108,6 +118,29 @@ function getChallengeWordTP(question) {
   const candidates = rawWords.filter((w, i) => words[i].length > 3 && !STOP_WORDS_TP.has(words[i]))
   if (candidates.length === 0) return rawWords.find((w, i) => words[i].length > 2) || null
   return candidates.sort((a, b) => b.length - a.length)[0] || null
+}
+
+// For Spanish TP MC questions: extract the key Spanish word from the question text.
+// MC correct_answers may be in English (translation questions), so we look at the question text.
+function getChallengeWordSpanishMC(question) {
+  if (!question) return null
+  const text = question.question || ''
+
+  // 1. Try quoted text (e.g. "el desayuno", 'estar', "Ayer _____ mucho calor")
+  const quotedMatches = [...text.matchAll(/["'\u201c\u201d\u00ab\u00bb]([^"'\u201c\u201d\u00ab\u00bb]+)["'\u201c\u201d\u00ab\u00bb]/g)]
+  for (const m of quotedMatches) {
+    const words = m[1].split(/\s+/).map(w => w.replace(/[.,!?;:_¿¡]/g, '')).filter(Boolean)
+    // Pick the longest word that isn't a stop word or blank placeholder
+    const candidates = words.filter(w => w.length > 3 && !STOP_WORDS_ES.has(w.toLowerCase()) && !STOP_WORDS_TP.has(w.toLowerCase()) && !/^_+$/.test(w))
+    if (candidates.length > 0) return candidates.sort((a, b) => b.length - a.length)[0]
+  }
+
+  // 2. Fall back: pick longest meaningful word from question text
+  const rawWords = text.split(/\s+/).map(w => w.replace(/[.,!?;:'"()¿¡_]/g, '')).filter(Boolean)
+  const candidates = rawWords.filter(w => w.length > 4 && !STOP_WORDS_ES.has(w.toLowerCase()) && !STOP_WORDS_TP.has(w.toLowerCase()))
+  if (candidates.length > 0) return candidates.sort((a, b) => b.length - a.length)[0]
+
+  return null
 }
 
 export default function TopicPracticeExercise({ exercise, userLevel, onBack, onComplete }) {
@@ -293,7 +326,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     if (altNorms.includes(norm)) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'alternative', note: altFeedback(norm) }); addR(true); setIsChecking(false); return }
     if (informal.some(a => normalise(a) === norm)) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'informal', note: q.informal_feedback }); addR(true); setIsChecking(false); return }
     const dist = levenshtein(norm, correctNorm)
-    const fuzzy = dist === 1 || (dist === 2 && correctNorm.length >= 6) || altNorms.some(an => { const d = levenshtein(norm, an); return d === 1 || (d === 2 && an.length >= 6) })
+    const fuzzy = (correctNorm.length > 3 && dist === 1) || (dist === 2 && correctNorm.length >= 6) || altNorms.some(an => { const d = levenshtein(norm, an); return (an.length > 3 && d === 1) || (d === 2 && an.length >= 6) })
     if (fuzzy) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'fuzzy' }); addR(true); setIsChecking(false); return }
     try {
       const res = await fetch('/api/mark-gap', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'gap_fill', question: q.question, correctAnswer: q.correct_answer, studentAnswer: answer, acceptableAlternatives: alts, informalAccepted: informal }) })
@@ -328,7 +361,11 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
       !challengeFiredRef.current &&
       challengePositionsRef.current.includes(currentQ)
     ) {
-      const word = getChallengeWordTP(questions[currentQ])
+      // For Spanish TP: use question-text extraction for MC (avoids English correct_answers).
+      // For gap_fill the correct_answer is always Spanish so use the standard picker.
+      const word = (isSpanishTP && questions[currentQ]?.type === 'multiple_choice')
+        ? getChallengeWordSpanishMC(questions[currentQ])
+        : getChallengeWordTP(questions[currentQ])
       if (word) {
         challengeFiredRef.current = true
         setChallengeWord(word)

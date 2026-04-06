@@ -79,8 +79,10 @@ function levenshtein(a, b) {
 
 function isFuzzyMatch(studentAnswer, correctAnswers) {
   for (const correct of correctAnswers) {
-    // Single-word answers: standard fuzzy (typo detection)
+    // Single-word answers: only fuzzy if the correct word is long enough to make a typo plausible.
+    // Words of 3 chars or fewer (e.g. "of", "on", "for") must not fuzzy-match each other.
     if (!correct.includes(' ') && !studentAnswer.includes(' ')) {
+      if (correct.length <= 3) continue;
       const dist = levenshtein(studentAnswer, correct);
       if (dist === 1) return true;
       if (dist === 2 && correct.length >= 6) return true;
@@ -675,7 +677,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const handleChallengeClose = (earnedStar) => {
     setShowChallenge(false);
     window.scrollTo({ top: 0, behavior: 'instant' });
-    advanceQuestion(earnedStar ? 1 : 0);
+    advanceQuestion(); // Stars are tracked separately — no score bonus
   };
 
   const retry = () => { startExercise(); };
