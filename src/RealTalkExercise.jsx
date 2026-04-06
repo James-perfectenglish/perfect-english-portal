@@ -56,11 +56,32 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
   const [score, setScore]               = useState(0)
 
   const audioRef = useRef(null)
+  const sessionSavedRef = useRef(false)
 
   useEffect(() => {
     fetchCounts()
     return () => { if (audioRef.current) audioRef.current.pause() }
   }, [])
+
+  // Save session exactly once when an ending node is reached
+  useEffect(() => {
+    if (!currentNode?.is_ending || sessionSavedRef.current) return
+    sessionSavedRef.current = true
+    const maxScore = history.length * 2
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user || !scenarioId) return
+      supabase.from('real_talk_sessions').insert({
+        student_id:     user.id,
+        scenario_id:    scenarioId,
+        scenario_title: scenarioTitle,
+        score,
+        max_score:      maxScore,
+        ending_type:    currentNode.ending_type,
+      }).then(({ error }) => {
+        if (error) console.warn('real_talk_sessions insert failed:', error.message)
+      })
+    })
+  }, [currentNode?.is_ending])
 
   async function fetchCounts() {
     const { data } = await supabase
@@ -98,6 +119,7 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
   }
 
   async function startScenario(sid, title, image) {
+    sessionSavedRef.current = false
     setScenarioId(sid)
     setScenarioTitle(title)
     setScenarioImage(image || null)
@@ -170,6 +192,7 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
 
   function restart() {
     if (audioRef.current) { audioRef.current.pause(); setIsPlaying(false) }
+    sessionSavedRef.current = false
     setHistory([])
     setCurrentNode(null)
     startScenario(scenarioId, scenarioTitle, scenarioImage)
@@ -439,23 +462,7 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
               </div>
             )}
 
-            {/* Save session on ending */}
-            {currentNode.is_ending && (() => {
-              const maxScore = history.length * 2
-              supabase.auth.getUser().then(({ data: { user } }) => {
-                if (user && scenarioId) {
-                  supabase.from('real_talk_sessions').insert({
-                    student_id: user.id,
-                    scenario_id: scenarioId,
-                    scenario_title: scenarioTitle,
-                    score,
-                    max_score: maxScore,
-                    ending_type: currentNode.ending_type,
-                  }).catch(() => {})
-                }
-              })
-              return null
-            })()}
+
 
             {/* Ending buttons */}
             {currentNode.is_ending && (

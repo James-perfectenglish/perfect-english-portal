@@ -41,17 +41,14 @@ function getMondayISO() {
   return mon.toISOString()
 }
 
-function exportCSV(students) {
-  const headers = ['Name', 'Level', 'Questions Answered', 'Accuracy %', 'Test ✅', 'Listen ✅', 'Dict ✅', 'Topic ✅', 'Best Type', 'Worst Type', 'Last Active']
-  const rows = students.map(s => [
+function exportCSV(students, showInactive) {
+  const headers = ['Name', 'Level', 'Questions', 'Success %', 'Passed', 'Best Type', 'Worst Type', 'Last Active']
+  const rows = students.filter(s => showInactive || s.lastActive).map(s => [
     s.full_name || 'Unknown',
     s.level || '—',
     s.totalAnswers,
     s.accuracy,
-    s.testPassed,
-    s.listenPassed,
-    s.dictPassed,
-    s.topicPassed,
+    s.passedTotal,
     s.bestType ? (TYPE_INFO[s.bestType]?.label || s.bestType) : '—',
     s.worstType ? (TYPE_INFO[s.worstType]?.label || s.worstType) : '—',
     s.lastActive ? new Date(s.lastActive).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'
@@ -80,6 +77,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
   const [wotdProfileMap, setWotdProfileMap] = useState({})
   const [wordleLeaderboard, setWordleLeaderboard] = useState([])
   const [wordleLeaderboardOpen, setWordleLeaderboardOpen] = useState(true)
+  const [showInactive, setShowInactive] = useState(true)
 
   useEffect(() => { fetchAllData(); fetchWotdData(); fetchWordleLeaderboard() }, [])
 
@@ -94,31 +92,31 @@ export default function TeacherDashboard({ profile, handleLogout }) {
 
     const ids = profiles.map(p => p.id)
 
-    const totalCountsPromises  = ids.map(id => supabase.from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', id))
-    const correctCountsPromises= ids.map(id => supabase.from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', id).eq('is_correct', true))
-    const testPassedPromises   = ids.map(id => supabase.from('student_attempts').select('*', { count: 'exact', head: true }).eq('student_id', id).gte('score', 14))
-    const listenPassPromises   = ids.map(id => supabase.from('listening_sessions').select('detail_correct, detail_total').eq('student_id', id).eq('stage_reached', 'review'))
-    const dictPassPromises     = ids.map(id => supabase.from('dictation_sessions').select('*', { count: 'exact', head: true }).eq('student_id', id).or('is_correct.eq.true,is_soft_pass.eq.true'))
-    const topicPassPromises    = ids.map(id => supabase.from('topic_sessions').select('*', { count: 'exact', head: true }).eq('student_id', id).eq('passed', true))
+    const totalCountsPromises   = ids.map(id => supabase.from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', id))
+    const correctCountsPromises  = ids.map(id => supabase.from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', id).eq('is_correct', true))
+    const testPassedPromises     = ids.map(id => supabase.from('student_attempts').select('*', { count: 'exact', head: true }).eq('student_id', id).gte('score', 14))
+    const listenPassPromises     = ids.map(id => supabase.from('listening_sessions').select('detail_correct, detail_total').eq('student_id', id).eq('stage_reached', 'review'))
+    const topicPassPromises      = ids.map(id => supabase.from('topic_sessions').select('*', { count: 'exact', head: true }).eq('student_id', id).eq('passed', true))
+    const realTalkPassPromises   = ids.map(id => supabase.from('real_talk_sessions').select('*', { count: 'exact', head: true }).eq('student_id', id).eq('ending_type', 'good'))
 
-    const [totalResults, correctResults, testPassedResults, listenPassResults, dictPassResults, topicPassResults] = await Promise.all([
+    const [totalResults, correctResults, testPassedResults, listenPassResults, topicPassResults, realTalkPassResults] = await Promise.all([
       Promise.all(totalCountsPromises),
       Promise.all(correctCountsPromises),
       Promise.all(testPassedPromises),
       Promise.all(listenPassPromises),
-      Promise.all(dictPassPromises),
       Promise.all(topicPassPromises),
+      Promise.all(realTalkPassPromises),
     ])
 
-    const totalMap = {}, correctMap = {}, testPassedMap = {}, listenPassMap = {}, dictPassMap = {}, topicPassMap = {}
+    const totalMap = {}, correctMap = {}, testPassedMap = {}, listenPassMap = {}, topicPassMap = {}, realTalkPassMap = {}
     ids.forEach((id, i) => {
-      totalMap[id]     = totalResults[i].count || 0
-      correctMap[id]   = correctResults[i].count || 0
-      testPassedMap[id]= testPassedResults[i].count || 0
-      const listenRows = listenPassResults[i].data || []
-      listenPassMap[id]= listenRows.filter(r => r.detail_total > 0 && r.detail_correct / r.detail_total >= 0.7).length
-      dictPassMap[id]  = dictPassResults[i].count || 0
-      topicPassMap[id] = topicPassResults[i].count || 0
+      totalMap[id]        = totalResults[i].count || 0
+      correctMap[id]      = correctResults[i].count || 0
+      testPassedMap[id]   = testPassedResults[i].count || 0
+      const listenRows    = listenPassResults[i].data || []
+      listenPassMap[id]   = listenRows.filter(r => r.detail_total > 0 && r.detail_correct / r.detail_total >= 0.7).length
+      topicPassMap[id]    = topicPassResults[i].count || 0
+      realTalkPassMap[id] = realTalkPassResults[i].count || 0
     })
 
     const activeIds = ids.filter(id => (totalMap[id] || 0) > 0)
@@ -148,6 +146,22 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       .order('completed_at', { ascending: false })
       .limit(500)
 
+    // Bulk lastActive from all other activity tables
+    const [dictSess, rtSess, topicSess, wordleSess, connSess, wotdSess] = await Promise.all([
+      supabase.from('dictation_sessions').select('student_id, completed_at').in('student_id', ids).order('completed_at', { ascending: false }).limit(500),
+      supabase.from('real_talk_sessions').select('student_id, completed_at').in('student_id', ids).order('completed_at', { ascending: false }).limit(200),
+      supabase.from('topic_sessions').select('student_id, created_at').in('student_id', ids).order('created_at', { ascending: false }).limit(500),
+      supabase.from('wordle_sessions').select('student_id, completed_at').in('student_id', ids).order('completed_at', { ascending: false }).limit(500),
+      supabase.from('connections_sessions').select('student_id, completed_at').in('student_id', ids).order('completed_at', { ascending: false }).limit(200),
+      supabase.from('word_of_the_day_submissions').select('student_id, submitted_at').in('student_id', ids).order('submitted_at', { ascending: false }).limit(500),
+    ])
+    const allDictSess  = dictSess.data  || []
+    const allRtSess    = rtSess.data    || []
+    const allTopicSess = topicSess.data || []
+    const allWrdlSess  = wordleSess.data|| []
+    const allConnSess  = connSess.data  || []
+    const allWotdSess  = wotdSess.data  || []
+
     let typeMap = {}
     if (answers && answers.length > 0) {
       const questionIds = [...new Set(answers.map(a => a.question_id).filter(Boolean))]
@@ -164,14 +178,14 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     profiles.forEach(p => {
       studentMap[p.id] = {
         ...p,
-        totalAnswers: totalMap[p.id] || 0,
-        correctAnswers: correctMap[p.id] || 0,
-        testPassed: testPassedMap[p.id] || 0,
-        listenPassed: listenPassMap[p.id] || 0,
-        dictPassed: dictPassMap[p.id] || 0,
-        topicPassed: topicPassMap[p.id] || 0,
+        totalAnswers:   totalMap[p.id]        || 0,
+        correctAnswers: correctMap[p.id]       || 0,
+        passedTotal:    (testPassedMap[p.id]   || 0)
+                      + (listenPassMap[p.id]   || 0)
+                      + (topicPassMap[p.id]    || 0)
+                      + (realTalkPassMap[p.id] || 0),
         accuracy: 0,
-        lastActive: null, lastAnswered: null, lastListened: null, lastAttempt: null,
+        lastActive: null,
         typeStats: {}, bestType: null, worstType: null,
       }
     })
@@ -180,7 +194,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       answers.forEach(a => {
         const s = studentMap[a.student_id]
         if (!s) return
-        if (!s.lastAnswered || new Date(a.answered_at) > new Date(s.lastAnswered)) s.lastAnswered = a.answered_at
         const type = typeMap[a.question_id]
         if (type) {
           if (!s.typeStats[type]) s.typeStats[type] = { correct: 0, total: 0 }
@@ -190,24 +203,32 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       })
     }
 
-    if (listeningSessions) {
-      listeningSessions.forEach(ls => {
-        const s = studentMap[ls.student_id]
-        if (!s) return
-        if (!s.lastListened || new Date(ls.completed_at) > new Date(s.lastListened)) s.lastListened = ls.completed_at
+    // Helper: latest date per student from a rows array
+    const latestPer = (rows, idKey, dateKey) => {
+      const map = {}
+      rows.forEach(r => {
+        const id = r[idKey], d = r[dateKey]
+        if (!id || !d) return
+        if (!map[id] || new Date(d) > new Date(map[id])) map[id] = d
       })
+      return map
     }
-
-    if (attempts) {
-      attempts.forEach(a => {
-        const s = studentMap[a.student_id]
-        if (!s) return
-        if (!s.lastAttempt || new Date(a.completed_at) > new Date(s.lastAttempt)) s.lastAttempt = a.completed_at
-      })
-    }
+    const answerDates  = latestPer(answers || [],    'student_id', 'answered_at')
+    const listenDates  = latestPer(listeningSessions || [], 'student_id', 'completed_at')
+    const attemptDates = latestPer(attempts || [],   'student_id', 'completed_at')
+    const dictDates    = latestPer(allDictSess,  'student_id', 'completed_at')
+    const rtDates      = latestPer(allRtSess,    'student_id', 'completed_at')
+    const topicDates   = latestPer(allTopicSess, 'student_id', 'created_at')
+    const wrdlDates    = latestPer(allWrdlSess,  'student_id', 'completed_at')
+    const connDates    = latestPer(allConnSess,  'student_id', 'completed_at')
+    const wotdDates    = latestPer(allWotdSess,  'student_id', 'submitted_at')
 
     Object.values(studentMap).forEach(s => {
-      s.lastActive = latestOf(s.lastAnswered, s.lastListened, s.lastAttempt)
+      s.lastActive = latestOf(
+        answerDates[s.id], listenDates[s.id], attemptDates[s.id],
+        dictDates[s.id], rtDates[s.id], topicDates[s.id],
+        wrdlDates[s.id], connDates[s.id], wotdDates[s.id]
+      )
       s.accuracy = s.totalAnswers > 0 ? Math.round((s.correctAnswers / s.totalAnswers) * 100) : 0
       const typeEntries = Object.entries(s.typeStats)
         .filter(([, d]) => d.total >= 5)
@@ -225,10 +246,12 @@ export default function TeacherDashboard({ profile, handleLogout }) {
 
   async function fetchWotdData() {
     setWotdLoading(true)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     const { data: subs } = await supabase
       .from('word_of_the_day_submissions')
       .select(`id, student_id, sentence, is_correct, is_soft_pass, ai_feedback, submitted_at,
         word_of_the_day ( id, date, word, part_of_speech, level, language )`)
+      .gte('submitted_at', sevenDaysAgo)
       .order('submitted_at', { ascending: false })
       .limit(200)
 
@@ -286,7 +309,8 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     else { setSortKey(key); setSortDir('desc') }
   }
 
-  const sorted = [...students].sort((a, b) => {
+  const visibleStudents = showInactive ? students : students.filter(s => s.lastActive !== null)
+  const sorted = [...visibleStudents].sort((a, b) => {
     let av = a[sortKey], bv = b[sortKey]
     if (av == null && bv == null) return 0
     if (av == null) return 1
@@ -295,13 +319,14 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     return sortDir === 'asc' ? av - bv : bv - av
   })
 
+  const neverActive = students.filter(s => !s.lastActive).length
   const activeThisWeek = students.filter(s => {
     if (!s.lastActive) return false
     return (new Date() - new Date(s.lastActive)) < 7 * 24 * 60 * 60 * 1000
   }).length
 
-  const totalQAll    = students.reduce((sum, s) => sum + s.totalAnswers, 0)
-  const totalCAll    = students.reduce((sum, s) => sum + s.correctAnswers, 0)
+  const totalQAll    = visibleStudents.reduce((sum, s) => sum + s.totalAnswers, 0)
+  const totalCAll    = visibleStudents.reduce((sum, s) => sum + s.correctAnswers, 0)
   const avgAccuracy  = totalQAll > 0 ? Math.round((totalCAll / totalQAll) * 100) : 0
   const totalQuestions = totalQAll
   const today = new Date().toISOString().split('T')[0]
@@ -338,6 +363,12 @@ export default function TeacherDashboard({ profile, handleLogout }) {
           <p style={{ color: '#718096', margin: 0, fontSize: '0.9rem' }}>
             {students.length} students · {activeThisWeek} active this week
           </p>
+          {neverActive > 0 && (
+            <button onClick={() => setShowInactive(v => !v)}
+              style={{ marginTop: '4px', padding: '2px 10px', fontSize: '0.75rem', borderRadius: '6px', border: `1px solid ${showInactive ? '#667eea' : '#e2e8f0'}`, background: showInactive ? '#EDE9FE' : 'white', color: showInactive ? '#553C9A' : '#718096', cursor: 'pointer', fontWeight: 600 }}>
+              {showInactive ? `Showing all (hide ${neverActive} never active)` : `${neverActive} never-active hidden`}
+            </button>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ width: '1px', height: '24px', background: '#e2e8f0', margin: '0 2px' }} />
@@ -346,7 +377,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
             {privateMode ? '🔒 Private' : 'Public'}
           </button>
           {privateMode && (
-            <button onClick={() => exportCSV(sorted)}
+            <button onClick={() => exportCSV(sorted, showInactive)}
               style={{ height: '34px', padding: '0 10px', borderRadius: '8px', border: '2px solid #48bb78', background: 'white', color: '#48bb78', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600', whiteSpace: 'nowrap' }}>
               ⬇ CSV
             </button>
@@ -411,11 +442,8 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                   ['full_name',    'Student'],
                   ['level',        'Level'],
                   ['totalAnswers', 'Questions'],
-                  ['accuracy',     'Accuracy'],
-                  ['testPassed',   'Test ✅'],
-                  ['listenPassed', 'Listen ✅'],
-                  ['dictPassed',   'Dict ✅'],
-                  ['topicPassed',  'Topic ✅'],
+                  ['accuracy',     'Success %'],
+                  ['passedTotal',  'Passed'],
                   ['bestType',     'Best Type'],
                   ['worstType',    'Worst Type'],
                   ['lastActive',   'Last Active'],
@@ -446,10 +474,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                       {s.totalAnswers > 0 ? `${s.accuracy}%` : '—'}
                     </span>
                   </td>
-                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568', textAlign: 'center' }}>{s.testPassed  || '—'}</td>
-                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568', textAlign: 'center' }}>{s.listenPassed|| '—'}</td>
-                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568', textAlign: 'center' }}>{s.dictPassed  || '—'}</td>
-                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568', textAlign: 'center' }}>{s.topicPassed || '—'}</td>
+                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568', textAlign: 'center', fontWeight: s.passedTotal > 0 ? 600 : 400 }}>{s.passedTotal || '—'}</td>
                   <td style={{ padding: '0.6rem 0.75rem', color: '#38a169', fontSize: '0.8rem' }}>
                     {s.bestType  ? `${TYPE_INFO[s.bestType]?.emoji  || ''} ${TYPE_INFO[s.bestType]?.label  || s.bestType}`  : '—'}
                   </td>
@@ -474,7 +499,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <span style={{ fontSize: '1.1rem' }}>⭐️</span>
             <div>
-              <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: 0 }}>Wordle — Weekly Stars</h2>
+              <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: 0 }}>Weekly Stars ⭐️</h2>
               <p style={{ fontSize: '0.75rem', color: '#718096', margin: 0 }}>
                 {wordleLeaderboard.length > 0
                   ? `${wordleLeaderboard.length} student${wordleLeaderboard.length !== 1 ? 's' : ''} this week`

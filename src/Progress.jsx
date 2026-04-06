@@ -124,8 +124,27 @@ export default function Progress({ session, profile, handleLogout }) {
       .from('student_answers').select('is_correct, question_id, answered_at')
       .eq('student_id', userId).order('answered_at', { ascending: false }).limit(2000)
 
+    // Collect activity dates from all engagement sources for streak
+    const [dictActivity, listenActivity, rtActivity, wordleActivity, connActivity, wotdActivity] = await Promise.all([
+      supabase.from('dictation_sessions').select('completed_at').eq('student_id', userId).order('completed_at', { ascending: false }).limit(500),
+      supabase.from('listening_sessions').select('completed_at').eq('student_id', userId).order('completed_at', { ascending: false }).limit(500),
+      supabase.from('real_talk_sessions').select('completed_at').eq('student_id', userId).order('completed_at', { ascending: false }).limit(200),
+      supabase.from('wordle_sessions').select('completed_at').eq('student_id', userId).order('completed_at', { ascending: false }).limit(500),
+      supabase.from('connections_sessions').select('completed_at').eq('student_id', userId).order('completed_at', { ascending: false }).limit(200),
+      supabase.from('word_of_the_day_submissions').select('submitted_at').eq('student_id', userId).order('submitted_at', { ascending: false }).limit(500),
+    ])
+    const allActivityDates = [
+      ...(recentAnswers || []).map(a => a.answered_at),
+      ...(dictActivity.data || []).map(a => a.completed_at),
+      ...(listenActivity.data || []).map(a => a.completed_at),
+      ...(rtActivity.data || []).map(a => a.completed_at),
+      ...(wordleActivity.data || []).map(a => a.completed_at),
+      ...(connActivity.data || []).map(a => a.completed_at),
+      ...(wotdActivity.data || []).map(a => a.submitted_at),
+    ].filter(Boolean)
+
     if (recentAnswers && recentAnswers.length > 0) {
-      setStreak(computeStreak(recentAnswers.map(a => a.answered_at)))
+      setStreak(computeStreak(allActivityDates))
       const questionIds = [...new Set(recentAnswers.map(a => a.question_id).filter(Boolean))]
       if (questionIds.length > 0) {
         const { data: questions } = await supabase.from('question_bank').select('question_number, type').in('question_number', questionIds)
@@ -143,6 +162,8 @@ export default function Progress({ session, profile, handleLogout }) {
           setTypeBreakdown(byType)
         }
       }
+    } else if (allActivityDates.length > 0) {
+      setStreak(computeStreak(allActivityDates))
     }
 
     const { data: attemptData } = await supabase
@@ -152,13 +173,12 @@ export default function Progress({ session, profile, handleLogout }) {
     if (attemptData && attemptData.length > 0) {
       const normalised = attemptData.map(a => ({ ...a, scorePercent: toPercent(a.score, a.answers) }))
       setLessonsPassed(normalised.filter(a => a.scorePercent >= 70).length)
-      const attemptDays = normalised.map(a => new Date(a.completed_at).toDateString())
-      const answerDays = (recentAnswers || []).map(a => new Date(a.answered_at).toDateString())
-      setDaysStudied(new Set([...attemptDays, ...answerDays]).size)
+      const allDays = [...new Set(allActivityDates.map(d => new Date(d).toDateString()))]
+      setDaysStudied(allDays.length)
       setAttempts([...normalised].reverse())
-    } else if (recentAnswers && recentAnswers.length > 0) {
-      const answerDays = recentAnswers.map(a => new Date(a.answered_at).toDateString())
-      setDaysStudied(new Set(answerDays).size)
+    } else if (allActivityDates.length > 0) {
+      const allDays = [...new Set(allActivityDates.map(d => new Date(d).toDateString()))]
+      setDaysStudied(allDays.length)
     }
 
     const { count: listenCount } = await supabase
