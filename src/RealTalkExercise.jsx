@@ -84,10 +84,12 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
   }, [currentNode?.is_ending])
 
   async function fetchCounts() {
+    const effectiveTracks = (userTracks && userTracks.length > 0) ? userTracks : ['general']
     const { data } = await supabase
       .from('scenario_nodes')
       .select('scenario_id, level, tracks, language')
       .eq('node_key', 'start')
+      .overlaps('tracks', effectiveTracks)
 
     if (data) {
       const counts = {}
@@ -100,11 +102,13 @@ export default function RealTalkExercise({ onBack, userTracks = [] }) {
 
   async function fetchScenarioList(dbLevels) {
     setListLoading(true)
+    const effectiveTracks = (userTracks && userTracks.length > 0) ? userTracks : ['general']
     const { data } = await supabase
       .from('scenario_nodes')
       .select('scenario_id, scenario_title, level, language, tracks, image_url')
       .eq('node_key', 'start')
       .in('level', dbLevels)
+      .overlaps('tracks', effectiveTracks)
       .order('scenario_title')
 
     if (data) setScenarioList(data)
