@@ -126,12 +126,16 @@ The student must write a sentence that correctly uses this word in a way that de
 
 IMPORTANT — PARTS OF SPEECH: Many English words are valid as multiple parts of speech (e.g. "whisper", "smile", "walk" work as both verb and noun). Do NOT penalise the student for using the word in a different grammatical role from the listed part of speech, provided the usage is correct English and shows understanding of the word's meaning.
 
-Assess: Is the sentence grammatically correct? Does it use the word appropriately and in a way consistent with the definition?
+ASSESSMENT RULES — apply in this order:
+1. GREEN (valid=true, no mention of spelling): If the student misspells the target word "${word}" by just 1-2 letters but has clearly used it correctly — treat it as a pure typo, accept it fully, and do NOT mention the spelling at all. Just praise the sentence normally.
+2. AMBER (valid=true, note the issue): If the student uses "${word}" correctly but the sentence has grammar errors elsewhere (wrong plurals, missing articles, wrong prepositions, capitalisation etc.) — accept it because they’ve shown they understand the word, but note the grammar issues briefly.
+3. ACCEPT (valid=true, praise only): Sentence is correct and uses the word well.
+4. REJECT (valid=false): The word is genuinely misused or misunderstood, OR the student has not actually used the word at all.
 
-Be warm and encouraging — like a good teacher who wants the student to succeed. Minor punctuation issues are fine. Accept creative, humorous, or playful sentences if the word is used correctly. Only reject if the word is genuinely misused or misunderstood.
+Minor punctuation issues are always fine. Accept creative, humorous, or playful sentences if the word is used correctly. Be warm and encouraging.
 
 Reply ONLY with a JSON object:
-{"valid": true, "feedback": "one warm, encouraging sentence explaining why it works well"}
+{"valid": true, "feedback": "one warm, encouraging sentence — if amber, briefly note the spelling or grammar issue"}
 or
 {"valid": false, "feedback": "one kind sentence explaining the issue and how to improve"}`
   }
