@@ -232,6 +232,7 @@ REJECT (valid=false) if:
 - There is a clear grammar error
 - The meaning is significantly different
 - The student uses a false friend or wrong collocation that changes the natural meaning. Example: model="a day off", student="a free day" → invalid ("free day" is not a natural English collocation in this context; "day off" is the fixed expression)
+- The student's word order produces unnatural or incorrect English (e.g. "awake fully" instead of "fully awake"). Different order from the model is fine IF the student's order is itself natural English — but if the student's own word order is wrong, mark invalid.
 
 FEEDBACK: Plain English only — no grammar labels, no syntactic categories (never write SVOC, SVO, etc.), no jargon. One short sentence. Warm and direct.
 

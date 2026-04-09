@@ -115,7 +115,7 @@ Student's answer: "${studentAnswer}"
 1. Ignore capitalisation and punctuation differences.
 2. Accept minor spelling mistakes if the intended word is obvious.
 3. The student may omit degree modifiers or attributive adjectives (e.g. "busy" for "very busy", "compromise" for "sensible compromise") as long as the core word is present in the correct form. Note the full phrase in your reason.
-4. The core word must be in the correct form (e.g. verb tense, noun form must match).
+4. WRONG WORD FORM = INVALID: If the student wrote a different part of speech from the correct answer (e.g. adjective "thorough" instead of adverb "thoroughly", noun instead of verb, base form instead of past tense), mark it INVALID. This is NOT a spelling mistake — it is a different word. Do not be fooled by visual similarity between word forms.
 5. A modifier alone without the core word is NOT acceptable.
 ${excerptType === 'sentence' ? '6. For full sentences, all key words must be present — but rule 3 still applies.' : ''}
 
