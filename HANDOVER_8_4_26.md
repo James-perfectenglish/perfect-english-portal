@@ -1,5 +1,5 @@
 # Perfect English Portal — Claude Reference
-## Updated: 8 April 2026
+## Updated: 9 April 2026
 
 ## Stack
 React + Supabase (dyxmgicedabvmsbuvxny) + Vercel
@@ -139,7 +139,10 @@ language: 'en' (default), 'es', 'both'
 - English filter: .in('language', ['en', 'both']).neq('topic', 'spanish')
 - Spanish filter: .in('language', ['es', 'both'])
 ⚠️ student_answers.question_id is int4 (question_number, not uuid)
-⚠️ 1896 rows as of 8 April (sentence_auction batch added 1857–1896)
+⚠️ 1976 rows as of 9 April
+- 1857–1896: sentence_auction batch
+- 1897–1936: matching questions (A en, B en, C en, Spanish)
+- 1937–1976: odd_one_out questions (A en, B en, C en, Spanish)
 
 ### question_bank tags column
 - Type is text[] — NOT jsonb
@@ -271,6 +274,14 @@ Students: NavBar (bottom mobile, top desktop) + student routes.
 - B level: 5 multiple_choice + 5 gap_fill
 - C level: gap_fill only
 
+### Gap fill — two-blank questions (fixed 9 April)
+- Two-blank format (e.g. `___ you ___ speak English?`) is confusing for students and unreliable to mark
+- All 11 two-blank questions converted to single-blank on 9 April (Q204, 211, 214, 219, 225, 229, 235, 258, 273, 276, 298)
+- Rule going forward: **always write gap-fill questions with a single blank**
+- Q273 has acceptable_alternatives: ['could']
+- Q276 has acceptable_alternatives: could, might, may — explanation notes 'may' is most polite
+- question_bank.acceptable_alternatives is **jsonb** (not text[]) — use '["alt1","alt2"]'::jsonb syntax
+
 ### Sentence Auction — content reference (added 8 April)
 **English A band (1857–1866):**
 - Grammar: Past simple -ed verbs · Comparative adjectives · Possessives · How much/many
@@ -331,7 +342,8 @@ Students: NavBar (bottom mobile, top desktop) + student routes.
 - Connections Spanish: covered to 30 April ✅ (daily) + 17 practice puzzles
 - Wordle English: to 4 July 2026
 - Wordle Spanish: to 25 May 2026
-- Sentence auction: 1897 is next question number
+- Sentence auction, matching, OOO: last used Q1976, next is Q1977
+- Matching image questions: Q1897–Q1899 (EN), Q1927–Q1929 (ES) — images at audio/matching/ in Supabase Storage
 - Blurt: 54 categories (34 en, 20 es)
 - Word Snake: 43 categories (23 en, 20 es)
 
@@ -368,6 +380,14 @@ Students: NavBar (bottom mobile, top desktop) + student routes.
 ---
 
 ## Priority List (as of 8 April 2026)
+
+### ✅ Completed 9 April
+- 40 matching questions added (Q1897–Q1936): A en, B en, C en, Spanish — includes 3 image sets (suitcase/backpack/briefcase, phone charger/cable/plug socket, glasses/a glass/glass)
+- 40 OOO questions added (Q1937–Q1976): A en, B en, C en, Spanish — includes 2× not-an-idiom, 2× make-you-think, 2× fun/funny per level
+- is_idiomatic boolean column added to question_bank (DEFAULT false) — 35 questions flagged on insert; backfill remaining idiom questions in future session
+- All 11 two-blank gap-fill questions converted to single-blank (Q204, 211, 214, 219, 225, 229, 235, 258, 273, 276, 298)
+- mark-gap.js: wrong word form rule added to dictation prompt ("thorough" ≠ "thoroughly" = invalid)
+- mark-free.js: word order rule added to word_order prompt ("awake fully" = invalid)
 
 ### ✅ Completed today (8 April)
 - Spanish Connections: fixed UNIQUE constraint (play_date, language) replacing (play_date) only

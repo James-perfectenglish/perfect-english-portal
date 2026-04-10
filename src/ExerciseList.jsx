@@ -32,7 +32,7 @@ const ACTIVE_EXERCISES = new Set([
   'Hotel Flashcards', 'Hotel Memory Game',
   'Odd One Out', 'Error Correction',
   'Matching', 'Sentence Auction', 'Lyrics Mixer', 'Blurt!', 'Word Snake', 'Real Talk',
-  'Travel 🧳', 'Sport ⚽️', 'Wordle 🟩', 'Connections 🔗',
+  'Travel 🧳', 'Sport ⚽️', 'Wordle 🟩', 'Connections 🔗', 'Spelling Bee 🐝',
 ])
 
 const EXERCISE_ICONS = {
@@ -66,6 +66,7 @@ const EXERCISE_ICONS = {
   'Sport ⚽️':                  '⚽️',
   'Wordle 🟩':                 '🟩',
   'Connections 🔗':            '🔗',
+  'Spelling Bee 🐝':           '🐝',
 }
 
 // Play removed from tabs — students use bottom nav, teachers use sidebar
@@ -171,6 +172,7 @@ export default function ExerciseList({
     if (exercise.title === 'Word Snake')   { navigate('/wordsnake'); return }
     if (exercise.title === 'Wordle 🟩')       { navigate('/wordle', { state: { isSpanish: userTracks.includes('spanish') } }); return }
     if (exercise.title === 'Connections 🔗') { navigate('/connections'); return }
+    if (exercise.title === 'Spelling Bee 🐝') { navigate('/spelling-bee', { state: { isSpanish: userTracks.includes('spanish') } }); return }
     setActiveExercise(exercise)
   }
 
