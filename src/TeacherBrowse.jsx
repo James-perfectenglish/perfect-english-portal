@@ -429,7 +429,7 @@ function InteractiveQuestion({ item: q }) {
     if (isCorrect && isSoft) {
       const note = aiReason ? `${aiReason} ` : '';
       const msg = `✅ Also correct! ${note}The model answer was: "${displaySentence}"`;
-      setSbFeedback({ correct: true, message: msg });
+      setSbFeedback({ correct: true, soft: true, message: msg });
       setFeedback({ message: msg, type: 'soft-pass', isCorrect: true });
     } else if (isCorrect) {
       const msg = `✅ Correct! ${q.explanation || ''}`;

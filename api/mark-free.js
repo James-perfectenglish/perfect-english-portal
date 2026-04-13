@@ -227,6 +227,7 @@ ACCEPT (valid=true) if:
 AMBER — still valid=true, but add a note if:
 - The student omits an important word (e.g. "daily" from "daily routine") — accept but note it
 - The student uses a word that is grammatically correct but not the natural collocation — accept but explain the more natural phrasing
+- The student uses "one" as an indefinite article where "a" or "an" is the natural English choice (e.g. "one suitcase" instead of "a suitcase", "one taxi" instead of "a taxi") — mark valid=true but note that "a/an" is more natural. NEVER say "one" is clearer or better than "a" — it is not. This is a common error for Spanish speakers because "uno/una" can mean both.
 
 REJECT (valid=false) if:
 - There is a clear grammar error

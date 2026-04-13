@@ -283,7 +283,7 @@ export default function SentenceBuildingInput({
 
       {/* FEEDBACK */}
       {feedback && (
-        <div style={{ backgroundColor: feedback.correct ? '#d4edda' : '#f8d7da', color: feedback.correct ? '#155724' : '#721c24', padding: '1rem 1.25rem', borderRadius: '10px', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: '1.6', marginBottom: '1rem', wordWrap: 'break-word' }}>
+        <div style={{ backgroundColor: feedback.soft ? '#fffbeb' : feedback.correct ? '#d4edda' : '#f8d7da', color: feedback.soft ? '#744210' : feedback.correct ? '#155724' : '#721c24', padding: '1rem 1.25rem', borderRadius: '10px', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: '1.6', marginBottom: '1rem', wordWrap: 'break-word', border: feedback.soft ? '1px solid #f6ad55' : 'none' }}>
           {feedback.message}
         </div>
       )}
