@@ -424,13 +424,18 @@ function InteractiveQuestion({ item: q }) {
     setFeedback({ type: 'incorrect', message: foundRightWord ? `❌ Good — you found the error in "${words[errorInfo.index]}", but "${ecCorrection.trim()}" doesn't quite work here. ${aiResult?.reason ? aiResult.reason + ' ' : ''}It should be "${errorInfo.correctWord}". ${q.explanation || ''}` : `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${q.explanation || ''}`, isCorrect: false, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
   };
 
-  const handleSentenceBuildingResult = (isCorrect) => {
-    if (isCorrect) {
+  const handleSentenceBuildingResult = (isCorrect, isSoft = false, userAnswer = '', aiReason = '') => {
+    const displaySentence = (q.correct_answer || '').replace(/ ([.,?!;:])/g, '$1').replace(/^(\w)/, m => m.toUpperCase());
+    if (isCorrect && isSoft) {
+      const note = aiReason ? `${aiReason} ` : '';
+      const msg = `✅ Also correct! ${note}The model answer was: "${displaySentence}"`;
+      setSbFeedback({ correct: true, message: msg });
+      setFeedback({ message: msg, type: 'soft-pass', isCorrect: true });
+    } else if (isCorrect) {
       const msg = `✅ Correct! ${q.explanation || ''}`;
       setSbFeedback({ correct: true, message: msg });
       setFeedback({ message: msg, type: 'correct', isCorrect: true });
     } else {
-      const displaySentence = (q.correct_answer || '').replace(/ ([.,?!;:])/g, '$1').replace(/^(\w)/, m => m.toUpperCase());
       const msg = `❌ Not quite. The correct answer is: "${displaySentence}" — ${q.explanation || ''}`;
       setSbFeedback({ correct: false, message: msg });
       setFeedback({ message: msg, type: 'incorrect', isCorrect: false });
