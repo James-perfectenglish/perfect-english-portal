@@ -634,6 +634,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       prompt: hasPrompt ? question.question : null,
       correctSentences: [question.correct_answer || ''],
       explanation: question.explanation || '',
+      acceptable_alternatives: Array.isArray(question.acceptable_alternatives) ? question.acceptable_alternatives : [],
     };
   };
 

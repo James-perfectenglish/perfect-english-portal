@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.93.3",
+    "an-array-of-english-words": "^2.0.0",
+    "an-array-of-spanish-words": "^2.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0",

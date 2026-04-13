@@ -47,6 +47,7 @@ export default function SentenceBuildingInput({
   language = 'en',
   allWordsUsed = false,
   showTypeBadge = true,
+  acceptable_alternatives = [],
 }) {
   const [bankWords, setBankWords] = useState([]);
   const [answerWords, setAnswerWords] = useState([]);
@@ -85,10 +86,20 @@ export default function SentenceBuildingInput({
     const userAnswer = normalizeAnswer(answerWords);
     const isCorrect = correctSentences.some(correct => correct.trim().toLowerCase() === userAnswer);
     if (isCorrect) { if (onResult) onResult(true, false, userAnswer); return true; }
-    const stripPunctuation = (str) => str.replace(/[.,?!;:]/g, '').replace(/\s+/g, ' ').trim();
+    const stripPunctuation = (str) => str.replace(/[.,?!;:¿¡]/g, '').replace(/\s+/g, ' ').trim();
     const userStripped = stripPunctuation(userAnswer);
     const isSoftCorrect = correctSentences.some(correct => stripPunctuation(correct.trim().toLowerCase()) === userStripped);
     if (isSoftCorrect) { if (onResult) onResult(true, true, userAnswer); return true; }
+    // Check acceptable_alternatives before calling AI
+    if (Array.isArray(acceptable_alternatives) && acceptable_alternatives.length > 0) {
+      const norm = (s) => stripPunctuation((s || '').toLowerCase().trim());
+      const match = acceptable_alternatives.find(alt => norm(alt.answer) === norm(userAnswer));
+      if (match) {
+        const hasFeedback = match.feedback && match.feedback.trim().length > 0;
+        if (onResult) onResult(true, hasFeedback, userAnswer, match.feedback || '');
+        return true;
+      }
+    }
     setIsChecking(true);
     const aiResult = await aiMarkSentence(correctSentences[0] || '', userAnswer, language);
     setIsChecking(false);

@@ -287,7 +287,7 @@ const _getSbProps = (q) => {
   if (!q) return {};
   const options = Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]');
   const hasPrompt = q.question && q.question.trim() !== '';
-  return { words: options, questionType: hasPrompt ? 'translation' : 'build', prompt: hasPrompt ? q.question : null, correctSentences: [q.correct_answer || ''], explanation: q.explanation || '' };
+  return { words: options, questionType: hasPrompt ? 'translation' : 'build', prompt: hasPrompt ? q.question : null, correctSentences: [q.correct_answer || ''], explanation: q.explanation || '', acceptable_alternatives: Array.isArray(q.acceptable_alternatives) ? q.acceptable_alternatives : [] };
 };
 
 const _parseMatchingPairs = (options) => {
