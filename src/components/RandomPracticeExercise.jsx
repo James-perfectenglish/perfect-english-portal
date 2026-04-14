@@ -107,7 +107,7 @@ function isFuzzyMatch(studentAnswer, correctAnswers) {
       const d = levenshtein(sWords[i] || '', cWords[i] || '');
       if (d > 0) {
         diffs++;
-        if (cWords[i].length < 5 || d > 2) diffOk = false;
+        if (cWords[i].length < 5 || d > 1) diffOk = false;
       }
     }
     if (diffs === 1 && diffOk) return true;
@@ -1214,7 +1214,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 )}
 
                 {/* Simple feedback (OOO, SB, matching) */}
-                {feedback && !['error_correction', 'sentence_building', 'gap_fill', 'multiple_choice', 'dictation'].includes(currentQuestion.type) && (
+                {feedback && !['error_correction', 'sentence_building', 'gap_fill', 'multiple_choice', 'dictation', 'pronunciation'].includes(currentQuestion.type) && (
                   <div style={{ backgroundColor: feedback.type === 'soft-pass' ? '#fffbeb' : feedback.isCorrect ? '#d4edda' : '#f8d7da', color: feedback.type === 'soft-pass' ? '#744210' : feedback.isCorrect ? '#155724' : '#721c24', border: feedback.type === 'soft-pass' ? '1px solid #fbd38d' : 'none', padding: '1.2rem', borderRadius: '10px', marginTop: '1rem', fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
                     {feedback.message}
                   </div>

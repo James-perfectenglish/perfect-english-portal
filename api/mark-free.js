@@ -275,7 +275,7 @@ Model answer: "${correctAnswerSentence}"
 
 Is the student's replacement grammatically correct AND does it fix the error?
 Answer YES if it genuinely works as a valid correction, even if different from the model answer.
-Answer AMBER if the student's word is clearly a typo of the correct answer (e.g. "foir" for "for") — the intended correction is right but misspelled. Mark valid=true and note the spelling in your reason.
+Answer AMBER (valid=true) if the student has found the right error AND their replacement is a near-typo of the correct answer (1-2 characters different — e.g. "Finishec" for "finished", "finshed" for "finished"). This IS the right answer with a spelling mistake. Mark valid=true, skip the grammar explanation entirely, just confirm the correct spelling briefly. Apply this rule first before any other consideration.
 Answer NO if grammatically wrong, changes the meaning inappropriately, or doesn't fix the error.
 
 FEEDBACK LENGTH by level:
