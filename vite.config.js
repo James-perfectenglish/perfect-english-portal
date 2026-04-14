@@ -39,11 +39,24 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Take over immediately — don't wait for old SW to close
+        skipWaiting: true,
+        clientsClaim: true,
         // Cache the app shell (JS, CSS, HTML)
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        // Don't cache Supabase API calls or Vercel serverless functions
+        // Offline fallback only — navigation itself is NetworkFirst below
         navigateFallback: 'index.html',
         runtimeCaching: [
+          {
+            // HTML navigation — always try network first so fresh index.html
+            // (with new asset hashes) loads immediately after a deploy
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'navigation-cache',
+              networkTimeoutSeconds: 3,
+            },
+          },
           {
             // Supabase — network first, fall back to cache
             urlPattern: /^https:\/\/[a-z]+\.supabase\.co\/.*/i,
