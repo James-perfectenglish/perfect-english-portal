@@ -8,12 +8,13 @@ import { LevelBadge, TypeBadge, AiMarkedBadge, TopicBadge } from './BadgePill';
 // ── Question mix per round (easy to tweak!) ──
 const QUESTION_MIX = {
   gap_fill: 3,
-  multiple_choice: 5,
+  multiple_choice: 4,
   sentence_building: 3,
   odd_one_out: 3,
   error_correction: 3,
   matching: 2,
   dictation: 1,
+  pronunciation: 1,
   // Total: 20
 };
 
@@ -54,6 +55,14 @@ if (typeof document !== 'undefined' && !document.getElementById(RP_STYLE_ID)) {
   `;
   document.head.appendChild(style);
 }
+
+// ── Mute helpers ──
+const MUTE_AUDIO_KEY = 'pe_mute_audio_until';
+const MUTE_SPEAKING_KEY = 'pe_mute_speaking_until';
+const MUTE_DURATION_MS = 15 * 60 * 1000;
+const isMuted = (key) => { const v = localStorage.getItem(key); return !!v && Date.now() < parseInt(v, 10); };
+const muteFor15 = (key) => localStorage.setItem(key, String(Date.now() + MUTE_DURATION_MS));
+const getMuteMinutesLeft = (key) => { const v = localStorage.getItem(key); if (!v) return 0; const ms = parseInt(v, 10) - Date.now(); return ms > 0 ? Math.ceil(ms / 60000) : 0; };
 
 function shuffleArray(arr) {
   const shuffled = [...arr];
@@ -132,7 +141,7 @@ const STOP_WORDS = new Set([
 ]);
 
 function getChallengeWord(question) {
-  if (!question || question.type === 'matching') return null;
+  if (!question || question.type === 'matching' || question.type === 'pronunciation') return null;
   const sourceText = question.correct_answer || '';
   if (!sourceText) return null;
   // Preserve original capitalisation for proper nouns
@@ -222,6 +231,17 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const audioRef = useRef(null);
   const [audioPlayed, setAudioPlayed] = useState(false);
 
+  // ── Pronunciation recording state ──
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isMarking, setIsMarking] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [pronTranscript, setPronTranscript] = useState('');
+  const pronRecorderRef = useRef(null);
+  const pronChunksRef = useRef([]);
+  const pronStreamRef = useRef(null);
+  const pronTimerRef = useRef(null);
+
   // ── Sentence challenge ──
   const [challengePositions, setChallengePositions] = useState(new Set());
   const challengePositionsRef = useRef(new Set());
@@ -305,6 +325,97 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     } catch (error) { console.error('Error saving dictation answer:', error); }
   };
 
+  // ── Pronunciation recording cleanup (safe to call anytime) ──
+  const stopPronunciationCleanup = () => {
+    if (pronTimerRef.current) { clearInterval(pronTimerRef.current); pronTimerRef.current = null; }
+    if (pronRecorderRef.current && pronRecorderRef.current.state !== 'inactive') { try { pronRecorderRef.current.stop(); } catch(e) {} }
+    if (pronStreamRef.current) { pronStreamRef.current.getTracks().forEach(t => t.stop()); pronStreamRef.current = null; }
+  };
+
+  // ── Mute handlers ──
+  const handleMuteAudio = () => { muteFor15(MUTE_AUDIO_KEY); advanceQuestion(); };
+  const handleMuteSpeaking = () => { stopPronunciationCleanup(); muteFor15(MUTE_SPEAKING_KEY); advanceQuestion(); };
+
+  // ── Pronunciation: start recording ──
+  const startPronunciationRecording = async () => {
+    if (isRecording || isTranscribing || isMarking) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      pronStreamRef.current = stream;
+      pronChunksRef.current = [];
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+                      : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      pronRecorderRef.current = rec;
+      rec.ondataavailable = (e) => { if (e.data && e.data.size > 0) pronChunksRef.current.push(e.data); };
+      rec.onstop = async () => {
+        stopPronunciationCleanup();
+        setIsRecording(false);
+        setRecordingSeconds(0);
+        const blob = new Blob(pronChunksRef.current, { type: mimeType || 'audio/webm' });
+        if (blob.size < 1000) {
+          setFeedback({ type: 'incorrect', isCorrect: false, message: "We didn't catch anything — make sure your microphone is working and try again.", pronFeedback: true });
+          return;
+        }
+        setIsTranscribing(true);
+        await transcribeAndMarkPronunciation(blob, mimeType || 'audio/webm');
+        setIsTranscribing(false);
+      };
+      rec.start(100);
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      pronTimerRef.current = setInterval(() => {
+        setRecordingSeconds(s => { if (s >= 14) { stopPronunciationRecording(); return 0; } return s + 1; });
+      }, 1000);
+    } catch (e) {
+      console.error('Microphone error:', e);
+      setFeedback({ type: 'incorrect', isCorrect: false, message: 'Could not access your microphone. Check your browser permissions and try again.', pronFeedback: true });
+    }
+  };
+
+  const stopPronunciationRecording = () => {
+    if (pronTimerRef.current) { clearInterval(pronTimerRef.current); pronTimerRef.current = null; }
+    if (pronRecorderRef.current && pronRecorderRef.current.state === 'recording') pronRecorderRef.current.stop();
+  };
+
+  const transcribeAndMarkPronunciation = async (blob, mimeType) => {
+    const cq = questions[currentQuestionIndex];
+    const target = cq?.sentence_template
+      ? cq.sentence_template.replace(/_{3,}/g, cq.correct_answer || '')
+      : (cq?.correct_answer || '');
+    const language = isSpanish ? 'es' : 'en';
+    try {
+      const transcribeRes = await fetch(`/api/transcribe?language=${language}`, {
+        method: 'POST',
+        headers: { 'Content-Type': mimeType },
+        body: blob,
+      });
+      const transcribeData = transcribeRes.ok ? await transcribeRes.json() : null;
+      const spokenText = transcribeData?.transcript?.trim() || '';
+      if (!spokenText) {
+        setFeedback({ type: 'incorrect', isCorrect: false, message: "We couldn't make out what you said. Try speaking more clearly and closer to your microphone.", pronFeedback: true });
+        return;
+      }
+      setPronTranscript(spokenText);
+      setIsMarking(true);
+      const markRes = await fetch('/api/mark-pronunciation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target, spoken: spokenText, language }),
+      });
+      const result = markRes.ok ? await markRes.json() : null;
+      const finalResult = result || { valid: null, feedback: 'Could not analyse your recording — try again.' };
+      setIsMarking(false);
+      const isCorrect = finalResult.valid === true;
+      setFeedback({ type: isCorrect ? 'correct' : finalResult.valid === null ? 'soft-pass' : 'incorrect', isCorrect, message: finalResult.feedback || '', pronFeedback: true });
+      if (isCorrect) setScore(s => s + 1);
+    } catch (e) {
+      console.error('Pronunciation marking error:', e);
+      setIsMarking(false);
+      setFeedback({ type: 'incorrect', isCorrect: false, message: 'Could not analyse your recording — please try again.', pronFeedback: true });
+    }
+  };
+
   const startExercise = async () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     setLoading(true);
@@ -355,8 +466,13 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         return q;
       });
 
-      const pickDictation = (data) => {
-        return shuffleArray(data || []).slice(0, activeMix.dictation || 0).map(ex => ({
+      // Pick dictation first — check mute, then pick pronunciation from remaining pool
+      const shuffledDictPool = shuffleArray(dictRes.data || []);
+      let pickedDictation = [];
+      let dictationUsedIds = new Set();
+      if (!isMuted(MUTE_AUDIO_KEY) && (activeMix.dictation || 0) > 0) {
+        const dictSlice = shuffledDictPool.slice(0, activeMix.dictation);
+        pickedDictation = dictSlice.map(ex => ({
           ...ex,
           type: 'dictation',
           question: ex.hint || '',
@@ -364,7 +480,21 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
           question_number: null,
           _dictation_exercise_id: ex.id,
         }));
-      };
+        dictationUsedIds = new Set(dictSlice.map(ex => ex.id));
+      }
+
+      let pickedPronunciation = [];
+      if (!isMuted(MUTE_SPEAKING_KEY) && (activeMix.pronunciation || 0) > 0) {
+        const remaining = shuffleArray(shuffledDictPool.filter(ex => !dictationUsedIds.has(ex.id)));
+        pickedPronunciation = remaining.slice(0, activeMix.pronunciation).map(ex => ({
+          ...ex,
+          type: 'pronunciation',
+          question: '',
+          correct_answer: ex.answer,
+          question_number: null,
+          _dictation_exercise_id: ex.id,
+        }));
+      }
 
       const pickedMC = pick(mcRes.data, 'multiple_choice');
       let baseQuestions = [
@@ -374,7 +504,8 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         ...pick(oooRes.data, 'odd_one_out'),
         ...pick(ecRes.data, 'error_correction'),
         ...pick(matchRes.data, 'matching'),
-        ...pickDictation(dictRes.data || []),
+        ...pickedDictation,
+        ...pickedPronunciation,
       ];
 
       if (baseQuestions.length < TARGET_TOTAL) {
@@ -396,7 +527,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       const positions = new Set();
       const eligible = allQuestions
         .map((_, i) => i)
-        .filter((_, i) => allQuestions[i]?.type !== 'matching');
+        .filter((_, i) => allQuestions[i]?.type !== 'matching' && allQuestions[i]?.type !== 'pronunciation');
       const shuffledEligible = shuffleArray(eligible);
       for (const idx of shuffledEligible) {
         if (positions.size >= 2) break;
@@ -420,6 +551,11 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setShowHint(false);
       setIsChecking(false);
       setAudioPlayed(false);
+      setIsRecording(false);
+      setIsTranscribing(false);
+      setIsMarking(false);
+      setRecordingSeconds(0);
+      setPronTranscript('');
       setShowChallenge(false);
       setChallengeWord('');
     } catch (error) {
@@ -640,6 +776,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
   // ── Advance to next question (called after challenge closes, or directly if no challenge) ──
   const advanceQuestion = (bonusScore = 0) => {
+    stopPronunciationCleanup();
     if (bonusScore) {
       scoreRef.current = scoreRef.current + bonusScore;
       setScore(s => s + bonusScore);
@@ -657,6 +794,11 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       setShowHint(false);
       setIsChecking(false);
       setAudioPlayed(false);
+      setIsRecording(false);
+      setIsTranscribing(false);
+      setIsMarking(false);
+      setRecordingSeconds(0);
+      setPronTranscript('');
     } else {
       finishExercise();
     }
@@ -823,7 +965,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 <TypeBadge type={currentQuestion.type} />
                 <LevelBadge level={currentQuestion.level} />
                 {currentQuestion.type !== 'dictation' && <TopicBadge topic={currentQuestion.topic} />}
-                {['error_correction', 'gap_fill', 'sentence_building', 'dictation'].includes(currentQuestion.type) && <AiMarkedBadge />}
+                {['error_correction', 'gap_fill', 'sentence_building', 'dictation', 'pronunciation'].includes(currentQuestion.type) && <AiMarkedBadge />}
               </div>
 
               {/* Question Text */}
@@ -984,12 +1126,19 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                     )}
 
                     {!feedback && (
+                      <>
                       <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && !isChecking && userAnswer.trim() && checkDictationAnswer()}
                         placeholder={currentQuestion.excerpt_type === 'sentence' ? 'Type the full sentence you heard...' : 'Type the word or phrase you heard...'}
                         disabled={isChecking}
                         style={{ width: '100%', padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', borderRadius: '10px', border: '2px solid #e0e0e0', boxSizing: 'border-box', color: '#2C3E50', opacity: isChecking ? 0.6 : 1 }}
                       />
+                      <div style={{ textAlign: 'center', marginTop: '0.75rem' }}>
+                        <button onClick={handleMuteAudio} style={{ fontSize: '0.78rem', color: '#a0aec0', background: 'none', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.35rem 0.75rem', cursor: 'pointer' }}>
+                          🔇 Mute audio for 15 mins
+                        </button>
+                      </div>
+                      </>
                     )}
 
                     {feedback && (
@@ -1002,6 +1151,53 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                         fontWeight: '500',
                       }}>
                         {feedback.message}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* PRONUNCIATION */}
+                {currentQuestion.type === 'pronunciation' && (
+                  <div>
+                    <div style={{ backgroundColor: '#EBF8FF', border: '2px solid #90CDF4', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1.25rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', color: '#2C3E50', lineHeight: '1.7', fontWeight: '500' }}>
+                      {currentQuestion.sentence_template
+                        ? currentQuestion.sentence_template.replace(/_{3,}/g, currentQuestion.correct_answer || '')
+                        : currentQuestion.correct_answer}
+                    </div>
+                    {!feedback && (
+                      <div style={{ textAlign: 'center', marginBottom: '1rem', color: '#553C9A', fontWeight: '600', fontSize: 'clamp(0.95rem, 3vw, 1rem)' }}>
+                        🎤 Read the sentence above out loud
+                      </div>
+                    )}
+                    {!feedback && !isTranscribing && !isMarking && (
+                      <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                        <button
+                          onClick={isRecording ? stopPronunciationRecording : startPronunciationRecording}
+                          style={{ padding: '0.9rem 2rem', background: isRecording ? 'linear-gradient(135deg, #e53e3e, #c53030)' : 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', fontWeight: '600', boxShadow: '0 2px 8px rgba(102,126,234,0.35)' }}>
+                          {isRecording ? `⏹ Stop (${recordingSeconds}s)` : '🎤 Start Recording'}
+                        </button>
+                      </div>
+                    )}
+                    {(isTranscribing || isMarking) && (
+                      <div style={{ textAlign: 'center', padding: '1rem', color: '#553C9A', fontSize: '0.95rem', border: '2px dashed #EDE9FE', borderRadius: '8px', marginBottom: '1rem' }}>
+                        {isTranscribing ? '🏽 Listening to your recording...' : '🤖 Analysing your pronunciation...'}
+                      </div>
+                    )}
+                    {pronTranscript && feedback?.pronFeedback && (
+                      <div style={{ backgroundColor: '#f7fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '0.75rem', fontSize: '0.9rem', color: '#718096' }}>
+                        🏽 We heard: <em>"{pronTranscript}"</em>
+                      </div>
+                    )}
+                    {feedback?.pronFeedback && (
+                      <div style={{ backgroundColor: feedback.isCorrect ? '#f0fff4' : feedback.type === 'soft-pass' ? '#fffbeb' : '#fff5f5', border: `2px solid ${feedback.isCorrect ? '#48bb78' : feedback.type === 'soft-pass' ? '#f6ad55' : '#f56565'}`, borderRadius: '10px', padding: '1rem', fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6', color: feedback.isCorrect ? '#276749' : feedback.type === 'soft-pass' ? '#744210' : '#c53030', fontWeight: '500' }}>
+                        {feedback.isCorrect ? '✅ ' : feedback.type === 'soft-pass' ? '⚠️ ' : '❌ '}{feedback.message}
+                      </div>
+                    )}
+                    {!feedback && !isRecording && !isTranscribing && !isMarking && (
+                      <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+                        <button onClick={handleMuteSpeaking} style={{ fontSize: '0.78rem', color: '#a0aec0', background: 'none', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.35rem 0.75rem', cursor: 'pointer' }}>
+                          🎤 Mute speaking for 15 mins
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1027,7 +1223,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
               {/* Buttons */}
               <div style={{ marginTop: '1.5rem' }}>
-                {!feedback && !['sentence_building', 'odd_one_out', 'error_correction', 'matching'].includes(currentQuestion.type) && (
+                {!feedback && !['sentence_building', 'odd_one_out', 'error_correction', 'matching', 'pronunciation'].includes(currentQuestion.type) && (
                   <button
                     onClick={currentQuestion.type === 'dictation' ? checkDictationAnswer : checkAnswer}
                     disabled={isChecking || !userAnswer.trim() && currentQuestion.type !== 'multiple_choice' || currentQuestion.type === 'multiple_choice' && !selectedOption}

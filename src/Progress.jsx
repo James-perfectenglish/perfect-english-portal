@@ -367,6 +367,61 @@ export default function Progress({ session, profile, handleLogout }) {
           <p style={{ margin: 0 }}>No data yet — complete some practice sessions and your progress will appear here.</p>
         </div>
       )}
+
+      {/* SETTINGS */}
+      <MuteSettings onLogout={handleLogout} />
     </div>
   )
+}
+
+const MUTE_AUDIO_KEY = 'pe_mute_audio_until';
+const MUTE_SPEAKING_KEY = 'pe_mute_speaking_until';
+
+function getMuteMinutesLeft(key) {
+  const v = localStorage.getItem(key);
+  if (!v) return 0;
+  const ms = parseInt(v, 10) - Date.now();
+  return ms > 0 ? Math.ceil(ms / 60000) : 0;
+}
+
+function MuteSettings({ onLogout }) {
+  const [tick, setTick] = useState(0);
+  const audioMins = getMuteMinutesLeft(MUTE_AUDIO_KEY);
+  const speakingMins = getMuteMinutesLeft(MUTE_SPEAKING_KEY);
+  const hasMute = audioMins > 0 || speakingMins > 0;
+
+  const unmute = (key) => {
+    localStorage.removeItem(key);
+    setTick(t => t + 1);
+  };
+
+  return (
+    <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '1rem' }}>
+      <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: '0 0 0.85rem' }}>⚙️ Settings</h2>
+
+      {hasMute && (
+        <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {audioMins > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.6rem 0.85rem' }}>
+              <span style={{ fontSize: '0.85rem', color: '#744210' }}>🔇 Audio muted — {audioMins} min{audioMins !== 1 ? 's' : ''} left</span>
+              <button onClick={() => unmute(MUTE_AUDIO_KEY)} style={{ fontSize: '0.75rem', color: '#553C9A', background: 'none', border: '1px solid #c4b5fd', borderRadius: '5px', padding: '0.25rem 0.6rem', cursor: 'pointer', fontWeight: 600 }}>Unmute</button>
+            </div>
+          )}
+          {speakingMins > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.6rem 0.85rem' }}>
+              <span style={{ fontSize: '0.85rem', color: '#744210' }}>🎤 Speaking muted — {speakingMins} min{speakingMins !== 1 ? 's' : ''} left</span>
+              <button onClick={() => unmute(MUTE_SPEAKING_KEY)} style={{ fontSize: '0.75rem', color: '#553C9A', background: 'none', border: '1px solid #c4b5fd', borderRadius: '5px', padding: '0.25rem 0.6rem', cursor: 'pointer', fontWeight: 600 }}>Unmute</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <button
+        onClick={onLogout}
+        style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem', fontWeight: '600', color: '#e53e3e', background: 'none', border: '1.5px solid #fed7d7', borderRadius: '8px', cursor: 'pointer' }}
+      >
+        Log out
+      </button>
+    </div>
+  );
 }
