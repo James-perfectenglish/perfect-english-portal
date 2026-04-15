@@ -8,14 +8,14 @@ const CENTRE_TEXT = '#7c4d00'
 const LETTER_GREY = '#e8e8e8'
 
 const RANKS = [
-  { label: 'Beginner',   pct: 0    },
-  { label: 'Good Start', pct: 0.02 },
-  { label: 'Moving Up',  pct: 0.05 },
-  { label: 'Almost',     pct: 0.08 },
-  { label: 'Nice',       pct: 0.15 },
-  { label: 'Great',      pct: 0.25 },
-  { label: 'Amazing',    pct: 0.50 },
-  { label: 'Genius',     pct: 0.70 },
+  { label: 'Beginner',   pct: 0     },
+  { label: 'Good Start', pct: 0.075 },
+  { label: 'Moving Up',  pct: 0.15  },
+  { label: 'Almost',     pct: 0.225 },
+  { label: 'Nice',       pct: 0.30  },
+  { label: 'Great',      pct: 0.375 },
+  { label: 'Amazing',    pct: 0.50  },
+  { label: 'Genius',     pct: 0.625 },
 ]
 
 // 6 outer letter positions in 220×220 container, radius 70px, starting top
@@ -211,7 +211,26 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
       return
     }
     if (!puzzle.valid_words.includes(word)) {
-      showMsg(isSpanish ? 'No está en la lista' : 'Not in word list', 'error')
+      // Check bonus word — valid letters + centre letter + in word_lists
+      const allLetters = [puzzle.centre_letter, ...puzzle.outer_letters]
+      const validLetters = word.split('').every(c => allLetters.includes(c))
+      if (validLetters) {
+        const { data: bonus } = await supabase
+          .from('word_lists')
+          .select('word')
+          .eq('word', word)
+          .eq('language', language)
+          .maybeSingle()
+        if (bonus) {
+          const newWords = [...foundWords, word]
+          setFoundWords(newWords)
+          setScore(s => s + 1)
+          showMsg(isSpanish ? '✨ ¡Palabra extra! +1' : '✨ Bonus word! +1', 'success', 2500)
+          await saveProgress(newWords, score + 1, RANKS[getRankIdx(score + 1, isC ? cMax : puzzle.max_score)].label, starsAwarded, null)
+          return
+        }
+      }
+      showMsg(isSpanish ? 'No está en la lista' : 'Not in our list', 'error')
       return
     }
 
@@ -365,6 +384,9 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
             {isSpanish
               ? `Forma palabras · la "${centre}" es obligatoria`
               : `Make words using the centre letter "${centre}"`}
+          </p>
+          <p style={{ margin: '4px 0 0', opacity: 0.75, fontSize: '0.75rem' }}>
+            {isSpanish ? '¡Encuentra las 40 palabras de hoy!' : "Find today's 40 words!"}
           </p>
         </div>
 
