@@ -187,10 +187,19 @@ or
 }
 
 // ── WORD ORDER ───────────────────────────────────────────────────────────────
+function normaliseAnswer(str) {
+  return str.toLowerCase().trim().replace(/[?!.،؟]+$/, '').replace(/\s+/g, ' ');
+}
+
 async function handleWordOrder(req, res) {
   const { correctAnswer, studentAnswer, language = 'en' } = req.body;
   if (!correctAnswer || !studentAnswer)
     return res.status(400).json({ error: 'Missing required fields' });
+
+  // Exact match — skip AI entirely
+  if (normaliseAnswer(studentAnswer) === normaliseAnswer(correctAnswer)) {
+    return res.status(200).json({ valid: true, feedback: '✅ Perfect!', reason: '✅ Perfect!' });
+  }
   const isSpanish = language === 'es';
   const prompt = isSpanish
     ? `Estás corrigiendo un ejercicio de construcción de frases en español.
@@ -203,6 +212,7 @@ El alumno ha ordenado palabras para construir una frase. Acéptala si:
 - Tiene el mismo significado o muy parecido a la respuesta modelo
 
 ACEPTA aunque el alumno use vocabulario diferente pero equivalente, diferente orden de palabras, o una frase más simple pero correcta.
+ACEPTA CON NOTA si el alumno omite un pronombre de objeto indirecto (me, te, le, nos, os, les) que aparece en la respuesta sugerida — la frase sigue siendo correcta, solo es menos natural. Márcalo como válido pero indica brevemente qué pronombre faltaba.
 RECHAZA solo si hay un error gramatical claro o el significado es muy diferente.
 
 JSON:
@@ -238,7 +248,7 @@ REJECT (valid=false) if:
 FEEDBACK: Plain English only — no grammar labels, no syntactic categories (never write SVOC, SVO, etc.), no jargon. One short sentence. Warm and direct.
 
 JSON:
-{"valid": true, "reason": "short encouraging note, mention model answer if vocabulary differs"}
+{"valid": true, "reason": "short encouraging note, mention suggested answer if vocabulary differs"}
 or
 {"valid": false, "reason": "one kind sentence explaining why"}`;
   return callAI(prompt, 150, res, 'mark-free.word_order');
