@@ -44,13 +44,18 @@ export default defineConfig({
         clientsClaim: true,
         // Cache the app shell (JS, CSS, HTML)
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        // Offline fallback only — navigation itself is NetworkFirst below
+        // Offline fallback only — navigation itself is NetworkFirst below.
+        // Denylist /api/* so server-rendered endpoints (e.g. approve-student)
+        // never get the SPA shell served to them by the service worker.
         navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             // HTML navigation — always try network first so fresh index.html
-            // (with new asset hashes) loads immediately after a deploy
-            urlPattern: ({ request }) => request.mode === 'navigate',
+            // (with new asset hashes) loads immediately after a deploy.
+            // Exclude /api/* so approval links etc. hit Vercel directly.
+            urlPattern: ({ request, url }) =>
+              request.mode === 'navigate' && !url.pathname.startsWith('/api/'),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'navigation-cache',
