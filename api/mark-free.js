@@ -39,6 +39,8 @@ Evalúa con rigor:
 - ¿Es gramaticalmente correcta?
 - ¿Usa "${word}" de forma apropiada y con sentido?
 
+REGLA FUNDAMENTAL — puntuación y mayúsculas: La puntuación menor y las mayúsculas NUNCA son motivo de rechazo. No marques como inválido por falta de mayúscula inicial, tildes olvidadas, comas faltantes, o signos de apertura (¿¡) ausentes. Si la palabra está bien usada y el sentido es claro, marca valid=true. Puedes añadir un consejo breve al final, pero nunca rechaces sólo por puntuación.
+
 Acepta frases creativas o sencillas.
 Si el único error es de género (el/la, un/una), márcalo como válido (valid=true) pero menciona el error con amabilidad en el feedback.
 Si hay errores gramaticales más importantes (tiempo verbal incorrecto, estructura rota), márcalo como inválido.
@@ -51,8 +53,9 @@ The student was asked to write a sentence using the word: "${word}"
 Their sentence: "${thesentence}"
 
 Mark strictly for:
-1. Grammatical correctness — errors in tense, subject-verb agreement, articles, or word form = invalid
-2. Appropriate use of "${word}" — the word must be used naturally and meaningfully
+1. MINOR PUNCTUATION & CAPITALISATION ARE NEVER GROUNDS FOR REJECTION. Do NOT mark invalid for: missing capital "I", lowercase proper nouns or initialisms ("tv", "monday"), missing commas after introductory phrases, comma splices, missing full stops. These are cosmetic and this is a quick sentence challenge, not a writing exam. Mark valid=true; you may add one brief, friendly tip at the end of feedback if you like, but NEVER reject for punctuation alone.
+2. Grammatical correctness — errors in tense, subject-verb agreement, articles, or word form = invalid
+3. Appropriate use of "${word}" — the word must be used naturally and meaningfully
 
 CRITICAL — PARTS OF SPEECH: Many English words function correctly as multiple parts of speech (e.g. "whisper", "smile", "walk", "love" are all valid as both verb and noun). Do NOT penalise a student for using a word in a different grammatical role from the one it was presented as, provided the usage is correct English. Award the mark for any valid, grammatically correct use of the word.
 
@@ -232,6 +235,7 @@ ACCEPT (valid=true) if:
 - Grammatically correct and same core meaning, even with different vocabulary or structure
 - Example: model="keep forgetting", student="always forget" → valid (same meaning, both natural)
 - Example: model="brush my teeth", student="clean my teeth" → valid (natural synonym)
+- Example: model="launch a new product", student="sell a new product" → valid=true with amber note ("launch" specifically means introduce for the first time; "sell" is grammatically natural here, just less specific)
 - A simpler version that omits optional words but keeps the core meaning — note what was omitted
 
 AMBER — still valid=true, but add a note if:
@@ -242,7 +246,7 @@ AMBER — still valid=true, but add a note if:
 REJECT (valid=false) if:
 - There is a clear grammar error
 - The meaning is significantly different
-- The student uses a false friend or wrong collocation that changes the natural meaning. Example: model="a day off", student="a free day" → invalid ("free day" is not a natural English collocation in this context; "day off" is the fixed expression)
+- The student uses a false friend or wrong collocation that produces unnatural English. Example: model="a day off", student="a free day" → invalid ("free day" is not natural English). This does NOT apply to natural synonyms or grammatically-fine content-word swaps — those are amber (valid=true), not red.
 - The student's word order produces unnatural or incorrect English (e.g. "awake fully" instead of "fully awake"). Different order from the model is fine IF the student's order is itself natural English — but if the student's own word order is wrong, mark invalid.
 
 FEEDBACK: Plain English only — no grammar labels, no syntactic categories (never write SVOC, SVO, etc.), no jargon. One short sentence. Warm and direct.
