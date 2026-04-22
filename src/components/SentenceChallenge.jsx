@@ -4,7 +4,17 @@ import { supabase } from '../supabaseClient';
 // Recording logic mirrors PronunciationExercise.jsx — cross-browser/iOS compatible.
 // Do not refactor the recording section without testing on both Chrome and Safari/iOS.
 
-export default function SentenceChallenge({ word, language = 'en', exercise = 'challenge', onClose }) {
+export default function SentenceChallenge({
+  word,
+  language = 'en',
+  exercise = 'challenge',
+  headerLabel,       // optional override for the small uppercase label at top
+  promptText,        // optional override for the "Write a sentence using:" subtitle
+  apiContext = 'challenge', // 'challenge' | 'wotd' | 'gotd' — routes the mark-free.js prompt
+  apiExtraFields = {},      // spread into the mark-free.js request body (e.g. partOfSpeech, definition)
+  onMarkResult,      // optional async callback: ({ sentence, inputMethod, result }) => {}
+  onClose
+}) {
   const isSpanish = language === 'es';
 
   const [mode, setMode]                         = useState('type');
@@ -81,13 +91,13 @@ export default function SentenceChallenge({ word, language = 'en', exercise = 'c
     try {
       const res = await fetch('/api/mark-free', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'sentence', context: 'challenge', word, sentence, language }),
+        body: JSON.stringify({ type: 'sentence', context: apiContext, word, sentence, language, ...apiExtraFields }),
       });
       const data = res.ok ? await res.json() : null;
       const result = data || { valid: false, feedback: isSpanish ? 'No se pudo comprobar.' : 'Could not check — try again.' };
       setResult(result);
       setPhase('result');
-      // Save to DB
+      // Save to sentence_challenges (star log — always written regardless of exercise)
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -105,6 +115,14 @@ export default function SentenceChallenge({ word, language = 'en', exercise = 'c
         }
       } catch (dbErr) {
         console.warn('SentenceChallenge: could not save to DB:', dbErr);
+      }
+      // Fire parent callback so WOTD/GOTD can do their own submissions-table write
+      if (typeof onMarkResult === 'function') {
+        try {
+          await onMarkResult({ sentence, inputMethod, result });
+        } catch (cbErr) {
+          console.warn('SentenceChallenge: onMarkResult callback error:', cbErr);
+        }
       }
     } catch (e) {
       setResult({ valid: false, feedback: isSpanish ? 'No se pudo comprobar.' : 'Could not check — try again.' });
@@ -134,10 +152,10 @@ export default function SentenceChallenge({ word, language = 'en', exercise = 'c
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
           <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.4rem' }}>
-            ⚡ {isSpanish ? 'Reto rápido' : 'Quick challenge!'}
+            {headerLabel || `⚡ ${isSpanish ? 'Reto rápido' : 'Quick challenge!'}`}
           </div>
           <div style={{ fontSize: '0.95rem', color: '#4a5568', marginBottom: '0.6rem' }}>
-            {isSpanish ? 'Escribe una frase con:' : 'Write a sentence using:'}
+            {promptText || (isSpanish ? 'Escribe una frase con:' : 'Write a sentence using:')}
           </div>
           <div style={{ display: 'inline-block', background: PG, color: 'white', padding: '6px 22px', borderRadius: '20px', fontSize: '1.15rem', fontWeight: '700' }}>
             "{word}"

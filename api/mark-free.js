@@ -15,11 +15,12 @@ async function handleSentence(req, res) {
   const { word, partOfSpeech, definition, studentSentence, sentence, language, context } = req.body
 
   // Challenge mode: called with { word, sentence, context: 'challenge', language }
-  // Wordle mode:    called with { word, sentence, language }
-  // WOTD mode:      called with { word, partOfSpeech, definition, studentSentence, language }
+  // Wordle mode:    called with { word, sentence, language } — no definition, no context
+  // WOTD mode:      called with { word, sentence | studentSentence, partOfSpeech, definition, language, context?: 'wotd' }
   const isChallenge = context === 'challenge'
-  const isWordle    = !definition && !isChallenge
-  const thesentence = (isWordle || isChallenge) ? sentence : studentSentence
+  const isWotd      = context === 'wotd' || (!!definition && !isChallenge)
+  const isWordle    = !isChallenge && !isWotd
+  const thesentence = sentence || studentSentence
   const isSpanish   = language === 'es'
 
   if (!word || !thesentence) {

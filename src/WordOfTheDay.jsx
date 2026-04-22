@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
+import SentenceChallenge from './components/SentenceChallenge'
 
 const levelBucket = (profileLevel) => {
   if (!profileLevel) return 'B1/B2'
@@ -37,15 +38,13 @@ function shuffleArray(arr) {
 }
 
 export default function WordOfTheDay({ profile, collapsible = false }) {
-  const [word, setWord]             = useState(null)
-  const [submission, setSubmission] = useState(null)
-  const [sentence, setSentence]     = useState('')
-  const [feedback, setFeedback]     = useState(null)
-  const [isMarking, setIsMarking]   = useState(false)
-  const [loading, setLoading]       = useState(true)
-  const [noWord, setNoWord]         = useState(false)
-  const [community, setCommunity]   = useState([])
-  const [expanded, setExpanded]     = useState(!collapsible)
+  const [word, setWord]                 = useState(null)
+  const [submission, setSubmission]     = useState(null)
+  const [loading, setLoading]           = useState(true)
+  const [noWord, setNoWord]             = useState(false)
+  const [community, setCommunity]       = useState([])
+  const [expanded, setExpanded]         = useState(!collapsible)
+  const [showChallenge, setShowChallenge] = useState(false)
 
   const isSpanish = (Array.isArray(profile?.tracks) && profile.tracks.includes('spanish')) || profile?.level === 'Spanish'
   const bucket    = levelBucket(profile?.level)
@@ -114,36 +113,30 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
     if (data && data.length >= 1) setCommunity(shuffleArray(data).slice(0, 8))
   }
 
-  const submitSentence = async () => {
-    if (!sentence.trim() || isMarking || !word) return
-    setIsMarking(true)
-    try {
-      const response = await fetch('/api/mark-free', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'sentence', word: word.word, partOfSpeech: word.part_of_speech,
-          definition: word.definition, studentSentence: sentence.trim(), language: word.language
-        })
-      })
-      const result = response.ok ? await response.json() : { valid: null, feedback: '', reason: '' }
-      const isCorrect = result.valid === true
-      const feedbackText = result.feedback || result.reason || (isCorrect ? 'Great sentence!' : 'Try again — read the definition carefully.')
-      setFeedback({ valid: result.valid, message: feedbackText })
-      if (word.id && !word.id?.toString().startsWith('qb_')) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const { data: saved } = await supabase
-            .from('word_of_the_day_submissions')
-            .insert({ student_id: user.id, word_id: word.id, sentence: sentence.trim(), is_correct: isCorrect, is_soft_pass: false, ai_feedback: feedbackText })
-            .select().single()
-          if (saved) { setSubmission(saved); fetchCommunity(word.id) }
-        }
+  const submitSentence = async ({ sentence, inputMethod, result }) => {
+    // Called by SentenceChallenge after it has already written to sentence_challenges.
+    // Our job here: persist to word_of_the_day_submissions so the student's answer
+    // shows on return, and the community feature can pick it up.
+    if (!word) return
+    const isCorrect = result?.valid === true
+    const feedbackText = result?.feedback || result?.reason || (isCorrect ? 'Great sentence!' : 'Try again — read the definition carefully.')
+    if (word.id && !word.id?.toString().startsWith('qb_')) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: saved } = await supabase
+          .from('word_of_the_day_submissions')
+          .insert({
+            student_id: user.id,
+            word_id:    word.id,
+            sentence:   sentence.trim(),
+            is_correct: isCorrect,
+            is_soft_pass: false,
+            ai_feedback: feedbackText
+          })
+          .select().single()
+        if (saved) { setSubmission(saved); fetchCommunity(word.id) }
       }
-    } catch (e) {
-      console.error('submitSentence error:', e)
-      setFeedback({ valid: null, message: 'Could not check your sentence right now — try again in a moment.' })
     }
-    setIsMarking(false)
   }
 
   if (loading) return (
@@ -155,10 +148,10 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
   if (noWord) return null
 
   const alreadySubmitted = !!submission
-  const feedbackToShow   = alreadySubmitted ? { valid: submission.is_correct, message: submission.ai_feedback } : feedback
+  const feedbackToShow   = alreadySubmitted ? { valid: submission.is_correct, message: submission.ai_feedback } : null
   const levelColour      = isSpanish ? '#e53e3e' : getLevelColour(bucket)
   const levelLabel       = isSpanish ? 'ES' : bucket
-  const showCommunity    = community.length > 0 && (alreadySubmitted || feedback != null)
+  const showCommunity    = community.length > 0 && alreadySubmitted
 
   // ── COLLAPSED ────────────────────────────────────────────────────────────
   if (collapsible && !expanded) {
@@ -192,6 +185,7 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
 
   // ── EXPANDED ─────────────────────────────────────────────────────────────
   return (
+    <>
     <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '1rem', overflow: 'hidden' }}>
       <div
         style={{ background: GRADIENT, padding: '0.85rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', cursor: collapsible ? 'pointer' : 'default' }}
@@ -236,38 +230,20 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
           </div>
         )}
 
-        {!alreadySubmitted && !feedback && (
+        {!alreadySubmitted && (
           <div>
-            <div style={{ fontSize: '0.78rem', fontWeight: '600', color: '#718096', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '0.4rem' }}>Use it in a sentence</div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input type="text" value={sentence} onChange={e => setSentence(e.target.value)}
-                onKeyPress={e => e.key === 'Enter' && submitSentence()}
-                placeholder={`Write a sentence using "${word.word}"...`} disabled={isMarking}
-                style={{ flex: 1, padding: '0.75rem 1rem', fontSize: '0.92rem', borderRadius: '8px', border: '2px solid #e2e8f0', outline: 'none', color: '#2d3748', transition: 'border-color 0.15s' }}
-                onFocus={e => e.target.style.borderColor = '#667eea'}
-                onBlur={e => e.target.style.borderColor = '#e2e8f0'}
-              />
-              <button onClick={submitSentence} disabled={!sentence.trim() || isMarking}
-                style={{ padding: '0 1.25rem', background: sentence.trim() && !isMarking ? GRADIENT : '#cbd5e0', color: 'white', border: 'none', borderRadius: '8px', cursor: sentence.trim() && !isMarking ? 'pointer' : 'not-allowed', fontWeight: '600', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
-                {isMarking ? '🤖...' : 'Submit →'}
-              </button>
-            </div>
-            {isMarking && <p style={{ fontSize: '0.8rem', color: '#553C9A', margin: '0.5rem 0 0', textAlign: 'center' }}>🤖 Checking your sentence...</p>}
-          </div>
-        )}
-
-        {!alreadySubmitted && feedback && (
-          <div>
-            <div style={{ background: feedback.valid ? '#f0fff4' : '#fff5f5', border: `1px solid ${feedback.valid ? '#c6f6d5' : '#fed7d7'}`, color: feedback.valid ? '#276749' : '#9b2c2c', borderRadius: '8px', padding: '0.75rem 1rem', fontSize: '0.88rem', lineHeight: '1.5', marginBottom: '0.5rem' }}>
-              {feedback.valid ? '✅ ' : '❌ '}{feedback.message}
-            </div>
-            {!feedback.valid && (
-              <button onClick={() => { setFeedback(null); setSentence('') }}
-                style={{ width: '100%', padding: '0.6rem', background: 'transparent', border: '2px solid #667eea', color: '#667eea', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '0.88rem' }}>
-                Try again ↩
-              </button>
-            )}
-            {feedback.valid && <p style={{ fontSize: '0.78rem', color: '#a0aec0', margin: '0.5rem 0 0', textAlign: 'center' }}>Come back tomorrow for a new word 👋</p>}
+            <button
+              onClick={() => setShowChallenge(true)}
+              style={{
+                width: '100%', padding: '0.85rem', background: GRADIENT, color: 'white',
+                border: 'none', borderRadius: '10px', cursor: 'pointer',
+                fontWeight: '700', fontSize: '0.95rem', letterSpacing: '0.2px'
+              }}>
+              ⭐ {isSpanish ? 'Úsala en una frase →' : 'Use it in a sentence →'}
+            </button>
+            <p style={{ fontSize: '0.78rem', color: '#a0aec0', margin: '0.6rem 0 0', textAlign: 'center' }}>
+              {isSpanish ? 'Escribe o graba una frase con' : 'Write or speak a sentence using'} "{word.word}"
+            </p>
           </div>
         )}
       </div>
@@ -290,5 +266,19 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
         </div>
       )}
     </div>
+    {showChallenge && word && (
+      <SentenceChallenge
+        word={word.word}
+        language={word.language || (isSpanish ? 'es' : 'en')}
+        exercise="wotd"
+        apiContext="wotd"
+        apiExtraFields={{ partOfSpeech: word.part_of_speech, definition: word.definition }}
+        headerLabel={isSpanish ? '📖 Palabra del día' : '📖 Word of the Day'}
+        promptText={isSpanish ? 'Úsala en una frase:' : 'Use it in a sentence:'}
+        onMarkResult={submitSentence}
+        onClose={() => setShowChallenge(false)}
+      />
+    )}
+    </>
   )
 }
