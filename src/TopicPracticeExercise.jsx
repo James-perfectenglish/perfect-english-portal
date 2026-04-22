@@ -35,6 +35,21 @@ function parseJsonb(val) {
   try { return JSON.parse(val) } catch { return [] }
 }
 
+// ── Hint masking helpers (for staged gap fill hints) ──
+// Level 2: letter count e.g. "supply chain" → "_ _ _ _ _ _   _ _ _ _ _"
+function maskLetterCount(answer) {
+  if (!answer) return ''
+  return answer.split(' ').map(word => word.split('').map(() => '_').join(' ')).join('   ')
+}
+// Level 3: first letter revealed e.g. "supply chain" → "s _ _ _ _ _   c _ _ _ _"
+function maskFirstLetter(answer) {
+  if (!answer) return ''
+  return answer.split(' ').map(word => {
+    if (word.length === 0) return ''
+    const rest = word.slice(1).split('').map(() => '_').join(' ')
+    return rest ? `${word[0]} ${rest}` : word[0]
+  }).join('   ')
+}
 
 function formatTitle(title) {
   // Match trailing emoji including flags (regional indicators), variation selectors, and standard emoji ranges
@@ -158,6 +173,12 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   const [sessionSaved, setSessionSaved] = useState(false)
   const inputRef = useRef(null)
 
+  // ── Hint state ──
+  // hintLevel: 0 = none shown, 1 = text hint, 2 = letter count, 3 = first letter
+  // autoHintShown: true if hint auto-revealed after a wrong answer (not counted as "used")
+  const [hintLevel, setHintLevel]         = useState(0)
+  const [autoHintShown, setAutoHintShown] = useState(false)
+
   // ── Sentence challenge ──
   const [showChallenge, setShowChallenge] = useState(false)
   const [challengeWord, setChallengeWord] = useState('')
@@ -194,6 +215,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   async function fetchQuestionsSpanish() {
     setCurrentQ(0); setScore(0); setResults([]); setFeedback(null)
     setUserAnswer(''); setSelectedOption(null); setSessionSaved(false)
+    setHintLevel(0); setAutoHintShown(false)
 
     const { data, error } = await supabase
       .from('question_bank')
@@ -237,6 +259,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   async function fetchQuestions(level) {
     setCurrentQ(0); setScore(0); setResults([]); setFeedback(null)
     setUserAnswer(''); setSelectedOption(null); setSessionSaved(false)
+    setHintLevel(0); setAutoHintShown(false)
 
     let query = supabase.from('question_bank').select('*').eq('topic', exercise.topic).in('level', level.dbLevels).is('sequence_group', null)
     query = query.in('language', ['en', 'both'])
@@ -284,6 +307,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     window.scrollTo({ top: 0, behavior: 'instant' })
     setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0)
     setFeedback(null); setUserAnswer(''); setSelectedOption(null)
+    setHintLevel(0); setAutoHintShown(false)
     setShowChallenge(false); challengeFiredRef.current = false; challengePositionsRef.current = []
     if (isSpanishTP) { setStage('loading'); fetchQuestionsSpanish() }
     else { setStage('level-select'); fetchCounts() }
@@ -308,9 +332,13 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     const alts = parseJsonb(q.acceptable_alternatives)
     const altNorms = alts.map(a => normalise(typeof a === 'object' ? a.answer : a))
     const isCorrect = normalise(q.correct_answer) === norm || altNorms.includes(norm)
-    setFeedback({ isCorrect, correct: q.correct_answer, type: 'mc' })
-    setResults(prev => [...prev, { question: q, isCorrect }])
-    if (isCorrect) setScore(s => s + 1)
+    const usedHint = hintLevel > 0
+    const pointAwarded = isCorrect && hintLevel < 3
+    // Auto-reveal hint after wrong answer (only if not already revealed)
+    if (!isCorrect && hintLevel === 0 && q.hint) setAutoHintShown(true)
+    setFeedback({ isCorrect, correct: q.correct_answer, type: 'mc', usedHint, pointAwarded })
+    setResults(prev => [...prev, { question: q, isCorrect: pointAwarded }])
+    if (pointAwarded) setScore(s => s + 1)
   }
 
   const checkGapFill = async (q, answer) => {
@@ -320,23 +348,30 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     // acceptable_alternatives can be [{answer, feedback}] objects or plain strings
     const altNorms = alts.map(a => normalise(typeof a === 'object' ? a.answer : a))
     const altFeedback = (norm) => { const match = alts.find(a => normalise(typeof a === 'object' ? a.answer : a) === norm); return match?.feedback || null }
-    const addR = (ok) => { setResults(prev => [...prev, { question: q, isCorrect: ok }]); if (ok) setScore(s => s + 1) }
+    const usedHint = hintLevel > 0
+    const finish = (isCorrect, fb) => {
+      const pointAwarded = isCorrect && hintLevel < 3
+      // Auto-reveal hint after wrong answer (only if not already revealed)
+      if (!isCorrect && hintLevel === 0 && q.hint) setAutoHintShown(true)
+      setFeedback({ ...fb, isCorrect, usedHint, pointAwarded })
+      setResults(prev => [...prev, { question: q, isCorrect: pointAwarded }])
+      if (pointAwarded) setScore(s => s + 1)
+      setIsChecking(false)
+    }
 
-    if (norm === correctNorm) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'exact' }); addR(true); setIsChecking(false); return }
-    if (altNorms.includes(norm)) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'alternative', note: altFeedback(norm) }); addR(true); setIsChecking(false); return }
-    if (informal.some(a => normalise(a) === norm)) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'informal', note: q.informal_feedback }); addR(true); setIsChecking(false); return }
+    if (norm === correctNorm) { finish(true, { correct: q.correct_answer, type: 'exact' }); return }
+    if (altNorms.includes(norm)) { finish(true, { correct: q.correct_answer, type: 'alternative', note: altFeedback(norm) }); return }
+    if (informal.some(a => normalise(a) === norm)) { finish(true, { correct: q.correct_answer, type: 'informal', note: q.informal_feedback }); return }
     const dist = levenshtein(norm, correctNorm)
     const fuzzy = (correctNorm.length > 3 && dist === 1) || (dist === 2 && correctNorm.length >= 6) || altNorms.some(an => { const d = levenshtein(norm, an); return (an.length > 3 && d === 1) || (d === 2 && an.length >= 6) })
-    if (fuzzy) { setFeedback({ isCorrect: true, correct: q.correct_answer, type: 'fuzzy' }); addR(true); setIsChecking(false); return }
+    if (fuzzy) { finish(true, { correct: q.correct_answer, type: 'fuzzy' }); return }
     try {
       const res = await fetch('/api/mark-gap', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'gap_fill', question: q.question, correctAnswer: q.correct_answer, studentAnswer: answer, acceptableAlternatives: alts, informalAccepted: informal }) })
       const data = await res.json()
-      setFeedback({ isCorrect: data.valid, correct: q.correct_answer, type: 'ai', note: data.reason })
-      addR(data.valid)
+      finish(data.valid, { correct: q.correct_answer, type: 'ai', note: data.reason })
     } catch {
-      setFeedback({ isCorrect: false, correct: q.correct_answer, type: 'fail' }); addR(false)
+      finish(false, { correct: q.correct_answer, type: 'fail' })
     }
-    setIsChecking(false)
   }
 
   const doAdvance = async () => {
@@ -353,6 +388,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
       setStage('finished'); return
     }
     setCurrentQ(c => c + 1); setFeedback(null); setUserAnswer(''); setSelectedOption(null)
+    setHintLevel(0); setAutoHintShown(false)
     setTimeout(() => inputRef.current?.focus(), 100)
   }
 
@@ -465,13 +501,59 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
             </div>
 
             <div style={{ border: '2px solid #e2e8f0', borderRadius: '8px', padding: '1.5rem', marginBottom: '1.5rem' }}>
-              {/* badges */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
-                <LevelBadge level={q.level} />
-                <TypeBadge type={q.type} />
-                {q.type === 'gap_fill' && <AiMarkedBadge />}
-                <TagBadges tags={q.tags} />
+              {/* badges + stuck? button */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', flex: 1 }}>
+                  <LevelBadge level={q.level} />
+                  <TypeBadge type={q.type} />
+                  {q.type === 'gap_fill' && <AiMarkedBadge />}
+                  <TagBadges tags={q.tags} />
+                </div>
+                {q.hint && !feedback && (() => {
+                  // MC: single stage hint. Gap fill: 3 stages.
+                  const maxLevel = q.type === 'multiple_choice' ? 1 : 3
+                  const canPress = hintLevel < maxLevel
+                  const label = q.type === 'multiple_choice'
+                    ? (hintLevel === 0 ? '🤔?' : '🤔')
+                    : `🤔? ${hintLevel}/${maxLevel}`
+                  return (
+                    <button
+                      onClick={() => { if (canPress) setHintLevel(l => l + 1) }}
+                      disabled={!canPress}
+                      title={canPress ? 'Stuck?' : 'No more hints'}
+                      style={{
+                        flexShrink: 0,
+                        background: canPress ? '#EDE9FE' : '#f7fafc',
+                        color: canPress ? '#553C9A' : '#a0aec0',
+                        border: `1px solid ${canPress ? '#c4b5fd' : '#e2e8f0'}`,
+                        borderRadius: '999px',
+                        padding: '4px 10px',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        cursor: canPress ? 'pointer' : 'default',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >{label}</button>
+                  )
+                })()}
               </div>
+
+              {/* Hint reveal box (shown if any hint level revealed and question not yet answered) */}
+              {q.hint && hintLevel > 0 && !feedback && (
+                <div style={{ background: '#EDE9FE', border: '1px solid #c4b5fd', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', color: '#553C9A', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                  <div>💡 {q.hint}</div>
+                  {hintLevel >= 2 && (
+                    <div style={{ marginTop: '0.5rem', fontFamily: 'monospace', fontSize: '1.1rem', letterSpacing: '0.1em' }}>
+                      {hintLevel >= 3 ? maskFirstLetter(q.correct_answer) : maskLetterCount(q.correct_answer)}
+                    </div>
+                  )}
+                  {hintLevel === 3 && (
+                    <div style={{ marginTop: '0.35rem', fontSize: '0.78rem', opacity: 0.8 }}>
+                      (Answering correctly now won't count towards your score.)
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* question text */}
               <div style={{ fontSize: 'clamp(1rem, 2.5vw, 1.15rem)', color: '#2d3748', lineHeight: 1.6, marginBottom: '1.25rem', fontWeight: 500 }}>
@@ -542,19 +624,29 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
 
               {/* Feedback */}
               {feedback && (() => {
-                const style = feedback.isCorrect
-                  ? { bg: '#f0fff4', border: '#c6f6d5', color: '#276749' }
-                  : { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c' }
+                let style = { bg: '#fff5f5', border: '#fed7d7', color: '#9b2c2c' }
+                if (feedback.isCorrect && feedback.pointAwarded && !feedback.usedHint) {
+                  style = { bg: '#f0fff4', border: '#c6f6d5', color: '#276749' }  // green
+                } else if (feedback.isCorrect) {
+                  style = { bg: '#ebf8ff', border: '#bee3f8', color: '#2c5282' }  // blue (hint used, with or without point)
+                }
                 const studentAns = q.type === 'multiple_choice' ? (selectedOption || '') : userAnswer
                 const modelDiffers = normalise(feedback.correct) !== normalise(studentAns)
+                // Header line
+                let header
+                if (feedback.isCorrect && !feedback.usedHint) {
+                  header = modelDiffers ? `✅ Correct! (or: "${feedback.correct}")` : '✅ Correct!'
+                } else if (feedback.isCorrect && feedback.pointAwarded) {
+                  header = '💡 Correct with a hint'
+                } else if (feedback.isCorrect) {
+                  header = '💡 Correct with a hint (no point this time)'
+                } else {
+                  header = `❌ Not quite — the answer is "${feedback.correct}"`
+                }
                 return (
                   <div style={{ backgroundColor: style.bg, border: `1px solid ${style.border}`, color: style.color, padding: '1rem 1.25rem', borderRadius: '10px', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: '1.6', marginBottom: '0.75rem' }}>
                     {/* Result line */}
-                    <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>
-                      {feedback.isCorrect
-                        ? modelDiffers ? `✅ Correct! (or: "${feedback.correct}")` : '✅ Correct!'
-                        : `❌ Not quite — the answer is "${feedback.correct}"`}
-                    </div>
+                    <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>{header}</div>
                     {/* Show what they typed for gap fill */}
                     {q.type === 'gap_fill' && studentAns && (
                       <div style={{ fontSize: '0.88rem', marginBottom: '0.3rem', opacity: 0.85 }}>
@@ -569,9 +661,15 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
                     {feedback.note && feedback.type !== 'fuzzy' && (
                       <div style={{ fontSize: '0.85rem', marginTop: '0.25rem', opacity: 0.85 }}>{feedback.note}</div>
                     )}
+                    {/* Auto-revealed hint after wrong answer */}
+                    {!feedback.isCorrect && autoHintShown && q.hint && (
+                      <div style={{ fontSize: '0.88rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: `1px solid ${style.border}`, opacity: 0.95 }}>
+                        🤔 The hint was: {q.hint}
+                      </div>
+                    )}
                     {/* Explanation from question bank */}
                     {q.explanation && (
-                      <div style={{ fontSize: '0.88rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: `1px solid ${feedback.isCorrect ? '#c6f6d5' : '#fed7d7'}`, opacity: 0.9 }}>
+                      <div style={{ fontSize: '0.88rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: `1px solid ${style.border}`, opacity: 0.9 }}>
                         💡 {q.explanation}
                       </div>
                     )}
