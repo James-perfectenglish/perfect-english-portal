@@ -606,7 +606,8 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
                     <div style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Your answer:</div>
                     <input ref={inputRef} type="text" value={userAnswer} onChange={e => setUserAnswer(e.target.value)} onKeyDown={handleKeyDown}
                       placeholder="Type the missing word(s)..." autoFocus
-                      style={{ width: '100%', padding: '0.9rem 1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', borderRadius: '8px', border: '2px solid #667eea', boxSizing: 'border-box', color: '#2d3748', fontWeight: 500, backgroundColor: '#EDE9FE' }}
+                      autoCorrect="off" autoCapitalize="off" spellCheck={false}
+                      style={{ width: '100%', padding: '0.9rem 1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', borderRadius: '8px', border: '2px solid #667eea', boxSizing: 'border-box', color: '#2d3748', fontWeight: 500, backgroundColor: '#EDE9FE', WebkitTextFillColor: '#2d3748' }}
                     />
                   </div>
                   <button onClick={checkAnswer} disabled={!userAnswer.trim()}
