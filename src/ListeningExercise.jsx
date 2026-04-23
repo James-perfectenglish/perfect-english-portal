@@ -4,7 +4,7 @@ import { LevelBadge } from './components/BadgePill';
 import SentenceChallenge from './components/SentenceChallenge';
 
 const LEVELS = [
-  { key: 'beginner',     label: 'Beginner',     sublabel: 'B1 – B2', description: 'Short, clear conversations and announcements with everyday vocabulary.', colour: '#48bb78', colourLight: '#f0fff4', dbLevels: ['A1', 'A2'], icon: '🌱' },
+  { key: 'beginner',     label: 'Beginner',     sublabel: 'A1 – A2', description: 'Short, clear conversations and announcements with everyday vocabulary.', colour: '#48bb78', colourLight: '#f0fff4', dbLevels: ['A1', 'A2'], icon: '🌱' },
   { key: 'intermediate', label: 'Intermediate', sublabel: 'B1 – B2', description: 'Longer dialogues, workplace scenarios, and natural-speed speech.',          colour: '#4299e1', colourLight: '#ebf8ff', dbLevels: ['B1', 'B2'], icon: '📘' },
   { key: 'advanced',     label: 'Advanced',     sublabel: 'C1 – C2', description: 'Complex discussions, implied meaning, and fast-paced natural speech.',       colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '🎓' }
 ];
