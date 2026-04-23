@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import SentenceChallenge from './components/SentenceChallenge'
 
 const GRADIENT     = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 const MAX_MISTAKES = 4
@@ -43,9 +44,8 @@ export default function ConnectionsGame({ onBack, userProfile }) {
   // Sentence challenge
   const [sentenceDone, setSentenceDone]         = useState(false)
   const [chosenWord, setChosenWord]             = useState(null)
-  const [sentenceInput, setSentenceInput]       = useState('')
-  const [sentenceChecking, setSentenceChecking] = useState(false)
   const [sentenceFeedback, setSentenceFeedback] = useState(null)
+  const [showChallenge, setShowChallenge]       = useState(false)
 
   // Stars
   const [solveStar, setSolveStar]       = useState(false)
@@ -197,7 +197,7 @@ export default function ConnectionsGame({ onBack, userProfile }) {
     setSolvedRanks(new Set()); setMistakes(0)
     setMessage(''); setAllWords([])
     setSentenceDone(false); setChosenWord(null)
-    setSentenceInput(''); setSentenceFeedback(null)
+    setSentenceFeedback(null); setShowChallenge(false)
     setSolveStar(false); setSentenceStar(false)
     setMode('practice')
 
@@ -232,43 +232,19 @@ export default function ConnectionsGame({ onBack, userProfile }) {
     })
   }
 
-  async function submitSentence() {
-    if (!sentenceInput.trim() || sentenceChecking || !chosenWord) return
-    setSentenceChecking(true)
-    try {
-      const res = await fetch('/api/mark-free', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'sentence', word: chosenWord.toLowerCase(), sentence: sentenceInput.trim(), language }),
-      })
-      const data = await res.json()
-      setSentenceFeedback(data)
-
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        await supabase.from('sentence_challenges').insert({
-          student_id:  user.id,
-          exercise:    'connections',
-          word:        chosenWord.toLowerCase(),
-          language,
-          sentence:    sentenceInput.trim(),
-          is_correct:  data.valid,
-          ai_feedback: data.reason || data.feedback,
-          is_practice: mode === 'practice',
-        })
-      }
-      if (data.valid) {
-        setSentenceStar(true)
-        if (mode === 'daily') await insertStar('sentence')
-      }
-      if (mode === 'daily') await saveSession(new Set([1,2,3,4]), mistakes, true, gameState === 'won', solveStar, true, data.valid)
-    } catch {
-      setSentenceFeedback({ valid: true, reason: 'Good effort!' })
+  async function handleSentenceMarked({ sentence, inputMethod, result }) {
+    // SentenceChallenge has already written to sentence_challenges. Game-level
+    // bookkeeping only: set feedback, award local star, upsert session.
+    const data = result || { valid: null }
+    setSentenceFeedback(data)
+    if (data.valid === true) {
       setSentenceStar(true)
-      if (mode === 'daily') await saveSession(new Set([1,2,3,4]), mistakes, true, gameState === 'won', solveStar, true, true)
+      if (mode === 'daily') await insertStar('sentence')
+    }
+    if (mode === 'daily') {
+      await saveSession(new Set([1,2,3,4]), mistakes, true, gameState === 'won', solveStar, true, data.valid === true)
     }
     setSentenceDone(true)
-    setSentenceChecking(false)
   }
 
   const solvedGroups = groups.filter(g => solvedRanks.has(g.colour_rank)).sort((a, b) => a.colour_rank - b.colour_rank)
@@ -402,7 +378,7 @@ export default function ConnectionsGame({ onBack, userProfile }) {
       )}
 
       {/* Sentence challenge — word picker */}
-      {gameOver && !sentenceDone && !chosenWord && (
+      {gameOver && !sentenceDone && (
         <div style={{ background: 'white', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', marginBottom: '1rem' }}>
           <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#2d3748', marginBottom: '4px' }}>
             ✍️ {language === 'es' ? '¡Usa una de las palabras en una frase!' : 'Now use one of the words in a sentence!'}
@@ -414,11 +390,14 @@ export default function ConnectionsGame({ onBack, userProfile }) {
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {allWords.map(w => (
-              <button key={w} onClick={() => setChosenWord(w)} style={{
-                padding: '6px 12px', borderRadius: '999px', fontWeight: 600, fontSize: '0.8rem',
-                background: 'white', border: '2px solid #534AB7', color: '#534AB7',
-                cursor: 'pointer', transition: 'all 0.12s ease',
-              }}
+              <button
+                key={w}
+                onClick={() => { setChosenWord(w); setShowChallenge(true) }}
+                style={{
+                  padding: '6px 12px', borderRadius: '999px', fontWeight: 600, fontSize: '0.8rem',
+                  background: 'white', border: '2px solid #534AB7', color: '#534AB7',
+                  cursor: 'pointer', transition: 'all 0.12s ease',
+                }}
                 onMouseEnter={e => { e.currentTarget.style.background = '#2d3748'; e.currentTarget.style.color = 'white' }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = '#534AB7' }}
               >
@@ -426,50 +405,9 @@ export default function ConnectionsGame({ onBack, userProfile }) {
               </button>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Sentence challenge — input */}
-      {gameOver && !sentenceDone && chosenWord && (
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', marginBottom: '1rem' }}>
-          <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#2d3748', marginBottom: '4px' }}>
-            ✍️ {language === 'es' ? 'Usa' : 'Use'} <span style={{ color: '#534AB7' }}>{chosenWord}</span> {language === 'es' ? 'en una frase' : 'in a sentence'}
-          </div>
-          <div style={{ fontSize: '0.82rem', color: '#718096', marginBottom: '10px' }}>
-            {language === 'es'
-              ? '¿No sabes qué significa? ¡Inténtalo — el feedback te lo explicará!'
-              : 'Not sure what it means? Have a go — the feedback will tell you!'}
-          </div>
-          <textarea
-            value={sentenceInput}
-            onChange={e => setSentenceInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitSentence() } }}
-            placeholder={language === 'es'
-              ? `Escribe tu frase usando "${chosenWord.toLowerCase()}"...`
-              : `Write your sentence using "${chosenWord.toLowerCase()}"...`}
-            rows={2}
-            style={{ width: '100%', padding: '0.75rem', fontSize: '0.95rem', border: '2px solid #667eea', borderRadius: '8px', boxSizing: 'border-box', resize: 'none', fontFamily: 'inherit', backgroundColor: '#f7f7ff' }}
-            autoFocus
-          />
-          <div style={{ fontSize: '0.72rem', color: '#a0aec0', margin: '4px 0 8px', textAlign: 'right' }}>
-            {language === 'es' ? 'Gana ⭐️ con una buena frase' : 'Earn ⭐️ for a good sentence'}
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => { setChosenWord(null); setSentenceInput('') }}
-              style={{ padding: '0.75rem 1rem', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '8px', fontWeight: 500, cursor: 'pointer', fontSize: '0.88rem' }}>
-              ← {language === 'es' ? 'Cambiar palabra' : 'Change word'}
-            </button>
-            <button onClick={submitSentence} disabled={!sentenceInput.trim() || sentenceChecking}
-              style={{ flex: 1, padding: '0.75rem',
-                background: sentenceInput.trim() && !sentenceChecking ? GRADIENT : '#cbd5e0',
-                color: 'white', border: 'none', borderRadius: '8px',
-                fontWeight: 700, fontSize: '0.95rem',
-                cursor: sentenceInput.trim() && !sentenceChecking ? 'pointer' : 'not-allowed' }}>
-              {sentenceChecking
-                ? '🤖 ' + (language === 'es' ? 'Comprobando...' : 'Checking...')
-                : language === 'es' ? 'Comprobar mi frase' : 'Check my sentence'}
-            </button>
-          </div>
+          <p style={{ fontSize: '0.72rem', color: '#a0aec0', margin: '10px 0 0', textAlign: 'center' }}>
+            {language === 'es' ? 'Escribe o graba — gana ⭐️ por una buena frase' : 'Type or speak — earn ⭐️ for a good sentence'}
+          </p>
         </div>
       )}
 
@@ -533,6 +471,16 @@ export default function ConnectionsGame({ onBack, userProfile }) {
       )}
 
     </div>
+    {showChallenge && chosenWord && (
+      <SentenceChallenge
+        word={chosenWord.toLowerCase()}
+        language={language}
+        exercise="connections"
+        apiContext="challenge"
+        onMarkResult={handleSentenceMarked}
+        onClose={() => setShowChallenge(false)}
+      />
+    )}
     <style>{`
       @keyframes shake {
         0%,100% { transform: translateX(0) }

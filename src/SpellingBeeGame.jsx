@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import SentenceChallenge from './components/SentenceChallenge'
 
 const GRADIENT    = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 const BEE_YELLOW  = '#f9df6d'
@@ -80,10 +81,9 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
 
   const [sentenceDone, setSentenceDone]         = useState(false)
   const [challengeWord, setChallengeWord]       = useState(null)
-  const [sentenceInput, setSentenceInput]       = useState('')
-  const [sentenceChecking, setSentenceChecking] = useState(false)
   const [sentenceFeedback, setSentenceFeedback] = useState(null)
   const [sentenceStar, setSentenceStar]         = useState(false)
+  const [showChallenge, setShowChallenge]       = useState(false)
 
   const stateRef = useRef({})
   const today    = new Date().toISOString().slice(0, 10)
@@ -286,53 +286,18 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
     setGameState('finished')
   }
 
-  async function submitSentence() {
-    if (!sentenceInput.trim() || sentenceChecking || !challengeWord) return
-    setSentenceChecking(true)
-    try {
-      const res = await fetch('/api/mark-free', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type:     'sentence',
-          word:     challengeWord,
-          sentence: sentenceInput.trim(),
-          language,
-        }),
-      })
-      const data = await res.json()
-      setSentenceFeedback(data)
+  async function handleSentenceMarked({ sentence, inputMethod, result }) {
+    // SentenceChallenge has already written to sentence_challenges. Game-level
+    // bookkeeping only here: set state, record the spelling-bee-specific pass, save progress.
+    const data = result || { valid: null }
+    setSentenceFeedback(data)
+    const passed = data.valid === true
+    if (passed) setSentenceStar(true)
 
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        await supabase.from('sentence_challenges').insert({
-          student_id:  user.id,
-          exercise:    'spelling_bee',
-          word:        challengeWord,
-          language,
-          sentence:    sentenceInput.trim(),
-          is_correct:  data.valid,
-          ai_feedback: data.reason || data.feedback || '',
-          is_practice: false,
-        })
-      }
-
-      const passed = data.valid === true
-      if (passed) setSentenceStar(true)
-
-      const denom   = isC ? cMax : (puzzle?.max_score || 1)
-      const rankIdx = getRankIdx(score, denom)
-      await saveProgress(foundWords, score, RANKS[rankIdx].label, starsAwarded, passed)
-    } catch {
-      setSentenceFeedback({
-        valid:  null,
-        reason: isSpanish
-          ? 'No se pudo comprobar tu frase — ¡inténtalo de nuevo!'
-          : 'Could not check your sentence — try again.',
-      })
-    }
+    const denom   = isC ? cMax : (puzzle?.max_score || 1)
+    const rankIdx = getRankIdx(score, denom)
+    await saveProgress(foundWords, score, RANKS[rankIdx].label, starsAwarded, passed)
     setSentenceDone(true)
-    setSentenceChecking(false)
   }
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -589,37 +554,23 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
                 <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#2d3748', marginBottom: '4px' }}>
                   {isSpanish ? '✍️ ¡Ahora úsala en una frase!' : '✍️ Now use it in a sentence!'}
                 </div>
-                <div style={{ fontSize: '0.82rem', color: '#718096', marginBottom: '10px' }}>
+                <div style={{ fontSize: '0.82rem', color: '#718096', marginBottom: '12px' }}>
                   {isSpanish
                     ? `Usa "${challengeWord}" en una frase. ¡Gana ⭐️ por una buena frase!`
                     : `Use "${challengeWord}" in a sentence. Earn ⭐️ for a correct sentence!`}
                 </div>
-                <textarea
-                  value={sentenceInput}
-                  onChange={e => setSentenceInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitSentence() } }}
-                  placeholder={isSpanish ? 'Escribe tu frase aquí...' : 'Type your sentence here...'}
-                  rows={2}
-                  autoFocus
-                  style={{ width: '100%', padding: '0.75rem', fontSize: '0.95rem', border: '2px solid #667eea', borderRadius: '8px', boxSizing: 'border-box', resize: 'none', fontFamily: 'inherit', backgroundColor: '#f7f7ff' }}
-                />
-                <div style={{ fontSize: '0.72rem', color: '#a0aec0', margin: '4px 0 8px', textAlign: 'right' }}>
-                  {isSpanish ? 'Gana ⭐️ por una buena frase' : 'Earn ⭐️ for a good sentence'}
-                </div>
                 <button
-                  onClick={submitSentence}
-                  disabled={!sentenceInput.trim() || sentenceChecking}
+                  onClick={() => setShowChallenge(true)}
                   style={{
-                    width: '100%', padding: '0.75rem',
-                    background: sentenceInput.trim() && !sentenceChecking ? GRADIENT : '#cbd5e0',
-                    color: 'white', border: 'none', borderRadius: '8px',
-                    fontWeight: 700, fontSize: '0.95rem',
-                    cursor: sentenceInput.trim() && !sentenceChecking ? 'pointer' : 'not-allowed',
+                    width: '100%', padding: '0.85rem', background: GRADIENT, color: 'white',
+                    border: 'none', borderRadius: '10px', cursor: 'pointer',
+                    fontWeight: 700, fontSize: '0.95rem', letterSpacing: '0.2px'
                   }}>
-                  {sentenceChecking
-                    ? (isSpanish ? '🤖 Comprobando...' : '🤖 Checking...')
-                    : (isSpanish ? 'Comprobar frase' : 'Check my sentence')}
+                  ⭐ {isSpanish ? 'Úsala en una frase →' : 'Use it in a sentence →'}
                 </button>
+                <p style={{ fontSize: '0.72rem', color: '#a0aec0', margin: '8px 0 0', textAlign: 'center' }}>
+                  {isSpanish ? 'Escribe o graba — gana ⭐️ por una buena frase' : 'Type or speak — earn ⭐️ for a good sentence'}
+                </p>
               </div>
             )}
 
@@ -679,6 +630,16 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
         )}
 
       </div>
+      {showChallenge && challengeWord && (
+        <SentenceChallenge
+          word={challengeWord}
+          language={language}
+          exercise="spelling_bee"
+          apiContext="challenge"
+          onMarkResult={handleSentenceMarked}
+          onClose={() => setShowChallenge(false)}
+        />
+      )}
     </div>
   )
 }
