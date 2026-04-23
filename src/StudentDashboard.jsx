@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import WordOfTheDay from './WordOfTheDay'
+import GrammarOfTheDay from './GrammarOfTheDay'
 
 const LEVEL_GRADIENT = {
   A1: 'linear-gradient(135deg, #43b581, #2ecc71)',
@@ -121,6 +122,9 @@ export default function StudentDashboard({ profile, session }) {
 
       {/* WORD OF THE DAY */}
       <WordOfTheDay profile={profile} collapsible={true} />
+
+      {/* GRAMMAR OF THE DAY */}
+      <GrammarOfTheDay profile={profile} collapsible={true} />
 
       {/* QUICK START */}
       <div style={{ marginTop: '0.5rem' }}>

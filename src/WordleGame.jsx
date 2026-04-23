@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import SentenceChallenge from './components/SentenceChallenge'
 
 const WORD_LENGTH  = 5
 const MAX_GUESSES  = 6
@@ -66,9 +67,8 @@ export default function WordleGame({ onBack }) {
   const [locked, setLocked]       = useState(false)
 
   const [sentenceDone, setSentenceDone]         = useState(false)
-  const [sentenceInput, setSentenceInput]       = useState('')
-  const [sentenceChecking, setSentenceChecking] = useState(false)
   const [sentenceFeedback, setSentenceFeedback] = useState(null)
+  const [showChallenge, setShowChallenge]       = useState(false)
 
   const [solveStar, setSolveStar]     = useState(false)
   const [sentenceStar, setSentenceStar] = useState(false)
@@ -142,7 +142,8 @@ export default function WordleGame({ onBack }) {
   async function startPractice() {
     setGameState('loading')
     setGuesses([]); setCurrent(''); setMessage('')
-    setSentenceDone(false); setSentenceInput(''); setSentenceFeedback(null)
+    setSentenceDone(false); setSentenceFeedback(null)
+    setShowChallenge(false)
     setSolveStar(false); setSentenceStar(false)
     setMode('practice')
 
@@ -226,36 +227,17 @@ export default function WordleGame({ onBack }) {
     })
   }
 
-  async function submitSentence() {
-    if (!sentenceInput.trim() || sentenceChecking) return
-    setSentenceChecking(true)
-    try {
-      const res = await fetch('/api/mark-free', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'sentence', word: word.toLowerCase(), sentence: sentenceInput.trim(), language }),
-      })
-      const data = await res.json()
-      setSentenceFeedback(data)
-
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        await supabase.from('sentence_challenges').insert({
-          student_id: user.id, exercise: 'wordle', word: word.toLowerCase(), language,
-          sentence: sentenceInput.trim(), is_correct: data.valid,
-          ai_feedback: data.reason, is_practice: mode === 'practice',
-        })
-      }
-      if (data.valid) {
-        setSentenceStar(true)
-        await insertStar('sentence', word, mode === 'practice')
-      }
-      await saveSession(guesses, gameState === 'won', true, data.valid, solveStar)
-    } catch {
-      setSentenceFeedback({ valid: null, reason: isSpanish ? 'No pudimos comprobar tu frase — ¡inténtalo de nuevo!' : 'Could not check your sentence right now — try again.' })
+  async function handleSentenceMarked({ sentence, inputMethod, result }) {
+    // SentenceChallenge has already written to sentence_challenges. Our job here:
+    // game-level bookkeeping (star + session upsert + feedback display).
+    const data = result || { valid: null }
+    setSentenceFeedback(data)
+    if (data.valid) {
+      setSentenceStar(true)
+      await insertStar('sentence', word, mode === 'practice')
     }
+    await saveSession(guesses, gameState === 'won', true, data.valid, solveStar)
     setSentenceDone(true)
-    setSentenceChecking(false)
   }
 
   const letterStates = computeLetterStates(guesses, word)
@@ -386,33 +368,23 @@ export default function WordleGame({ onBack }) {
           <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#2d3748', marginBottom: '4px' }}>
             {isSpanish ? '✍️ ¡Ahora úsala en una frase!' : '✍️ Now use it in a sentence!'}
           </div>
-          <div style={{ fontSize: '0.82rem', color: '#718096', marginBottom: '10px' }}>
+          <div style={{ fontSize: '0.82rem', color: '#718096', marginBottom: '12px' }}>
             {isSpanish
               ? `Usa la palabra "${word.toLowerCase()}" en una frase. Si no sabes lo que significa, ¡inténtalo igualmente!`
               : `Use the word "${word.toLowerCase()}" in a sentence. Not sure what it means? Have a go anyway!`}
           </div>
-          <textarea
-            ref={inputRef}
-            value={sentenceInput}
-            onChange={e => setSentenceInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitSentence() } }}
-            placeholder={isSpanish ? 'Escribe tu frase aquí...' : 'Type your sentence here...'}
-            rows={2}
-            style={{ width: '100%', padding: '0.75rem', fontSize: '0.95rem', border: '2px solid #667eea', borderRadius: '8px', boxSizing: 'border-box', resize: 'none', fontFamily: 'inherit', backgroundColor: '#f7f7ff' }}
-          />
-          <div style={{ fontSize: '0.72rem', color: '#a0aec0', margin: '4px 0 8px', textAlign: 'right' }}>
-            {isSpanish ? 'Gana ⭐️ por una buena frase' : 'Earn ⭐️ for a good sentence'}
-          </div>
-          <button onClick={submitSentence} disabled={!sentenceInput.trim() || sentenceChecking}
+          <button
+            onClick={() => setShowChallenge(true)}
             style={{
-              width: '100%', padding: '0.75rem',
-              background: sentenceInput.trim() && !sentenceChecking ? GRADIENT : '#cbd5e0',
-              color: 'white', border: 'none', borderRadius: '8px',
-              fontWeight: 700, fontSize: '0.95rem',
-              cursor: sentenceInput.trim() && !sentenceChecking ? 'pointer' : 'not-allowed',
+              width: '100%', padding: '0.85rem', background: GRADIENT, color: 'white',
+              border: 'none', borderRadius: '10px', cursor: 'pointer',
+              fontWeight: 700, fontSize: '0.95rem', letterSpacing: '0.2px'
             }}>
-            {sentenceChecking ? (isSpanish ? '🤖 Comprobando...' : '🤖 Checking...') : (isSpanish ? 'Comprobar frase' : 'Check my sentence')}
+            ⭐ {isSpanish ? 'Úsala en una frase →' : 'Use it in a sentence →'}
           </button>
+          <p style={{ fontSize: '0.72rem', color: '#a0aec0', margin: '8px 0 0', textAlign: 'center' }}>
+            {isSpanish ? 'Escribe o graba — gana ⭐️ por una buena frase' : 'Type or speak — earn ⭐️ for a good sentence'}
+          </p>
         </div>
       )}
 
@@ -462,6 +434,16 @@ export default function WordleGame({ onBack }) {
       )}
 
     </div>
+    {showChallenge && word && (
+      <SentenceChallenge
+        word={word.toLowerCase()}
+        language={language}
+        exercise="wordle"
+        apiContext="challenge"
+        onMarkResult={handleSentenceMarked}
+        onClose={() => setShowChallenge(false)}
+      />
+    )}
     <style>{`
       @keyframes shake {
         0%,100% { transform: translateX(0) }

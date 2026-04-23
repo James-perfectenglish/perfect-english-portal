@@ -12,14 +12,17 @@ export default async function handler(req, res) {
 
 // ── SENTENCE (WOTD + Wordle) ──────────────────────────────────────────────────
 async function handleSentence(req, res) {
-  const { word, partOfSpeech, definition, studentSentence, sentence, language, context } = req.body
+  const { word, partOfSpeech, definition, studentSentence, sentence, language, context,
+          grammarPoint, structure, example, usage } = req.body
 
   // Challenge mode: called with { word, sentence, context: 'challenge', language }
   // Wordle mode:    called with { word, sentence, language } — no definition, no context
   // WOTD mode:      called with { word, sentence | studentSentence, partOfSpeech, definition, language, context?: 'wotd' }
+  // GOTD mode:      called with { word: grammarPoint, sentence, grammarPoint, structure, example, usage, context: 'gotd', language }
   const isChallenge = context === 'challenge'
-  const isWotd      = context === 'wotd' || (!!definition && !isChallenge)
-  const isWordle    = !isChallenge && !isWotd
+  const isGotd      = context === 'gotd'
+  const isWotd      = !isGotd && (context === 'wotd' || (!!definition && !isChallenge))
+  const isWordle    = !isChallenge && !isGotd && !isWotd
   const thesentence = sentence || studentSentence
   const isSpanish   = language === 'es'
 
@@ -28,6 +31,57 @@ async function handleSentence(req, res) {
   }
 
   let prompt
+
+  if (isGotd) {
+    prompt = isSpanish
+      ? `Estás corrigiendo el ejercicio "Gramática del día" de un estudiante de español.
+
+Punto gramatical: "${grammarPoint}"
+Estructura: ${structure}
+Ejemplo correcto: "${example}"
+Uso: ${usage}
+
+Frase del estudiante: "${thesentence}"
+
+El estudiante debe escribir una frase en ESPAÑOL que use esta estructura gramatical correctamente.
+
+REGLAS DE EVALUACIÓN — aplica en este orden:
+1. ¿La frase usa claramente la estructura objetivo ("${grammarPoint}")? Si la estructura no aparece en absoluto o está claramente mal construida, marca valid=false con una explicación amable y breve.
+2. Si la estructura está presente y correcta → valid=true. Elogia con calidez y brevedad.
+3. Si la estructura está presente y correcta pero hay algún error menor en otro sitio (puntuación, tilde olvidada, género de un artículo, preposición no ideal), sigue siendo valid=true. Puedes mencionar el detalle muy brevemente, pero NO rechaces.
+4. Errores de puntuación, mayúsculas, tildes sueltas o signos de apertura (¿¡) NUNCA son motivo de rechazo.
+
+Sé generoso/a, cálido/a y alentador/a. Esto es un ejercicio de aprendizaje, no un examen. Mantente breve (1-2 frases).
+
+Responde SÓLO con JSON:
+{"valid": true, "feedback": "elogio cálido y breve, opcionalmente con una nota menor"}
+o
+{"valid": false, "feedback": "explicación amable de por qué la estructura no aparece o está mal, y un ejemplo pequeño si ayuda"}`
+      : `You are marking a student's "Grammar of the Day" exercise.
+
+Grammar point: "${grammarPoint}"
+Structure: ${structure}
+Correct example: "${example}"
+Usage: ${usage}
+
+Student's sentence: "${thesentence}"
+
+The student must write an English sentence that uses this grammar structure correctly.
+
+ASSESSMENT RULES — apply in this order:
+1. Does the sentence clearly use the target structure ("${grammarPoint}")? If the structure is missing or clearly malformed → valid=false with a kind, brief explanation.
+2. If the structure is present and correctly used → valid=true. Warm, brief praise.
+3. If the structure is present and correctly used but there is a minor error elsewhere (punctuation, article, spelling typo, a less-ideal preposition) → still valid=true. Mention the small detail briefly if you like, but do NOT reject.
+4. Punctuation, capitalisation and minor cosmetic errors are NEVER grounds for rejection.
+
+Be generous, warm and encouraging. This is a learning exercise, not a test. Keep it to 1–2 sentences.
+
+Reply ONLY with JSON:
+{"valid": true, "feedback": "warm brief praise, optionally a small note"}
+or
+{"valid": false, "feedback": "kind explanation of why the structure isn't quite there, plus a small nudge if helpful"}`
+    return callAI(prompt, 200, res, 'mark-free.gotd')
+  }
 
   if (isChallenge) {
     prompt = isSpanish
