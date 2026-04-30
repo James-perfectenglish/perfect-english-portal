@@ -225,10 +225,14 @@ export default function ConnectionsGame({ onBack, userProfile }) {
   }
 
   async function insertStar(type) {
+    if (type === 'sentence') return  // handled by SentenceChallenge
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    await supabase.from('wordle_stars').insert({
-      student_id: user.id, type, word: today, language, is_practice: false,
+    await supabase.from('stars').insert({
+      student_id: user.id,
+      source:     'connections',
+      subtype:    type,
+      context:    { play_date: today, language, mistakes },
     })
   }
 

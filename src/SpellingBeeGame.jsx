@@ -335,6 +335,32 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
     }
 
     setPreviousRankIdx(newRankIdx)
+
+    // Milestone star transitions — emit a star each time a threshold is crossed.
+    const milestones = []
+    if (pangramsFound.length === 0 && newPangs.length >= 1)            milestones.push('pangram')
+    if (foundWords.length < 22  && newWords.length >= 22)              milestones.push('milestone_solid')
+    if (foundWords.length < 50  && newWords.length >= 50)              milestones.push('milestone_genius')
+    if (foundWords.length < 60  && newWords.length >= 60)              milestones.push('milestone_60')
+    if (foundWords.length < 70  && newWords.length >= 70)              milestones.push('milestone_70')
+    if (foundWords.length < 80  && newWords.length >= 80)              milestones.push('milestone_80')
+    if (foundWords.length < 90  && newWords.length >= 90)              milestones.push('milestone_90')
+    if (foundWords.length < QUEEN_BEE && newWords.length >= QUEEN_BEE) milestones.push('queen_bee')
+    if (milestones.length > 0) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const rows = milestones.map(subtype => ({
+            student_id: user.id,
+            source:     'spelling_bee',
+            subtype,
+            context:    { puzzle_id: puzzle.id, language, word_count: newWords.length, score: newScore },
+          }))
+          await supabase.from('stars').insert(rows)
+        }
+      } catch (e) { console.warn('Milestone star log failed:', e) }
+    }
+
     await saveProgress(newWords, newScore, RANKS[newRankIdx].label,
       computeStars(newWords.length, newPangs.length), null)
   }
@@ -404,22 +430,7 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
     const rankIdx = getRankIdx(foundWords.length)
     await saveProgress(foundWords, score, RANKS[rankIdx].label, stars, passed)
     setSentenceDone(true)
-
-    // Award a Stars-system star for the sentence pass
-    if (passed) {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user && puzzle) {
-          await supabase.from('wordle_stars').insert({
-            student_id: user.id,
-            type: 'spelling_bee_sentence',
-            word: challengeWord,
-            language,
-            is_practice: false,
-          })
-        }
-      } catch (e) { console.warn('Star log failed:', e) }
-    }
+    // Sentence-pass star is written by SentenceChallenge directly to `stars`.
   }
 
   // ── Derived ────────────────────────────────────────────────────────────────

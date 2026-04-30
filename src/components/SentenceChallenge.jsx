@@ -97,24 +97,27 @@ export default function SentenceChallenge({
       const result = data || { valid: false, feedback: isSpanish ? 'No se pudo comprobar.' : 'Could not check — try again.' };
       setResult(result);
       setPhase('result');
-      // Save to sentence_challenges (star log — always written regardless of exercise)
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await supabase.from('sentence_challenges').insert({
-            student_id:   user.id,
-            exercise,
-            word,
-            sentence,
-            language,
-            is_correct:   result.valid === true,
-            ai_feedback:  result.feedback || result.reason || '',
-            is_practice:  false,
-            input_method: inputMethod,
-          });
+      // Star log — only write on pass. source = exercise (wotd/gotd/wordle/spelling_bee/etc).
+      if (result.valid === true) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase.from('stars').insert({
+              student_id: user.id,
+              source:     exercise,
+              subtype:    'sentence',
+              context: {
+                word,
+                sentence,
+                language,
+                input_method: inputMethod,
+                ai_feedback:  result.feedback || result.reason || '',
+              },
+            });
+          }
+        } catch (dbErr) {
+          console.warn('SentenceChallenge: could not save star:', dbErr);
         }
-      } catch (dbErr) {
-        console.warn('SentenceChallenge: could not save to DB:', dbErr);
       }
       // Fire parent callback so WOTD/GOTD can do their own submissions-table write
       if (typeof onMarkResult === 'function') {

@@ -220,10 +220,15 @@ export default function WordleGame({ onBack }) {
   }
 
   async function insertStar(type, w, isPractice) {
+    // 'sentence' is now handled by SentenceChallenge directly — skip.
+    if (type === 'sentence') return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    await supabase.from('wordle_stars').insert({
-      student_id: user.id, type, word: w.toLowerCase(), language, is_practice: isPractice,
+    await supabase.from('stars').insert({
+      student_id: user.id,
+      source:     'wordle',
+      subtype:    type,
+      context:    { word: w.toLowerCase(), language, is_practice: isPractice },
     })
   }
 
