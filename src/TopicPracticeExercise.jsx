@@ -36,19 +36,32 @@ function parseJsonb(val) {
 }
 
 // ── Hint masking helpers (for staged gap fill hints) ──
-// Level 2: letter count e.g. "supply chain" → "_ _ _ _ _ _   _ _ _ _ _"
+// Level 2: letter count, preserving non-letters like hyphens/apostrophes.
+// e.g. "cost-benefit" → "_ _ _ _ - _ _ _ _ _ _ _"
 function maskLetterCount(answer) {
   if (!answer) return ''
-  return answer.split(' ').map(word => word.split('').map(() => '_').join(' ')).join('   ')
+  return answer.split(' ').map(word =>
+    word.split('').map(ch => /[a-zA-ZÀ-ÿ]/.test(ch) ? '_' : ch).join(' ')
+  ).join('   ')
 }
-// Level 3: first letter revealed e.g. "supply chain" → "s _ _ _ _ _   c _ _ _ _"
-function maskFirstLetter(answer) {
+// Level 3: first letter of every word + one extra random letter from the longest word.
+// randomIndex is the position within the longest word to also reveal (1-indexed within that word).
+function maskFirstAndRandom(answer, randomIndex) {
   if (!answer) return ''
-  return answer.split(' ').map(word => {
-    if (word.length === 0) return ''
-    const rest = word.slice(1).split('').map(() => '_').join(' ')
-    return rest ? `${word[0]} ${rest}` : word[0]
-  }).join('   ')
+  const words = answer.split(' ')
+  let longestIdx = 0
+  for (let i = 1; i < words.length; i++) {
+    if (words[i].length > words[longestIdx].length) longestIdx = i
+  }
+  return words.map((word, wIdx) =>
+    word.split('').map((ch, cIdx) => {
+      const isLetter = /[a-zA-ZÀ-ÿ]/.test(ch)
+      if (!isLetter) return ch
+      if (cIdx === 0) return ch
+      if (wIdx === longestIdx && cIdx === randomIndex) return ch
+      return '_'
+    }).join(' ')
+  ).join('   ')
 }
 
 function formatTitle(title) {
@@ -174,10 +187,12 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   const inputRef = useRef(null)
 
   // ── Hint state ──
-  // hintLevel: 0 = none shown, 1 = text hint, 2 = letter count, 3 = first letter
+  // hintLevel: 0 = none shown, 1 = L1 text hint, 2 = L2 (hint2 OR word class) + letter pattern, 3 = first letter + random letter
+  // hintRandomIdx: position within the longest word to reveal at L3 (set when L3 is triggered)
   // autoHintShown: true if hint auto-revealed after a wrong answer (not counted as "used")
-  const [hintLevel, setHintLevel]         = useState(0)
-  const [autoHintShown, setAutoHintShown] = useState(false)
+  const [hintLevel, setHintLevel]           = useState(0)
+  const [hintRandomIdx, setHintRandomIdx]   = useState(null)
+  const [autoHintShown, setAutoHintShown]   = useState(false)
 
   // ── Sentence challenge ──
   const [showChallenge, setShowChallenge] = useState(false)
@@ -215,7 +230,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   async function fetchQuestionsSpanish() {
     setCurrentQ(0); setScore(0); setResults([]); setFeedback(null)
     setUserAnswer(''); setSelectedOption(null); setSessionSaved(false)
-    setHintLevel(0); setAutoHintShown(false)
+    setHintLevel(0); setHintRandomIdx(null); setAutoHintShown(false)
 
     const { data, error } = await supabase
       .from('question_bank')
@@ -259,7 +274,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   async function fetchQuestions(level) {
     setCurrentQ(0); setScore(0); setResults([]); setFeedback(null)
     setUserAnswer(''); setSelectedOption(null); setSessionSaved(false)
-    setHintLevel(0); setAutoHintShown(false)
+    setHintLevel(0); setHintRandomIdx(null); setAutoHintShown(false)
 
     let query = supabase.from('question_bank').select('*').eq('topic', exercise.topic).in('level', level.dbLevels).is('sequence_group', null)
     query = query.in('language', ['en', 'both'])
@@ -307,7 +322,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     window.scrollTo({ top: 0, behavior: 'instant' })
     setSelectedLevel(null); setQuestions([]); setCurrentQ(0); setScore(0)
     setFeedback(null); setUserAnswer(''); setSelectedOption(null)
-    setHintLevel(0); setAutoHintShown(false)
+    setHintLevel(0); setHintRandomIdx(null); setAutoHintShown(false)
     setShowChallenge(false); challengeFiredRef.current = false; challengePositionsRef.current = []
     if (isSpanishTP) { setStage('loading'); fetchQuestionsSpanish() }
     else { setStage('level-select'); fetchCounts() }
@@ -388,7 +403,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
       setStage('finished'); return
     }
     setCurrentQ(c => c + 1); setFeedback(null); setUserAnswer(''); setSelectedOption(null)
-    setHintLevel(0); setAutoHintShown(false)
+    setHintLevel(0); setHintRandomIdx(null); setAutoHintShown(false)
     setTimeout(() => inputRef.current?.focus(), 100)
   }
 
@@ -516,9 +531,27 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
                   const label = q.type === 'multiple_choice'
                     ? (hintLevel === 0 ? '🤔?' : '🤔')
                     : `🤔? ${hintLevel}/${maxLevel}`
+                  const advanceHint = () => {
+                    if (!canPress) return
+                    const newLevel = hintLevel + 1
+                    setHintLevel(newLevel)
+                    // When reaching L3, pick a random letter index from the longest word
+                    if (newLevel === 3 && q.correct_answer) {
+                      const words = q.correct_answer.split(' ')
+                      let longest = words[0]
+                      for (const w of words) if (w.length > longest.length) longest = w
+                      const letterPositions = []
+                      for (let i = 1; i < longest.length; i++) {
+                        if (/[a-zA-ZÀ-ÿ]/.test(longest[i])) letterPositions.push(i)
+                      }
+                      if (letterPositions.length > 0) {
+                        setHintRandomIdx(letterPositions[Math.floor(Math.random() * letterPositions.length)])
+                      }
+                    }
+                  }
                   return (
                     <button
-                      onClick={() => { if (canPress) setHintLevel(l => l + 1) }}
+                      onClick={advanceHint}
                       disabled={!canPress}
                       title={canPress ? 'Stuck?' : 'No more hints'}
                       style={{
@@ -542,14 +575,24 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
               {q.hint && hintLevel > 0 && !feedback && (
                 <div style={{ background: '#EDE9FE', border: '1px solid #c4b5fd', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', color: '#553C9A', fontSize: '0.9rem', lineHeight: 1.5 }}>
                   <div>💡 {q.hint}</div>
+                  {/* L2: a second text hint OR word class, plus letter pattern */}
                   {hintLevel >= 2 && (
-                    <div style={{ marginTop: '0.5rem', fontFamily: 'monospace', fontSize: '1.1rem', letterSpacing: '0.1em' }}>
-                      {hintLevel >= 3 ? maskFirstLetter(q.correct_answer) : maskLetterCount(q.correct_answer)}
-                    </div>
+                    <>
+                      {q.hint2 ? (
+                        <div style={{ marginTop: '0.5rem' }}>💡 {q.hint2}</div>
+                      ) : q.hint_word_class ? (
+                        <div style={{ marginTop: '0.5rem', fontStyle: 'italic', opacity: 0.9 }}>
+                          It's {/^[aeiou]/i.test(q.hint_word_class) ? 'an' : 'a'} {q.hint_word_class}.
+                        </div>
+                      ) : null}
+                      <div style={{ marginTop: '0.5rem', fontFamily: 'monospace', fontSize: '1.1rem', letterSpacing: '0.1em' }}>
+                        {hintLevel >= 3 ? maskFirstAndRandom(q.correct_answer, hintRandomIdx) : maskLetterCount(q.correct_answer)}
+                      </div>
+                    </>
                   )}
                   {hintLevel === 3 && (
                     <div style={{ marginTop: '0.35rem', fontSize: '0.78rem', opacity: 0.8 }}>
-                      (Answering correctly now won't count towards your score.)
+                      (This one's a freebie — the answer's almost there for you.)
                     </div>
                   )}
                 </div>
