@@ -36,32 +36,52 @@ function parseJsonb(val) {
 }
 
 // ── Hint masking helpers (for staged gap fill hints) ──
-// Level 2: letter count, preserving non-letters like hyphens/apostrophes.
-// e.g. "cost-benefit" → "_ _ _ _ - _ _ _ _ _ _ _"
-function maskLetterCount(answer) {
-  if (!answer) return ''
-  return answer.split(' ').map(word =>
-    word.split('').map(ch => /[a-zA-ZÀ-ÿ]/.test(ch) ? '_' : ch).join(' ')
-  ).join('   ')
-}
-// Level 3: first letter of every word + one extra random letter from the longest word.
-// randomIndex is the position within the longest word to also reveal (1-indexed within that word).
-function maskFirstAndRandom(answer, randomIndex) {
+// L3 only: first letter of every word + last letter + one extra random middle letter
+// from the longest word (only if longest word ≥ 7 letters).
+// e.g. "overexpansion" → "O _ _ _ _ _ _ _ _ _ _ _ N" or with middle "O _ _ _ X _ _ _ _ _ _ _ N".
+function maskRevealStage3(answer, randomIndex) {
   if (!answer) return ''
   const words = answer.split(' ')
   let longestIdx = 0
   for (let i = 1; i < words.length; i++) {
     if (words[i].length > words[longestIdx].length) longestIdx = i
   }
-  return words.map((word, wIdx) =>
-    word.split('').map((ch, cIdx) => {
+  const longestLen = words[longestIdx].length
+  const showMiddle = longestLen >= 7
+  return words.map((word, wIdx) => {
+    // Find first and last letter positions (skipping non-letters at edges).
+    let firstLetterIdx = -1, lastLetterIdx = -1
+    for (let i = 0; i < word.length; i++) {
+      if (/[a-zA-ZÀ-ÿ]/.test(word[i])) { firstLetterIdx = i; break }
+    }
+    for (let i = word.length - 1; i >= 0; i--) {
+      if (/[a-zA-ZÀ-ÿ]/.test(word[i])) { lastLetterIdx = i; break }
+    }
+    return word.split('').map((ch, cIdx) => {
       const isLetter = /[a-zA-ZÀ-ÿ]/.test(ch)
       if (!isLetter) return ch
-      if (cIdx === 0) return ch
-      if (wIdx === longestIdx && cIdx === randomIndex) return ch
+      if (cIdx === firstLetterIdx) return ch
+      if (cIdx === lastLetterIdx)  return ch
+      if (showMiddle && wIdx === longestIdx && cIdx === randomIndex) return ch
       return '_'
     }).join(' ')
-  ).join('   ')
+  }).join('   ')
+}
+
+// L2 plain-text shape clue: letter count + first letter of the longest word.
+// e.g. "overexpansion" → "13 letters, starts with O"
+// e.g. "cost benefit" → "two words; longest 7 letters, starts with B"
+function shapeClue(answer) {
+  if (!answer) return ''
+  const words = answer.split(' ').filter(Boolean)
+  if (words.length === 0) return ''
+  const longest = words.reduce((a, b) => b.length > a.length ? b : a)
+  // First actual letter (skip leading non-letters)
+  const firstLetter = (longest.match(/[a-zA-ZÀ-ÿ]/) || [''])[0].toUpperCase()
+  if (words.length === 1) {
+    return `${longest.length} letters, starts with ${firstLetter}.`
+  }
+  return `${words.length} words; longest is ${longest.length} letters, starts with ${firstLetter}.`
 }
 
 function formatTitle(title) {
@@ -535,38 +555,57 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
                     if (!canPress) return
                     const newLevel = hintLevel + 1
                     setHintLevel(newLevel)
-                    // When reaching L3, pick a random letter index from the longest word
+                    // When reaching L3, pick a random *middle* letter index from the longest word
+                    // (skipping the first and last letters — those are revealed unconditionally).
                     if (newLevel === 3 && q.correct_answer) {
                       const words = q.correct_answer.split(' ')
                       let longest = words[0]
                       for (const w of words) if (w.length > longest.length) longest = w
-                      const letterPositions = []
-                      for (let i = 1; i < longest.length; i++) {
-                        if (/[a-zA-ZÀ-ÿ]/.test(longest[i])) letterPositions.push(i)
+                      // Find first/last letter positions to exclude.
+                      let first = -1, last = -1
+                      for (let i = 0; i < longest.length; i++) {
+                        if (/[a-zA-ZÀ-ÿ]/.test(longest[i])) { first = i; break }
                       }
-                      if (letterPositions.length > 0) {
-                        setHintRandomIdx(letterPositions[Math.floor(Math.random() * letterPositions.length)])
+                      for (let i = longest.length - 1; i >= 0; i--) {
+                        if (/[a-zA-ZÀ-ÿ]/.test(longest[i])) { last = i; break }
+                      }
+                      // Eligible middle letters — only matters for words ≥ 7 letters.
+                      const middlePositions = []
+                      for (let i = first + 1; i < last; i++) {
+                        if (/[a-zA-ZÀ-ÿ]/.test(longest[i])) middlePositions.push(i)
+                      }
+                      if (middlePositions.length > 0 && longest.length >= 7) {
+                        setHintRandomIdx(middlePositions[Math.floor(Math.random() * middlePositions.length)])
+                      } else {
+                        setHintRandomIdx(null)
                       }
                     }
                   }
                   return (
-                    <button
-                      onClick={advanceHint}
-                      disabled={!canPress}
-                      title={canPress ? 'Stuck?' : 'No more hints'}
-                      style={{
-                        flexShrink: 0,
-                        background: canPress ? '#EDE9FE' : '#f7fafc',
-                        color: canPress ? '#553C9A' : '#a0aec0',
-                        border: `1px solid ${canPress ? '#c4b5fd' : '#e2e8f0'}`,
-                        borderRadius: '999px',
-                        padding: '4px 10px',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        cursor: canPress ? 'pointer' : 'default',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >{label}</button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px', flexShrink: 0 }}>
+                      <button
+                        onClick={advanceHint}
+                        disabled={!canPress}
+                        title={canPress ? 'Stuck?' : 'No more hints'}
+                        style={{
+                          background: canPress ? '#EDE9FE' : '#f7fafc',
+                          color: canPress ? '#553C9A' : '#a0aec0',
+                          border: `1px solid ${canPress ? '#c4b5fd' : '#e2e8f0'}`,
+                          borderRadius: '999px',
+                          padding: '4px 10px',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          cursor: canPress ? 'pointer' : 'default',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >{label}</button>
+                      {/* Cost warning: about to commit the costly L3 reveal */}
+                      {q.type === 'gap_fill' && hintLevel === 2 && (
+                        <span style={{ fontSize: '0.7rem', color: '#a0aec0', fontStyle: 'italic' }}>
+                          next hint costs the point
+                        </span>
+                      )}
+                    </div>
                   )
                 })()}
               </div>
@@ -575,20 +614,24 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
               {q.hint && hintLevel > 0 && !feedback && (
                 <div style={{ background: '#EDE9FE', border: '1px solid #c4b5fd', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', color: '#553C9A', fontSize: '0.9rem', lineHeight: 1.5 }}>
                   <div>💡 {q.hint}</div>
-                  {/* L2: a second text hint OR word class, plus letter pattern */}
+                  {/* L2: a second text hint OR word-class note, plus a plain-text shape clue. */}
                   {hintLevel >= 2 && (
                     <>
-                      {q.hint2 ? (
+                      {q.hint2 && (
                         <div style={{ marginTop: '0.5rem' }}>💡 {q.hint2}</div>
-                      ) : q.hint_word_class ? (
-                        <div style={{ marginTop: '0.5rem', fontStyle: 'italic', opacity: 0.9 }}>
-                          It's {/^[aeiou]/i.test(q.hint_word_class) ? 'an' : 'a'} {q.hint_word_class}.
-                        </div>
-                      ) : null}
-                      <div style={{ marginTop: '0.5rem', fontFamily: 'monospace', fontSize: '1.1rem', letterSpacing: '0.1em' }}>
-                        {hintLevel >= 3 ? maskFirstAndRandom(q.correct_answer, hintRandomIdx) : maskLetterCount(q.correct_answer)}
+                      )}
+                      <div style={{ marginTop: '0.5rem' }}>
+                        💡 {q.hint_word_class && !q.hint2
+                          ? `It's ${/^[aeiou]/i.test(q.hint_word_class) ? 'an' : 'a'} ${q.hint_word_class}. `
+                          : ''}{shapeClue(q.correct_answer)}
                       </div>
                     </>
+                  )}
+                  {/* L3: dashed pattern with first + last + middle letter — the costly reveal. */}
+                  {hintLevel >= 3 && (
+                    <div style={{ marginTop: '0.5rem', fontFamily: 'monospace', fontSize: '1.1rem', letterSpacing: '0.1em' }}>
+                      {maskRevealStage3(q.correct_answer, hintRandomIdx)}
+                    </div>
                   )}
                   {hintLevel === 3 && (
                     <div style={{ marginTop: '0.35rem', fontSize: '0.78rem', opacity: 0.8 }}>
