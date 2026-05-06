@@ -218,7 +218,7 @@ export default function Progress({ session, profile, handleLogout }) {
       const bySource = {}
       let thisWeek = 0
       allStars.forEach(s => {
-        const bucket = ['wordle','spelling_bee','connections','wotd','gotd'].includes(s.source) ? s.source : 'other'
+        const bucket = ['wordle','spelling_bee','connections','wotd','gotd','teacher_awarded'].includes(s.source) ? s.source : 'other'
         bySource[bucket] = (bySource[bucket] || 0) + 1
         if (new Date(s.awarded_at) >= monday) thisWeek++
       })
@@ -313,12 +313,13 @@ export default function Progress({ session, profile, handleLogout }) {
         >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))', gap: '0.6rem' }}>
             {[
-              { key: 'wordle',       emoji: '🔤', label: 'Wordle' },
-              { key: 'spelling_bee', emoji: '🐝', label: isSpanish ? 'Spelling Bee' : 'Spelling Bee' },
-              { key: 'connections',  emoji: '🔗', label: 'Connections' },
-              { key: 'wotd',         emoji: '📖', label: isSpanish ? 'Palabra'  : 'Word'    },
-              { key: 'gotd',         emoji: '📝', label: isSpanish ? 'Gramática' : 'Grammar' },
-              { key: 'other',        emoji: '✍️', label: isSpanish ? 'Frases'   : 'Sentences' },
+              { key: 'teacher_awarded', emoji: '👨‍🏫', label: isSpanish ? 'Profesor'   : 'Teacher'   },
+              { key: 'wordle',          emoji: '🔤', label: 'Wordle' },
+              { key: 'spelling_bee',    emoji: '🐝', label: isSpanish ? 'Spelling Bee' : 'Spelling Bee' },
+              { key: 'connections',     emoji: '🔗', label: 'Connections' },
+              { key: 'wotd',            emoji: '📖', label: isSpanish ? 'Palabra'    : 'Word'      },
+              { key: 'gotd',            emoji: '📝', label: isSpanish ? 'Gramática' : 'Grammar'   },
+              { key: 'other',           emoji: '✍️', label: isSpanish ? 'Frases'     : 'Sentences' },
             ].filter(({ key }) => (stars.bySource[key] || 0) > 0).map(({ key, emoji, label }) => (
               <div key={key} style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '0.65rem 0.5rem', textAlign: 'center' }}>
                 <div style={{ fontSize: '1.3rem', lineHeight: 1 }}>{emoji}</div>
@@ -329,8 +330,8 @@ export default function Progress({ session, profile, handleLogout }) {
           </div>
           <p style={{ fontSize: '0.78rem', color: '#718096', margin: '0.85rem 0 0' }}>
             {isSpanish
-              ? 'Gana ⭐ jugando Wordle, Spelling Bee, Connections, la Palabra y la Gramática del día, y por escribir buenas frases.'
-              : 'Earn ⭐ by playing Wordle, Spelling Bee, Connections, Word and Grammar of the Day, and by writing good sentences.'}
+              ? 'Gana ⭐ jugando Wordle, Spelling Bee, Connections, la Palabra y la Gramática del día, escribiendo buenas frases, o cuando tu profesor te dé una.'
+              : 'Earn ⭐ by playing Wordle, Spelling Bee, Connections, Word and Grammar of the Day, by writing good sentences, or when your teacher awards you one.'}
           </p>
         </Section>
       )}

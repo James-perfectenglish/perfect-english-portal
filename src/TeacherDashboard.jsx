@@ -78,6 +78,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
   const [weeklyStars, setWeeklyStars] = useState([])
   const [weeklyStarsOpen, setWeeklyStarsOpen] = useState(true)
   const [showInactive, setShowInactive] = useState(true)
+  const [awardingFor, setAwardingFor] = useState(null) // { id, name } | null
 
   useEffect(() => { fetchAllData(); fetchWotdData(); fetchStarsLeaderboard() }, [])
 
@@ -287,8 +288,8 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     // Group: per student, count by source.
     const totals = {}
     rows.forEach(r => {
-      if (!totals[r.student_id]) totals[r.student_id] = { wordle: 0, spelling_bee: 0, connections: 0, wotd: 0, gotd: 0, other: 0, total: 0 }
-      const bucket = ['wordle','spelling_bee','connections','wotd','gotd'].includes(r.source) ? r.source : 'other'
+      if (!totals[r.student_id]) totals[r.student_id] = { wordle: 0, spelling_bee: 0, connections: 0, wotd: 0, gotd: 0, teacher_awarded: 0, other: 0, total: 0 }
+      const bucket = ['wordle','spelling_bee','connections','wotd','gotd','teacher_awarded'].includes(r.source) ? r.source : 'other'
       totals[r.student_id][bucket]++
       totals[r.student_id].total++
     })
@@ -454,6 +455,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                     {label} {sortKey === key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                   </th>
                 ))}
+                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: '#718096', fontWeight: '600', whiteSpace: 'nowrap' }}>Award</th>
               </tr>
             </thead>
             <tbody>
@@ -484,6 +486,14 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                   </td>
                   <td style={{ padding: '0.6rem 0.75rem', color: '#718096', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
                     {formatDate(s.lastActive)}
+                  </td>
+                  <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
+                    <button
+                      onClick={() => setAwardingFor({ id: s.id, name: s.full_name || 'Student' })}
+                      title={`Award a star to ${s.full_name || 'this student'}`}
+                      style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid #fde68a', background: '#fffbeb', color: '#92400e', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      +⭐
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -528,6 +538,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Word of the Day">📖</th>
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Grammar of the Day">📝</th>
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Sentence challenges in topic practice / RPE">✍️</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Awarded by you">👨‍🏫</th>
                     <th style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: '#718096', fontWeight: 600 }}>Total</th>
                   </tr>
                 </thead>
@@ -538,12 +549,13 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                         {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                       </td>
                       <td style={{ padding: '0.6rem 0.5rem', fontWeight: 600, color: '#2C3E50' }}>{s.name}</td>
-                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wordle       || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.spelling_bee || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.connections  || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wotd         || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.gotd         || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.other        || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wordle          || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.spelling_bee    || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.connections     || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wotd            || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.gotd            || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.other           || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.teacher_awarded || '—'}</td>
                       <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 700, color: '#2C3E50' }}>
                         {s.total}
                       </td>
@@ -656,6 +668,14 @@ export default function TeacherDashboard({ profile, handleLogout }) {
           </div>
         )}
       </div>
+
+      {awardingFor && (
+        <AwardStarModal
+          student={awardingFor}
+          onClose={() => setAwardingFor(null)}
+          onAwarded={() => { setAwardingFor(null); fetchStarsLeaderboard() }}
+        />
+      )}
     </div>
   )
 }
@@ -667,5 +687,87 @@ function SummaryCard({ emoji, label, value }) {
       <div style={{ fontSize: 'clamp(1.25rem, 3vw, 1.75rem)', fontWeight: '700', color: '#2C3E50', lineHeight: 1.1 }}>{value}</div>
       <div style={{ fontSize: '0.72rem', color: '#718096', marginTop: '0.2rem' }}>{label}</div>
     </div>
+  )
+}
+
+function AwardStarModal({ student, onClose, onAwarded }) {
+  const [note, setNote] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function award() {
+    setSubmitting(true); setError(null)
+    const trimmed = note.trim()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error: insertError } = await supabase.from('stars').insert({
+      student_id: student.id,
+      source:     'teacher_awarded',
+      subtype:    'manual',
+      context:    {
+        ...(trimmed ? { note: trimmed } : {}),
+        ...(user ? { awarded_by: user.id } : {}),
+      },
+    })
+    setSubmitting(false)
+    if (insertError) {
+      console.warn('Award star failed:', insertError)
+      setError(insertError.message || 'Could not award star')
+      return
+    }
+    onAwarded()
+  }
+
+  return (
+    <>
+      <div onClick={() => !submitting && onClose()}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000 }} />
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+        background: 'white', borderRadius: '16px', padding: '1.5rem',
+        width: 'min(420px, 92vw)', zIndex: 1001,
+        boxShadow: '0 16px 48px rgba(0,0,0,0.25)',
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: '0.25rem' }}>⭐</div>
+          <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', color: '#2C3E50', fontWeight: 700 }}>
+            Award a star to {student.name}
+          </h3>
+          <p style={{ margin: 0, fontSize: '0.82rem', color: '#718096' }}>
+            They'll see it in their stars total.
+          </p>
+        </div>
+
+        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#718096', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '0.4rem' }}>
+          Note (optional)
+        </label>
+        <textarea
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          placeholder="e.g. Great effort in class today"
+          rows={2}
+          maxLength={200}
+          disabled={submitting}
+          style={{ width: '100%', padding: '0.7rem', fontSize: '0.92rem', border: '1.5px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box', resize: 'none', fontFamily: 'inherit', background: '#fafafa' }}
+          autoFocus
+        />
+
+        {error && (
+          <div style={{ marginTop: '0.75rem', padding: '0.6rem 0.85rem', background: '#fff5f5', border: '1px solid #fed7d7', color: '#9b2c2c', borderRadius: '8px', fontSize: '0.85rem' }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+          <button onClick={onClose} disabled={submitting}
+            style={{ flex: 1, padding: '0.7rem', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: 'white', color: '#718096', cursor: submitting ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '0.9rem' }}>
+            Cancel
+          </button>
+          <button onClick={award} disabled={submitting}
+            style={{ flex: 2, padding: '0.7rem', borderRadius: '8px', border: 'none', background: submitting ? '#cbd5e0' : 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', cursor: submitting ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+            {submitting ? 'Awarding…' : '⭐ Award star'}
+          </button>
+        </div>
+      </div>
+    </>
   )
 }
