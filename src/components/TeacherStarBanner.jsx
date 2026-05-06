@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 
@@ -15,10 +15,29 @@ import { supabase } from '../supabaseClient'
  * nothing pending.
  */
 export default function TeacherStarBanner({ profile, isSpanish = false }) {
-  const [pending, setPending] = useState(null)   // the row currently being shown
+  const [pending, setPending] = useState(null)         // current row being shown
+  const [awarderName, setAwarderName] = useState(null) // first name of the teacher who awarded it
   const [dismissing, setDismissing] = useState(false)
-  const [visible, setVisible] = useState(false)  // for the slide-in animation
+  const [visible, setVisible] = useState(false)        // for slide-in animation
   const location = useLocation()
+
+  // Cache awarder names for the session — usually only one teacher anyway.
+  const nameCacheRef = useRef({})
+
+  async function lookupAwarderName(awarderId) {
+    if (!awarderId) return null
+    if (nameCacheRef.current[awarderId] !== undefined) {
+      return nameCacheRef.current[awarderId]
+    }
+    const { data } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', awarderId)
+      .maybeSingle()
+    const firstName = data?.full_name?.trim().split(/\s+/)[0] || null
+    nameCacheRef.current[awarderId] = firstName
+    return firstName
+  }
 
   const fetchNext = useCallback(async () => {
     if (!profile?.id) return
@@ -32,23 +51,24 @@ export default function TeacherStarBanner({ profile, isSpanish = false }) {
       .limit(1)
       .maybeSingle()
     if (error) {
-      // Most likely "no rows" or a transient network blip — fail silent.
-      // (maybeSingle returns null+no error for 0 rows.)
       console.warn('TeacherStarBanner fetch failed:', error.message)
       return
     }
     if (data) {
+      // Look up awarder name BEFORE showing the banner so it doesn't flicker.
+      const awarderId = data.context?.awarded_by || null
+      const name = await lookupAwarderName(awarderId)
+      setAwarderName(name)
       setPending(data)
-      // Slide in on the next paint.
       requestAnimationFrame(() => setVisible(true))
     } else {
       setPending(null)
+      setAwarderName(null)
       setVisible(false)
     }
   }, [profile?.id])
 
-  // Refetch on mount and on every route change. Cheap, indexed, and
-  // catches stars awarded mid-session as soon as the student navigates.
+  // Refetch on mount and on every route change.
   useEffect(() => {
     fetchNext()
   }, [fetchNext, location.pathname])
@@ -56,7 +76,7 @@ export default function TeacherStarBanner({ profile, isSpanish = false }) {
   async function dismiss() {
     if (!pending || dismissing) return
     setDismissing(true)
-    setVisible(false)  // animate out
+    setVisible(false)
 
     const { error } = await supabase
       .from('stars')
@@ -66,13 +86,11 @@ export default function TeacherStarBanner({ profile, isSpanish = false }) {
 
     if (error) {
       console.warn('Could not mark star as seen:', error)
-      // Don't loop — let the user out. They'll see it again next session;
-      // if it persists, the dismiss button still re-attempts via fetchNext.
     }
 
-    // Wait for the slide-out animation, then look for the next one.
     setTimeout(() => {
       setPending(null)
+      setAwarderName(null)
       setDismissing(false)
       fetchNext()
     }, 320)
@@ -83,6 +101,15 @@ export default function TeacherStarBanner({ profile, isSpanish = false }) {
   const note = pending.context?.note?.trim() || null
   const dateLabel = formatAwardedDate(pending.awarded_at, isSpanish)
 
+  // Headline — uses awarder's first name if known, else falls back to "Your teacher".
+  const headline = awarderName
+    ? (isSpanish
+        ? `\u00a1${awarderName} te ha dado una estrella!`
+        : `${awarderName} gave you a star!`)
+    : (isSpanish
+        ? '\u00a1Tu profesor te ha dado una estrella!'
+        : 'Your teacher gave you a star!')
+
   return (
     <div
       role="status"
@@ -91,7 +118,6 @@ export default function TeacherStarBanner({ profile, isSpanish = false }) {
         position: 'sticky',
         top: 0,
         zIndex: 1500,
-        // Smooth slide + fade. Kept short so it doesn't feel laggy.
         transform: visible ? 'translateY(0)' : 'translateY(-100%)',
         opacity: visible ? 1 : 0,
         transition: 'transform 280ms ease-out, opacity 280ms ease-out',
@@ -112,9 +138,7 @@ export default function TeacherStarBanner({ profile, isSpanish = false }) {
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, color: '#78350f', fontSize: '0.92rem', lineHeight: 1.3 }}>
-            {isSpanish
-              ? '\u00a1Tu profesor te ha dado una estrella!'
-              : 'Your teacher gave you a star!'}
+            {headline}
           </div>
           {note ? (
             <div style={{
@@ -123,7 +147,6 @@ export default function TeacherStarBanner({ profile, isSpanish = false }) {
               marginTop: '2px',
               lineHeight: 1.35,
               fontStyle: 'italic',
-              // Wrap nicely on mobile but allow longer notes to flow.
               wordBreak: 'break-word',
             }}>
               &ldquo;{note}&rdquo;
