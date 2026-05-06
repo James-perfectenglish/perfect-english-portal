@@ -49,6 +49,7 @@ export default function ConnectionsGame({ onBack, userProfile }) {
 
   // Stars
   const [solveStar, setSolveStar]       = useState(false)
+  const [perfectStar, setPerfectStar]   = useState(false)  // 0 mistakes bonus
   const [sentenceStar, setSentenceStar] = useState(false)
 
   const today = new Date().toISOString().slice(0, 10)
@@ -97,6 +98,8 @@ export default function ConnectionsGame({ onBack, userProfile }) {
         setMistakes(session.mistakes || 0)
         setSentenceDone(session.sentence_done || false)
         setSolveStar(session.solve_star || false)
+        // Derive perfect-star from session: won with 0 mistakes earned the bonus.
+        setPerfectStar(!!session.won && (session.mistakes || 0) === 0)
         setSentenceStar(session.sentence_star || false)
         if (session.won) {
           setSolvedRanks(new Set([1, 2, 3, 4]))
@@ -144,7 +147,14 @@ export default function ConnectionsGame({ onBack, userProfile }) {
       if (won) {
         setGameState('won')
         setMessage('Brilliant! You got them all! 🎉')
-        if (mode === 'daily') { setSolveStar(true); await insertStar('solve') }
+        if (mode === 'daily') {
+          setSolveStar(true)
+          await insertStar('solve')
+          if (mistakes === 0) {
+            setPerfectStar(true)
+            await insertStar('solve_perfect')
+          }
+        }
       }
       if (mode === 'daily') await saveSession(newSolved, mistakes, won, won, won, false, false)
       setLocked(false)
@@ -228,12 +238,16 @@ export default function ConnectionsGame({ onBack, userProfile }) {
     if (type === 'sentence') return  // handled by SentenceChallenge
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    await supabase.from('stars').insert({
+    const dedupe_key = `${today}:${language}`
+    // Anti-farming: ux_stars_dedupe partial unique index will reject re-awards.
+    // We swallow 23505 (unique violation) silently so retries are no-ops.
+    const { error } = await supabase.from('stars').insert({
       student_id: user.id,
       source:     'connections',
       subtype:    type,
-      context:    { play_date: today, language, mistakes },
+      context:    { play_date: today, language, mistakes, dedupe_key },
     })
+    if (error && error.code !== '23505') console.warn('Connections star insert failed:', error)
   }
 
   async function handleSentenceMarked({ sentence, inputMethod, result }) {
@@ -254,7 +268,7 @@ export default function ConnectionsGame({ onBack, userProfile }) {
   const solvedGroups = groups.filter(g => solvedRanks.has(g.colour_rank)).sort((a, b) => a.colour_rank - b.colour_rank)
   const activeTiles  = tiles.filter(t => !solvedRanks.has(t.rank))
   const gameOver     = gameState === 'won' || gameState === 'lost'
-  const totalStars   = (solveStar ? 1 : 0) + (sentenceStar ? 1 : 0)
+  const totalStars   = (solveStar ? 1 : 0) + (perfectStar ? 1 : 0) + (sentenceStar ? 1 : 0)
 
   // ── Loading ───────────────────────────────────────
   if (gameState === 'loading') return (
@@ -434,7 +448,11 @@ export default function ConnectionsGame({ onBack, userProfile }) {
             <div style={{ textAlign: 'center', marginBottom: '1rem', padding: '0.75rem', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
               <div style={{ fontSize: '2rem', marginBottom: '2px' }}>{Array(totalStars).fill('⭐️').join(' ')}</div>
               <div style={{ fontSize: '0.78rem', color: '#92400e', fontWeight: 600 }}>
-                {solveStar && sentenceStar
+                {perfectStar && sentenceStar
+                  ? (language === 'es' ? '¡Sin errores + frase perfecta!' : 'No mistakes + great sentence!')
+                  : perfectStar
+                  ? (language === 'es' ? '¡Resuelto sin errores!' : 'Solved with no mistakes!')
+                  : solveStar && sentenceStar
                   ? (language === 'es' ? '¡Puzzle resuelto + frase perfecta!' : 'Puzzle solved + great sentence!')
                   : solveStar
                   ? (language === 'es' ? '¡Puzzle resuelto!' : 'Puzzle solved!')
@@ -481,6 +499,7 @@ export default function ConnectionsGame({ onBack, userProfile }) {
         language={language}
         exercise="connections"
         apiContext="challenge"
+        dedupeKey={mode === 'daily' ? `daily:${today}:${language}:sentence` : undefined}
         onMarkResult={handleSentenceMarked}
         onClose={() => setShowChallenge(false)}
       />

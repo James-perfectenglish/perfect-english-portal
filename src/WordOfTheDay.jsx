@@ -273,6 +273,7 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
         exercise="wotd"
         apiContext="wotd"
         apiExtraFields={{ partOfSpeech: word.part_of_speech, definition: word.definition }}
+        dedupeKey={word.id && !word.id?.toString().startsWith('qb_') ? `wotd:${word.id}` : undefined}
         headerLabel={isSpanish ? '📖 Palabra del día' : '📖 Word of the Day'}
         promptText={isSpanish ? 'Úsala en una frase:' : 'Use it in a sentence:'}
         onMarkResult={submitSentence}

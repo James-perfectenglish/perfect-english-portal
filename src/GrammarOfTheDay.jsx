@@ -264,6 +264,7 @@ export default function GrammarOfTheDay({ profile, collapsible = true }) {
           example:      item.example,
           usage:        item.usage,
         }}
+        dedupeKey={`gotd:${item.id}:${new Date().toISOString().slice(0, 10)}`}
         headerLabel={isSpanish ? '📝 Gramática del día' : '📝 Grammar of the Day'}
         promptText={isSpanish ? 'Úsala en una frase:' : 'Use it in a sentence:'}
         onMarkResult={onMarked}

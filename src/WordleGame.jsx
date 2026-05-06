@@ -224,12 +224,19 @@ export default function WordleGame({ onBack }) {
     if (type === 'sentence') return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    await supabase.from('stars').insert({
+    // Anti-farming via ux_stars_dedupe partial unique index.
+    // Daily: one star per day per language (regardless of which word).
+    // Practice: one star per word per language ever (so you can't farm replays of the same word).
+    const dedupe_key = isPractice
+      ? `practice:${language}:${w.toLowerCase()}`
+      : `daily:${today}:${language}`
+    const { error } = await supabase.from('stars').insert({
       student_id: user.id,
       source:     'wordle',
       subtype:    type,
-      context:    { word: w.toLowerCase(), language, is_practice: isPractice },
+      context:    { word: w.toLowerCase(), language, is_practice: isPractice, play_date: today, dedupe_key },
     })
+    if (error && error.code !== '23505') console.warn('Wordle star insert failed:', error)
   }
 
   async function handleSentenceMarked({ sentence, inputMethod, result }) {
@@ -445,6 +452,9 @@ export default function WordleGame({ onBack }) {
         language={language}
         exercise="wordle"
         apiContext="challenge"
+        dedupeKey={mode === 'practice'
+          ? `practice:${language}:${word.toLowerCase()}`
+          : `daily:${today}:${language}`}
         onMarkResult={handleSentenceMarked}
         onClose={() => setShowChallenge(false)}
       />

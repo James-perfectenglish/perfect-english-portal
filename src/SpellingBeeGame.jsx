@@ -354,9 +354,11 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
             student_id: user.id,
             source:     'spelling_bee',
             subtype,
-            context:    { puzzle_id: puzzle.id, language, word_count: newWords.length, score: newScore },
+            // dedupe_key: one milestone star per puzzle per subtype, ever.
+            context:    { puzzle_id: puzzle.id, language, word_count: newWords.length, score: newScore, dedupe_key: `${puzzle.id}:${subtype}` },
           }))
-          await supabase.from('stars').insert(rows)
+          const { error } = await supabase.from('stars').insert(rows)
+          if (error && error.code !== '23505') console.warn('Spelling Bee milestone star insert failed:', error)
         }
       } catch (e) { console.warn('Milestone star log failed:', e) }
     }
@@ -827,6 +829,7 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
           language={language}
           exercise="spelling_bee"
           apiContext="challenge"
+          dedupeKey={puzzle ? `${puzzle.id}:sentence` : undefined}
           onMarkResult={handleSentenceMarked}
           onClose={() => setShowChallenge(false)}
         />

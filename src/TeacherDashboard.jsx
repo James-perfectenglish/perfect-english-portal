@@ -79,7 +79,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
   const [wordleLeaderboardOpen, setWordleLeaderboardOpen] = useState(true)
   const [showInactive, setShowInactive] = useState(true)
 
-  useEffect(() => { fetchAllData(); fetchWotdData(); fetchWordleLeaderboard() }, [])
+  useEffect(() => { fetchAllData(); fetchWotdData(); fetchStarsLeaderboard() }, [])
 
   async function fetchAllData() {
     const { data: profiles } = await supabase
@@ -269,35 +269,36 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     setWotdLoading(false)
   }
 
-  async function fetchWordleLeaderboard() {
+  async function fetchStarsLeaderboard() {
     const monday = getMondayISO()
-    const { data: stars } = await supabase
-      .from('wordle_stars')
-      .select('student_id, type')
+    const { data: rows } = await supabase
+      .from('stars')
+      .select('student_id, source, subtype')
       .gte('awarded_at', monday)
 
-    if (!stars || stars.length === 0) return
+    if (!rows || rows.length === 0) return
 
-    const studentIds = [...new Set(stars.map(s => s.student_id))]
+    const studentIds = [...new Set(rows.map(r => r.student_id))]
     const { data: profiles } = await supabase
       .from('profiles').select('id, full_name, level').in('id', studentIds)
     const profileMap = {}
     if (profiles) profiles.forEach(p => { profileMap[p.id] = p })
 
+    // Group: per student, count by source.
     const totals = {}
-    stars.forEach(s => {
-      if (!totals[s.student_id]) totals[s.student_id] = { solve: 0, sentence: 0 }
-      totals[s.student_id][s.type]++
+    rows.forEach(r => {
+      if (!totals[r.student_id]) totals[r.student_id] = { wordle: 0, spelling_bee: 0, connections: 0, wotd: 0, gotd: 0, other: 0, total: 0 }
+      const bucket = ['wordle','spelling_bee','connections','wotd','gotd'].includes(r.source) ? r.source : 'other'
+      totals[r.student_id][bucket]++
+      totals[r.student_id].total++
     })
 
     const leaderboard = Object.entries(totals)
       .map(([id, counts]) => ({
         id,
-        name: profileMap[id]?.full_name || 'Unknown',
-        level: profileMap[id]?.level || '—',
-        solve: counts.solve || 0,
-        sentence: counts.sentence || 0,
-        total: (counts.solve || 0) + (counts.sentence || 0),
+        name:  profileMap[id]?.full_name || 'Unknown',
+        level: profileMap[id]?.level     || '—',
+        ...counts,
       }))
       .sort((a, b) => b.total - a.total)
 
@@ -514,29 +515,37 @@ export default function TeacherDashboard({ profile, handleLogout }) {
         {wordleLeaderboardOpen && (
           <div style={{ padding: '1.25rem' }}>
             {wordleLeaderboard.length === 0 ? (
-              <p style={{ color: '#a0aec0', textAlign: 'center', padding: '1rem', margin: 0 }}>No Wordle stars earned this week yet.</p>
+              <p style={{ color: '#a0aec0', textAlign: 'center', padding: '1rem', margin: 0 }}>No stars earned this week yet.</p>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                    <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', color: '#718096', fontWeight: 600 }}>#</th>
-                    <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', color: '#718096', fontWeight: 600 }}>Student</th>
-                    <th style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: '#718096', fontWeight: 600 }}>Solve ⭐️</th>
-                    <th style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: '#718096', fontWeight: 600 }}>Sentence ⭐️</th>
-                    <th style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: '#718096', fontWeight: 600 }}>Total</th>
+                    <th style={{ padding: '0.5rem 0.5rem', textAlign: 'left',   color: '#718096', fontWeight: 600 }}>#</th>
+                    <th style={{ padding: '0.5rem 0.5rem', textAlign: 'left',   color: '#718096', fontWeight: 600 }}>Student</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Wordle">🔤</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Spelling Bee">🐝</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Connections">🔗</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Word of the Day">📖</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Grammar of the Day">📝</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Sentence challenges in topic practice / RPE">✍️</th>
+                    <th style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: '#718096', fontWeight: 600 }}>Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {wordleLeaderboard.map((s, i) => (
                     <tr key={s.id} style={{ borderBottom: '1px solid #f0f0f0', background: i === 0 ? '#fffbeb' : i % 2 === 0 ? 'white' : '#fafafa' }}>
-                      <td style={{ padding: '0.6rem 0.75rem', fontWeight: 700, color: i === 0 ? '#f59e0b' : '#718096' }}>
+                      <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: i === 0 ? '#f59e0b' : '#718096' }}>
                         {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                       </td>
-                      <td style={{ padding: '0.6rem 0.75rem', fontWeight: 600, color: '#2C3E50' }}>{s.name}</td>
-                      <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', color: '#4a5568' }}>{s.solve || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', color: '#4a5568' }}>{s.sentence || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', fontWeight: 700, color: '#2C3E50' }}>
-                        {Array(Math.min(s.total, 7)).fill('⭐️').join('')}
+                      <td style={{ padding: '0.6rem 0.5rem', fontWeight: 600, color: '#2C3E50' }}>{s.name}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wordle       || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.spelling_bee || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.connections  || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wotd         || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.gotd         || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.other        || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 700, color: '#2C3E50' }}>
+                        {s.total}
                       </td>
                     </tr>
                   ))}

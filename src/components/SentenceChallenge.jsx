@@ -12,6 +12,7 @@ export default function SentenceChallenge({
   promptText,        // optional override for the "Write a sentence using:" subtitle
   apiContext = 'challenge', // 'challenge' | 'wotd' | 'gotd' — routes the mark-free.js prompt
   apiExtraFields = {},      // spread into the mark-free.js request body (e.g. partOfSpeech, definition)
+  dedupeKey,         // optional: when set, opts in to ux_stars_dedupe anti-farming.
   onMarkResult,      // optional async callback: ({ sentence, inputMethod, result }) => {}
   onClose
 }) {
@@ -102,18 +103,24 @@ export default function SentenceChallenge({
         try {
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
-            await supabase.from('stars').insert({
+            const context = {
+              word,
+              sentence,
+              language,
+              input_method: inputMethod,
+              ai_feedback:  result.feedback || result.reason || '',
+            };
+            // Opt-in anti-farming: callers that pass dedupeKey get ux_stars_dedupe protection.
+            if (dedupeKey) context.dedupe_key = dedupeKey;
+            const { error } = await supabase.from('stars').insert({
               student_id: user.id,
               source:     exercise,
               subtype:    'sentence',
-              context: {
-                word,
-                sentence,
-                language,
-                input_method: inputMethod,
-                ai_feedback:  result.feedback || result.reason || '',
-              },
+              context,
             });
+            if (error && error.code !== '23505') {
+              console.warn('SentenceChallenge: could not save star:', error);
+            }
           }
         } catch (dbErr) {
           console.warn('SentenceChallenge: could not save star:', dbErr);
