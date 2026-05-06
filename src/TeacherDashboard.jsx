@@ -532,7 +532,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                   <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                     <th style={{ padding: '0.5rem 0.5rem', textAlign: 'left',   color: '#718096', fontWeight: 600 }}>#</th>
                     <th style={{ padding: '0.5rem 0.5rem', textAlign: 'left',   color: '#718096', fontWeight: 600 }}>Student</th>
-                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Wordle">🔤</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Wordle">🟩</th>
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Spelling Bee">🐝</th>
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Connections">🔗</th>
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Word of the Day">📖</th>

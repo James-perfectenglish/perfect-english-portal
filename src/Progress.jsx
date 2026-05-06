@@ -314,7 +314,7 @@ export default function Progress({ session, profile, handleLogout }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))', gap: '0.6rem' }}>
             {[
               { key: 'teacher_awarded', emoji: '👨‍🏫', label: isSpanish ? 'Profesor'   : 'Teacher'   },
-              { key: 'wordle',          emoji: '🔤', label: 'Wordle' },
+              { key: 'wordle',          emoji: '🟩', label: 'Wordle' },
               { key: 'spelling_bee',    emoji: '🐝', label: isSpanish ? 'Spelling Bee' : 'Spelling Bee' },
               { key: 'connections',     emoji: '🔗', label: 'Connections' },
               { key: 'wotd',            emoji: '📖', label: isSpanish ? 'Palabra'    : 'Word'      },

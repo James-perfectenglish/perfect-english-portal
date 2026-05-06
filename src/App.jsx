@@ -19,6 +19,7 @@ import ConnectionsGame from './ConnectionsGame'
 import SpellingBeeGame from './SpellingBeeGame'
 import NavBar from './components/NavBar'
 import TeacherSidebar from './components/TeacherSidebar'
+import TeacherStarBanner from './components/TeacherStarBanner'
 import PronunciationExercise from './PronunciationExercise'
 import { TRACK_CYCLE } from './components/TeacherToolbar'
 
@@ -222,8 +223,12 @@ function Dashboard({ session }) {
 // ── Student routes ────────────────────────────────────────────────────────────
 function StudentRoutes({ session, profile, handleLogout }) {
   const navigate = useNavigate()
+  const isSpanishStudent = profile?.level === 'Spanish'
+    || (Array.isArray(profile?.tracks) && profile.tracks.includes('spanish'))
   return (
-    <Routes>
+    <>
+      <TeacherStarBanner profile={profile} isSpanish={isSpanishStudent} />
+      <Routes>
       <Route path="/" element={<StudentDashboard profile={profile} session={session} />} />
       <Route path="/practise" element={<PracticePage profile={profile} isTeacher={false} />} />
       <Route path="/practice" element={<Navigate to="/practise" replace />} />
@@ -241,6 +246,7 @@ function StudentRoutes({ session, profile, handleLogout }) {
       <Route path="/exercises" element={<Navigate to="/learn" replace />} />
       <Route path="*"          element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   )
 }
 
