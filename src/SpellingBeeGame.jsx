@@ -76,12 +76,13 @@ function computeStars(wordCount, pangramCount) {
   return stars
 }
 
-// Hexagon SVG path for pointy-top hex with given centre and "size" (radius)
+// Hexagon SVG path for flat-top hex with given centre and "size" (circumradius).
+// NYT Spelling Bee uses flat-top: horizontal edges at top and bottom, vertices on left/right.
 function hexPath(cx, cy, size) {
-  // Pointy-top: vertex up. Angle 0 = top.
+  // Flat-top: vertex at right (angle 0). Vertices every 60°.
   const pts = []
   for (let i = 0; i < 6; i++) {
-    const angle = (i * 60 - 90) * (Math.PI / 180)
+    const angle = (i * 60) * (Math.PI / 180)
     const x = cx + size * Math.cos(angle)
     const y = cy + size * Math.sin(angle)
     pts.push(`${x.toFixed(1)},${y.toFixed(1)}`)
@@ -89,18 +90,19 @@ function hexPath(cx, cy, size) {
   return pts.join(' ')
 }
 
-// Layout: pointy-top hexagons in honeycomb
-// Centre at (110, 110). 6 outer hexes at angles 30, 90, 150, 210, 270, 330 (gap-top arrangement)
-// Hex size: 32 (vertex-to-vertex / 2 = "circumradius")
-// Distance centre-to-outer-centre: 2 * size * cos(30°) ≈ 55.4
+// Layout: flat-top hexagons in honeycomb arrangement (NYT-style).
+// Centre at (110, 110). Six neighbours sit at 30°, 90°, 150°, 210°, 270°, 330°
+// (i.e. upper-right, bottom, lower-left, upper-left, top, lower-right — the
+// edge-sharing positions for flat-top hexes).
+// Hex "size" = circumradius (centre to vertex) = 32.
+// Centre-to-centre spacing for edge-touching flat-top hexes = size * √3.
 const HEX_SIZE = 32
 const CENTRE_X = 110
 const CENTRE_Y = 110
 const OUTER_DIST = HEX_SIZE * Math.sqrt(3)  // ≈ 55.4 — touching honeycomb spacing
 
 const OUTER_HEX_POS = Array.from({ length: 6 }, (_, i) => {
-  // start at top-left and go clockwise: angles -120, -60, 0, 60, 120, 180
-  // Actually for pointy-top honeycomb the 6 surrounding cells sit at 30°, 90°, 150°, 210°, 270°, 330°
+  // 30°, 90°, 150°, 210°, 270°, 330° — the six edge-neighbours of a flat-top hex.
   const angle = (i * 60 + 30) * (Math.PI / 180)
   return {
     cx: CENTRE_X + OUTER_DIST * Math.cos(angle),
