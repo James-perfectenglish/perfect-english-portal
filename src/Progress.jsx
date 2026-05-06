@@ -79,6 +79,7 @@ function TypeBar({ info, pct, total }) {
 }
 
 export default function Progress({ session, profile, handleLogout }) {
+  const isSpanish = profile?.level === 'Spanish' || (Array.isArray(profile?.tracks) && profile.tracks.includes('spanish'))
   const [stats, setStats]               = useState(null)
   const [attempts, setAttempts]         = useState([])
   const [typeBreakdown, setTypeBreakdown] = useState({})
@@ -87,7 +88,7 @@ export default function Progress({ session, profile, handleLogout }) {
   const [daysStudied, setDaysStudied]   = useState(0)
   const [streak, setStreak]             = useState(0)
   const [listeningCompleted, setListeningCompleted] = useState(0)
-  const [wordleStars, setWordleStars]   = useState({ total: 0, thisWeek: 0 })
+  const [stars, setStars]               = useState({ total: 0, thisWeek: 0, bySource: {} })
   const [loading, setLoading]           = useState(true)
 
   useEffect(() => { fetchData() }, [session])
@@ -209,15 +210,19 @@ export default function Progress({ session, profile, handleLogout }) {
       setTopicProgress(topicList)
     }
 
-    // Wordle stars
+    // Stars (unified across all sources)
     const { data: allStars } = await supabase
-      .from('wordle_stars').select('awarded_at').eq('student_id', userId)
+      .from('stars').select('source, awarded_at').eq('student_id', userId)
     if (allStars && allStars.length > 0) {
       const monday = new Date(getMondayISO())
-      setWordleStars({
-        total: allStars.length,
-        thisWeek: allStars.filter(s => new Date(s.awarded_at) >= monday).length,
+      const bySource = {}
+      let thisWeek = 0
+      allStars.forEach(s => {
+        const bucket = ['wordle','spelling_bee','connections','wotd','gotd'].includes(s.source) ? s.source : 'other'
+        bySource[bucket] = (bySource[bucket] || 0) + 1
+        if (new Date(s.awarded_at) >= monday) thisWeek++
       })
+      setStars({ total: allStars.length, thisWeek, bySource })
     }
 
     setLoading(false)
@@ -232,13 +237,13 @@ export default function Progress({ session, profile, handleLogout }) {
   const recent     = attempts.slice(-10)
 
   const statCards = [
-    { emoji: '📊', label: 'Questions Answered', value: hasData ? stats.total.toLocaleString() : '—' },
-    { emoji: '🎯', label: 'Overall Accuracy',   value: hasData ? `${stats.accuracy}%` : '—' },
-    { emoji: '🏆', label: 'Lessons Passed',     value: hasAttempts ? lessonsPassed : '—' },
-    { emoji: '🎧', label: 'Listening Done',     value: listeningCompleted > 0 ? listeningCompleted : '—' },
-    { emoji: '📅', label: 'Days Studied',       value: hasAttempts ? daysStudied : '—' },
-    ...(streak > 0 ? [{ emoji: '🔥', label: 'Day Streak', value: streak, highlight: streak >= 7 }] : []),
-    ...(wordleStars.total > 0 ? [{ emoji: '⭐️', label: 'Wordle Stars', value: wordleStars.total, sub: `${wordleStars.thisWeek} this week`, highlight2: true }] : []),
+    { emoji: '📊', label: isSpanish ? 'Preguntas respondidas' : 'Questions Answered', value: hasData ? stats.total.toLocaleString() : '—' },
+    { emoji: '🎯', label: isSpanish ? 'Acierto general'      : 'Overall Accuracy',    value: hasData ? `${stats.accuracy}%` : '—' },
+    { emoji: '🏆', label: isSpanish ? 'Lecciones aprobadas'  : 'Lessons Passed',      value: hasAttempts ? lessonsPassed : '—' },
+    { emoji: '🎧', label: isSpanish ? 'Audios completados'   : 'Listening Done',      value: listeningCompleted > 0 ? listeningCompleted : '—' },
+    { emoji: '📅', label: isSpanish ? 'Días estudiados'   : 'Days Studied',        value: hasAttempts ? daysStudied : '—' },
+    ...(streak > 0 ? [{ emoji: '🔥', label: isSpanish ? 'Días seguidos' : 'Day Streak', value: streak, highlight: streak >= 7 }] : []),
+    ...(stars.total > 0 ? [{ emoji: '⭐', label: isSpanish ? 'Estrellas' : 'Stars', value: stars.total, sub: isSpanish ? `${stars.thisWeek} esta semana` : `${stars.thisWeek} this week`, highlight2: true }] : []),
   ]
 
   return (
@@ -298,23 +303,34 @@ export default function Progress({ session, profile, handleLogout }) {
         </Section>
       )}
 
-      {/* WORDLE STATS */}
-      {wordleStars.total > 0 && (
-        <Section title="🟩 Wordle" subtitle="Your Wordle star breakdown">
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '120px', background: '#fffbeb', borderRadius: '10px', padding: '0.75rem', textAlign: 'center', border: '1px solid #fde68a' }}>
-              <div style={{ fontSize: '1.5rem' }}>⭐️</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#92400e' }}>{wordleStars.total}</div>
-              <div style={{ fontSize: '0.72rem', color: '#a0aec0' }}>All time</div>
-            </div>
-            <div style={{ flex: 1, minWidth: '120px', background: '#f0fff4', borderRadius: '10px', padding: '0.75rem', textAlign: 'center', border: '1px solid #c6f6d5' }}>
-              <div style={{ fontSize: '1.5rem' }}>📅</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#276749' }}>{wordleStars.thisWeek}</div>
-              <div style={{ fontSize: '0.72rem', color: '#a0aec0' }}>This week</div>
-            </div>
+      {/* STARS BREAKDOWN */}
+      {stars.total > 0 && (
+        <Section
+          title={isSpanish ? '⭐ Estrellas' : '⭐ Stars'}
+          subtitle={isSpanish
+            ? `${stars.total} en total · ${stars.thisWeek} esta semana`
+            : `${stars.total} all time · ${stars.thisWeek} this week`}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))', gap: '0.6rem' }}>
+            {[
+              { key: 'wordle',       emoji: '🔤', label: 'Wordle' },
+              { key: 'spelling_bee', emoji: '🐝', label: isSpanish ? 'Spelling Bee' : 'Spelling Bee' },
+              { key: 'connections',  emoji: '🔗', label: 'Connections' },
+              { key: 'wotd',         emoji: '📖', label: isSpanish ? 'Palabra'  : 'Word'    },
+              { key: 'gotd',         emoji: '📝', label: isSpanish ? 'Gramática' : 'Grammar' },
+              { key: 'other',        emoji: '✍️', label: isSpanish ? 'Frases'   : 'Sentences' },
+            ].filter(({ key }) => (stars.bySource[key] || 0) > 0).map(({ key, emoji, label }) => (
+              <div key={key} style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '0.65rem 0.5rem', textAlign: 'center' }}>
+                <div style={{ fontSize: '1.3rem', lineHeight: 1 }}>{emoji}</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#92400e', lineHeight: 1.1, marginTop: '4px' }}>{stars.bySource[key]}</div>
+                <div style={{ fontSize: '0.68rem', color: '#a0aec0', marginTop: '2px' }}>{label}</div>
+              </div>
+            ))}
           </div>
-          <p style={{ fontSize: '0.78rem', color: '#718096', margin: '0.75rem 0 0' }}>
-            Earn ⭐️ by solving the daily word in 5 or fewer guesses, and a second ⭐️ for writing a correct sentence.
+          <p style={{ fontSize: '0.78rem', color: '#718096', margin: '0.85rem 0 0' }}>
+            {isSpanish
+              ? 'Gana ⭐ jugando Wordle, Spelling Bee, Connections, la Palabra y la Gramática del día, y por escribir buenas frases.'
+              : 'Earn ⭐ by playing Wordle, Spelling Bee, Connections, Word and Grammar of the Day, and by writing good sentences.'}
           </p>
         </Section>
       )}

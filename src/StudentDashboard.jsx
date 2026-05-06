@@ -42,6 +42,7 @@ export default function StudentDashboard({ profile, session }) {
   const [streak, setStreak]               = useState(0)
   const [questionsTotal, setQTotal]       = useState(0)
   const [typeBreakdown, setTypeBreakdown] = useState({})
+  const [starsThisWeek, setStarsThisWeek] = useState(0)
   const [loading, setLoading]             = useState(true)
 
   const firstName     = profile.full_name?.split(' ')[0] || 'there'
@@ -59,6 +60,18 @@ export default function StudentDashboard({ profile, session }) {
     const { count: totalCount } = await supabase
       .from('student_answers').select('*', { count: 'exact', head: true }).eq('student_id', userId)
     setQTotal(totalCount || 0)
+
+    // Stars earned this week (across all sources)
+    const monday = (() => {
+      const d = new Date(); const day = d.getDay()
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+      const m = new Date(d); m.setDate(diff); m.setHours(0,0,0,0)
+      return m.toISOString()
+    })()
+    const { count: weekStarCount } = await supabase
+      .from('stars').select('*', { count: 'exact', head: true })
+      .eq('student_id', userId).gte('awarded_at', monday)
+    setStarsThisWeek(weekStarCount || 0)
 
     const { data: recentAnswers } = await supabase
       .from('student_answers').select('is_correct, question_id, answered_at')
@@ -115,8 +128,9 @@ export default function StudentDashboard({ profile, session }) {
           {greeting}, {firstName}! 👋
         </h1>
         <p style={{ color: '#718096', margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          {questionsTotal > 0 && <span>{questionsTotal.toLocaleString()} questions answered</span>}
-          {streak > 0 && <span style={{ color: '#ed8936', fontWeight: 600 }}>🔥 {streak} day streak</span>}
+          {questionsTotal > 0 && <span>{questionsTotal.toLocaleString()} {isSpanish ? 'preguntas respondidas' : 'questions answered'}</span>}
+          {streak > 0 && <span style={{ color: '#ed8936', fontWeight: 600 }}>🔥 {streak} {isSpanish ? 'días seguidos' : `day streak`}</span>}
+          {starsThisWeek > 0 && <span style={{ color: '#92400e', fontWeight: 600 }}>⭐ {starsThisWeek} {isSpanish ? (starsThisWeek === 1 ? 'estrella esta semana' : 'estrellas esta semana') : (starsThisWeek === 1 ? 'star this week' : 'stars this week')}</span>}
         </p>
       </div>
 

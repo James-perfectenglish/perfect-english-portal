@@ -75,8 +75,8 @@ export default function TeacherDashboard({ profile, handleLogout }) {
   const [wotdOpen, setWotdOpen] = useState(true)
   const [wotdFilter, setWotdFilter] = useState('all')
   const [wotdProfileMap, setWotdProfileMap] = useState({})
-  const [wordleLeaderboard, setWordleLeaderboard] = useState([])
-  const [wordleLeaderboardOpen, setWordleLeaderboardOpen] = useState(true)
+  const [weeklyStars, setWeeklyStars] = useState([])
+  const [weeklyStarsOpen, setWeeklyStarsOpen] = useState(true)
   const [showInactive, setShowInactive] = useState(true)
 
   useEffect(() => { fetchAllData(); fetchWotdData(); fetchStarsLeaderboard() }, [])
@@ -302,7 +302,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       }))
       .sort((a, b) => b.total - a.total)
 
-    setWordleLeaderboard(leaderboard)
+    setWeeklyStars(leaderboard)
   }
 
   function handleSort(key) {
@@ -493,28 +493,28 @@ export default function TeacherDashboard({ profile, handleLogout }) {
         </div>
       )}
 
-      {/* WORDLE WEEKLY LEADERBOARD */}
+      {/* WEEKLY STARS LEADERBOARD */}
       <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden', marginBottom: '1rem' }}>
-        <div onClick={() => setWordleLeaderboardOpen(o => !o)}
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', cursor: 'pointer', borderBottom: wordleLeaderboardOpen ? '1px solid #e2e8f0' : 'none', background: '#fafafa' }}>
+        <div onClick={() => setWeeklyStarsOpen(o => !o)}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', cursor: 'pointer', borderBottom: weeklyStarsOpen ? '1px solid #e2e8f0' : 'none', background: '#fafafa' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '1.1rem' }}>⭐️</span>
+            <span style={{ fontSize: '1.1rem' }}>⭐</span>
             <div>
-              <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: 0 }}>Weekly Stars ⭐️</h2>
+              <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: 0 }}>Stars this week</h2>
               <p style={{ fontSize: '0.75rem', color: '#718096', margin: 0 }}>
-                {wordleLeaderboard.length > 0
-                  ? `${wordleLeaderboard.length} student${wordleLeaderboard.length !== 1 ? 's' : ''} this week`
+                {weeklyStars.length > 0
+                  ? `${weeklyStars.length} student${weeklyStars.length !== 1 ? 's' : ''} earned stars`
                   : 'No stars yet this week'}
               </p>
             </div>
           </div>
-          <div style={{ background: wordleLeaderboardOpen ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#e2e8f0', borderRadius: '8px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
-            {wordleLeaderboardOpen ? '🟩' : '🔒'}
+          <div style={{ background: weeklyStarsOpen ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#e2e8f0', borderRadius: '8px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
+            {weeklyStarsOpen ? '🟩' : '🔒'}
           </div>
         </div>
-        {wordleLeaderboardOpen && (
+        {weeklyStarsOpen && (
           <div style={{ padding: '1.25rem' }}>
-            {wordleLeaderboard.length === 0 ? (
+            {weeklyStars.length === 0 ? (
               <p style={{ color: '#a0aec0', textAlign: 'center', padding: '1rem', margin: 0 }}>No stars earned this week yet.</p>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
@@ -532,7 +532,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {wordleLeaderboard.map((s, i) => (
+                  {weeklyStars.map((s, i) => (
                     <tr key={s.id} style={{ borderBottom: '1px solid #f0f0f0', background: i === 0 ? '#fffbeb' : i % 2 === 0 ? 'white' : '#fafafa' }}>
                       <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: i === 0 ? '#f59e0b' : '#718096' }}>
                         {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
