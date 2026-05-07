@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import SentenceChallenge from './components/SentenceChallenge'
+import Breadcrumb from './components/Breadcrumb'
 
 // ── Wordsearch v1 (8 May 2026) ──────────────────────────────────────────────
 // Daily puzzle, 10 themed words to find in a grid (varying sizes, see DB).
@@ -394,6 +395,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
   async function handleHint() {
     const { puzzle, themeWordsFound, hintsUsed, revealedHintCells } = stateRef.current
     if (!puzzle) return
+    if (hintsUsed >= 3) return
     const themeWords  = puzzle.theme_words || []
     const placements  = puzzle.word_placements || []
     const keyWord     = puzzle.key_word
@@ -472,6 +474,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
 
   if (gameState === 'noword') return (
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      {onBack && <Breadcrumb section={isSpanish ? 'Jugar' : 'Play'} title={isSpanish ? 'Sopa de letras' : 'Wordsearch'} onExit={onBack} />}
       <div style={{ maxWidth: '500px', margin: '0 auto', padding: '2rem', textAlign: 'center' }}>
         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔎</div>
         <h2 style={{ color: '#2d3748' }}>{isSpanish ? 'Sin puzzle hoy' : 'No puzzle today'}</h2>
@@ -492,6 +495,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
 
   return (
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      {onBack && <Breadcrumb section={isSpanish ? 'Jugar' : 'Play'} title={isSpanish ? 'Sopa de letras' : 'Wordsearch'} onExit={onBack} />}
       <div style={{ maxWidth: '500px', margin: '0 auto', padding: '1rem 1rem 3rem' }}>
 
         {/* Header */}
@@ -538,19 +542,19 @@ export default function WordSearchGame({ onBack, userProfile }) {
           {gameState === 'playing' && (
             <button
               onClick={handleHint}
-              disabled={allFound}
+              disabled={hintsUsed >= 3 || allFound}
               style={{
                 padding: '0.6rem 0.95rem', borderRadius: '999px',
-                background: allFound ? '#f0f0f0' : '#fef3c7',
-                border: '2px solid ' + (allFound ? '#e2e8f0' : '#f59e0b'),
+                background: (hintsUsed >= 3 || allFound) ? '#f0f0f0' : '#fef3c7',
+                border: '2px solid ' + ((hintsUsed >= 3 || allFound) ? '#e2e8f0' : '#f59e0b'),
                 fontWeight: 700, fontSize: '0.9rem',
-                color: allFound ? '#a0aec0' : '#92400e',
-                cursor: allFound ? 'not-allowed' : 'pointer',
+                color: (hintsUsed >= 3 || allFound) ? '#a0aec0' : '#92400e',
+                cursor: (hintsUsed >= 3 || allFound) ? 'not-allowed' : 'pointer',
                 whiteSpace: 'nowrap',
               }}
               title={isSpanish ? 'Pista' : 'Hint'}
             >
-              🔎 {hintsUsed > 0 && <span style={{ fontSize: '0.78rem', fontWeight: 600 }}>×{hintsUsed}</span>}
+              🔎 {hintsUsed > 0 && <span style={{ fontSize: '0.78rem', fontWeight: 600 }}>{hintsUsed}/3</span>}
             </button>
           )}
         </div>
