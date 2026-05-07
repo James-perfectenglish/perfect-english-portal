@@ -26,6 +26,7 @@ export default function SentenceChallenge({
   const [isTranscribing, setIsTranscribing]     = useState(false);
   const [isMarking, setIsMarking]               = useState(false);
   const [editedTranscript, setEditedTranscript] = useState('');
+  const [submittedSentence, setSubmittedSentence] = useState('');
   const [result, setResult]                     = useState(null);
 
   const mediaRecRef = useRef(null);
@@ -88,6 +89,7 @@ export default function SentenceChallenge({
   }
 
   async function markSentence(sentence, inputMethod = 'text') {
+    setSubmittedSentence(sentence);
     setIsMarking(true);
     try {
       const res = await fetch('/api/mark-free', {
@@ -281,6 +283,20 @@ export default function SentenceChallenge({
         {/* ── RESULT PHASE ── */}
         {phase === 'result' && result && (
           <>
+            {/* Echo the student's sentence back so they can see what they wrote */}
+            {submittedSentence && (
+              <div style={{
+                padding: '0.75rem 0.9rem', borderRadius: '8px', marginBottom: '0.75rem',
+                background: '#f7fafc', border: '1px solid #e2e8f0',
+              }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: '600', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '0.3rem' }}>
+                  {isSpanish ? 'Tu frase:' : 'Your sentence:'}
+                </div>
+                <div style={{ fontSize: '0.9rem', color: '#4a5568', fontStyle: 'italic', lineHeight: 1.4 }}>
+                  "{submittedSentence}"
+                </div>
+              </div>
+            )}
             {earnedStar && (
               <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
                 <div style={{ fontSize: '2.5rem' }}>⭐️</div>

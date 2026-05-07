@@ -314,11 +314,69 @@ or
 }
 
 // ── ERROR CORRECTION ──────────────────────────────────────────────────────────
+// Levenshtein distance — for EC deterministic typo detection
+function ecLevenshtein(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  let prev = Array(b.length + 1).fill(0).map((_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = a[i - 1] === b[j - 1]
+        ? prev[j - 1]
+        : 1 + Math.min(prev[j - 1], prev[j], cur[j - 1]);
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+// Diff originalSentence vs correctAnswerSentence to find the one differing word.
+// Returns the expected replacement (lowercase), or null if not a clean single-word swap.
+function findExpectedReplacement(originalSentence, correctAnswerSentence) {
+  const tokenise = s => s.toLowerCase().replace(/[.,!?;:]/g, '').split(/\s+/).filter(Boolean);
+  const orig = tokenise(originalSentence);
+  const corr = tokenise(correctAnswerSentence);
+  if (orig.length !== corr.length) return null;
+  let diffIdx = -1;
+  for (let i = 0; i < orig.length; i++) {
+    if (orig[i] !== corr[i]) {
+      if (diffIdx !== -1) return null;
+      diffIdx = i;
+    }
+  }
+  return diffIdx === -1 ? null : corr[diffIdx];
+}
+
 async function handleCorrection(req, res) {
   const { originalSentence, errorWord, studentReplacement, correctAnswerSentence, language = 'en', level = 'B1' } = req.body;
   if (!originalSentence || !errorWord || !studentReplacement || !correctAnswerSentence)
     return res.status(400).json({ error: 'Missing required fields' });
   const isSpanish = language === 'es';
+
+  // Deterministic typo check — fires before AI for the easy cases.
+  // Only meaningful if the student actually changed the tile.
+  const studentTrimmed = studentReplacement.toLowerCase().trim();
+  const errorTrimmed   = errorWord.toLowerCase().trim();
+  if (studentTrimmed !== errorTrimmed) {
+    const expected = findExpectedReplacement(originalSentence, correctAnswerSentence);
+    if (expected) {
+      if (studentTrimmed === expected) {
+        const reason = isSpanish ? '✅ ¡Correcto!' : '✅ Correct!';
+        return res.status(200).json({ valid: true, reason, feedback: reason });
+      }
+      const d = ecLevenshtein(studentTrimmed, expected);
+      const maxLen = Math.max(studentTrimmed.length, expected.length);
+      if ((d === 1 && maxLen >= 4) || (d === 2 && maxLen >= 6)) {
+        const reason = isSpanish
+          ? `Encontraste el error — solo un pequeño desliz de ortografía. La forma correcta es "${expected}".`
+          : `Right answer — just a small typo. The correct spelling is "${expected}".`;
+        return res.status(200).json({ valid: true, reason, feedback: reason });
+      }
+    }
+  }
+
   const prompt = isSpanish
     ? `Estás corrigiendo un ejercicio de corrección de errores en español.
 

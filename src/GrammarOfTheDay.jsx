@@ -61,15 +61,23 @@ export default function GrammarOfTheDay({ profile, collapsible = true }) {
     const pick = pool[daysSinceEpoch() % pool.length]
     setItem(pick)
 
-    // Existing submission?
+    // Existing submission for TODAY only?
+    // We use the UTC-day boundary, matching `daysSinceEpoch()` above so the question
+    // "did I already submit?" stays consistent with "which grammar item is today's?".
+    // This means a student can submit again the next time the same grammar point comes round.
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
+      const startOfTodayUTC = new Date()
+      startOfTodayUTC.setUTCHours(0, 0, 0, 0)
       const { data: existing } = await supabase
         .from('grammar_of_the_day_submissions')
         .select('*')
         .eq('student_id', user.id)
         .eq('grammar_id', pick.id)
-        .single()
+        .gte('submitted_at', startOfTodayUTC.toISOString())
+        .order('submitted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
       if (existing) setSubmission(existing)
     }
 
