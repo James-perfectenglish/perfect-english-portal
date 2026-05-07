@@ -47,6 +47,7 @@ El estudiante debe escribir una frase en ESPAÑOL que use esta estructura gramat
 
 REGLAS DE EVALUACIÓN — aplica en este orden:
 1. ¿La frase usa claramente la estructura objetivo ("${grammarPoint}")? Si la estructura no aparece en absoluto o está claramente mal construida, marca valid=false con una explicación amable y breve.
+   IMPORTANTE: Las formas negativas ("no estaba esperando", "no he estado estudiando") e interrogativas ("¿Estaba durmiendo?") SON usos válidos de la estructura objetivo. No rechaces sólo porque la forma sea negativa o interrogativa — son variaciones normales de la estructura.
 2. Si la estructura está presente y correcta → valid=true. Elogia con calidez y brevedad.
 3. Si la estructura está presente y correcta pero hay algún error menor en otro sitio (puntuación, tilde olvidada, género de un artículo, preposición no ideal), sigue siendo valid=true. Puedes mencionar el detalle muy brevemente, pero NO rechaces.
 4. Errores de puntuación, mayúsculas, tildes sueltas o signos de apertura (¿¡) NUNCA son motivo de rechazo.
@@ -70,6 +71,7 @@ The student must write an English sentence that uses this grammar structure corr
 
 ASSESSMENT RULES — apply in this order:
 1. Does the sentence clearly use the target structure ("${grammarPoint}")? If the structure is missing or clearly malformed → valid=false with a kind, brief explanation.
+   IMPORTANT: Negative forms ("wasn't expecting", "hasn't been studying"), questions ("Was she sleeping?"), and contractions ARE valid uses of the target structure. Do not reject just because the form is negative, interrogative, or contracted — these are normal variations of the structure.
 2. If the structure is present and correctly used → valid=true. Warm, brief praise.
 3. If the structure is present and correctly used but there is a minor error elsewhere (punctuation, article, spelling typo, a less-ideal preposition) → still valid=true. Mention the small detail briefly if you like, but do NOT reject.
 4. Punctuation, capitalisation and minor cosmetic errors are NEVER grounds for rejection.
@@ -291,6 +293,7 @@ ACCEPT (valid=true) if:
 - Example: model="keep forgetting", student="always forget" → valid (same meaning, both natural)
 - Example: model="brush my teeth", student="clean my teeth" → valid (natural synonym)
 - Example: model="launch a new product", student="sell a new product" → valid=true with amber note ("launch" specifically means introduce for the first time; "sell" is grammatically natural here, just less specific)
+- Example: model="The report must be finished by Friday at the latest", student="The latest the report must be finished is Friday" → valid=true with amber note (same deadline meaning, just rearranged into a cleft structure — the model phrasing is more natural)
 - A simpler version that omits optional words but keeps the core meaning — note what was omitted
 
 AMBER — still valid=true, but add a note if:
