@@ -571,11 +571,12 @@ export default function WordSearchGame({ onBack, userProfile }) {
         {/* Grid */}
         <div
           style={{
+            position: 'relative',
             background: 'white', borderRadius: '12px', padding: '8px',
             marginBottom: '0.75rem',
             display: 'grid',
             gridTemplateColumns: `repeat(${cols}, 1fr)`,
-            gap: '2px',
+            gap: 0,
             touchAction: 'none',
             userSelect: 'none',
             WebkitUserSelect: 'none',
@@ -585,6 +586,39 @@ export default function WordSearchGame({ onBack, userProfile }) {
           onPointerCancel={handlePointerCancel}
           onPointerLeave={handlePointerUp}
         >
+          {/* SVG overlay: capsules outline each found theme word so they read
+              as discrete shapes rather than blurring into a green blob */}
+          <svg
+            viewBox={`0 0 ${cols} ${rows}`}
+            preserveAspectRatio="none"
+            style={{
+              position: 'absolute',
+              top: '8px', left: '8px', right: '8px', bottom: '8px',
+              pointerEvents: 'none',
+              zIndex: 2,
+              overflow: 'visible',
+            }}
+          >
+            {themeWordsFound.map(word => {
+              const pl = (puzzle.word_placements || []).find(p => p.word === word)
+              if (!pl) return null
+              const isKey = word === puzzle.key_word
+              const [r0, c0] = pl.start
+              const [r1, c1] = pl.end
+              return (
+                <line
+                  key={word}
+                  x1={c0 + 0.5}
+                  y1={r0 + 0.5}
+                  x2={c1 + 0.5}
+                  y2={r1 + 0.5}
+                  stroke={isKey ? 'rgba(245, 158, 11, 0.45)' : 'rgba(16, 185, 129, 0.32)'}
+                  strokeWidth={0.78}
+                  strokeLinecap="round"
+                />
+              )
+            })}
+          </svg>
           {Array.from({ length: rows }).map((_, r) =>
             Array.from({ length: cols }).map((_, c) => {
               const key = `${r},${c}`
@@ -594,8 +628,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
               const hintWord = revealedHintCells[key]
               let bg = 'white'
               let color = '#2d3748'
-              if (found === 'key') { bg = COLOR_KEY_BG; color = COLOR_KEY_TEXT }
-              else if (found === 'theme') { bg = COLOR_FOUND_BG; color = COLOR_FOUND_TEXT }
+              // Found theme/key words shown via SVG capsule overlay — cell stays white
               if (inDrag && !found) { bg = COLOR_DRAG_BG; color = COLOR_DRAG_TEXT }
               if (flashThis && flash) { bg = flash.bg; color = '#1a202c' }
               const showHintRing = !!hintWord && !found
