@@ -77,10 +77,12 @@ export default function TeacherDashboard({ profile, handleLogout }) {
   const [wotdProfileMap, setWotdProfileMap] = useState({})
   const [weeklyStars, setWeeklyStars] = useState([])
   const [weeklyStarsOpen, setWeeklyStarsOpen] = useState(true)
+  const [queenBeeAlerts, setQueenBeeAlerts] = useState([])
+  const [queenBeeOpen, setQueenBeeOpen] = useState(true)
   const [showInactive, setShowInactive] = useState(true)
   const [awardingFor, setAwardingFor] = useState(null) // { id, name } | null
 
-  useEffect(() => { fetchAllData(); fetchWotdData(); fetchStarsLeaderboard() }, [])
+  useEffect(() => { fetchAllData(); fetchWotdData(); fetchStarsLeaderboard(); fetchQueenBeeAlerts() }, [])
 
   async function fetchAllData() {
     const { data: profiles } = await supabase
@@ -306,6 +308,36 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     setWeeklyStars(leaderboard)
   }
 
+  async function fetchQueenBeeAlerts() {
+    const { data: alerts } = await supabase
+      .from('queen_bee_alerts')
+      .select('*')
+      .order('achieved_at', { ascending: false })
+      .limit(20)
+    if (!alerts || alerts.length === 0) return
+
+    const userIds   = [...new Set(alerts.map(a => a.user_id))]
+    const puzzleIds = [...new Set(alerts.map(a => a.puzzle_id))]
+    const [profilesRes, puzzlesRes] = await Promise.all([
+      supabase.from('profiles').select('id, full_name, level').in('id', userIds),
+      supabase.from('spelling_bee_puzzles').select('id, play_date, language, centre_letter, outer_letters, pangrams').in('id', puzzleIds),
+    ])
+    const profileMap = {}, puzzleMap = {}
+    ;(profilesRes.data || []).forEach(p => { profileMap[p.id] = p })
+    ;(puzzlesRes.data  || []).forEach(p => { puzzleMap[p.id]  = p })
+
+    setQueenBeeAlerts(alerts.map(a => ({
+      ...a,
+      student: profileMap[a.user_id] || null,
+      puzzle:  puzzleMap[a.puzzle_id] || null,
+    })))
+  }
+
+  async function markQueenBeeSeen(id) {
+    await supabase.from('queen_bee_alerts').update({ seen_by_teacher: true }).eq('id', id)
+    setQueenBeeAlerts(prev => prev.map(a => a.id === id ? { ...a, seen_by_teacher: true } : a))
+  }
+
   function handleSort(key) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('desc') }
@@ -500,6 +532,80 @@ export default function TeacherDashboard({ profile, handleLogout }) {
             </tbody>
           </table>
           {students.length === 0 && <p style={{ textAlign: 'center', color: '#a0aec0', padding: '2rem' }}>No student data yet.</p>}
+        </div>
+      )}
+
+      {/* QUEEN BEE ACHIEVEMENTS */}
+      {queenBeeAlerts.length > 0 && (
+        <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden', marginBottom: '1rem' }}>
+          <div onClick={() => setQueenBeeOpen(o => !o)}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', cursor: 'pointer', borderBottom: queenBeeOpen ? '1px solid #fde68a' : 'none', background: '#fffbeb' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span style={{ fontSize: '1.3rem' }}>👑</span>
+              <div>
+                <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#2C3E50', margin: 0 }}>Queen Bee Achievements</h2>
+                <p style={{ fontSize: '0.75rem', color: '#718096', margin: 0 }}>
+                  {(() => {
+                    const unseen = queenBeeAlerts.filter(a => !a.seen_by_teacher).length
+                    return unseen > 0
+                      ? `${unseen} new · ${queenBeeAlerts.length} all-time`
+                      : `${queenBeeAlerts.length} total`
+                  })()}
+                </p>
+              </div>
+            </div>
+            <div style={{ background: queenBeeOpen ? 'linear-gradient(135deg, #f59e0b, #d97706)' : '#e2e8f0', color: 'white', borderRadius: '8px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
+              {queenBeeOpen ? '🍯' : '🔒'}
+            </div>
+          </div>
+          {queenBeeOpen && (
+            <div style={{ padding: '0.5rem 1.25rem 1.25rem' }}>
+              {queenBeeAlerts.map(a => {
+                const lang     = a.puzzle?.language === 'es' ? '🇪🇸' : '🇬🇧'
+                const centre   = (a.puzzle?.centre_letter || '').toUpperCase()
+                const outer    = (a.puzzle?.outer_letters || []).map(l => l.toUpperCase()).join('')
+                const pangrams = (a.puzzle?.pangrams || []).map(p => p.toUpperCase()).join(', ')
+                return (
+                  <div key={a.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.75rem',
+                    padding: '0.8rem 0.9rem', borderRadius: '10px', marginTop: '0.6rem',
+                    background: a.seen_by_teacher ? '#fafafa' : '#fffbeb',
+                    border: `1px solid ${a.seen_by_teacher ? '#e2e8f0' : '#fde68a'}`,
+                  }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.8rem' }}>
+                      {initials(a.student?.full_name)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 700, color: '#2C3E50' }}>{a.student?.full_name || 'Unknown'}</span>
+                        {!a.seen_by_teacher && (
+                          <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 700, background: '#fde68a', color: '#92400e' }}>NEW</span>
+                        )}
+                        <span style={{ fontSize: '0.75rem', color: '#a0aec0' }}>{formatDate(a.achieved_at)}</span>
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#718096', marginTop: '2px' }}>
+                        {lang} · centre <strong style={{ color: '#d97706' }}>{centre}</strong> · {outer} · {a.word_count} words · {a.score} pts
+                        {pangrams && <> · {pangrams}</>}
+                      </div>
+                      {a.note && (
+                        <div style={{ fontSize: '0.78rem', color: '#92400e', marginTop: '4px', fontStyle: 'italic', lineHeight: 1.4 }}>
+                          📝 {a.note}
+                        </div>
+                      )}
+                    </div>
+                    {!a.seen_by_teacher && (
+                      <button
+                        onClick={() => markQueenBeeSeen(a.id)}
+                        title="Mark as seen"
+                        style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #fde68a', background: 'white', color: '#92400e', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        ✓ Seen
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
