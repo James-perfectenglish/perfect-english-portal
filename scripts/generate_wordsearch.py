@@ -119,6 +119,72 @@ THEMES_EN = {
         "BASEMENT", "GARAGE", "BALCONY", "STAIRS", "WINDOW",
         "DOOR", "ROOF", "FLOOR", "WALL", "CHIMNEY", "CORRIDOR",
     ],
+    "Hotel": [
+        "RECEPTION", "LOBBY", "KEY", "GUEST", "PORTER", "LIFT",
+        "CONCIERGE", "BELLBOY", "SUITE", "BREAKFAST", "CHECKOUT",
+        "BOOKING", "PILLOW", "MINIBAR", "BALCONY", "TOWEL", "VIEW",
+    ],
+    "Restaurant": [
+        "WAITER", "MENU", "STARTER", "DESSERT", "BILL", "TABLE",
+        "ORDER", "CHEF", "NAPKIN", "COURSE", "DRINK", "SPECIAL",
+        "CUSTOMER", "WINE", "TIP", "BOOKING", "RESERVE",
+    ],
+    "The City": [
+        "PARK", "MUSEUM", "SQUARE", "BRIDGE", "MARKET", "LIBRARY",
+        "AVENUE", "CHURCH", "TOWER", "CINEMA", "THEATRE", "GALLERY",
+        "FOUNTAIN", "CATHEDRAL", "STREET", "METRO", "MONUMENT",
+    ],
+    "Hobbies": [
+        "READING", "COOKING", "PAINTING", "KNITTING", "FISHING",
+        "GARDENING", "DANCING", "CHESS", "YOGA", "BAKING", "POTTERY",
+        "HIKING", "SEWING", "DRAWING", "BIRDING", "COLLECTING", "PUZZLES",
+    ],
+    "Health": [
+        "DOCTOR", "NURSE", "PILL", "FEVER", "COUGH", "BANDAGE",
+        "COLD", "HEALTHY", "EXERCISE", "VITAMIN", "CHEMIST", "MEDICINE",
+        "SYMPTOM", "PATIENT", "CLINIC", "SURGEON", "REMEDY",
+    ],
+    "Money": [
+        "BANK", "COIN", "NOTE", "CARD", "WALLET", "PURSE", "CASH",
+        "CHEQUE", "ACCOUNT", "INTEREST", "LOAN", "BUDGET", "INVOICE",
+        "RECEIPT", "SAVINGS", "PAYMENT", "REFUND",
+    ],
+    "School": [
+        "TEACHER", "STUDENT", "PEN", "RULER", "BLACKBOARD", "EXAM",
+        "LESSON", "HOMEWORK", "BREAK", "CHALK", "NOTEBOOK", "TIMETABLE",
+        "UNIFORM", "PUPIL", "PLAYGROUND", "TEXTBOOK", "PENCIL",
+    ],
+    "Music": [
+        "GUITAR", "PIANO", "VIOLIN", "DRUMS", "SINGER", "BAND", "ALBUM",
+        "CONCERT", "MELODY", "RHYTHM", "SONG", "LYRICS", "CHOIR", "FLUTE",
+        "TRUMPET", "ORCHESTRA", "SYMPHONY",
+    ],
+    "Nature": [
+        "TREE", "RIVER", "MOUNTAIN", "FOREST", "LAKE", "FIELD", "FLOWER",
+        "GRASS", "ROCK", "OCEAN", "VALLEY", "HILL", "MEADOW", "STREAM",
+        "CAVE", "DESERT", "ISLAND",
+    ],
+    "Time": [
+        "MONDAY", "TUESDAY", "JANUARY", "SPRING", "SUMMER", "WINTER",
+        "MORNING", "EVENING", "MIDNIGHT", "NOON", "HOUR", "MINUTE",
+        "SECOND", "WEEK", "YEAR", "MONTH", "AUTUMN",
+    ],
+    "Technology": [
+        "COMPUTER", "PHONE", "INTERNET", "SCREEN", "KEYBOARD", "MOUSE",
+        "LAPTOP", "TABLET", "BROWSER", "BATTERY", "ROUTER", "BLUETOOTH",
+        "CABLE", "DEVICE", "DOWNLOAD", "PASSWORD", "WIFI",
+    ],
+    "Jobs": [
+        "BAKER", "BUTCHER", "DENTIST", "ENGINEER", "FARMER", "LAWYER",
+        "PILOT", "PLUMBER", "SOLDIER", "MECHANIC", "ARCHITECT",
+        "JOURNALIST", "ELECTRICIAN", "SCIENTIST", "ARTIST", "WRITER",
+        "POLICE",
+    ],
+    "Personality": [
+        "KIND", "SHY", "BRAVE", "FUNNY", "HONEST", "LAZY", "RUDE",
+        "POLITE", "CLEVER", "PATIENT", "FRIENDLY", "GENEROUS", "CAREFUL",
+        "MEAN", "CONFIDENT", "CHEERFUL", "MODEST",
+    ],
 }
 
 THEMES_ES = {
@@ -132,7 +198,7 @@ THEMES_ES = {
         "FRIO", "CALOR", "NIEBLA", "TRUENO", "GRANIZO", "HUMEDAD",
     ],
     "Partes del cuerpo": [
-        "CABEZA", "CUELLO", "HOMBRO", "CODO", "MUNECA", "MANO",
+        "CABEZA", "CUELLO", "HOMBRO", "CODO", "MUÑECA", "MANO",
         "DEDO", "PECHO", "RODILLA", "TOBILLO", "PIE", "BOCA",
         "FRENTE", "BARBILLA", "ESPALDA",
     ],
@@ -150,6 +216,37 @@ THEMES_ES = {
         "PAN", "QUESO", "MANTEQUILLA", "PASTA", "ARROZ", "SOPA",
         "ENSALADA", "PIZZA", "POLLO", "PESCADO",
         "MANZANA", "PLATANO", "NARANJA", "TOMATE", "PATATA",
+    ],
+    "La casa": [
+        "SALON", "COCINA", "BAÑO", "DORMITORIO", "JARDIN", "GARAJE",
+        "PASILLO", "BALCON", "TERRAZA", "VENTANA", "PUERTA", "MUEBLE",
+        "SUELO", "TECHO", "ESCALERA", "CHIMENEA", "ALFOMBRA",
+    ],
+    "La familia": [
+        "MADRE", "PADRE", "HERMANO", "HERMANA", "ABUELA", "ABUELO",
+        "PRIMO", "SOBRINO", "NIETO", "ESPOSO", "ESPOSA", "HIJO", "HIJA",
+        "MARIDO", "MUJER", "SUEGRA", "CUÑADO",
+    ],
+    "Trabajos": [
+        "MEDICO", "PROFESOR", "ABOGADO", "COCINERO", "ARTISTA",
+        "CAMARERO", "BOMBERO", "POLICIA", "INGENIERO", "GRANJERO",
+        "PESCADOR", "OBRERO", "JEFE", "EMPLEADO", "PINTOR", "PANADERO",
+        "ENFERMERO",
+    ],
+    "Deportes": [
+        "FUTBOL", "BALONCESTO", "TENIS", "NATACION", "CICLISMO", "BOXEO",
+        "ATLETISMO", "GIMNASIA", "ESQUI", "RUGBY", "VOLEIBOL", "GOLF",
+        "KARATE", "JUDO", "CORRER", "NADAR", "SALTAR",
+    ],
+    "La ciudad": [
+        "PARQUE", "IGLESIA", "MUSEO", "BANCO", "TIENDA", "MERCADO",
+        "CALLE", "PLAZA", "ESTACION", "CINE", "BIBLIOTECA", "FARMACIA",
+        "HOSPITAL", "COLEGIO", "AVENIDA", "PUENTE", "FUENTE",
+    ],
+    "Verbos comunes": [
+        "HABLAR", "COMER", "DORMIR", "BEBER", "CORRER", "ANDAR", "JUGAR",
+        "ESCRIBIR", "LEER", "CANTAR", "BAILAR", "ESCUCHAR", "MIRAR",
+        "TRABAJAR", "VIVIR", "SOÑAR", "COMPRAR",
     ],
 }
 

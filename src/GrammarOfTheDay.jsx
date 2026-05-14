@@ -97,7 +97,7 @@ export default function GrammarOfTheDay({ profile, collapsible = true }) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { data: saved } = await supabase
+    const { data: saved, error: saveErr } = await supabase
       .from('grammar_of_the_day_submissions')
       .insert({
         student_id:  user.id,
@@ -109,6 +109,7 @@ export default function GrammarOfTheDay({ profile, collapsible = true }) {
       })
       .select().single()
 
+    if (saveErr) console.warn('GOTD: could not save submission:', saveErr)
     if (saved) setSubmission(saved)
   }
 
