@@ -17,14 +17,19 @@ import Breadcrumb from './components/Breadcrumb'
 
 const GRADIENT          = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 
-const COLOR_FOUND_BG    = '#d1fae5'  // emerald — theme words
-const COLOR_FOUND_TEXT  = '#065f46'
-const COLOR_KEY_BG      = '#fde68a'  // amber/gold — key word
-const COLOR_KEY_TEXT    = '#78350f'
-const COLOR_DRAG_BG     = '#bfdbfe'  // blue — current drag
+// ── Palette B — Calm (slate / coral / faint lime) ────────────────────────
+// SVG capsule colours — persistent overlay (drawn on top of cells)
+const CAPSULE_THEME = 'rgba(100, 116, 139, 0.32)'  // slate, theme words
+const CAPSULE_KEY   = 'rgba(251, 113, 133, 0.45)'  // coral, key word
+const CAPSULE_BONUS = 'rgba(132, 204, 22, 0.18)'   // faint lime, bonus words
+
+// Cell flash backgrounds — brief, on discovery
+const COLOR_FOUND_BG    = '#e2e8f0'  // slate flash — theme word found
+const COLOR_KEY_BG      = '#ffe4e6'  // coral flash — key word found
+const COLOR_BONUS_BG    = '#d9f99d'  // lime flash — bonus word found
+const COLOR_DRAG_BG     = '#bfdbfe'  // blue — current drag preview
 const COLOR_DRAG_TEXT   = '#1e40af'
 const COLOR_HINT_RING   = '#f59e0b'  // amber ring on revealed hint cells
-const COLOR_BONUS_BG    = '#86efac'  // light green flash for bonus word
 const COLOR_SHADOW_BG   = '#fbbf24'  // amber flash for shadow words
 const COLOR_INVALID_BG  = '#fca5a5'  // red flash for invalid
 
@@ -110,6 +115,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
 
   const [themeWordsFound, setThemeWordsFound] = useState([])  // uppercase strings
   const [bonusWordsFound, setBonusWordsFound] = useState([])  // uppercase strings
+  const [bonusWordPaths, setBonusWordPaths] = useState([])    // [{word, start:[r,c], end:[r,c]}, ...] — for persistent capsule rendering
   const [hintsUsed, setHintsUsed]           = useState(0)
   const [revealedHintCells, setRevealedHintCells] = useState({})  // 'r,c' -> themeWord
   const [score, setScore]                   = useState(0)
@@ -133,7 +139,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
 
   useEffect(() => {
     stateRef.current = {
-      gameState, puzzle, themeWordsFound, bonusWordsFound,
+      gameState, puzzle, themeWordsFound, bonusWordsFound, bonusWordPaths,
       dragging, dragStart, dragPath, hintsUsed, score, revealedHintCells,
       keyWordStarAwarded,
     }
@@ -164,8 +170,10 @@ export default function WordSearchGame({ onBack, userProfile }) {
       if (saved) {
         const tw = saved.theme_words_found || []
         const bw = saved.bonus_words_found || []
+        const bp = saved.bonus_word_paths || []
         setThemeWordsFound(tw)
         setBonusWordsFound(bw)
+        setBonusWordPaths(bp)
         setHintsUsed(saved.hints_used || 0)
         setScore(saved.score || 0)
         setKeyWordStarAwarded(tw.includes(p.key_word))
@@ -187,12 +195,13 @@ export default function WordSearchGame({ onBack, userProfile }) {
   async function saveProgress(extras = {}) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || !puzzle) return
-    const { themeWordsFound, bonusWordsFound, hintsUsed, score } = stateRef.current
+    const { themeWordsFound, bonusWordsFound, bonusWordPaths, hintsUsed, score } = stateRef.current
     await supabase.from('wordsearch_scores').upsert({
       user_id:                   user.id,
       puzzle_id:                 puzzle.id,
       theme_words_found:         themeWordsFound,
       bonus_words_found:         bonusWordsFound,
+      bonus_word_paths:          bonusWordPaths,
       hints_used:                hintsUsed,
       score,
       completed:                 themeWordsFound.length >= 10,
@@ -355,10 +364,18 @@ export default function WordSearchGame({ onBack, userProfile }) {
     }
 
     // 4) Real bonus word
+    const { bonusWordPaths } = stateRef.current
     const bonusPts = matchedWord.length
     const newBonus = [...bonusWordsFound, matchedWord]
+    const newPath = {
+      word: matchedWord,
+      start: [path[0][0], path[0][1]],
+      end:   [path[path.length - 1][0], path[path.length - 1][1]],
+    }
+    const newPaths = [...bonusWordPaths, newPath]
     const newScore = score + bonusPts
     setBonusWordsFound(newBonus)
+    setBonusWordPaths(newPaths)
     setScore(newScore)
     triggerFlash(path, COLOR_BONUS_BG, FLASH_MS)
     showMsg(`+${bonusPts}`, 'success')
@@ -572,98 +589,119 @@ export default function WordSearchGame({ onBack, userProfile }) {
           </div>
         )}
 
-        {/* Grid */}
-        <div
-          style={{
-            position: 'relative',
-            background: 'white', borderRadius: '12px', padding: '8px',
-            marginBottom: '0.75rem',
-            display: 'grid',
-            gridTemplateColumns: `repeat(${cols}, 1fr)`,
-            gap: 0,
-            touchAction: 'none',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-          }}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerCancel}
-          onPointerLeave={handlePointerUp}
-        >
-          {/* SVG overlay: capsules outline each found theme word so they read
-              as discrete shapes rather than blurring into a green blob */}
-          <svg
-            viewBox={`0 0 ${cols} ${rows}`}
-            preserveAspectRatio="none"
+        {/* Grid — outer wrapper holds padding + bg; inner wrapper has
+            aspectRatio cols/rows so cells stay perfectly square and the SVG
+            overlay aligns 1:1 with cells regardless of viewport width. */}
+        <div style={{
+          background: 'white', borderRadius: '12px', padding: '8px',
+          marginBottom: '0.75rem',
+        }}>
+          <div
             style={{
-              position: 'absolute',
-              top: '8px', left: '8px', right: '8px', bottom: '8px',
-              pointerEvents: 'none',
-              zIndex: 2,
-              overflow: 'visible',
+              position: 'relative',
+              aspectRatio: `${cols} / ${rows}`,
+              display: 'grid',
+              gridTemplateColumns: `repeat(${cols}, 1fr)`,
+              gridTemplateRows: `repeat(${rows}, 1fr)`,
+              gap: 0,
+              touchAction: 'none',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
             }}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            onPointerLeave={handlePointerUp}
           >
-            {themeWordsFound.map(word => {
-              const pl = (puzzle.word_placements || []).find(p => p.word === word)
-              if (!pl) return null
-              const isKey = word === puzzle.key_word
-              const [r0, c0] = pl.start
-              const [r1, c1] = pl.end
-              return (
+            {/* SVG overlay — bonus capsules drawn first (sit underneath),
+                theme + key capsules drawn on top. inset:0 + preserveAspect
+                Ratio="none" gives pixel-perfect alignment with grid cells. */}
+            <svg
+              viewBox={`0 0 ${cols} ${rows}`}
+              preserveAspectRatio="none"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                pointerEvents: 'none',
+                zIndex: 2,
+                overflow: 'visible',
+              }}
+            >
+              {/* Bonus capsules (faint, persistent) */}
+              {bonusWordPaths.map((b, i) => (
                 <line
-                  key={word}
-                  x1={c0 + 0.5}
-                  y1={r0 + 0.5}
-                  x2={c1 + 0.5}
-                  y2={r1 + 0.5}
-                  stroke={isKey ? 'rgba(245, 158, 11, 0.45)' : 'rgba(16, 185, 129, 0.32)'}
+                  key={`bonus-${i}`}
+                  x1={b.start[1] + 0.5}
+                  y1={b.start[0] + 0.5}
+                  x2={b.end[1] + 0.5}
+                  y2={b.end[0] + 0.5}
+                  stroke={CAPSULE_BONUS}
                   strokeWidth={0.78}
                   strokeLinecap="round"
                 />
-              )
-            })}
-          </svg>
-          {Array.from({ length: rows }).map((_, r) =>
-            Array.from({ length: cols }).map((_, c) => {
-              const key = `${r},${c}`
-              const found = foundCellMap[key]   // 'theme' | 'key' | undefined
-              const inDrag = dragCellSet.has(key)
-              const flashThis = flashCellSet?.has(key)
-              const hintWord = revealedHintCells[key]
-              let bg = 'white'
-              let color = '#2d3748'
-              // Found theme/key words shown via SVG capsule overlay — cell stays white
-              if (inDrag && !found) { bg = COLOR_DRAG_BG; color = COLOR_DRAG_TEXT }
-              if (flashThis && flash) { bg = flash.bg; color = '#1a202c' }
-              const showHintRing = !!hintWord && !found
-              return (
-                <div
-                  key={key}
-                  data-cell="1"
-                  data-row={r}
-                  data-col={c}
-                  onPointerDown={e => handlePointerDown(e, r, c)}
-                  style={{
-                    aspectRatio: '1',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: bg,
-                    color,
-                    fontWeight: 700,
-                    fontSize: cols >= 13 ? '0.75rem' : cols >= 11 ? '0.85rem' : '0.95rem',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    transition: 'background 0.15s ease, color 0.15s ease',
-                    boxShadow: showHintRing ? `inset 0 0 0 2px ${COLOR_HINT_RING}` : 'none',
-                    touchAction: 'none',
-                  }}
-                >
-                  {puzzle.grid[r][c]}
-                </div>
-              )
-            })
-          )}
+              ))}
+              {/* Theme + key capsules */}
+              {themeWordsFound.map(word => {
+                const pl = (puzzle.word_placements || []).find(p => p.word === word)
+                if (!pl) return null
+                const isKey = word === puzzle.key_word
+                const [r0, c0] = pl.start
+                const [r1, c1] = pl.end
+                return (
+                  <line
+                    key={word}
+                    x1={c0 + 0.5}
+                    y1={r0 + 0.5}
+                    x2={c1 + 0.5}
+                    y2={r1 + 0.5}
+                    stroke={isKey ? CAPSULE_KEY : CAPSULE_THEME}
+                    strokeWidth={0.78}
+                    strokeLinecap="round"
+                  />
+                )
+              })}
+            </svg>
+            {Array.from({ length: rows }).map((_, r) =>
+              Array.from({ length: cols }).map((_, c) => {
+                const key = `${r},${c}`
+                const found = foundCellMap[key]   // 'theme' | 'key' | undefined
+                const inDrag = dragCellSet.has(key)
+                const flashThis = flashCellSet?.has(key)
+                const hintWord = revealedHintCells[key]
+                let bg = 'white'
+                let color = '#2d3748'
+                // Found theme/key words shown via SVG capsule overlay — cell stays white
+                if (inDrag && !found) { bg = COLOR_DRAG_BG; color = COLOR_DRAG_TEXT }
+                if (flashThis && flash) { bg = flash.bg; color = '#1a202c' }
+                const showHintRing = !!hintWord && !found
+                return (
+                  <div
+                    key={key}
+                    data-cell="1"
+                    data-row={r}
+                    data-col={c}
+                    onPointerDown={e => handlePointerDown(e, r, c)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: bg,
+                      color,
+                      fontWeight: 700,
+                      fontSize: cols >= 13 ? '0.75rem' : cols >= 11 ? '0.85rem' : '0.95rem',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s ease, color 0.15s ease',
+                      boxShadow: showHintRing ? `inset 0 0 0 2px ${COLOR_HINT_RING}` : 'none',
+                      touchAction: 'none',
+                    }}
+                  >
+                    {puzzle.grid[r][c]}
+                  </div>
+                )
+              })
+            )}
+          </div>
         </div>
 
         {/* Bonus words */}
