@@ -185,6 +185,36 @@ THEMES_EN = {
         "POLITE", "CLEVER", "PATIENT", "FRIENDLY", "GENEROUS", "CAREFUL",
         "MEAN", "CONFIDENT", "CHEERFUL", "MODEST",
     ],
+    "Family": [
+        "PARENT", "MOTHER", "FATHER", "BROTHER", "SISTER", "COUSIN",
+        "NEPHEW", "NIECE", "UNCLE", "AUNT", "HUSBAND", "WIFE",
+        "CHILD", "FAMILY", "TWIN", "GRANDMA", "GRANDPA",
+    ],
+    "Beach": [
+        "SAND", "WAVE", "SHELL", "TOWEL", "PARASOL", "BIKINI",
+        "SUNSCREEN", "SHORE", "SURFBOARD", "SUNGLASSES", "SWIMSUIT",
+        "PEBBLE", "COCONUT", "SEAGULL", "LIFEGUARD", "BUCKET", "FLIPPER",
+    ],
+    "Shopping": [
+        "TROLLEY", "BASKET", "BARGAIN", "DISCOUNT", "AISLE", "CASHIER",
+        "BRAND", "SALE", "COUPON", "BOUTIQUE", "SHOPPER", "PURCHASE",
+        "QUEUE", "CART", "RACK", "TILL", "SCANNER", "OUTLET",
+    ],
+    "Transport": [
+        "TRAIN", "BIKE", "MOTORBIKE", "SCOOTER", "LORRY", "TAXI",
+        "TRAM", "FERRY", "BOAT", "AEROPLANE", "HELICOPTER", "COACH",
+        "METRO", "CARAVAN", "TRUCK", "SHIP", "YACHT", "CYCLE",
+    ],
+    "Garden": [
+        "LAWN", "HOSE", "SPADE", "RAKE", "FENCE", "GATE",
+        "PATIO", "SHED", "GREENHOUSE", "HEDGE", "BUSH", "SEED",
+        "ROSE", "POND", "BENCH", "COMPOST", "GNOME", "TULIP",
+    ],
+    "Cooking": [
+        "CHOP", "SLICE", "DICE", "GRATE", "WHISK", "STIR",
+        "BOIL", "ROAST", "BAKE", "GRILL", "SIMMER", "STEAM",
+        "KNEAD", "MARINATE", "SEASON", "CHILL", "GLAZE", "BRAISE",
+    ],
 }
 
 THEMES_ES = {
@@ -247,6 +277,36 @@ THEMES_ES = {
         "HABLAR", "COMER", "DORMIR", "BEBER", "CORRER", "ANDAR", "JUGAR",
         "ESCRIBIR", "LEER", "CANTAR", "BAILAR", "ESCUCHAR", "MIRAR",
         "TRABAJAR", "VIVIR", "SOÑAR", "COMPRAR",
+    ],
+    "Hotel": [
+        "RECEPCION", "LLAVE", "HUESPED", "RESERVA", "CONSERJE", "MALETERO",
+        "BOTONES", "SUITE", "DESAYUNO", "ALMOHADA", "MINIBAR", "BALCON",
+        "TOALLA", "VISTA", "ASCENSOR", "REGISTRO", "CAMARERA", "PERSIANA",
+    ],
+    "Restaurante": [
+        "CAMARERO", "MENU", "ENTRANTE", "POSTRE", "CUENTA", "MESA",
+        "COMANDA", "COCINERO", "SERVILLETA", "BEBIDA", "PROPINA", "COPA",
+        "VINO", "PEDIDO", "CLIENTE", "TAPA", "CARTA", "RACION",
+    ],
+    "Naturaleza": [
+        "ARBOL", "MONTAÑA", "BOSQUE", "LAGO", "CAMPO", "FLOR",
+        "HIERBA", "ROCA", "OCEANO", "VALLE", "COLINA", "PRADERA",
+        "ARROYO", "CUEVA", "DESIERTO", "ISLA", "PLAYA", "SELVA",
+    ],
+    "Sentimientos": [
+        "ALEGRIA", "TRISTEZA", "MIEDO", "AMOR", "ODIO", "CARIÑO",
+        "SORPRESA", "ORGULLO", "VERGUENZA", "ENFADO", "ALIVIO", "ESPERANZA",
+        "EMOCION", "NOSTALGIA", "RESPETO", "ASOMBRO", "ANGUSTIA", "ILUSION",
+    ],
+    "Música": [
+        "GUITARRA", "PIANO", "VIOLIN", "TAMBOR", "CANCION", "CANTANTE",
+        "BANDA", "ALBUM", "CONCIERTO", "MELODIA", "RITMO", "LETRA",
+        "CORO", "FLAUTA", "TROMPETA", "ORQUESTA", "SINFONIA", "BATERIA",
+    ],
+    "Salud": [
+        "MEDICO", "ENFERMERA", "PASTILLA", "FIEBRE", "VENDA", "RESFRIADO",
+        "SANO", "EJERCICIO", "VITAMINA", "FARMACIA", "MEDICINA", "SINTOMA",
+        "PACIENTE", "CLINICA", "CIRUJANO", "REMEDIO", "ALERGIA", "DOLOR",
     ],
 }
 

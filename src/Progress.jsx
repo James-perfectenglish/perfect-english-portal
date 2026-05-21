@@ -386,7 +386,7 @@ export default function Progress({ session, profile, handleLogout }) {
       )}
 
       {/* SETTINGS */}
-      <MuteSettings onLogout={handleLogout} />
+      <MuteSettings onLogout={handleLogout} isSpanish={isSpanish} />
     </div>
   )
 }
@@ -401,8 +401,14 @@ function getMuteMinutesLeft(key) {
   return ms > 0 ? Math.ceil(ms / 60000) : 0;
 }
 
-function MuteSettings({ onLogout }) {
+function MuteSettings({ onLogout, isSpanish }) {
   const [tick, setTick] = useState(0);
+  const [showPwForm, setShowPwForm] = useState(false);
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwMessage, setPwMessage] = useState(null); // { type: 'success'|'error', text }
+
   const audioMins = getMuteMinutesLeft(MUTE_AUDIO_KEY);
   const speakingMins = getMuteMinutesLeft(MUTE_SPEAKING_KEY);
   const hasMute = audioMins > 0 || speakingMins > 0;
@@ -412,24 +418,123 @@ function MuteSettings({ onLogout }) {
     setTick(t => t + 1);
   };
 
+  const handlePasswordChange = async () => {
+    setPwMessage(null);
+    if (newPw.length < 6) {
+      setPwMessage({ type: 'error', text: isSpanish ? 'La contraseña debe tener al menos 6 caracteres.' : 'Password must be at least 6 characters.' });
+      return;
+    }
+    if (newPw !== confirmPw) {
+      setPwMessage({ type: 'error', text: isSpanish ? 'Las contraseñas no coinciden.' : 'Passwords do not match.' });
+      return;
+    }
+    setPwLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: newPw });
+    setPwLoading(false);
+    if (error) {
+      setPwMessage({ type: 'error', text: error.message });
+    } else {
+      setPwMessage({ type: 'success', text: isSpanish ? '✓ Contraseña actualizada.' : '✓ Password updated.' });
+      setNewPw('');
+      setConfirmPw('');
+      setTimeout(() => { setShowPwForm(false); setPwMessage(null); }, 2500);
+    }
+  };
+
+  const closePwForm = () => {
+    setShowPwForm(false);
+    setNewPw('');
+    setConfirmPw('');
+    setPwMessage(null);
+  };
+
   return (
     <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '1rem' }}>
-      <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: '0 0 0.85rem' }}>⚙️ Settings</h2>
+      <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: '0 0 0.85rem' }}>⚙️ {isSpanish ? 'Ajustes' : 'Settings'}</h2>
 
       {hasMute && (
         <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {audioMins > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.6rem 0.85rem' }}>
-              <span style={{ fontSize: '0.85rem', color: '#744210' }}>🔇 Audio muted — {audioMins} min{audioMins !== 1 ? 's' : ''} left</span>
-              <button onClick={() => unmute(MUTE_AUDIO_KEY)} style={{ fontSize: '0.75rem', color: '#553C9A', background: 'none', border: '1px solid #c4b5fd', borderRadius: '5px', padding: '0.25rem 0.6rem', cursor: 'pointer', fontWeight: 600 }}>Unmute</button>
+              <span style={{ fontSize: '0.85rem', color: '#744210' }}>🔇 {isSpanish ? 'Audio silenciado' : 'Audio muted'} — {audioMins} min{audioMins !== 1 ? 's' : ''} {isSpanish ? 'restantes' : 'left'}</span>
+              <button onClick={() => unmute(MUTE_AUDIO_KEY)} style={{ fontSize: '0.75rem', color: '#553C9A', background: 'none', border: '1px solid #c4b5fd', borderRadius: '5px', padding: '0.25rem 0.6rem', cursor: 'pointer', fontWeight: 600 }}>{isSpanish ? 'Reactivar' : 'Unmute'}</button>
             </div>
           )}
           {speakingMins > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.6rem 0.85rem' }}>
-              <span style={{ fontSize: '0.85rem', color: '#744210' }}>🎤 Speaking muted — {speakingMins} min{speakingMins !== 1 ? 's' : ''} left</span>
-              <button onClick={() => unmute(MUTE_SPEAKING_KEY)} style={{ fontSize: '0.75rem', color: '#553C9A', background: 'none', border: '1px solid #c4b5fd', borderRadius: '5px', padding: '0.25rem 0.6rem', cursor: 'pointer', fontWeight: 600 }}>Unmute</button>
+              <span style={{ fontSize: '0.85rem', color: '#744210' }}>🎤 {isSpanish ? 'Habla silenciada' : 'Speaking muted'} — {speakingMins} min{speakingMins !== 1 ? 's' : ''} {isSpanish ? 'restantes' : 'left'}</span>
+              <button onClick={() => unmute(MUTE_SPEAKING_KEY)} style={{ fontSize: '0.75rem', color: '#553C9A', background: 'none', border: '1px solid #c4b5fd', borderRadius: '5px', padding: '0.25rem 0.6rem', cursor: 'pointer', fontWeight: 600 }}>{isSpanish ? 'Reactivar' : 'Unmute'}</button>
             </div>
           )}
+        </div>
+      )}
+
+      {!showPwForm ? (
+        <button
+          onClick={() => setShowPwForm(true)}
+          style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem', fontWeight: '600', color: '#553C9A', background: 'none', border: '1.5px solid #d6bcfa', borderRadius: '8px', cursor: 'pointer', marginBottom: '0.6rem' }}
+        >
+          🔑 {isSpanish ? 'Cambiar contraseña' : 'Change password'}
+        </button>
+      ) : (
+        <div style={{ background: '#faf5ff', border: '1px solid #d6bcfa', borderRadius: '10px', padding: '0.85rem', marginBottom: '0.6rem' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#553C9A', marginBottom: '0.6rem' }}>
+            🔑 {isSpanish ? 'Cambiar contraseña' : 'Change password'}
+          </div>
+          <input
+            type="password"
+            value={newPw}
+            onChange={e => setNewPw(e.target.value)}
+            placeholder={isSpanish ? 'Nueva contraseña (mínimo 6 caracteres)' : 'New password (min 6 characters)'}
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            style={{ width: '100%', padding: '0.55rem 0.7rem', fontSize: '0.9rem', border: '1px solid #e2e8f0', borderRadius: '6px', marginBottom: '0.5rem', boxSizing: 'border-box', color: '#2d3748', WebkitTextFillColor: '#2d3748' }}
+          />
+          <input
+            type="password"
+            value={confirmPw}
+            onChange={e => setConfirmPw(e.target.value)}
+            placeholder={isSpanish ? 'Confirmar contraseña' : 'Confirm password'}
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            onKeyDown={e => { if (e.key === 'Enter' && newPw && confirmPw && !pwLoading) handlePasswordChange(); }}
+            style={{ width: '100%', padding: '0.55rem 0.7rem', fontSize: '0.9rem', border: '1px solid #e2e8f0', borderRadius: '6px', marginBottom: '0.6rem', boxSizing: 'border-box', color: '#2d3748', WebkitTextFillColor: '#2d3748' }}
+          />
+          {pwMessage && (
+            <div style={{
+              fontSize: '0.8rem',
+              color: pwMessage.type === 'success' ? '#22543d' : '#9b2c2c',
+              background: pwMessage.type === 'success' ? '#f0fff4' : '#fff5f5',
+              border: `1px solid ${pwMessage.type === 'success' ? '#9ae6b4' : '#feb2b2'}`,
+              borderRadius: '6px', padding: '0.5rem 0.7rem', marginBottom: '0.6rem'
+            }}>
+              {pwMessage.text}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={handlePasswordChange}
+              disabled={pwLoading || !newPw || !confirmPw}
+              style={{
+                flex: 1, padding: '0.6rem', fontSize: '0.85rem', fontWeight: 600,
+                color: 'white',
+                background: (pwLoading || !newPw || !confirmPw) ? '#cbd5e0' : '#667eea',
+                border: 'none', borderRadius: '6px',
+                cursor: (pwLoading || !newPw || !confirmPw) ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {pwLoading ? (isSpanish ? 'Guardando…' : 'Saving…') : (isSpanish ? 'Actualizar' : 'Update')}
+            </button>
+            <button
+              onClick={closePwForm}
+              disabled={pwLoading}
+              style={{ flex: 1, padding: '0.6rem', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', background: 'none', border: '1px solid #cbd5e0', borderRadius: '6px', cursor: pwLoading ? 'not-allowed' : 'pointer' }}
+            >
+              {isSpanish ? 'Cancelar' : 'Cancel'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -437,7 +542,7 @@ function MuteSettings({ onLogout }) {
         onClick={onLogout}
         style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem', fontWeight: '600', color: '#e53e3e', background: 'none', border: '1.5px solid #fed7d7', borderRadius: '8px', cursor: 'pointer' }}
       >
-        Log out
+        {isSpanish ? 'Cerrar sesión' : 'Log out'}
       </button>
     </div>
   );
