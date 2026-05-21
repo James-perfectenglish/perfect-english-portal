@@ -51,28 +51,7 @@ const WC = { correct: '#538d4e', present: '#b59f3b', absent: '#787c7e' };
 
 const NEW_COUNT = 50;
 
-const ALL_TAGS = [
-  'Present tense', 'Past tense', 'Future form',
-  'Conditional', 'Passive voice', 'Reported speech',
-  'Modal verb', 'Gerund & infinitive', 'Subjunctive',
-  'Wish & regret', 'Causative',
-  'Relative clause', 'Participle clause', 'Cleft sentence',
-  'Inversion', 'Linking word', 'Question form',
-  'Article', 'Quantifier', 'Pronoun', 'Adjective', 'Adverb',
-  'Comparative', 'Superlative', 'Plural', 'Possessive',
-  'To be', 'Have got', 'There is/are', 'Too & enough',
-  'Irregular verb', 'Word formation', 'Time expression',
-  'Preposition', 'Dependent preposition',
-  'Preposition of time', 'Preposition of place', 'Preposition of movement',
-  'Vocabulary', 'Collocation', 'Phrasal verb', 'Business phrasal verb',
-  'Fixed expression', 'Confusable words',
-  'Uncountable noun', 'Countable noun',
-  'Business vocabulary', 'Financial vocabulary', 'HR vocabulary',
-  'Hotel vocabulary', 'Bathroom vocabulary', 'Academic English',
-  'Formal register', 'Making suggestions',
-  'Vocabulario',
-  'Pronunciation',
-];
+// ALL_TAGS removed — tags now fetched live from question_bank on mount (see availableTags state)
 
 const SETS_KEY = 'pep_teacher_sets_v1';
 const loadSets  = () => { try { return JSON.parse(localStorage.getItem(SETS_KEY) || '[]'); } catch { return []; } };
@@ -1134,7 +1113,7 @@ const EXERCISE_SOURCES = ['all', 'question_bank', 'listening', 'dictation'];
 
 export default function TeacherBrowse({ user, globalLang = 'en' }) {
   const [filters, setFilters] = useState({
-    source: 'all', levels: [], types: [], tags: [], topic: '', lang: 'en',
+    source: 'all', levels: [], types: [], tags: [], topic: '', searchText: '', lang: 'en',
     qFrom: '', qTo: '', newOnly: false, dateFrom: '', dateTo: '',
   });
   const [maxQNumber,         setMaxQNumber]         = useState(null);
@@ -1154,6 +1133,10 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
   const [typeOpen,           setTypeOpen]           = useState(false);
   const [tagOpen,            setTagOpen]            = useState(false);
   const [tagFilter,          setTagFilter]          = useState('');
+  const [searchOpen,         setSearchOpen]         = useState(false);
+  const [availableTopics,    setAvailableTopics]    = useState([]);
+  const [availableTags,      setAvailableTags]      = useState([]);
+  const searchRef = useRef(null);
   // Content type overlays
   const [connectionsFocus,   setConnectionsFocus]   = useState(null); // { groups, title, playDate }
   const [wordleFocus,        setWordleFocus]        = useState(null); // { word, language, playDate }
@@ -1167,8 +1150,8 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
   const toggleTag   = (tg) => setFilter('tags',   filters.tags.includes(tg)   ? filters.tags.filter(t => t !== tg)   : [...filters.tags, tg]);
 
   const visibleTags = tagFilter.trim()
-    ? ALL_TAGS.filter(t => t.toLowerCase().includes(tagFilter.toLowerCase()))
-    : ALL_TAGS;
+    ? availableTags.filter(t => t.toLowerCase().includes(tagFilter.toLowerCase()))
+    : availableTags;
 
   // Quick date helpers
   function setMonth(offset) {
@@ -1183,6 +1166,27 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
   useEffect(() => {
     supabase.from('question_bank').select('question_number').order('question_number', { ascending: false }).limit(1).single()
       .then(({ data }) => { if (data) setMaxQNumber(data.question_number); });
+  }, []);
+
+  // Fetch distinct topics + tags from question_bank for the search typeahead.
+  useEffect(() => {
+    supabase.from('question_bank').select('topic, tags')
+      .then(({ data }) => {
+        if (!data) return;
+        const topics = [...new Set(data.map(r => r.topic).filter(Boolean))].sort();
+        const tags   = [...new Set(data.flatMap(r => r.tags || []))].sort();
+        setAvailableTopics(topics);
+        setAvailableTags(tags);
+      });
+  }, []);
+
+  // Close the search-suggestions dropdown when clicking outside it.
+  useEffect(() => {
+    const handler = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   const search = useCallback(async (overrideFilters) => {
@@ -1257,7 +1261,8 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       if (f.levels.length) q = q.in('level', f.levels);
       if (f.types.length)  q = q.in('type',  f.types);
       if (f.tags.length)   q = q.overlaps('tags', f.tags);
-      if (f.topic) q = q.or(`topic.ilike.%${f.topic}%,question.ilike.%${f.topic}%,explanation.ilike.%${f.topic}%`);
+      if (f.topic) q = q.ilike('topic', `%${f.topic}%`);
+      if (f.searchText) q = q.or(`topic.ilike.%${f.searchText}%,question.ilike.%${f.searchText}%,explanation.ilike.%${f.searchText}%`);
       if (f.qFrom)  q = q.gte('question_number', parseInt(f.qFrom));
       if (f.qTo)    q = q.lte('question_number', parseInt(f.qTo));
       if (f.newOnly && newThreshold) q = q.gte('question_number', newThreshold);
@@ -1268,6 +1273,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       let q = supabase.from('listening_exercises').select('*').order('title');
       if (f.levels.length) q = q.in('level', f.levels);
       if (f.topic) q = q.ilike('topic', `%${f.topic}%`);
+      if (f.searchText) q = q.or(`topic.ilike.%${f.searchText}%,title.ilike.%${f.searchText}%,description.ilike.%${f.searchText}%`);
       const { data } = await q.limit(100);
       if (data) data.forEach(r => all.push({ ...r, _source: 'listening', _rowKey: `li_${r.id}` }));
     }
@@ -1277,6 +1283,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       else if (f.lang === 'es') q = q.in('language', ['es', 'both']);
       if (f.levels.length) q = q.in('level', f.levels);
       if (f.topic) q = q.ilike('topic', `%${f.topic}%`);
+      if (f.searchText) q = q.or(`topic.ilike.%${f.searchText}%,title.ilike.%${f.searchText}%,answer.ilike.%${f.searchText}%`);
       const { data } = await q.limit(100);
       if (data) data.forEach(r => all.push({ ...r, _source: 'dictation', _rowKey: `di_${r.id}`, type: 'dictation', correct_answer: r.answer }));
     }
@@ -1448,8 +1455,57 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
             </FilterSection>
           )}
 
-          <FilterSection label="Keyword search">
-            <input value={filters.topic} onChange={e => setFilter('topic', e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="e.g. conditional, would have" style={{ width: '100%', padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+          <FilterSection label="Search">
+            <div ref={searchRef} style={{ position: 'relative' }}>
+              <input
+                value={filters.searchText}
+                onChange={e => { setFilter('searchText', e.target.value); setSearchOpen(true); }}
+                onFocus={() => setSearchOpen(true)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter')  { setSearchOpen(false); search(); }
+                  if (e.key === 'Escape') { setSearchOpen(false); }
+                }}
+                placeholder="Topic, tag, or question text…"
+                style={{ width: '100%', padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }}
+              />
+              {searchOpen && filters.searchText.trim() && (() => {
+                const q = filters.searchText.trim().toLowerCase();
+                const topicMatches = availableTopics.filter(t => t.toLowerCase().includes(q) && t !== filters.topic).slice(0, 8);
+                const tagMatches   = availableTags.filter(t => t.toLowerCase().includes(q) && !filters.tags.includes(t)).slice(0, 8);
+                if (!topicMatches.length && !tagMatches.length) return null;
+                return (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 2, background: 'white', border: '1px solid #e2e8f0', borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.08)', zIndex: 100, maxHeight: 240, overflowY: 'auto' }}>
+                    {topicMatches.map(t => (
+                      <button key={`top-${t}`} onClick={() => { setFilter('topic', t); setFilter('searchText', ''); setSearchOpen(false); }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f7fafc'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '5px 9px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, color: '#2d3748' }}>
+                        📁 <span style={{ color: '#4a5568' }}>{t}</span>
+                      </button>
+                    ))}
+                    {tagMatches.map(t => (
+                      <button key={`tag-${t}`} onClick={() => { toggleTag(t); setFilter('searchText', ''); setSearchOpen(false); }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f7fafc'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '5px 9px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, color: '#2d3748' }}>
+                        🏷️ <span style={{ color: '#4a5568' }}>{t}</span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+            {filters.topic && (
+              <div style={{ marginTop: 5, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#EDF2F7', border: '1px solid #CBD5E0', borderRadius: 4, padding: '2px 6px', fontSize: 11, color: '#2d3748', fontWeight: 600 }}>
+                  📁 {filters.topic}
+                  <button onClick={() => setFilter('topic', '')} style={{ background: 'none', border: 'none', color: '#718096', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}>×</button>
+                </span>
+              </div>
+            )}
+            <div style={{ fontSize: 10, color: '#a0aec0', marginTop: 5, lineHeight: 1.4 }}>
+              Click a suggestion to filter exactly, or hit Enter to search across question text.
+            </div>
           </FilterSection>
 
           {(filters.source === 'all' || filters.source === 'question_bank') && (
@@ -1474,8 +1530,8 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
         {loading ? '…' : '🔍 Search'}
       </button>
       <button onClick={() => {
-        setFilters({ source: filters.source, levels: [], types: [], tags: [], topic: '', lang: 'en', qFrom: '', qTo: '', newOnly: false, dateFrom: '', dateTo: '' });
-        setResults([]); setHasSearched(false); setActiveSet(null); setSelected(new Set()); setTagFilter('');
+        setFilters({ source: filters.source, levels: [], types: [], tags: [], topic: '', searchText: '', lang: 'en', qFrom: '', qTo: '', newOnly: false, dateFrom: '', dateTo: '' });
+        setResults([]); setHasSearched(false); setActiveSet(null); setSelected(new Set()); setTagFilter(''); setSearchOpen(false);
       }} style={{ width: '100%', padding: '7px', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, cursor: 'pointer', marginTop: 5 }}>
         Clear
       </button>
