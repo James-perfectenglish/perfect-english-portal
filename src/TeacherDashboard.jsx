@@ -290,8 +290,8 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     // Group: per student, count by source.
     const totals = {}
     rows.forEach(r => {
-      if (!totals[r.student_id]) totals[r.student_id] = { wordle: 0, spelling_bee: 0, connections: 0, wotd: 0, gotd: 0, teacher_awarded: 0, other: 0, total: 0 }
-      const bucket = ['wordle','spelling_bee','connections','wotd','gotd','teacher_awarded'].includes(r.source) ? r.source : 'other'
+      if (!totals[r.student_id]) totals[r.student_id] = { wordle: 0, spelling_bee: 0, connections: 0, wotd: 0, gotd: 0, wordsearch: 0, teacher_awarded: 0, other: 0, total: 0 }
+      const bucket = ['wordle','spelling_bee','connections','wotd','gotd','wordsearch','teacher_awarded'].includes(r.source) ? r.source : 'other'
       totals[r.student_id][bucket]++
       totals[r.student_id].total++
     })
@@ -643,6 +643,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Connections">🔗</th>
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Word of the Day">📖</th>
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Grammar of the Day">📝</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Wordsearch">🔎</th>
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Sentence challenges in topic practice / RPE">✍️</th>
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Awarded by you">👨‍🏫</th>
                     <th style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: '#718096', fontWeight: 600 }}>Total</th>
@@ -660,6 +661,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                       <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.connections     || '—'}</td>
                       <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wotd            || '—'}</td>
                       <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.gotd            || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wordsearch      || '—'}</td>
                       <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.other           || '—'}</td>
                       <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.teacher_awarded || '—'}</td>
                       <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 700, color: '#2C3E50' }}>
