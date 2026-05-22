@@ -25,6 +25,7 @@ export default function SentenceChallenge({
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isTranscribing, setIsTranscribing]     = useState(false);
   const [isMarking, setIsMarking]               = useState(false);
+  const [aiUnavailable, setAiUnavailable]       = useState(false);
   const [editedTranscript, setEditedTranscript] = useState('');
   const [submittedSentence, setSubmittedSentence] = useState('');
   const [result, setResult]                     = useState(null);
@@ -91,13 +92,27 @@ export default function SentenceChallenge({
   async function markSentence(sentence, inputMethod = 'text') {
     setSubmittedSentence(sentence);
     setIsMarking(true);
+    setAiUnavailable(false);
     try {
       const res = await fetch('/api/mark-free', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'sentence', context: apiContext, word, sentence, language, ...apiExtraFields }),
       });
-      const data = res.ok ? await res.json() : null;
-      const result = data || { valid: false, feedback: isSpanish ? 'No se pudo comprobar.' : 'Could not check — try again.' };
+      // 529 (overload) or other non-2xx → stay in input phase so the student can retry without burning today's attempt.
+      // Nothing is persisted (no submission row, no star), so WOTD/GOTD don't see a fake "failed" answer.
+      if (!res.ok) {
+        setAiUnavailable(true);
+        setIsMarking(false);
+        return;
+      }
+      const data = await res.json();
+      // valid:null with no feedback also means the AI didn't return a usable result — treat as overloaded.
+      if (!data || (data.valid !== true && data.valid !== false)) {
+        setAiUnavailable(true);
+        setIsMarking(false);
+        return;
+      }
+      const result = data;
       setResult(result);
       setPhase('result');
       // Star log — only write on pass. source = exercise (wotd/gotd/wordle/spelling_bee/etc).
@@ -137,8 +152,8 @@ export default function SentenceChallenge({
         }
       }
     } catch (e) {
-      setResult({ valid: false, feedback: isSpanish ? 'No se pudo comprobar.' : 'Could not check — try again.' });
-      setPhase('result');
+      // Network blip, JSON parse failure, etc. — same UX as overload: stay in input phase, let them retry.
+      setAiUnavailable(true);
     }
     setIsMarking(false);
   }
@@ -173,6 +188,19 @@ export default function SentenceChallenge({
             "{word}"
           </div>
         </div>
+
+        {/* Transient AI failure banner (Anthropic 529 overload, network blip, etc.) — we stay in input phase so the student can retry. */}
+        {aiUnavailable && phase !== 'result' && (
+          <div style={{
+            background: '#fef5e7', border: '1px solid #f6ad55', color: '#7b341e',
+            borderRadius: '10px', padding: '0.7rem 0.9rem', marginBottom: '1rem',
+            fontSize: '0.88rem', lineHeight: 1.5,
+          }}>
+            ⏳ {isSpanish
+              ? 'Nuestro corrector de IA está ocupado ahora mismo. Tu respuesta no se ha guardado — inténtalo de nuevo en un momento.'
+              : "Our AI checker is busy right now. Your answer hasn't been saved — try again in a moment."}
+          </div>
+        )}
 
         {/* ── INPUT PHASE ── */}
         {phase === 'input' && (

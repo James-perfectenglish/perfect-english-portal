@@ -200,50 +200,8 @@ or
 {"valid": false, "feedback": "one kind sentence explaining the issue and how to improve"}`
   }
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 12000)
-  try {
-    let response
-    try {
-      response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 150,
-          messages: [{ role: 'user', content: prompt }],
-        }),
-        signal: controller.signal,
-      })
-    } finally {
-      clearTimeout(timeout)
-    }
-
-    if (!response.ok) {
-      console.error('Anthropic API error:', await response.text())
-      return res.status(502).json({ error: 'AI service error', valid: null, feedback: '', reason: '' })
-    }
-
-    const data = await response.json()
-    const text = data.content?.find(b => b.type === 'text')?.text || ''
-    const clean = text.replace(/```json|```/g, '').trim()
-    const result = JSON.parse(clean)
-
-    // Normalise: WOTD uses 'feedback', Wordle uses 'reason' — return both so callers work either way
-    return res.status(200).json({
-      valid:    result.valid,
-      feedback: result.feedback || result.reason || '',
-      reason:   result.reason   || result.feedback || '',
-    })
-
-  } catch (e) {
-    console.error('mark-sentence error:', e)
-    return res.status(200).json({ valid: null, feedback: '', reason: '' })
-  }
+  // Delegate to the shared caller so WOTD and Wordle get the same 529-retry + status passthrough as the other branches.
+  return callAI(prompt, 150, res, isWordle ? 'mark-free.wordle' : 'mark-free.wotd')
 }
 
 // ── WORD ORDER ───────────────────────────────────────────────────────────────
@@ -422,32 +380,46 @@ or
 
 // ── SHARED AI CALLER ─────────────────────────────────────────────────────────
 const TIMEOUT_MS = 12000;
+
+async function fetchAnthropic(prompt, maxTokens, signal) {
+  return fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+    signal,
+  });
+}
+
 async function callAI(prompt, maxTokens, res, label) {
+  const start = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    let response;
-    try {
-      response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: maxTokens,
-          messages: [{ role: 'user', content: prompt }],
-        }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
+    let response = await fetchAnthropic(prompt, maxTokens, controller.signal);
+
+    // One-shot retry on 529 overloaded — usually transient capacity at Anthropic.
+    // Only retry if we have enough time budget left for backoff + another attempt + parse.
+    if (response.status === 529 && (Date.now() - start) < TIMEOUT_MS - 3500) {
+      const overloadBody = await response.text();
+      console.warn(`${label} got 529 overloaded, retrying once. Body: ${overloadBody.slice(0, 200)}`);
+      await new Promise(r => setTimeout(r, 800 + Math.random() * 400));
+      response = await fetchAnthropic(prompt, maxTokens, controller.signal);
     }
+
     if (!response.ok) {
-      console.error(`${label} Anthropic error:`, await response.text());
-      return res.status(502).json({ error: 'AI service error', valid: null });
+      const errBody = await response.text();
+      console.error(`${label} Anthropic error (${response.status}):`, errBody);
+      // Pass 529 through so the client can show "AI is busy, try again" rather than a generic red X.
+      const status = response.status === 529 ? 529 : 502;
+      return res.status(status).json({ error: 'AI service error', valid: null, overloaded: response.status === 529 });
     }
     const data = await response.json();
     const text = data.content?.find(b => b.type === 'text')?.text || '';
@@ -465,5 +437,7 @@ async function callAI(prompt, maxTokens, res, label) {
     }
     console.error(`${label} error:`, e);
     return res.status(200).json({ valid: null, reason: '', feedback: '' });
+  } finally {
+    clearTimeout(timeout);
   }
 }
