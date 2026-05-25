@@ -70,8 +70,10 @@ Student's sentence: "${thesentence}"
 The student must write an English sentence that uses this grammar structure correctly.
 
 ASSESSMENT RULES — apply in this order:
-1. Does the sentence clearly use the target structure ("${grammarPoint}")? If the structure is missing or clearly malformed → valid=false with a kind, brief explanation.
-   IMPORTANT: Negative forms ("wasn't expecting", "hasn't been studying"), questions ("Was she sleeping?"), and contractions ARE valid uses of the target structure. Do not reject just because the form is negative, interrogative, or contracted — these are normal variations of the structure.
+1. Identify the auxiliary verb(s) and main verb form in the student's sentence. EXPAND CONTRACTIONS FIRST: "wasn't" = "was not", "weren't" = "were not", "hasn't" = "has not", "haven't" = "have not", "didn't" = "did not", "isn't" = "is not", "won't" = "will not". The contraction CONCEALS the auxiliary, it doesn't remove it.
+   Then check: does the structure (auxiliary + correct verb form) match the target "${grammarPoint}"?
+   Negative forms ("wasn't expecting" = was + -ing = past continuous), questions ("Was she sleeping?" = was + -ing = past continuous), and contractions ARE full uses of the target structure. Do NOT reject because the form is negative, interrogative, or contracted.
+   If the structure is genuinely missing or malformed → valid=false with a kind, brief explanation.
 2. If the structure is present and correctly used → valid=true. Warm, brief praise.
 3. If the structure is present and correctly used but there is a minor error elsewhere (punctuation, article, spelling typo, a less-ideal preposition) → still valid=true. Mention the small detail briefly if you like, but do NOT reject.
 4. Punctuation, capitalisation and minor cosmetic errors are NEVER grounds for rejection.

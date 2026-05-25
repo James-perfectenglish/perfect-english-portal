@@ -117,7 +117,8 @@ Student's answer: "${studentAnswer}"
 3. The student may omit degree modifiers or attributive adjectives (e.g. "busy" for "very busy", "compromise" for "sensible compromise") as long as the core word is present in the correct form. Note the full phrase in your reason.
 4. WRONG WORD FORM = INVALID: If the student wrote a different part of speech from the correct answer (e.g. adjective "thorough" instead of adverb "thoroughly", noun instead of verb, base form instead of past tense), mark it INVALID. This is NOT a spelling mistake — it is a different word. Do not be fooled by visual similarity between word forms.
 5. A modifier alone without the core word is NOT acceptable.
-${excerptType === 'sentence' ? '6. For full sentences, all key words must be present — but rule 3 still applies.' : ''}
+6. Function-word swaps (prepositions, articles, pronouns) are ACCEPTABLE if ALL of: (a) the meaning is essentially preserved, (b) both versions sound natural to a native speaker, (c) only ONE function word differs. ACCEPT: "waiting at the airport" ↔ "waiting in the airport" (both natural; same meaning). REJECT: "before lunch" ↔ "after lunch" (opposite meanings). REJECT: "a car" ↔ "the car" (different referent). REJECT: "he said" ↔ "she said" (different person). When accepting, mention in your reason what the original word was so the student learns it.
+${excerptType === 'sentence' ? '7. For full sentences, all key content words must be present — but rule 3 still applies.' : ''}
 
 JSON only: {"valid": true/false, "reason": "one short sentence"}`;
   return callAI(prompt, 120, res, 'mark-gap.dictation');

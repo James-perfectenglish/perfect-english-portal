@@ -38,7 +38,7 @@ export default function ConnectionsGame({ onBack, userProfile }) {
   const [locked, setLocked]           = useState(false)
   const [allWords, setAllWords]       = useState([])
   const [mode, setMode]               = useState('daily')
-  const [practiceTitle, setPracticeTitle] = useState('')
+  const [puzzleTitle, setPuzzleTitle] = useState('')
   const [language, setLanguage]       = useState('en')
 
   // Sentence challenge
@@ -69,12 +69,14 @@ export default function ConnectionsGame({ onBack, userProfile }) {
 
     const { data: puzzle } = await supabase
       .from('connections_puzzles')
-      .select('id')
+      .select('id, title')
       .eq('play_date', today)
       .eq('language', lang)
       .single()
 
     if (!puzzle) { setGameState('noword'); return }
+
+    setPuzzleTitle(puzzle.title || '')
 
     const { data: grps } = await supabase
       .from('connections_groups').select('*').eq('puzzle_id', puzzle.id).order('colour_rank')
@@ -220,7 +222,7 @@ export default function ConnectionsGame({ onBack, userProfile }) {
     if (!puzzles || puzzles.length === 0) { setGameState('noword'); return }
 
     const puzzle = puzzles[Math.floor(Math.random() * puzzles.length)]
-    setPracticeTitle(puzzle.title || puzzle.play_date)
+    setPuzzleTitle(puzzle.title || puzzle.play_date)
 
     const { data: grps } = await supabase
       .from('connections_groups').select('*').eq('puzzle_id', puzzle.id).order('colour_rank')
@@ -299,8 +301,10 @@ export default function ConnectionsGame({ onBack, userProfile }) {
         <h1 style={{ margin: 0, fontSize: '1.7rem', fontWeight: 800, letterSpacing: '2px' }}>CONNECTIONS</h1>
         <p style={{ margin: '4px 0 0', opacity: 0.85, fontSize: '0.82rem' }}>
           {mode === 'practice'
-            ? `${language === 'es' ? 'Práctica' : 'Practice'}: ${practiceTitle}`
-            : language === 'es' ? 'Agrupa las 16 palabras en 4 categorías' : 'Group the 16 words into 4 categories'}
+            ? `${language === 'es' ? 'Práctica' : 'Practice'}: ${puzzleTitle}`
+            : puzzleTitle
+              ? puzzleTitle
+              : (language === 'es' ? 'Agrupa las 16 palabras en 4 categorías' : 'Group the 16 words into 4 categories')}
         </p>
       </div>
 
