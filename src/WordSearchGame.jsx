@@ -9,7 +9,7 @@ import Breadcrumb from './components/Breadcrumb'
 // Bonus words: any 4+ letter word in word_lists (besides the 10 theme words)
 // counts toward score for vocabulary discovery. No gameplay gating.
 // Hint mechanic: reveals the first letter of an unfound theme word at random
-// (key word held back until last). Unlimited but tracked in hints_used.
+// (Star word held back until last). Unlimited but tracked in hints_used.
 // Star events: solve (10/10), key_word (when found), sentence (SC pass).
 // Stars use dedupe_key='daily:<date>:<lang>:<subtype>'.
 // Grid display: full discovery — no theme word list shown to player.
@@ -308,7 +308,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
       })
       triggerFlash(path, isKey ? COLOR_KEY_BG : COLOR_FOUND_BG, FLASH_MS)
       if (isKey) {
-        showMsg(isSpanish ? `🔑 ¡Palabra clave! +${THEME_WORD_PTS} ⭐` : `🔑 Key word! +${THEME_WORD_PTS} ⭐`, 'success', 2200)
+        showMsg(isSpanish ? `🌟 ¡Palabra estrella! +${THEME_WORD_PTS} ⭐` : `🌟 Star word! +${THEME_WORD_PTS} ⭐`, 'success', 2200)
         if (!keyWordStarAwarded) {
           await writeStar('key_word', { word: matchedTheme })
           setKeyWordStarAwarded(true)
@@ -418,7 +418,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
     const keyWord     = puzzle.key_word
     const unfound     = themeWords.filter(w => !themeWordsFound.includes(w))
     if (unfound.length === 0) return
-    // Hold key word back unless it's the only unfound one
+    // Hold Star word back unless it's the only unfound one
     let candidates = unfound.filter(w => w !== keyWord)
     if (candidates.length === 0) candidates = unfound
     // Filter out words that already have a revealed hint
