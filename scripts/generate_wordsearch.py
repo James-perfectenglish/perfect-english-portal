@@ -4,7 +4,7 @@ Wordsearch puzzle generator for Perfect English Portal.
 Pipeline per puzzle:
   1. Pick a theme (round-robin from the bank for variety across days)
   2. Sample 10 words from that theme's pool
-  3. Pick a key word for the post-game sentence challenge
+  3. Pick a star word for the post-game sentence challenge
   4. Pick a grid size variant
   5. Place words with backtracking, allowing letter overlaps
   6. Fill empty cells with random letters
@@ -452,7 +452,7 @@ def generate_one(theme_name, theme_pool, language, rng, valid_word_set):
             "theme": theme_name,
             "language": language,
             "theme_words": words,
-            "key_word": rng.choice(words),
+            "star_word": rng.choice(words),
             "grid": grid,
             "grid_rows": rows,
             "grid_cols": cols,
@@ -474,7 +474,7 @@ def insert_puzzle(conn, puzzle, play_date):
         cur.execute(
             """
             INSERT INTO wordsearch_puzzles (
-                play_date, language, theme, theme_words, key_word,
+                play_date, language, theme, theme_words, star_word,
                 grid, grid_rows, grid_cols, word_placements, estimated_bonus_words
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (play_date, language) DO NOTHING
@@ -482,7 +482,7 @@ def insert_puzzle(conn, puzzle, play_date):
             """,
             (
                 play_date, puzzle["language"], puzzle["theme"],
-                puzzle["theme_words"], puzzle["key_word"],
+                puzzle["theme_words"], puzzle["star_word"],
                 Json(puzzle["grid"]), puzzle["grid_rows"], puzzle["grid_cols"],
                 Json(puzzle["word_placements"]), puzzle["estimated_bonus_words"],
             ),
@@ -495,7 +495,7 @@ def print_summary(play_date, puzzle, inserted_id=None):
     flag = "✓" if puzzle["estimated_bonus_words"] >= MIN_BONUS_TARGET else "⚠"
     suffix = f" → id={inserted_id}" if inserted_id else " (dry-run)"
     print(f"{play_date} {puzzle['language'].upper()} {flag} "
-          f"{puzzle['theme']} · key={puzzle['key_word']} · "
+          f"{puzzle['theme']} · star={puzzle['star_word']} · "
           f"{puzzle['estimated_bonus_words']} bonus est{suffix}")
 
 

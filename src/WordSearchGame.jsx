@@ -10,7 +10,7 @@ import Breadcrumb from './components/Breadcrumb'
 // counts toward score for vocabulary discovery. No gameplay gating.
 // Hint mechanic: reveals the first letter of an unfound theme word at random
 // (Star word held back until last). Unlimited but tracked in hints_used.
-// Star events: solve (10/10), key_word (when found), sentence (SC pass).
+// Star events: solve (10/10), star_word (when found), sentence (SC pass).
 // Stars use dedupe_key='daily:<date>:<lang>:<subtype>'.
 // Grid display: full discovery — no theme word list shown to player.
 // Drag-to-select with pointer events; touch-action:none on the grid.
@@ -20,12 +20,12 @@ const GRADIENT          = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 // ── Palette B — Calm (slate / coral / faint lime) ────────────────────────
 // SVG capsule colours — persistent overlay (drawn on top of cells)
 const CAPSULE_THEME = 'rgba(100, 116, 139, 0.32)'  // slate, theme words
-const CAPSULE_KEY   = 'rgba(251, 113, 133, 0.45)'  // coral, key word
+const CAPSULE_KEY   = 'rgba(251, 113, 133, 0.45)'  // coral, star word
 const CAPSULE_BONUS = 'rgba(132, 204, 22, 0.18)'   // faint lime, bonus words
 
 // Cell flash backgrounds — brief, on discovery
 const COLOR_FOUND_BG    = '#e2e8f0'  // slate flash — theme word found
-const COLOR_KEY_BG      = '#ffe4e6'  // coral flash — key word found
+const COLOR_KEY_BG      = '#ffe4e6'  // coral flash — star word found
 const COLOR_BONUS_BG    = '#d9f99d'  // lime flash — bonus word found
 const COLOR_DRAG_BG     = '#bfdbfe'  // blue — current drag preview
 const COLOR_DRAG_TEXT   = '#1e40af'
@@ -119,7 +119,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
   const [hintsUsed, setHintsUsed]           = useState(0)
   const [revealedHintCells, setRevealedHintCells] = useState({})  // 'r,c' -> themeWord
   const [score, setScore]                   = useState(0)
-  const [keyWordStarAwarded, setKeyWordStarAwarded] = useState(false)
+  const [starWordAwarded, setStarWordAwarded] = useState(false)
 
   const [dragging, setDragging]   = useState(false)
   const [dragStart, setDragStart] = useState(null)  // [r, c]
@@ -141,7 +141,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
     stateRef.current = {
       gameState, puzzle, themeWordsFound, bonusWordsFound, bonusWordPaths,
       dragging, dragStart, dragPath, hintsUsed, score, revealedHintCells,
-      keyWordStarAwarded,
+      starWordAwarded,
     }
   })
 
@@ -176,7 +176,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
         setBonusWordPaths(bp)
         setHintsUsed(saved.hints_used || 0)
         setScore(saved.score || 0)
-        setKeyWordStarAwarded(tw.includes(p.key_word))
+        setStarWordAwarded(tw.includes(p.star_word))
         if (saved.sentence_challenge_passed !== null && saved.sentence_challenge_passed !== undefined) {
           setSentenceDone(true)
           setSentenceStar(saved.sentence_challenge_passed === true)
@@ -278,7 +278,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
   // ── Word validation ───────────────────────────────────────────────────────
 
   async function processPath(path) {
-    const { puzzle, themeWordsFound, bonusWordsFound, score, keyWordStarAwarded } = stateRef.current
+    const { puzzle, themeWordsFound, bonusWordsFound, score, starWordAwarded } = stateRef.current
     if (!puzzle) return
     const word = wordFromPath(puzzle.grid, path)
     const wordRev = reverse(word)
@@ -295,7 +295,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
         // Already found — silent
         return
       }
-      const isKey = matchedTheme === puzzle.key_word
+      const isStar = matchedTheme === puzzle.star_word
       const newFound = [...themeWordsFound, matchedTheme]
       const newScore = score + THEME_WORD_PTS
       setThemeWordsFound(newFound)
@@ -306,12 +306,12 @@ export default function WordSearchGame({ onBack, userProfile }) {
         for (const k of Object.keys(next)) if (next[k] === matchedTheme) delete next[k]
         return next
       })
-      triggerFlash(path, isKey ? COLOR_KEY_BG : COLOR_FOUND_BG, FLASH_MS)
-      if (isKey) {
+      triggerFlash(path, isStar ? COLOR_KEY_BG : COLOR_FOUND_BG, FLASH_MS)
+      if (isStar) {
         showMsg(isSpanish ? `🌟 ¡Palabra estrella! +${THEME_WORD_PTS} ⭐` : `🌟 Star word! +${THEME_WORD_PTS} ⭐`, 'success', 2200)
-        if (!keyWordStarAwarded) {
-          await writeStar('key_word', { word: matchedTheme })
-          setKeyWordStarAwarded(true)
+        if (!starWordAwarded) {
+          await writeStar('star_word', { word: matchedTheme })
+          setStarWordAwarded(true)
         }
       } else {
         showMsg(`+${THEME_WORD_PTS}`, 'success')
@@ -415,11 +415,11 @@ export default function WordSearchGame({ onBack, userProfile }) {
     if (hintsUsed >= 3) return
     const themeWords  = puzzle.theme_words || []
     const placements  = puzzle.word_placements || []
-    const keyWord     = puzzle.key_word
+    const starWord    = puzzle.star_word
     const unfound     = themeWords.filter(w => !themeWordsFound.includes(w))
     if (unfound.length === 0) return
     // Hold Star word back unless it's the only unfound one
-    let candidates = unfound.filter(w => w !== keyWord)
+    let candidates = unfound.filter(w => w !== starWord)
     if (candidates.length === 0) candidates = unfound
     // Filter out words that already have a revealed hint
     const alreadyRevealed = new Set(Object.values(revealedHintCells))
@@ -460,7 +460,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
 
   const themeCount = themeWordsFound.length
   const allFound   = themeCount >= 10
-  const baseStars  = (allFound ? 1 : 0) + (keyWordStarAwarded ? 1 : 0)
+  const baseStars  = (allFound ? 1 : 0) + (starWordAwarded ? 1 : 0)
   const totalStars = baseStars + (sentenceStar ? 1 : 0)
 
   // For grid render: which cells are "found" (theme word path) and what colour.
@@ -472,8 +472,8 @@ export default function WordSearchGame({ onBack, userProfile }) {
       const pl = (puzzle.word_placements || []).find(p => p.word === w)
       if (!pl) continue
       const cells = straightPath(pl.start, pl.end) || []
-      const isKey = w === puzzle.key_word
-      for (const [r, c] of cells) map[`${r},${c}`] = isKey ? 'key' : 'theme'
+      const isStar = w === puzzle.star_word
+      for (const [r, c] of cells) map[`${r},${c}`] = isStar ? 'star' : 'theme'
     }
     return map
   })()
@@ -614,7 +614,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
             onPointerLeave={handlePointerUp}
           >
             {/* SVG overlay — bonus capsules drawn first (sit underneath),
-                theme + key capsules drawn on top. inset:0 + preserveAspect
+                theme + star capsules drawn on top. inset:0 + preserveAspect
                 Ratio="none" gives pixel-perfect alignment with grid cells. */}
             <svg
               viewBox={`0 0 ${cols} ${rows}`}
@@ -640,11 +640,11 @@ export default function WordSearchGame({ onBack, userProfile }) {
                   strokeLinecap="round"
                 />
               ))}
-              {/* Theme + key capsules */}
+              {/* Theme + star capsules */}
               {themeWordsFound.map(word => {
                 const pl = (puzzle.word_placements || []).find(p => p.word === word)
                 if (!pl) return null
-                const isKey = word === puzzle.key_word
+                const isStar = word === puzzle.star_word
                 const [r0, c0] = pl.start
                 const [r1, c1] = pl.end
                 return (
@@ -654,7 +654,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
                     y1={r0 + 0.5}
                     x2={c1 + 0.5}
                     y2={r1 + 0.5}
-                    stroke={isKey ? CAPSULE_KEY : CAPSULE_THEME}
+                    stroke={isStar ? CAPSULE_KEY : CAPSULE_THEME}
                     strokeWidth={0.78}
                     strokeLinecap="round"
                   />
@@ -664,13 +664,13 @@ export default function WordSearchGame({ onBack, userProfile }) {
             {Array.from({ length: rows }).map((_, r) =>
               Array.from({ length: cols }).map((_, c) => {
                 const key = `${r},${c}`
-                const found = foundCellMap[key]   // 'theme' | 'key' | undefined
+                const found = foundCellMap[key]   // 'theme' | 'star' | undefined
                 const inDrag = dragCellSet.has(key)
                 const flashThis = flashCellSet?.has(key)
                 const hintWord = revealedHintCells[key]
                 let bg = 'white'
                 let color = '#2d3748'
-                // Found theme/key words shown via SVG capsule overlay — cell stays white
+                // Found theme/star words shown via SVG capsule overlay — cell stays white
                 if (inDrag && !found) { bg = COLOR_DRAG_BG; color = COLOR_DRAG_TEXT }
                 if (flashThis && flash) { bg = flash.bg; color = '#1a202c' }
                 const showHintRing = !!hintWord && !found
@@ -772,8 +772,8 @@ export default function WordSearchGame({ onBack, userProfile }) {
                 </div>
                 <div style={{ fontSize: '0.82rem', color: '#718096', marginBottom: '12px' }}>
                   {isSpanish
-                    ? `Usa "${puzzle.key_word}" en una frase. ¡Gana ⭐ por una buena frase!`
-                    : `Use "${puzzle.key_word}" in a sentence. Earn ⭐ for a correct sentence!`}
+                    ? `Usa "${puzzle.star_word}" en una frase. ¡Gana ⭐ por una buena frase!`
+                    : `Use "${puzzle.star_word}" in a sentence. Earn ⭐ for a correct sentence!`}
                 </div>
                 <button
                   onClick={() => setShowChallenge(true)}
@@ -845,9 +845,9 @@ export default function WordSearchGame({ onBack, userProfile }) {
 
       </div>
 
-      {showChallenge && puzzle?.key_word && (
+      {showChallenge && puzzle?.star_word && (
         <SentenceChallenge
-          word={puzzle.key_word}
+          word={puzzle.star_word}
           language={language}
           exercise="wordsearch"
           apiContext="challenge"
