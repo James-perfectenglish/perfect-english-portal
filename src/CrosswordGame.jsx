@@ -13,13 +13,14 @@ import Breadcrumb from './components/Breadcrumb'
 const GRADIENT          = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 
 // Cell backgrounds
-const COLOR_ACTIVE_CELL  = '#fde68a'   // amber, the single active cell
-const COLOR_ACTIVE_WORD  = '#fef3c7'   // pale amber, the active word's other cells
-const COLOR_LOCKED       = '#d1fae5'   // light green, correctly completed word
-const COLOR_STAR_LOCKED  = '#ffe4e6'   // coral, the star word once locked
-const COLOR_BLOCKED      = '#1f2937'   // dark, blocked squares
-const COLOR_CELL_DEFAULT = '#ffffff'
-const COLOR_HINT_RING    = '#f59e0b'
+const COLOR_ACTIVE_CELL   = '#bfdbfe'  // blue, the single active cell
+const COLOR_ACTIVE_WORD   = '#dbeafe'  // pale blue, the active word's other cells
+const COLOR_LOCKED        = '#d1fae5'  // light green, correctly completed word
+const COLOR_STAR_LOCKED   = '#fde68a'  // amber, the star word once locked
+const COLOR_BLOCKED       = '#1f2937'  // dark, blocked squares
+const COLOR_CELL_DEFAULT  = '#ffffff'
+const COLOR_HINT_RING     = '#f59e0b'  // amber ring on hint-revealed cells
+const COLOR_CONFLICT_RING = '#ef4444'  // red ring: typed letter conflicts with a locked crossing
 
 const KEYBOARD_EN = [
   ['Q','W','E','R','T','Y','U','I','O','P'],
@@ -271,6 +272,28 @@ export default function CrosswordGame({ onBack, userProfile }) {
   }, [clues, cellLetters, grid, puzzle])
 
   const revealedSet = useMemo(() => new Set(revealedCells), [revealedCells])
+
+  // A cell "conflicts" if it has a typed letter that disagrees with the grid truth
+  // AND at least one cell in a word containing it is already locked. Stays silent
+  // during early exploration; only fires once the student has committed to a
+  // contradiction with something already proved correct.
+  const conflictCellSet = useMemo(() => {
+    const conflicts = new Set()
+    if (!puzzle) return conflicts
+    for (const [k, letter] of Object.entries(cellLetters)) {
+      if (lockedCellSet.has(k)) continue
+      const [r, c] = k.split(',').map(Number)
+      const cell = grid[r]?.[c]
+      if (!cell || cell.blocked) continue
+      if (letter.toUpperCase() === (cell.letter || '').toUpperCase()) continue
+      const containingClues = clues.filter(cl => cellInClue(cl, r, c))
+      const hasLockedNeighbour = containingClues.some(cl =>
+        getClueCells(cl).some(([rr, cc]) => lockedCellSet.has(cellKey(rr, cc)))
+      )
+      if (hasLockedNeighbour) conflicts.add(k)
+    }
+    return conflicts
+  }, [cellLetters, lockedCellSet, clues, grid, puzzle])
 
   const totalLetterCells = useMemo(() => {
     let n = 0
@@ -630,9 +653,9 @@ export default function CrosswordGame({ onBack, userProfile }) {
         {/* Active clue banner */}
         {activeClue && gameState === 'playing' && (
           <div style={{
-            background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px',
+            background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px',
             padding: '0.6rem 0.85rem', marginBottom: '0.6rem',
-            fontSize: '0.9rem', color: '#92400e', fontWeight: 600,
+            fontSize: '0.9rem', color: '#1e40af', fontWeight: 600,
             display: 'flex', alignItems: 'baseline', gap: '8px',
           }}>
             <span style={{ fontWeight: 800, whiteSpace: 'nowrap' }}>
@@ -682,6 +705,7 @@ export default function CrosswordGame({ onBack, userProfile }) {
                 const isStarLocked = starWordCellSet.has(k)
                 const isLocked  = lockedCellSet.has(k)
                 const isRevealed = revealedSet.has(k)
+                const isConflict = conflictCellSet.has(k)
                 const typed = cellLetters[k] || ''
                 let bg = COLOR_CELL_DEFAULT
                 if (isStarLocked) bg = COLOR_STAR_LOCKED
@@ -703,7 +727,11 @@ export default function CrosswordGame({ onBack, userProfile }) {
                       justifyContent: 'center',
                       fontWeight: 700,
                       fontSize: cellFontSize,
-                      boxShadow: isRevealed ? `inset 0 0 0 2px ${COLOR_HINT_RING}` : 'none',
+                      boxShadow: isConflict
+                        ? `inset 0 0 0 2.5px ${COLOR_CONFLICT_RING}`
+                        : isRevealed
+                        ? `inset 0 0 0 2px ${COLOR_HINT_RING}`
+                        : 'none',
                       transition: 'background 0.12s ease',
                     }}
                   >
@@ -917,8 +945,8 @@ function ClueList({ title, clues, activeClue, cellLetters, grid, onTap }) {
                 display: 'flex', gap: '6px', alignItems: 'baseline',
                 textAlign: 'left',
                 padding: '6px 8px',
-                background: isActive ? '#fef3c7' : 'transparent',
-                border: '1px solid ' + (isActive ? '#fde68a' : 'transparent'),
+                background: isActive ? '#eff6ff' : 'transparent',
+                border: '1px solid ' + (isActive ? '#bfdbfe' : 'transparent'),
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '0.85rem',
