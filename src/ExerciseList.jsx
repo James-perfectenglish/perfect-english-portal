@@ -68,7 +68,7 @@ const EXERCISE_ICONS = {
   'Connections':               '🔗',
   'Spelling Bee':              '🐝',
   'Wordsearch':                '🔎',
-  'Crossword':                 '📝',
+  'Crossword':                 '✜',
 }
 
 // Play removed from tabs — students use bottom nav, teachers use sidebar

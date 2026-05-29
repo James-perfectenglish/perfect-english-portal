@@ -93,7 +93,7 @@ export default function CrosswordGame({ onBack, userProfile }) {
   const [language] = useState(() => detectLanguage())
   const isSpanish  = language === 'es'
 
-  const [level, setLevel] = useState(() => levelForProfile(userProfile))
+  const [level, setLevel] = useState(() => isSpanish ? 'A' : levelForProfile(userProfile))
   const [gameState, setGameState]         = useState('loading')
   const [puzzle, setPuzzle]               = useState(null)
   const [cellLetters, setCellLetters]     = useState({})
@@ -559,14 +559,14 @@ export default function CrosswordGame({ onBack, userProfile }) {
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
       {onBack && <Breadcrumb section={isSpanish ? 'Jugar' : 'Play'} title={isSpanish ? 'Crucigrama' : 'Crossword'} onExit={onBack} />}
       <div style={{ maxWidth: '500px', margin: '0 auto', padding: '2rem 1rem' }}>
-        {LevelPills}
+        {!isSpanish && LevelPills}
         <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📝</div>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✜</div>
           <h2 style={{ color: '#2d3748' }}>
-            {isSpanish ? `Sin crucigrama de nivel ${level} hoy` : `No level ${level} crossword today`}
+            {isSpanish ? 'No hay crucigrama hoy' : `No level ${level} crossword today`}
           </h2>
           <p style={{ color: '#718096' }}>
-            {isSpanish ? 'Prueba otro nivel o vuelve mañana.' : 'Try another level or check back tomorrow.'}
+            {isSpanish ? 'Vuelve mañana.' : 'Try another level or check back tomorrow.'}
           </p>
           {onBack && (
             <button onClick={onBack} style={{ marginTop: '1rem', padding: '10px 24px', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
@@ -599,7 +599,7 @@ export default function CrosswordGame({ onBack, userProfile }) {
         {/* Header */}
         <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.1rem 1.5rem', textAlign: 'center', color: 'white', marginBottom: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>📝</span>
+            <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>✜</span>
             <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, letterSpacing: '2px' }}>
               {isSpanish ? 'CRUCIGRAMA' : 'CROSSWORD'}
             </h1>
@@ -610,7 +610,7 @@ export default function CrosswordGame({ onBack, userProfile }) {
           </p>
         </div>
 
-        {LevelPills}
+        {!isSpanish && LevelPills}
 
         {/* Status bar */}
         <div style={{ background: 'white', borderRadius: '12px', padding: '0.75rem 1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
@@ -879,7 +879,7 @@ export default function CrosswordGame({ onBack, userProfile }) {
                   </div>
                 )}
                 <p style={{ color: '#718096', fontSize: '0.82rem', textAlign: 'center', margin: '0 0 10px' }}>
-                  {isSpanish ? '¡Vuelve mañana para un nuevo crucigrama! 📝' : 'Come back tomorrow for a new crossword! 📝'}
+                  {isSpanish ? '¡Vuelve mañana para un nuevo crucigrama! ✜' : 'Come back tomorrow for a new crossword! ✜'}
                 </p>
                 {onBack && (
                   <button onClick={onBack} style={{ width: '100%', padding: '0.7rem', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '8px', fontWeight: 500, cursor: 'pointer', fontSize: '0.9rem' }}>
