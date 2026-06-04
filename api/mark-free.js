@@ -105,7 +105,10 @@ Si el único error es de género (el/la, un/una), márcalo como válido (valid=t
 Si hay errores gramaticales más importantes (tiempo verbal incorrecto, estructura rota), márcalo como inválido.
 Sé cálido/a y alentador/a — esto es un ejercicio de aprendizaje.
 
-JSON: {"valid": true, "feedback": "feedback cálido, menciona cualquier detalle menor"} o {"valid": false, "feedback": "corrección amable y clara"}`
+Responde SÓLO con JSON, sin texto adicional ni marcadores de código:
+{"valid": true, "feedback": "feedback cálido, menciona cualquier detalle menor"}
+o
+{"valid": false, "feedback": "corrección amable y clara"}`
       : `You are an English teacher marking a sentence challenge exercise.
 
 The student was asked to write a sentence using the word: "${word}"
@@ -425,7 +428,15 @@ async function callAI(prompt, maxTokens, res, label) {
     }
     const data = await response.json();
     const text = data.content?.find(b => b.type === 'text')?.text || '';
-    const clean = text.replace(/```json|```/g, '').trim();
+    // Be defensive: the model occasionally wraps the JSON in prose or code fences
+    // (seen more with looser Spanish prompts). Strip fences, then extract the first
+    // {...} block so a conversational preamble/suffix can't break JSON.parse.
+    let clean = text.replace(/```json|```/g, '').trim();
+    const firstBrace = clean.indexOf('{');
+    const lastBrace  = clean.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      clean = clean.slice(firstBrace, lastBrace + 1);
+    }
     const result = JSON.parse(clean);
     return res.status(200).json({
       valid: result.valid,
