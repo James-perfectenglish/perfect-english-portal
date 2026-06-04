@@ -71,7 +71,13 @@ Reply ONLY with a JSON object:
 
     const data = await response.json()
     const text = data.content?.find(b => b.type === 'text')?.text || ''
-    const clean = text.replace(/```json|```/g, '').trim()
+    // Defensive: extract the first {...} block so a prose preamble/suffix can't break JSON.parse.
+    let clean = text.replace(/```json|```/g, '').trim()
+    const firstBrace = clean.indexOf('{')
+    const lastBrace  = clean.lastIndexOf('}')
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      clean = clean.slice(firstBrace, lastBrace + 1)
+    }
     const result = JSON.parse(clean)
     return res.status(200).json(result)
   } catch (e) {

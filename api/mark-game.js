@@ -48,8 +48,14 @@ Example: [{"answer":"went","accepted":true,"penalty":false,"note":""},{"answer":
       body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] }),
     });
     const data = await response.json();
-    const raw = data.content[0].text.trim();
-    const clean = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const text = (data.content?.find(b => b.type === 'text')?.text || '').trim();
+    // Defensive: extract the first [...] array so a prose preamble/suffix can't break JSON.parse.
+    let clean = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const firstBracket = clean.indexOf('[');
+    const lastBracket  = clean.lastIndexOf(']');
+    if (firstBracket !== -1 && lastBracket > firstBracket) {
+      clean = clean.slice(firstBracket, lastBracket + 1);
+    }
     res.json({ scored: JSON.parse(clean) });
   } catch (err) {
     console.error('mark-game.blurt error:', err);
@@ -87,8 +93,14 @@ or
       body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 150, messages: [{ role: 'user', content: prompt }] }),
     });
     const data = await response.json();
-    const raw = data.content[0].text.trim();
-    const clean = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const text = (data.content?.find(b => b.type === 'text')?.text || '').trim();
+    // Defensive: extract the first {...} block so a prose preamble/suffix can't break JSON.parse.
+    let clean = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const firstBrace = clean.indexOf('{');
+    const lastBrace  = clean.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      clean = clean.slice(firstBrace, lastBrace + 1);
+    }
     const result = JSON.parse(clean);
     res.json({ valid: Boolean(result.valid), reason: result.reason || '' });
   } catch (err) {
