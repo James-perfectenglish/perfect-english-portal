@@ -4,6 +4,7 @@ import SentenceBuildingInput from './SentenceBuildingInput';
 import MatchingPairs from './MatchingPairs';
 import SentenceChallenge from './SentenceChallenge';
 import { LevelBadge, TypeBadge, AiMarkedBadge, TopicBadge } from './BadgePill';
+import FlagQuestion from './FlagQuestion';
 
 // ── Question mix per round (easy to tweak!) ──
 const QUESTION_MIX = {
@@ -1229,6 +1230,9 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                     disabled={isChecking || !userAnswer.trim() && currentQuestion.type !== 'multiple_choice' || currentQuestion.type === 'multiple_choice' && !selectedOption}
                     style={{ padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)', backgroundColor: '#2C3E50', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', width: '100%', fontWeight: '600', opacity: (isChecking || (!userAnswer.trim() && currentQuestion.type !== 'multiple_choice') || (currentQuestion.type === 'multiple_choice' && !selectedOption)) ? 0.5 : 1 }}
                   >{isChecking ? '🤖 Checking...' : 'Check Answer'}</button>
+                )}
+                {feedback && currentQuestion?.question_number && (
+                  <FlagQuestion questionNumber={currentQuestion.question_number} language={isSpanish ? 'es' : 'en'} />
                 )}
                 {feedback && (
                   <button onClick={nextQuestion} style={{ padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)', backgroundColor: '#3498DB', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', width: '100%', fontWeight: '600' }}>

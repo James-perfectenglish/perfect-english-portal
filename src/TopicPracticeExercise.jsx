@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import { LevelBadge, TypeBadge, AiMarkedBadge, TagBadges } from './components/BadgePill'
 import SentenceChallenge from './components/SentenceChallenge'
+import FlagQuestion from './components/FlagQuestion'
 
 function shuffleArray(arr) {
   const shuffled = [...arr]
@@ -770,6 +771,10 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
                   style={{ width: '100%', padding: '1rem', fontSize: '1rem', background: selectedOption ? GRADIENT : '#cbd5e0', color: 'white', border: 'none', borderRadius: '10px', cursor: selectedOption ? 'pointer' : 'not-allowed', fontWeight: 600 }}>
                   Check Answer
                 </button>
+              )}
+
+              {feedback && q && (
+                <FlagQuestion questionNumber={q.question_number} language={isSpanishTP ? 'es' : 'en'} />
               )}
 
               {feedback && (

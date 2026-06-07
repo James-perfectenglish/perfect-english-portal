@@ -79,10 +79,12 @@ export default function TeacherDashboard({ profile, handleLogout }) {
   const [weeklyStarsOpen, setWeeklyStarsOpen] = useState(true)
   const [queenBeeAlerts, setQueenBeeAlerts] = useState([])
   const [queenBeeOpen, setQueenBeeOpen] = useState(true)
+  const [questionFlags, setQuestionFlags] = useState([])
+  const [flagsOpen, setFlagsOpen] = useState(true)
   const [showInactive, setShowInactive] = useState(true)
   const [awardingFor, setAwardingFor] = useState(null) // { id, name } | null
 
-  useEffect(() => { fetchAllData(); fetchWotdData(); fetchStarsLeaderboard(); fetchQueenBeeAlerts() }, [])
+  useEffect(() => { fetchAllData(); fetchWotdData(); fetchStarsLeaderboard(); fetchQueenBeeAlerts(); fetchQuestionFlags() }, [])
 
   async function fetchAllData() {
     const { data: profiles } = await supabase
@@ -338,6 +340,37 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     setQueenBeeAlerts(prev => prev.map(a => a.id === id ? { ...a, seen_by_teacher: true } : a))
   }
 
+  async function fetchQuestionFlags() {
+    const { data: flags } = await supabase
+      .from('question_flags')
+      .select('*')
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (!flags || flags.length === 0) { setQuestionFlags([]); return }
+
+    const userIds  = [...new Set(flags.map(f => f.user_id))]
+    const qNumbers = [...new Set(flags.map(f => f.question_number))]
+    const [profilesRes, questionsRes] = await Promise.all([
+      supabase.from('profiles').select('id, full_name, level').in('id', userIds),
+      supabase.from('question_bank').select('question_number, question, type, level, topic, correct_answer').in('question_number', qNumbers),
+    ])
+    const profileMap = {}, questionMap = {}
+    ;(profilesRes.data  || []).forEach(p => { profileMap[p.id] = p })
+    ;(questionsRes.data || []).forEach(q => { questionMap[q.question_number] = q })
+
+    setQuestionFlags(flags.map(f => ({
+      ...f,
+      student:  profileMap[f.user_id] || null,
+      question: questionMap[f.question_number] || null,
+    })))
+  }
+
+  async function resolveFlag(id) {
+    await supabase.from('question_flags').update({ status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', id)
+    setQuestionFlags(prev => prev.filter(f => f.id !== id))
+  }
+
   function handleSort(key) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('desc') }
@@ -532,6 +565,72 @@ export default function TeacherDashboard({ profile, handleLogout }) {
             </tbody>
           </table>
           {students.length === 0 && <p style={{ textAlign: 'center', color: '#a0aec0', padding: '2rem' }}>No student data yet.</p>}
+        </div>
+      )}
+
+      {/* REPORTED QUESTIONS */}
+      {questionFlags.length > 0 && (
+        <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden', marginBottom: '1rem' }}>
+          <div onClick={() => setFlagsOpen(o => !o)}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', cursor: 'pointer', borderBottom: flagsOpen ? '1px solid #fed7d7' : 'none', background: '#fff5f5' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span style={{ fontSize: '1.3rem' }}>🚩</span>
+              <div>
+                <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#2C3E50', margin: 0 }}>Reported Questions</h2>
+                <p style={{ fontSize: '0.75rem', color: '#718096', margin: 0 }}>
+                  {questionFlags.length} open report{questionFlags.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+            <div style={{ background: flagsOpen ? 'linear-gradient(135deg, #f56565, #c53030)' : '#e2e8f0', color: 'white', borderRadius: '8px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
+              {flagsOpen ? '🚩' : '🔒'}
+            </div>
+          </div>
+          {flagsOpen && (
+            <div style={{ padding: '0.5rem 1.25rem 1.25rem' }}>
+              {questionFlags.map(f => {
+                const q = f.question
+                const typeInfo = q ? TYPE_INFO[q.type] : null
+                return (
+                  <div key={f.id} style={{
+                    display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
+                    padding: '0.8rem 0.9rem', borderRadius: '10px', marginTop: '0.6rem',
+                    background: '#fff5f5', border: '1px solid #fed7d7',
+                  }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #fc8181, #e53e3e)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.8rem' }}>
+                      {initials(f.student?.full_name)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 700, color: '#2C3E50' }}>{f.student?.full_name || 'Unknown'}</span>
+                        <span style={{ fontSize: '0.75rem', color: '#a0aec0' }}>{formatDate(f.created_at)}</span>
+                        <span style={{ fontSize: '0.72rem', color: '#a0aec0' }}>
+                          Q{f.question_number}{q ? ` · ${typeInfo?.emoji || ''} ${typeInfo?.label || q.type}` : ' · (not found)'}{q?.level ? ` · ${q.level}` : ''}
+                        </span>
+                      </div>
+                      {q && (
+                        <div style={{ fontSize: '0.85rem', color: '#2d3748', marginTop: '4px', lineHeight: 1.4 }}>
+                          {q.question}
+                          {q.correct_answer ? <span style={{ color: '#718096' }}> — <em>ans: {q.correct_answer}</em></span> : null}
+                        </div>
+                      )}
+                      {f.reason && (
+                        <div style={{ fontSize: '0.78rem', color: '#9b2c2c', marginTop: '4px', fontStyle: 'italic', lineHeight: 1.4 }}>
+                          💬 {f.reason}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => resolveFlag(f.id)}
+                      title="Mark as resolved"
+                      style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #fed7d7', background: 'white', color: '#c53030', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      ✓ Resolve
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
