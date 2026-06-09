@@ -355,6 +355,8 @@ Decide: ¿es la sustitución del alumno gramaticalmente correcta Y corrige el er
 Responde SÍ sólo si la palabra del alumno realmente funciona como corrección válida, aunque sea diferente al modelo.
 Responde NO si es gramaticalmente incorrecta, cambia el significado de manera inapropiada, o no corrige el error.
 
+LONGITUD DEL FEEDBACK — sé MUY breve: una sola frase corta (dos como máximo), en un solo idioma. No escribas párrafos ni expliques de más. En A1/A2 usa palabras sencillas, sin terminología gramatical.
+
 JSON:
 {"valid": true, "reason": "una frase corta"}
 o

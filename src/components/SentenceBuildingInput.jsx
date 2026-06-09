@@ -84,12 +84,13 @@ export default function SentenceBuildingInput({
   const checkAnswer = async () => {
     if (isChecking || answerWords.length === 0) return;
     const userAnswer = normalizeAnswer(answerWords);
-    const isCorrect = correctSentences.some(correct => correct.trim().toLowerCase() === userAnswer);
-    if (isCorrect) { if (onResult) onResult(true, false, userAnswer); return true; }
     const stripPunctuation = (str) => str.replace(/[.,?!;:¿¡]/g, '').replace(/\s+/g, ' ').trim();
     const userStripped = stripPunctuation(userAnswer);
-    const isSoftCorrect = correctSentences.some(correct => stripPunctuation(correct.trim().toLowerCase()) === userStripped);
-    if (isSoftCorrect) { if (onResult) onResult(true, true, userAnswer); return true; }
+    // A correct word order is a full (green) match. Tiles can't carry the model's
+    // capitalisation or end punctuation, so compare with those stripped — otherwise a
+    // perfect build always fell through to the AI "also correct" (amber) path.
+    const isCorrect = correctSentences.some(correct => stripPunctuation(correct.trim().toLowerCase()) === userStripped);
+    if (isCorrect) { if (onResult) onResult(true, false, userAnswer); return true; }
     // Check acceptable_alternatives before calling AI
     if (Array.isArray(acceptable_alternatives) && acceptable_alternatives.length > 0) {
       const norm = (s) => stripPunctuation((s || '').toLowerCase().trim());
