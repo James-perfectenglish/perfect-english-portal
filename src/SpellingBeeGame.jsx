@@ -142,10 +142,15 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
   const [showChallenge, setShowChallenge]       = useState(false)
 
   const stateRef = useRef({})
+  const handlersRef = useRef({})
   const today    = new Date().toISOString().slice(0, 10)
 
   useEffect(() => {
     stateRef.current = { input, gameState, foundWords, pangramsFound, score, puzzle }
+    // Keep the live handlers in a ref so the keydown listener (registered once,
+    // before the puzzle loads) always calls the CURRENT closures — otherwise
+    // keyboard-driven saves fire against a stale puzzle=null and silently bail.
+    handlersRef.current = { handleEnter, handleLetterClick }
   })
 
   useEffect(() => {
@@ -157,10 +162,10 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
   function handleKeyDown(e) {
     const { gameState } = stateRef.current
     if (gameState !== 'playing') return
-    if (e.key === 'Enter')     { handleEnter(); return }
+    if (e.key === 'Enter')     { handlersRef.current.handleEnter?.(); return }
     if (e.key === 'Backspace') { setInput(i => i.slice(0, -1)); return }
     const key = e.key.toLowerCase()
-    if (/^[a-záéíóúñü]$/.test(key)) handleLetterClick(key)
+    if (/^[a-záéíóúñü]$/.test(key)) handlersRef.current.handleLetterClick?.(key)
   }
 
   async function loadPuzzle() {
