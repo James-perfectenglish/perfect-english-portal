@@ -66,7 +66,7 @@ export default function FlagQuestion({ questionNumber, language = 'en' }) {
 
   if (mode === 'done') {
     return (
-      <div style={{ textAlign: 'center', marginTop: '0.5rem', fontSize: '0.8rem', color: '#718096' }}>
+      <div style={{ textAlign: 'center', marginTop: '0.5rem', marginBottom: '10px', fontSize: '0.8rem', color: '#718096' }}>
         {t.done}
       </div>
     )
@@ -74,7 +74,7 @@ export default function FlagQuestion({ questionNumber, language = 'en' }) {
 
   if (mode === 'idle') {
     return (
-      <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
+      <div style={{ textAlign: 'center', marginTop: '0.5rem', marginBottom: '10px' }}>
         <button
           onClick={() => setMode('open')}
           style={{
@@ -90,7 +90,7 @@ export default function FlagQuestion({ questionNumber, language = 'en' }) {
   // mode === 'open'
   return (
     <div style={{
-      marginTop: '0.5rem', padding: '0.75rem', borderRadius: '8px',
+      marginTop: '0.5rem', marginBottom: '10px', padding: '0.75rem', borderRadius: '8px',
       background: '#f7fafc', border: '1px solid #e2e8f0',
     }}>
       <div style={{ fontSize: '0.82rem', color: '#4a5568', marginBottom: '0.4rem' }}>{t.prompt}</div>
