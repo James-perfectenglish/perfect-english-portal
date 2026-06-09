@@ -390,19 +390,84 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
   }
 
   async function saveProgress(words, sc, rankLabel, stars, sentChallengePassed) {
-    const { data: { user } } = await supabase.auth.getUser()
+    // Recover the user even if the access token has briefly lapsed on a
+    // long-open PWA — otherwise a stale session would silently skip the save.
+    let user = (await supabase.auth.getUser()).data?.user || null
+    if (!user) {
+      const { data: sess } = await supabase.auth.getSession()
+      user = sess?.session?.user || null
+    }
     if (!user || !puzzle) return
-    await supabase.from('spelling_bee_scores').upsert({
+
+    // ── Merge, never overwrite ───────────────────────────────────────────────
+    // Found words only ever grow during the day, so a save must UNION the
+    // current tab's words with whatever is already on the server. Without this,
+    // a stale tab or a second device clobbers a longer list with a shorter one
+    // (Carolina playing on phone + computer => "I lose all my words").
+    let mergedWords  = words
+    let serverSCP    = undefined
+    try {
+      const { data: existing } = await supabase
+        .from('spelling_bee_scores')
+        .select('found_words, sentence_challenge_passed')
+        .eq('user_id', user.id)
+        .eq('puzzle_id', puzzle.id)
+        .eq('version', 2)
+        .maybeSingle()
+      if (existing) {
+        serverSCP = existing.sentence_challenge_passed
+        if (existing.found_words?.length) {
+          const seen = new Set(words)
+          mergedWords = [...words]
+          for (const w of existing.found_words) if (!seen.has(w)) mergedWords.push(w)
+        }
+      }
+    } catch (e) {
+      // If the read fails, fall back to writing what this tab has — the merge
+      // is a safety net, not a hard dependency.
+      console.warn('Spelling Bee merge-read failed, writing local state:', e)
+    }
+
+    // Recompute score / rank / stars from the merged set so they stay consistent
+    // with the words actually being stored.
+    const allowed = new Set([puzzle.centre_letter, ...puzzle.outer_letters])
+    let mergedScore = 0
+    let mergedPangs = 0
+    for (const w of mergedWords) {
+      const pg = isPangramWord(w, allowed)
+      if (pg) mergedPangs++
+      mergedScore += scoreWord(w, pg)
+    }
+    const mergedRank  = RANKS[getRankIdx(mergedWords.length)].label
+    const mergedStars = computeStars(mergedWords.length, mergedPangs)
+
+    // Don't let a per-word save (which passes null) wipe a sentence-challenge
+    // result already recorded on the server from another device.
+    let finalSCP = sentChallengePassed
+    if (finalSCP === null && serverSCP !== null && serverSCP !== undefined) {
+      finalSCP = serverSCP
+    }
+
+    const { error } = await supabase.from('spelling_bee_scores').upsert({
       user_id:                   user.id,
       puzzle_id:                 puzzle.id,
-      found_words:               words,
-      score:                     sc,
-      rank_label:                rankLabel,
-      stars_awarded:             stars,
-      sentence_challenge_passed: sentChallengePassed,
+      found_words:               mergedWords,
+      score:                     mergedScore,
+      rank_label:                mergedRank,
+      stars_awarded:             mergedStars,
+      sentence_challenge_passed: finalSCP,
       completed_at:              new Date().toISOString(),
       version:                   2,
     }, { onConflict: 'user_id,puzzle_id' })
+    if (error) console.warn('Spelling Bee save failed:', error)
+
+    // If the server held words this tab didn't, pull them into local state so
+    // the screen reflects the full set and the two devices stay in sync.
+    if (mergedWords.length > words.length) {
+      setFoundWords(mergedWords)
+      setPangramsFound(mergedWords.filter(w => isPangramWord(w, allowed)))
+      setScore(mergedScore)
+    }
   }
 
   function handleFinish() {

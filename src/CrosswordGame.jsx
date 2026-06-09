@@ -121,6 +121,41 @@ export default function CrosswordGame({ onBack, userProfile }) {
 
   useEffect(() => { loadPuzzle() /* eslint-disable-line */ }, [level, language])
 
+  // Keep the latest key handlers in a ref so the physical-keyboard listener
+  // (registered once) always calls the current closures, never stale ones.
+  const keyFnRef = useRef({})
+  useEffect(() => {
+    keyFnRef.current = { handleKeyTap, handleBackspace }
+  })
+
+  // Physical keyboard support (desktop). The on-screen keyboard is untouched
+  // and remains the input method on touch devices.
+  useEffect(() => {
+    function onPhysicalKey(e) {
+      if (stateRef.current.gameState !== 'playing') return
+      // Never hijack typing in the sentence-challenge modal or any text field.
+      const el  = e.target
+      const tag = (el?.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || el?.isContentEditable) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key === 'Backspace') {
+        e.preventDefault()
+        keyFnRef.current.handleBackspace?.()
+        return
+      }
+      let key = e.key.toLowerCase()
+      // Strip accents so á/é/í/ó/ú fill the accent-stripped grid, but keep ñ —
+      // a real, distinct grid letter on the Spanish board.
+      if (key !== 'ñ') key = key.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      if (/^[a-zñ]$/.test(key)) {
+        e.preventDefault()
+        keyFnRef.current.handleKeyTap?.(key.toUpperCase())
+      }
+    }
+    window.addEventListener('keydown', onPhysicalKey)
+    return () => window.removeEventListener('keydown', onPhysicalKey)
+  }, [])
+
   // ── Load / save ──────────────────────────────────────────────────────────
 
   async function loadPuzzle() {
