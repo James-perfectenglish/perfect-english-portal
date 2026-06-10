@@ -15,6 +15,23 @@ async function handleGapFill(req, res) {
   const { question, correctAnswer, studentAnswer, language = 'en' } = req.body;
   if (!question || !correctAnswer || !studentAnswer)
     return res.status(400).json({ error: 'Missing required fields' });
+
+  // Short function-word answers (of/on/in/at/to/up/by/as…): exact match only.
+  // These are all ~1 edit apart, so AI typo-leniency wrongly pardons a different
+  // (wrong) preposition. No fuzzy matching when the expected answer is <=2 chars.
+  const _norm = s => s.toLowerCase().trim().replace(/[.,!?;:'"]/g, '');
+  if (_norm(correctAnswer).length <= 2) {
+    if (_norm(studentAnswer) === _norm(correctAnswer)) {
+      return res.status(200).json({ valid: true, reason: '✅ Correct!' });
+    }
+    return res.status(200).json({
+      valid: false,
+      reason: language === 'es'
+        ? `No exactamente — aquí la preposición correcta es "${correctAnswer}".`
+        : `Not quite — the preposition here is "${correctAnswer}".`,
+    });
+  }
+
   const isSpanish = language === 'es';
   const prompt = isSpanish
     ? `Estás corrigiendo un ejercicio de completar huecos en español.

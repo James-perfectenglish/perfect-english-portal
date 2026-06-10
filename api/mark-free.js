@@ -175,6 +175,7 @@ El estudiante debe escribir una frase en ESPAÑOL usando esta palabra de forma q
 Evalúa: ¿La frase está en español? ¿Es gramaticalmente correcta? ¿Usa la palabra de forma apropiada?
 
 Sé cálido/a y alentador/a — como un buen profesor. Los errores menores de puntuación están bien. Acepta frases creativas o divertidas si usan la palabra correctamente.
+Lo más importante es que el alumno use la palabra con su SIGNIFICADO correcto. Si lo hace, marca valid=true aunque haya errores gramaticales menores en otra parte o use la palabra como otra categoría gramatical (por ejemplo, verbo en lugar de adjetivo) — sobre todo en niveles bajos, premia el uso correcto y con sentido por encima de la elegancia. Rechaza solo si la palabra está mal usada (significado equivocado) o no aparece.
 
 Responde SOLO con un objeto JSON:
 {"valid": true, "feedback": "una frase cálida y alentadora explicando por qué funciona bien"}
@@ -195,7 +196,8 @@ ASSESSMENT RULES — apply in this order:
 1. GREEN (valid=true, no mention of spelling): If the student misspells the target word "${word}" by just 1-2 letters but has clearly used it correctly — treat it as a pure typo, accept it fully, and do NOT mention the spelling at all. Just praise the sentence normally.
 2. AMBER (valid=true, note the issue): If the student uses "${word}" correctly but the sentence has grammar errors elsewhere (wrong plurals, missing articles, wrong prepositions, capitalisation etc.) — accept it because they’ve shown they understand the word, but note the grammar issues briefly.
 3. ACCEPT (valid=true, praise only): Sentence is correct and uses the word well.
-4. REJECT (valid=false): The word is genuinely misused or misunderstood, OR the student has not actually used the word at all.
+4. REJECT (valid=false) ONLY IF the word is genuinely misused (wrong meaning) or not present at all. If the word is used with its correct meaning, mark valid=true — even if the sentence is an indirect or simple illustration. At lower levels especially, reward correct, meaningful use over elegance.
+PART OF SPEECH (applies at all levels, especially A): Do NOT reject for using the word as a different part of speech from the one listed, provided the usage is correct English and shows the word's meaning. E.g. if the word of the day is the adjective "clean" and the student writes "She cleans the house", they have shown they understand what "clean" means — mark valid=true and you may briefly note the adjective form, but do not fail it.
 
 Minor punctuation issues are always fine. Accept creative, humorous, or playful sentences if the word is used correctly. Be warm and encouraging.
 
@@ -238,6 +240,9 @@ ACEPTA aunque el alumno use vocabulario diferente pero equivalente, diferente or
 ACEPTA CON NOTA si el alumno omite un pronombre de objeto indirecto (me, te, le, nos, os, les) que aparece en la respuesta sugerida — la frase sigue siendo correcta, solo es menos natural. Márcalo como válido pero indica brevemente qué pronombre faltaba.
 RECHAZA solo si hay un error gramatical claro o el significado es muy diferente.
 
+ITEMS QUE PRACTICAN UNA ESTRUCTURA — IMPORTANTE:
+Si la respuesta modelo usa una estructura específica (inversión, oración escindida/"cleft", futuro perfecto, etc.) y la frase del alumno es gramaticalmente correcta y significa lo mismo pero NO usa esa estructura, márcala como válida (valid=true), nunca como incorrecta. Reconoce que es correcta y luego anima a usar la estructura que se practica. Una frase gramaticalmente correcta y con sentido NUNCA se marca como inválida en este ejercicio.
+
 JSON:
 {"valid": true, "reason": "una frase corta alentadora"}
 o
@@ -272,6 +277,11 @@ REJECT (valid=false) if:
 
 FEEDBACK: Plain English only — no grammar labels, no syntactic categories (never write SVOC, SVO, etc.), no jargon. One short sentence. Warm and direct.
 
+STRUCTURE-TARGETED ITEMS — IMPORTANT:
+If the model answer uses a specific structure (inversion, cleft, future perfect, fronting, etc.) and the student's sentence is grammatically correct and means the same thing but does NOT use that structure, mark it AMBER (valid=true), never invalid. Affirm it's correct English, then nudge toward the structure being practised.
+Example: model="Only after the meeting did I realise my mistake.", student="I realised my mistake after the meeting." → valid=true, reason="That's correct English! This one's practising inversion though — try starting with 'Only after…'".
+A grammatically correct, meaningful sentence is NEVER marked invalid in this exercise.
+
 JSON:
 {"valid": true, "reason": "short encouraging note, mention suggested answer if vocabulary differs"}
 or
@@ -304,6 +314,17 @@ function findExpectedReplacement(originalSentence, correctAnswerSentence) {
   const tokenise = s => s.toLowerCase().replace(/[.,!?;:]/g, '').split(/\s+/).filter(Boolean);
   const orig = tokenise(originalSentence);
   const corr = tokenise(correctAnswerSentence);
+  // Clean single-word DELETION: orig has exactly one extra token, rest identical in order.
+  if (orig.length === corr.length + 1) {
+    let removedAt = -1;
+    for (let i = 0, j = 0; i < orig.length; i++) {
+      if (orig[i] === corr[j]) { j++; }
+      else if (removedAt === -1) { removedAt = i; }
+      else { return null; }  // more than one mismatch -> not a clean deletion
+    }
+    if (removedAt !== -1) return { remove: true, word: orig[removedAt] };
+    return null;
+  }
   if (orig.length !== corr.length) return null;
   let diffIdx = -1;
   for (let i = 0; i < orig.length; i++) {
@@ -327,7 +348,17 @@ async function handleCorrection(req, res) {
   const errorTrimmed   = errorWord.toLowerCase().trim();
   if (studentTrimmed !== errorTrimmed) {
     const expected = findExpectedReplacement(originalSentence, correctAnswerSentence);
-    if (expected) {
+    // Deletion case: the fix is to remove the error word entirely (tile UI sends "-").
+    if (expected && expected.remove) {
+      const removedOk =
+        (studentTrimmed === '-' || studentTrimmed === '') &&
+        expected.word === errorTrimmed;
+      if (removedOk) {
+        const reason = isSpanish ? '✅ ¡Correcto!' : '✅ Correct!';
+        return res.status(200).json({ valid: true, reason, feedback: reason });
+      }
+    }
+    if (expected && !expected.remove) {
       if (studentTrimmed === expected) {
         const reason = isSpanish ? '✅ ¡Correcto!' : '✅ Correct!';
         return res.status(200).json({ valid: true, reason, feedback: reason });
@@ -354,6 +385,7 @@ La respuesta correcta del modelo es: "${correctAnswerSentence}"
 Decide: ¿es la sustitución del alumno gramaticalmente correcta Y corrige el error?
 Responde SÍ sólo si la palabra del alumno realmente funciona como corrección válida, aunque sea diferente al modelo.
 Responde NO si es gramaticalmente incorrecta, cambia el significado de manera inapropiada, o no corrige el error.
+Si la corrección consiste en ELIMINAR la palabra con error por completo (sin sustituirla), entonces una respuesta vacía o "-" es la respuesta CORRECTA — marca valid=true.
 
 LONGITUD DEL FEEDBACK — sé MUY breve: una sola frase corta (dos como máximo), en un solo idioma. No escribas párrafos ni expliques de más. En A1/A2 usa palabras sencillas, sin terminología gramatical.
 
@@ -372,6 +404,7 @@ Is the student's replacement grammatically correct AND does it fix the error?
 Answer YES if it genuinely works as a valid correction, even if different from the model answer.
 Answer AMBER (valid=true) if the student has found the right error AND their replacement is a near-typo of the correct answer (1-2 characters different — e.g. "Finishec" for "finished", "finshed" for "finished"). This IS the right answer with a spelling mistake. Mark valid=true, skip the grammar explanation entirely, just confirm the correct spelling briefly. Apply this rule first before any other consideration.
 Answer NO if grammatically wrong, changes the meaning inappropriately, or doesn't fix the error.
+If the correction is to DELETE the error word entirely (no replacement needed), then an empty answer or "-" is the CORRECT response — mark valid=true.
 
 FEEDBACK LENGTH by level:
 - A1/A2: max 1 sentence, simple words, no grammar terminology.
