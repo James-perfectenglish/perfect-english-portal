@@ -247,45 +247,36 @@ JSON:
 {"valid": true, "reason": "una frase corta alentadora"}
 o
 {"valid": false, "reason": "una frase corta explicando por qué"}`
-    : `You are an experienced English teacher marking a sentence-building translation exercise. Mark as a good teacher would — fair, encouraging, and linguistically aware.
+    : `You are an experienced English teacher marking a "build a sentence" exercise. The student was given a bank of word tiles and asked to "build a correct sentence" — they were NOT told which tense or structure to use, and they do not see the model answer.
 
-Model answer: "${correctAnswer}"
+Model answer (what we had in mind): "${correctAnswer}"
 Student's answer: "${studentAnswer}"
 
-Step 1 — Is the student's sentence grammatically correct English? If not, it is invalid.
-Step 2 — Does it express the same or very similar meaning to the model answer?
-Step 3 — For translation exercises, check collocations: some phrases have fixed English equivalents that are different from a word-for-word translation.
+GUIDING PRINCIPLE — the most important rule:
+The brief was "build a CORRECT sentence". The student met it if they produced a grammatical, natural, sensible English sentence from the tiles. Because we did NOT request a specific tense, structure, or meaning, the student must NEVER be marked wrong merely for building a DIFFERENT sentence from the one we had in mind. BUT "different" must still be genuinely correct, natural English — not just word-shaped. A sentence that is unnatural, uses the wrong collocation, or is a false friend is NOT a correct sentence, and is still red.
 
-ACCEPT (valid=true) if:
-- Grammatically correct and same core meaning, even with different vocabulary or structure
-- Example: model="keep forgetting", student="always forget" → valid (same meaning, both natural)
-- Example: model="brush my teeth", student="clean my teeth" → valid (natural synonym)
-- Example: model="launch a new product", student="sell a new product" → valid=true with amber note ("launch" specifically means introduce for the first time; "sell" is grammatically natural here, just less specific)
-- Example: model="The report must be finished by Friday at the latest", student="The latest the report must be finished is Friday" → valid=true with amber note (same deadline meaning, just rearranged into a cleft structure — the model phrasing is more natural)
-- A simpler version that omits optional words but keeps the core meaning — note what was omitted
+The one thing this exercise drops compared to a translation task: we no longer reject for "meaning differs from the model". Everything else a good teacher checks — grammar, naturalness, collocation — still applies.
 
-AMBER — still valid=true, but add a note if:
-- The student omits an important word (e.g. "daily" from "daily routine") — accept but note it
-- The student uses a word that is grammatically correct but not the natural collocation — accept but explain the more natural phrasing
-- The student uses "one" as an indefinite article where "a" or "an" is the natural English choice (e.g. "one suitcase" instead of "a suitcase", "one taxi" instead of "a taxi") — mark valid=true but note that "a/an" is more natural. NEVER say "one" is clearer or better than "a" — it is not. This is a common error for Spanish speakers because "uno/una" can mean both.
+MARK valid=true (ACCEPT) when the sentence is correct and natural:
+- Same meaning as the model → valid=true, just praise it.
+- DIFFERENT but still correct and natural English (different tense, simpler, different emphasis, a genuine synonym) → valid=true with an AMBER note. Affirm it's correct, then invite the richer version as an open question.
+  Example: model="The bridge is being repaired at the moment", student="The bridge was repaired" → valid=true. "That's a correct sentence! How could you build one with 'is being repaired' to say it's happening right now?"
+  Example: model="keep forgetting", student="always forget" → valid=true (natural synonym).
+  Example: model="brush my teeth", student="clean my teeth" → valid=true (natural).
+- "one" used as an indefinite article where "a/an" is natural (e.g. "one suitcase" for "a suitcase") → valid=true, but note "a/an" is more natural. NEVER say "one" is clearer or better than "a" — it isn't. (Common Spanish-speaker slip: "uno/una".)
 
-REJECT (valid=false) if:
-- There is a clear grammar error
-- The meaning is significantly different
-- The student uses a false friend or wrong collocation that produces unnatural English. Example: model="a day off", student="a free day" → invalid ("free day" is not natural English). This does NOT apply to natural synonyms or grammatically-fine content-word swaps — those are amber (valid=true), not red.
-- The student's word order produces unnatural or incorrect English (e.g. "awake fully" instead of "fully awake"). Different order from the model is fine IF the student's order is itself natural English — but if the student's own word order is wrong, mark invalid.
+MARK valid=false (REJECT) when the sentence is NOT correct, natural English:
+- A clear grammar error, or word order that produces unnatural/incorrect English (e.g. "awake fully" instead of "fully awake"). A different order from the model is fine ONLY if the student's order is itself natural English.
+- A false friend or wrong collocation that produces unnatural English. Example: model="a day off", student="a free day" → invalid ("free day" is not natural English). This does NOT apply to genuine synonyms or grammatically-fine content-word swaps — those are amber (valid=true), not red.
+- The sentence is broken or nonsensical.
+Do NOT reject for a different-but-natural tense/structure, and do NOT reject for minor punctuation or capitalisation.
 
-FEEDBACK: Plain English only — no grammar labels, no syntactic categories (never write SVOC, SVO, etc.), no jargon. One short sentence. Warm and direct.
-
-STRUCTURE-TARGETED ITEMS — IMPORTANT:
-If the model answer uses a specific structure (inversion, cleft, future perfect, fronting, etc.) and the student's sentence is grammatically correct and means the same thing but does NOT use that structure, mark it AMBER (valid=true), never invalid. Affirm it's correct English, then nudge toward the structure being practised.
-Example: model="Only after the meeting did I realise my mistake.", student="I realised my mistake after the meeting." → valid=true, reason="That's correct English! This one's practising inversion though — try starting with 'Only after…'".
-A grammatically correct, meaningful sentence is NEVER marked invalid in this exercise.
+FEEDBACK: Plain English only — no grammar-jargon codes (never write SVO, SVOC, etc.). One or two short, warm sentences. When nudging toward a tense/structure, phrase it as a friendly "how could you…?" invitation and quote the helpful phrase, never a telling-off.
 
 JSON:
-{"valid": true, "reason": "short encouraging note, mention suggested answer if vocabulary differs"}
+{"valid": true, "reason": "short warm note; if it differs from the model, affirm it's correct then invite the target tense/structure as a question"}
 or
-{"valid": false, "reason": "one kind sentence explaining why"}`;
+{"valid": false, "reason": "one kind sentence on what's unnatural/incorrect and how to fix it"}`;
   return callAI(prompt, 150, res, 'mark-free.word_order');
 }
 

@@ -399,7 +399,10 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     if (altNorms.includes(norm)) { finish(true, { correct: q.correct_answer, type: 'alternative', note: altFeedback(norm) }); return }
     if (informal.some(a => normalise(a) === norm)) { finish(true, { correct: q.correct_answer, type: 'informal', note: q.informal_feedback }); return }
     const dist = levenshtein(norm, correctNorm)
-    const fuzzy = (correctNorm.length > 3 && dist === 1) || (dist === 2 && correctNorm.length >= 6) || altNorms.some(an => { const d = levenshtein(norm, an); return (an.length > 3 && d === 1) || (d === 2 && an.length >= 6) })
+    // Short function-word answers (of/on/in/at/to/up/by/as…): exact match only, no fuzzy.
+    // These are all ~1 edit apart, so typo-tolerance wrongly pardons a different wrong word.
+    const shortAnswer = correctNorm.length <= 2
+    const fuzzy = !shortAnswer && ((correctNorm.length > 3 && dist === 1) || (dist === 2 && correctNorm.length >= 6) || altNorms.some(an => { const d = levenshtein(norm, an); return (an.length > 3 && d === 1) || (d === 2 && an.length >= 6) }))
     if (fuzzy) { finish(true, { correct: q.correct_answer, type: 'fuzzy' }); return }
     try {
       const res = await fetch('/api/mark-gap', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'gap_fill', question: q.question, correctAnswer: q.correct_answer, studentAnswer: answer, acceptableAlternatives: alts, informalAccepted: informal }) })
