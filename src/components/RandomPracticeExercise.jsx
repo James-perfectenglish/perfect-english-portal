@@ -720,6 +720,29 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     saveAnswer(cq, `${words[ecSelectedWordIndex]} → ${ecCorrection.trim()}`, false);
   };
 
+  // ── Remove the selected tile (deletion correction) ── deterministic, no AI ──
+  const removeECWord = () => {
+    if (ecSelectedWordIndex === null || feedback || isChecking) return;
+    const cq = questions[currentQuestionIndex];
+    const words = cq.question.trim().split(/\s+/);
+    const correctAnswer = cq.correct_answer || '';
+    const removedSentence = words.filter((_, i) => i !== ecSelectedWordIndex).join(' ');
+    const errorInfo = findErrorIndex(words, correctAnswer);
+    if (normaliseEC(removedSentence) === normaliseEC(correctAnswer)) {
+      setFeedback({ type: 'correct', message: `✅ Correct! ${cq.explanation || ''}`, isCorrect: true, errorIndex: ecSelectedWordIndex, correctWord: '(removed)' });
+      setScore(s => s + 1);
+      saveAnswer(cq, `${words[ecSelectedWordIndex]} → (removed)`, true);
+      return;
+    }
+    if (ecSelectedWordIndex !== errorInfo.index) {
+      setFeedback({ type: 'incorrect', message: `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${cq.explanation || ''}`, isCorrect: false, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
+      saveAnswer(cq, `${words[ecSelectedWordIndex]} → (removed)`, false);
+      return;
+    }
+    setFeedback({ type: 'incorrect', message: `❌ Good — you found the error, but this word needs changing, not removing. It should be "${errorInfo.correctWord}". ${cq.explanation || ''}`, isCorrect: false, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
+    saveAnswer(cq, `${words[ecSelectedWordIndex]} → (removed)`, false);
+  };
+
   const handleSentenceBuildingResult = (isCorrect, isSoft = false, userAnswer = '', aiReason = '') => {
     const cq = questions[currentQuestionIndex];
     if (isCorrect) {
@@ -1045,7 +1068,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 {currentQuestion.type === 'error_correction' && (
                   <div>
                     <div style={{ fontSize: '0.9rem', color: '#718096', marginBottom: '1rem', fontStyle: 'italic' }}>
-                      {isChecking ? '🤖 Checking your answer...' : !feedback ? '👆 Tap the word that is wrong, then type the correction below.' : feedback.isCorrect ? 'Well done!' : 'See the correction below.'}
+                      {isChecking ? '🤖 Checking your answer...' : !feedback ? '👆 Tap the word that is wrong, then change it or remove it.' : feedback.isCorrect ? 'Well done!' : 'See the correction below.'}
                     </div>
                     <div style={{ backgroundColor: '#F8FBFF', padding: '1.25rem', borderRadius: '10px', border: '1px solid #AED6F1', lineHeight: '2.4', marginBottom: '1.25rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
                       {ecWords.map((word, index) => (
@@ -1063,19 +1086,22 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                       )}
                     </div>
                     {ecSelectedWordIndex !== null && !feedback && !isChecking && (
-                      <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', alignItems: 'stretch' }}>
+                      <>
+                      <div style={{ display: 'flex', gap: '10px', marginBottom: '0.6rem', alignItems: 'stretch' }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                            Your correction for "{ecWords[ecSelectedWordIndex]}":
+                            Fix "{ecWords[ecSelectedWordIndex]}" — type the correction, or remove it:
                           </div>
                           <input type="text" value={ecCorrection} onChange={(e) => setEcCorrection(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && checkECAnswer()}
+                            onKeyDown={(e) => { if (e.key === 'Enter') checkECAnswer(); else if (e.key === 'Backspace' && ecCorrection === '') { e.preventDefault(); removeECWord(); } }}
                             placeholder="Type the correct word..." autoFocus
                             style={{ width: '100%', padding: '0.9rem 1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', borderRadius: '8px', border: '2px solid #667eea', boxSizing: 'border-box', color: '#2d3748', fontWeight: 500, backgroundColor: '#EDE9FE' }} />
                         </div>
                         <button onClick={checkECAnswer} disabled={!ecCorrection.trim() || isChecking}
                           style={{ padding: '0 1.5rem', background: ecCorrection.trim() ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#cbd5e0', color: 'white', border: 'none', borderRadius: '8px', cursor: ecCorrection.trim() ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '1rem', alignSelf: 'flex-end', minHeight: '48px' }}>Check</button>
                       </div>
+                      <button onClick={removeECWord} style={{ marginBottom: '1rem', background: 'white', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.5rem 0.9rem', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>🗑 Remove "{ecWords[ecSelectedWordIndex]}" (it shouldn't be there)</button>
+                      </>
                     )}
                     {ecSelectedWordIndex === null && !feedback && !isChecking && (
                       <div style={{ textAlign: 'center', padding: '1rem', color: '#A0AEC0', fontSize: '0.95rem', border: '2px dashed #E2E8F0', borderRadius: '8px' }}>

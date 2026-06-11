@@ -205,6 +205,30 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter, userT
     saveAnswer(q, `${words[selectedWordIndex]} → ${correction.trim()}`, false, false);
   };
 
+  // ── Remove the selected tile (deletion correction) ──
+  // Deterministic: splice the tile out and exact-match the result. No AI call.
+  const removeWord = () => {
+    if (selectedWordIndex === null || feedback || isChecking) return;
+    const q = questions[currentQ];
+    const words = q.question.trim().split(/\s+/);
+    const correctAnswer = q.correct_answer || '';
+    const removedSentence = words.filter((_, i) => i !== selectedWordIndex).join(' ');
+    const errorInfo = findErrorIndex(words, correctAnswer);
+    if (normalise(removedSentence) === normalise(correctAnswer)) {
+      setScore(s => s + 1);
+      setFeedback({ type: 'pass', message: `✅ Correct! ${q.explanation || ''}`, errorIndex: selectedWordIndex, correctWord: '(removed)' });
+      saveAnswer(q, `${words[selectedWordIndex]} → (removed)`, true, false);
+      return;
+    }
+    if (selectedWordIndex !== errorInfo.index) {
+      setFeedback({ type: 'fail', message: `❌ The error is actually in "${words[errorInfo.index]}" — it should be "${errorInfo.correctWord}". ${q.explanation || ''}`, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
+      saveAnswer(q, `${words[selectedWordIndex]} → (removed)`, false, false);
+      return;
+    }
+    setFeedback({ type: 'fail', message: `❌ Good — you found the error, but this word needs changing, not removing. It should be "${errorInfo.correctWord}". ${q.explanation || ''}`, errorIndex: errorInfo.index, correctWord: errorInfo.correctWord });
+    saveAnswer(q, `${words[selectedWordIndex]} → (removed)`, false, false);
+  };
+
   const nextQuestion = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     if (currentQ + 1 >= questions.length) setStage('finished');
@@ -305,7 +329,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter, userT
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
       <div style={{ background: GRADIENT, borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1.5rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.8rem' }}>✏️ Error Correction</h1>
-        <p style={{ margin: '8px 0 0', opacity: 0.9 }}>👆 Tap the wrong word, then type the correction</p>
+        <p style={{ margin: '8px 0 0', opacity: 0.9 }}>👆 Tap the wrong word, then change it or remove it</p>
         {selectedLevel && <span style={{ display: 'inline-block', background: selectedLevel.colour, padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, marginTop: '8px' }}>{selectedLevel.badgeLabel}</span>}
       </div>
       <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
@@ -331,7 +355,7 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter, userT
                 <AiMarkedBadge />
               </div>
               <div style={{ fontSize: '0.9rem', color: '#718096', marginBottom: '1rem', fontStyle: 'italic' }}>
-                {isChecking ? '🤖 Checking your answer...' : !feedback ? '👆 Tap the word that is wrong, then type the correction below.' : feedback.type === 'pass' ? 'Well done!' : feedback.type === 'fuzzy' ? 'Correct — watch your spelling!' : feedback.type === 'soft-pass' ? 'Valid alternative — well spotted!' : 'See the correction below.'}
+                {isChecking ? '🤖 Checking your answer...' : !feedback ? '👆 Tap the word that is wrong, then change it or remove it.' : feedback.type === 'pass' ? 'Well done!' : feedback.type === 'fuzzy' ? 'Correct — watch your spelling!' : feedback.type === 'soft-pass' ? 'Valid alternative — well spotted!' : 'See the correction below.'}
               </div>
               <div style={{ backgroundColor: '#F8FBFF', padding: '1.25rem', borderRadius: '10px', border: '1px solid #AED6F1', lineHeight: '2.4', marginBottom: '1.25rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
                 {questionWords.map((word, index) => (
@@ -350,13 +374,16 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter, userT
               </div>
               {isChecking && <div style={{ textAlign: 'center', padding: '1rem', color: '#553C9A', fontSize: '0.95rem', border: '2px dashed #EDE9FE', borderRadius: '8px', marginBottom: '1rem' }}>🤖 Asking the AI marker...</div>}
               {selectedWordIndex !== null && !feedback && !isChecking && (
-                <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', alignItems: 'stretch' }}>
+                <>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '0.6rem', alignItems: 'stretch' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Your correction for "{questionWords[selectedWordIndex]}":</div>
-                    <input type="text" value={correction} onChange={(e) => setCorrection(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && checkAnswer()} placeholder="Type the correct word..." autoFocus style={{ width: '100%', padding: '0.9rem 1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', borderRadius: '8px', border: '2px solid #667eea', boxSizing: 'border-box', color: '#2d3748', fontWeight: 500, backgroundColor: '#EDE9FE' }} />
+                    <div style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Fix "{questionWords[selectedWordIndex]}" — type the correction, or remove it:</div>
+                    <input type="text" value={correction} onChange={(e) => setCorrection(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') checkAnswer(); else if (e.key === 'Backspace' && correction === '') { e.preventDefault(); removeWord(); } }} placeholder="Type the correct word..." autoFocus style={{ width: '100%', padding: '0.9rem 1rem', fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', borderRadius: '8px', border: '2px solid #667eea', boxSizing: 'border-box', color: '#2d3748', fontWeight: 500, backgroundColor: '#EDE9FE' }} />
                   </div>
                   <button onClick={checkAnswer} disabled={!correction.trim()} style={{ padding: '0 1.5rem', background: correction.trim() ? GRADIENT : '#cbd5e0', color: 'white', border: 'none', borderRadius: '8px', cursor: correction.trim() ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '1rem', alignSelf: 'flex-end', minHeight: '48px' }}>Check</button>
                 </div>
+                <button onClick={removeWord} style={{ marginBottom: '1rem', background: 'white', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.5rem 0.9rem', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>🗑 Remove "{questionWords[selectedWordIndex]}" (it shouldn't be there)</button>
+                </>
               )}
               {selectedWordIndex === null && !feedback && !isChecking && <div style={{ textAlign: 'center', padding: '1rem', color: '#A0AEC0', fontSize: '0.95rem', border: '2px dashed #E2E8F0', borderRadius: '8px' }}>👆 Tap the word you think is wrong</div>}
               {feedback && feedbackStyle && <div style={{ backgroundColor: feedbackStyle.bg, border: `1px solid ${feedbackStyle.border}`, color: feedbackStyle.color, padding: '1rem 1.25rem', borderRadius: '10px', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: '1.6', marginBottom: '0.75rem' }}>{feedback.message}</div>}
