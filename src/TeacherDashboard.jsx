@@ -292,8 +292,8 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     // Group: per student, count by source.
     const totals = {}
     rows.forEach(r => {
-      if (!totals[r.student_id]) totals[r.student_id] = { wordle: 0, spelling_bee: 0, connections: 0, wotd: 0, gotd: 0, wordsearch: 0, teacher_awarded: 0, other: 0, total: 0 }
-      const bucket = ['wordle','spelling_bee','connections','wotd','gotd','wordsearch','teacher_awarded'].includes(r.source) ? r.source : 'other'
+      if (!totals[r.student_id]) totals[r.student_id] = { wordle: 0, spelling_bee: 0, connections: 0, wotd: 0, gotd: 0, wordsearch: 0, crossword: 0, teacher_awarded: 0, other: 0, total: 0 }
+      const bucket = ['wordle','spelling_bee','connections','wotd','gotd','wordsearch','crossword','teacher_awarded'].includes(r.source) ? r.source : 'other'
       totals[r.student_id][bucket]++
       totals[r.student_id].total++
     })
@@ -669,6 +669,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Word of the Day">📖</th>
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Grammar of the Day">📝</th>
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Wordsearch">🔎</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Crossword">✜</th>
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Sentence challenges in topic practice / RPE">✍️</th>
                     <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Awarded by you">👨‍🏫</th>
                     <th style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: '#718096', fontWeight: 600 }}>Total</th>
@@ -687,6 +688,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                       <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wotd            || '—'}</td>
                       <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.gotd            || '—'}</td>
                       <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wordsearch      || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.crossword       || '—'}</td>
                       <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.other           || '—'}</td>
                       <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.teacher_awarded || '—'}</td>
                       <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 700, color: '#2C3E50' }}>
@@ -700,80 +702,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
           </div>
         )}
       </div>
-
-      {/* QUEEN BEE ACHIEVEMENTS */}
-      {queenBeeAlerts.length > 0 && (
-        <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden', marginBottom: '1rem' }}>
-          <div onClick={() => setQueenBeeOpen(o => !o)}
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', cursor: 'pointer', borderBottom: queenBeeOpen ? '1px solid #fde68a' : 'none', background: '#fffbeb' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <span style={{ fontSize: '1.3rem' }}>👑</span>
-              <div>
-                <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#2C3E50', margin: 0 }}>Queen Bee Achievements</h2>
-                <p style={{ fontSize: '0.75rem', color: '#718096', margin: 0 }}>
-                  {(() => {
-                    const unseen = queenBeeAlerts.filter(a => !a.seen_by_teacher).length
-                    return unseen > 0
-                      ? `${unseen} new · ${queenBeeAlerts.length} all-time`
-                      : `${queenBeeAlerts.length} total`
-                  })()}
-                </p>
-              </div>
-            </div>
-            <div style={{ background: queenBeeOpen ? 'linear-gradient(135deg, #f59e0b, #d97706)' : '#e2e8f0', color: 'white', borderRadius: '8px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
-              {queenBeeOpen ? '🍯' : '🔒'}
-            </div>
-          </div>
-          {queenBeeOpen && (
-            <div style={{ padding: '0.5rem 1.25rem 1.25rem' }}>
-              {queenBeeAlerts.map(a => {
-                const lang     = a.puzzle?.language === 'es' ? '🇪🇸' : '🇬🇧'
-                const centre   = (a.puzzle?.centre_letter || '').toUpperCase()
-                const outer    = (a.puzzle?.outer_letters || []).map(l => l.toUpperCase()).join('')
-                const pangrams = (a.puzzle?.pangrams || []).map(p => p.toUpperCase()).join(', ')
-                return (
-                  <div key={a.id} style={{
-                    display: 'flex', alignItems: 'center', gap: '0.75rem',
-                    padding: '0.8rem 0.9rem', borderRadius: '10px', marginTop: '0.6rem',
-                    background: a.seen_by_teacher ? '#fafafa' : '#fffbeb',
-                    border: `1px solid ${a.seen_by_teacher ? '#e2e8f0' : '#fde68a'}`,
-                  }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.8rem' }}>
-                      {initials(a.student?.full_name)}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 700, color: '#2C3E50' }}>{a.student?.full_name || 'Unknown'}</span>
-                        {!a.seen_by_teacher && (
-                          <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 700, background: '#fde68a', color: '#92400e' }}>NEW</span>
-                        )}
-                        <span style={{ fontSize: '0.75rem', color: '#a0aec0' }}>{formatDate(a.achieved_at)}</span>
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: '#718096', marginTop: '2px' }}>
-                        {lang} · centre <strong style={{ color: '#d97706' }}>{centre}</strong> · {outer} · {a.word_count} words · {a.score} pts
-                        {pangrams && <> · {pangrams}</>}
-                      </div>
-                      {a.note && (
-                        <div style={{ fontSize: '0.78rem', color: '#92400e', marginTop: '4px', fontStyle: 'italic', lineHeight: 1.4 }}>
-                          📝 {a.note}
-                        </div>
-                      )}
-                    </div>
-                    {!a.seen_by_teacher && (
-                      <button
-                        onClick={() => markQueenBeeSeen(a.id)}
-                        title="Mark as seen"
-                        style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #fde68a', background: 'white', color: '#92400e', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                        ✓ Seen
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* WORD OF THE DAY SUBMISSIONS */}
       <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
@@ -875,6 +803,80 @@ export default function TeacherDashboard({ profile, handleLogout }) {
           </div>
         )}
       </div>
+
+      {/* QUEEN BEE ACHIEVEMENTS */}
+      {queenBeeAlerts.length > 0 && (
+        <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden', marginBottom: '1rem' }}>
+          <div onClick={() => setQueenBeeOpen(o => !o)}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', cursor: 'pointer', borderBottom: queenBeeOpen ? '1px solid #fde68a' : 'none', background: '#fffbeb' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span style={{ fontSize: '1.3rem' }}>👑</span>
+              <div>
+                <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#2C3E50', margin: 0 }}>Queen Bee Achievements</h2>
+                <p style={{ fontSize: '0.75rem', color: '#718096', margin: 0 }}>
+                  {(() => {
+                    const unseen = queenBeeAlerts.filter(a => !a.seen_by_teacher).length
+                    return unseen > 0
+                      ? `${unseen} new · ${queenBeeAlerts.length} all-time`
+                      : `${queenBeeAlerts.length} total`
+                  })()}
+                </p>
+              </div>
+            </div>
+            <div style={{ background: queenBeeOpen ? 'linear-gradient(135deg, #f59e0b, #d97706)' : '#e2e8f0', color: 'white', borderRadius: '8px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
+              {queenBeeOpen ? '🍯' : '🔒'}
+            </div>
+          </div>
+          {queenBeeOpen && (
+            <div style={{ padding: '0.5rem 1.25rem 1.25rem' }}>
+              {queenBeeAlerts.map(a => {
+                const lang     = a.puzzle?.language === 'es' ? '🇪🇸' : '🇬🇧'
+                const centre   = (a.puzzle?.centre_letter || '').toUpperCase()
+                const outer    = (a.puzzle?.outer_letters || []).map(l => l.toUpperCase()).join('')
+                const pangrams = (a.puzzle?.pangrams || []).map(p => p.toUpperCase()).join(', ')
+                return (
+                  <div key={a.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.75rem',
+                    padding: '0.8rem 0.9rem', borderRadius: '10px', marginTop: '0.6rem',
+                    background: a.seen_by_teacher ? '#fafafa' : '#fffbeb',
+                    border: `1px solid ${a.seen_by_teacher ? '#e2e8f0' : '#fde68a'}`,
+                  }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.8rem' }}>
+                      {initials(a.student?.full_name)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 700, color: '#2C3E50' }}>{a.student?.full_name || 'Unknown'}</span>
+                        {!a.seen_by_teacher && (
+                          <span style={{ padding: '1px 8px', borderRadius: '99px', fontSize: '0.68rem', fontWeight: 700, background: '#fde68a', color: '#92400e' }}>NEW</span>
+                        )}
+                        <span style={{ fontSize: '0.75rem', color: '#a0aec0' }}>{formatDate(a.achieved_at)}</span>
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#718096', marginTop: '2px' }}>
+                        {lang} · centre <strong style={{ color: '#d97706' }}>{centre}</strong> · {outer} · {a.word_count} words · {a.score} pts
+                        {pangrams && <> · {pangrams}</>}
+                      </div>
+                      {a.note && (
+                        <div style={{ fontSize: '0.78rem', color: '#92400e', marginTop: '4px', fontStyle: 'italic', lineHeight: 1.4 }}>
+                          📝 {a.note}
+                        </div>
+                      )}
+                    </div>
+                    {!a.seen_by_teacher && (
+                      <button
+                        onClick={() => markQueenBeeSeen(a.id)}
+                        title="Mark as seen"
+                        style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #fde68a', background: 'white', color: '#92400e', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        ✓ Seen
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {awardingFor && (
         <AwardStarModal
