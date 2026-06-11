@@ -634,6 +634,73 @@ export default function TeacherDashboard({ profile, handleLogout }) {
         </div>
       )}
 
+      {/* WEEKLY STARS LEADERBOARD */}
+      <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden', marginBottom: '1rem' }}>
+        <div onClick={() => setWeeklyStarsOpen(o => !o)}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', cursor: 'pointer', borderBottom: weeklyStarsOpen ? '1px solid #e2e8f0' : 'none', background: '#fafafa' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.1rem' }}>⭐</span>
+            <div>
+              <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: 0 }}>Stars this week</h2>
+              <p style={{ fontSize: '0.75rem', color: '#718096', margin: 0 }}>
+                {weeklyStars.length > 0
+                  ? `${weeklyStars.length} student${weeklyStars.length !== 1 ? 's' : ''} earned stars`
+                  : 'No stars yet this week'}
+              </p>
+            </div>
+          </div>
+          <div style={{ background: weeklyStarsOpen ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#e2e8f0', borderRadius: '8px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
+            {weeklyStarsOpen ? '🟩' : '🔒'}
+          </div>
+        </div>
+        {weeklyStarsOpen && (
+          <div style={{ padding: '1.25rem' }}>
+            {weeklyStars.length === 0 ? (
+              <p style={{ color: '#a0aec0', textAlign: 'center', padding: '1rem', margin: 0 }}>No stars earned this week yet.</p>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                    <th style={{ padding: '0.5rem 0.5rem', textAlign: 'left',   color: '#718096', fontWeight: 600 }}>#</th>
+                    <th style={{ padding: '0.5rem 0.5rem', textAlign: 'left',   color: '#718096', fontWeight: 600 }}>Student</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Wordle">🟩</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Spelling Bee">🐝</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Connections">🔗</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Word of the Day">📖</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Grammar of the Day">📝</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Wordsearch">🔎</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Sentence challenges in topic practice / RPE">✍️</th>
+                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Awarded by you">👨‍🏫</th>
+                    <th style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: '#718096', fontWeight: 600 }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {weeklyStars.map((s, i) => (
+                    <tr key={s.id} style={{ borderBottom: '1px solid #f0f0f0', background: i === 0 ? '#fffbeb' : i % 2 === 0 ? 'white' : '#fafafa' }}>
+                      <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: i === 0 ? '#f59e0b' : '#718096' }}>
+                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                      </td>
+                      <td style={{ padding: '0.6rem 0.5rem', fontWeight: 600, color: '#2C3E50' }}>{s.name}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wordle          || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.spelling_bee    || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.connections     || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wotd            || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.gotd            || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wordsearch      || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.other           || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.teacher_awarded || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 700, color: '#2C3E50' }}>
+                        {s.total}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* QUEEN BEE ACHIEVEMENTS */}
       {queenBeeAlerts.length > 0 && (
         <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden', marginBottom: '1rem' }}>
@@ -707,73 +774,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
           )}
         </div>
       )}
-
-      {/* WEEKLY STARS LEADERBOARD */}
-      <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden', marginBottom: '1rem' }}>
-        <div onClick={() => setWeeklyStarsOpen(o => !o)}
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', cursor: 'pointer', borderBottom: weeklyStarsOpen ? '1px solid #e2e8f0' : 'none', background: '#fafafa' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '1.1rem' }}>⭐</span>
-            <div>
-              <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: 0 }}>Stars this week</h2>
-              <p style={{ fontSize: '0.75rem', color: '#718096', margin: 0 }}>
-                {weeklyStars.length > 0
-                  ? `${weeklyStars.length} student${weeklyStars.length !== 1 ? 's' : ''} earned stars`
-                  : 'No stars yet this week'}
-              </p>
-            </div>
-          </div>
-          <div style={{ background: weeklyStarsOpen ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#e2e8f0', borderRadius: '8px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
-            {weeklyStarsOpen ? '🟩' : '🔒'}
-          </div>
-        </div>
-        {weeklyStarsOpen && (
-          <div style={{ padding: '1.25rem' }}>
-            {weeklyStars.length === 0 ? (
-              <p style={{ color: '#a0aec0', textAlign: 'center', padding: '1rem', margin: 0 }}>No stars earned this week yet.</p>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                    <th style={{ padding: '0.5rem 0.5rem', textAlign: 'left',   color: '#718096', fontWeight: 600 }}>#</th>
-                    <th style={{ padding: '0.5rem 0.5rem', textAlign: 'left',   color: '#718096', fontWeight: 600 }}>Student</th>
-                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Wordle">🟩</th>
-                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Spelling Bee">🐝</th>
-                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Connections">🔗</th>
-                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Word of the Day">📖</th>
-                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Grammar of the Day">📝</th>
-                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Wordsearch">🔎</th>
-                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Sentence challenges in topic practice / RPE">✍️</th>
-                    <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center', color: '#718096', fontWeight: 600 }} title="Awarded by you">👨‍🏫</th>
-                    <th style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: '#718096', fontWeight: 600 }}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {weeklyStars.map((s, i) => (
-                    <tr key={s.id} style={{ borderBottom: '1px solid #f0f0f0', background: i === 0 ? '#fffbeb' : i % 2 === 0 ? 'white' : '#fafafa' }}>
-                      <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: i === 0 ? '#f59e0b' : '#718096' }}>
-                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
-                      </td>
-                      <td style={{ padding: '0.6rem 0.5rem', fontWeight: 600, color: '#2C3E50' }}>{s.name}</td>
-                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wordle          || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.spelling_bee    || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.connections     || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wotd            || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.gotd            || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.wordsearch      || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.other           || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center', color: '#4a5568' }}>{s.teacher_awarded || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 700, color: '#2C3E50' }}>
-                        {s.total}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* WORD OF THE DAY SUBMISSIONS */}
       <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
