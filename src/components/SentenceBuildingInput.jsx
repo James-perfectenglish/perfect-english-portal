@@ -68,6 +68,10 @@ export default function SentenceBuildingInput({
     return Math.min(...counts);
   })();
 
+  // Signal when the target sentence is a question, so students know to build a question form.
+  const isQuestionTarget = Array.isArray(correctSentences) &&
+    correctSentences.some(s => (s || '').trim().endsWith('?'));
+
   useEffect(() => {
     const wordsWithIds = words.map((text, i) => ({ id: `w${i}`, text }));
     setBankWords(shuffleArray(wordsWithIds));
@@ -225,6 +229,13 @@ export default function SentenceBuildingInput({
       {showTypeBadge && questionType === 'build' && (
         <div style={{ display: 'inline-block', padding: '3px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '600', marginBottom: '1rem', backgroundColor: '#DBEAFE', color: '#1E40AF', border: '1px solid #60A5FA' }}>
           🔨 Build a sentence
+        </div>
+      )}
+
+      {/* Question-target hint — shows whenever the answer is a question, so the student aims for a question form */}
+      {isQuestionTarget && (
+        <div style={{ display: 'inline-block', padding: '3px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '600', marginBottom: '1rem', marginLeft: showTypeBadge ? '8px' : '0', backgroundColor: '#FEF3C7', color: '#92400E', border: '1px solid #F59E0B' }}>
+          ❓ Make a question
         </div>
       )}
 
