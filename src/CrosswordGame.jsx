@@ -80,8 +80,9 @@ function levelForProfile(profile) {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function CrosswordGame({ onBack, userProfile }) {
+export default function CrosswordGame({ onBack, userProfile, classPuzzle = null }) {
   const location = useLocation()
+  const teacherMode = !!classPuzzle  // Class Play: specific puzzle, no stars/session writes
 
   function detectLanguage() {
     if (location.state?.isSpanish) return 'es'
@@ -90,10 +91,10 @@ export default function CrosswordGame({ onBack, userProfile }) {
     return 'en'
   }
 
-  const [language] = useState(() => detectLanguage())
+  const [language] = useState(() => classPuzzle ? classPuzzle.language : detectLanguage())
   const isSpanish  = language === 'es'
 
-  const [level, setLevel] = useState(() => isSpanish ? 'A' : levelForProfile(userProfile))
+  const [level, setLevel] = useState(() => classPuzzle ? classPuzzle.level : (isSpanish ? 'A' : levelForProfile(userProfile)))
   const [gameState, setGameState]         = useState('loading')
   const [puzzle, setPuzzle]               = useState(null)
   const [cellLetters, setCellLetters]     = useState({})
@@ -170,6 +171,14 @@ export default function CrosswordGame({ onBack, userProfile }) {
     setSentenceFeedback(null)
     setSentenceStar(false)
 
+    // Class Play: a specific puzzle is supplied; play it fresh, no saved progress.
+    if (teacherMode) {
+      setPuzzle(classPuzzle)
+      setInitialActiveCell(classPuzzle)
+      setGameState('playing')
+      return
+    }
+
     const { data: p } = await supabase
       .from('crossword_puzzles')
       .select('*')
@@ -227,6 +236,7 @@ export default function CrosswordGame({ onBack, userProfile }) {
   }
 
   async function saveProgress(extras = {}) {
+    if (teacherMode) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || !puzzle) return
     const { cellLetters, revealedCells, hintsUsed, starWordFound } = stateRef.current
@@ -243,6 +253,7 @@ export default function CrosswordGame({ onBack, userProfile }) {
   }
 
   async function writeStar(subtype, contextExtras = {}) {
+    if (teacherMode) return
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user || !puzzle) return
@@ -594,7 +605,7 @@ export default function CrosswordGame({ onBack, userProfile }) {
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
       {onBack && <Breadcrumb section={isSpanish ? 'Jugar' : 'Play'} title={isSpanish ? 'Crucigrama' : 'Crossword'} onExit={onBack} />}
       <div style={{ maxWidth: '500px', margin: '0 auto', padding: '2rem 1rem' }}>
-        {!isSpanish && LevelPills}
+        {!isSpanish && !teacherMode && LevelPills}
         <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✜</div>
           <h2 style={{ color: '#2d3748' }}>
@@ -645,7 +656,7 @@ export default function CrosswordGame({ onBack, userProfile }) {
           </p>
         </div>
 
-        {!isSpanish && LevelPills}
+        {!isSpanish && !teacherMode && LevelPills}
 
         {/* Status bar */}
         <div style={{ background: 'white', borderRadius: '12px', padding: '0.75rem 1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
@@ -953,6 +964,7 @@ export default function CrosswordGame({ onBack, userProfile }) {
           apiContext="challenge"
           dedupeKey={`crossword:${puzzle.play_date}:${language}:${puzzle.level}:sentence`}
           onMarkResult={handleSentenceMarked}
+          noStars={teacherMode}
           onClose={() => setShowChallenge(false)}
         />
       )}

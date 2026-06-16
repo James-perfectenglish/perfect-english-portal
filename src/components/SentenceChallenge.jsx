@@ -13,6 +13,7 @@ export default function SentenceChallenge({
   apiContext = 'challenge', // 'challenge' | 'wotd' | 'gotd' — routes the mark-free.js prompt
   apiExtraFields = {},      // spread into the mark-free.js request body (e.g. partOfSpeech, definition)
   dedupeKey,         // optional: when set, opts in to ux_stars_dedupe anti-farming.
+  noStars = false,   // teacher Class Play: run the full challenge but persist no star
   onMarkResult,      // optional async callback: ({ sentence, inputMethod, result }) => {}
   onClose
 }) {
@@ -116,7 +117,8 @@ export default function SentenceChallenge({
       setResult(result);
       setPhase('result');
       // Star log — only write on pass. source = exercise (wotd/gotd/wordle/spelling_bee/etc).
-      if (result.valid === true) {
+      // teacher Class Play (noStars) plays the full challenge but writes nothing.
+      if (result.valid === true && !noStars) {
         try {
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {

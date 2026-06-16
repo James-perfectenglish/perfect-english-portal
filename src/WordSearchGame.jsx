@@ -97,8 +97,9 @@ function isShadowPath(path, placements) {
   return false
 }
 
-export default function WordSearchGame({ onBack, userProfile }) {
+export default function WordSearchGame({ onBack, userProfile, classPuzzle = null }) {
   const location = useLocation()
+  const teacherMode = !!classPuzzle  // Class Play: specific puzzle, no stars/session writes
 
   function detectLanguage() {
     if (location.state?.isSpanish) return 'es'
@@ -107,7 +108,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
     return 'en'
   }
 
-  const [language] = useState(() => detectLanguage())
+  const [language] = useState(() => classPuzzle ? classPuzzle.language : detectLanguage())
   const isSpanish  = language === 'es'
 
   const [gameState, setGameState]           = useState('loading')
@@ -148,6 +149,9 @@ export default function WordSearchGame({ onBack, userProfile }) {
   useEffect(() => { loadPuzzle() }, [])
 
   async function loadPuzzle() {
+    // Class Play: a specific puzzle is supplied; play it fresh, no saved progress.
+    if (teacherMode) { setPuzzle(classPuzzle); setGameState('playing'); return }
+
     const { data: p } = await supabase
       .from('wordsearch_puzzles')
       .select('*')
@@ -193,6 +197,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
   }
 
   async function saveProgress(extras = {}) {
+    if (teacherMode) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || !puzzle) return
     const { themeWordsFound, bonusWordsFound, bonusWordPaths, hintsUsed, score } = stateRef.current
@@ -383,6 +388,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
   }
 
   async function writeStar(subtype, contextExtras = {}) {
+    if (teacherMode) return
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user || !puzzle) return
@@ -853,6 +859,7 @@ export default function WordSearchGame({ onBack, userProfile }) {
           apiContext="challenge"
           dedupeKey={puzzle ? `daily:${puzzle.play_date}:${language}:sentence` : undefined}
           onMarkResult={handleSentenceMarked}
+          noStars={teacherMode}
           onClose={() => setShowChallenge(false)}
         />
       )}

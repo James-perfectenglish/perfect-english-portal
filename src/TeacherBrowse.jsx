@@ -3,6 +3,8 @@ import { supabase } from './supabaseClient';
 import SentenceBuildingInput from './components/SentenceBuildingInput';
 import { LevelBadge, TypeBadge, AiMarkedBadge, TagBadges } from './components/BadgePill';
 import MatchingPairs from './components/MatchingPairs';
+import CrosswordGame from './CrosswordGame';
+import WordSearchGame from './WordSearchGame';
 
 const TYPE_INFO = {
   gap_fill:          { emoji: '✏️',  label: 'Gap Fill' },
@@ -1126,7 +1128,7 @@ function FocusMode({ items, index, onChangeIndex, previewMode, setPreviewMode, o
 }
 
 // ─── Main TeacherBrowse Component ─────────────────────────────────────────────
-const CONTENT_SOURCES = ['connections', 'wotd', 'wordle'];
+const CONTENT_SOURCES = ['connections', 'wotd', 'wordle', 'crossword', 'wordsearch'];
 const EXERCISE_SOURCES = ['all', 'question_bank', 'listening', 'dictation'];
 
 export default function TeacherBrowse({ user, globalLang = 'en' }) {
@@ -1158,6 +1160,8 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
   // Content type overlays
   const [connectionsFocus,   setConnectionsFocus]   = useState(null); // { groups, title, playDate }
   const [wordleFocus,        setWordleFocus]        = useState(null); // { word, language, playDate }
+  const [crosswordFocus,     setCrosswordFocus]     = useState(null); // full crossword_puzzles row → Class Play
+  const [wordsearchFocus,    setWordsearchFocus]    = useState(null); // full wordsearch_puzzles row → Class Play
   const [wotdExpanded,       setWotdExpanded]       = useState(new Set());
 
   const isContentSource = CONTENT_SOURCES.includes(filters.source);
@@ -1269,6 +1273,29 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       setResults(items); setLoading(false); return;
     }
 
+    // ── Crossword ──────────────────────────────────────────────────
+    // Class Play: list specific crossword puzzles (any date/level) to run live in class.
+    if (f.source === 'crossword') {
+      let q = supabase.from('crossword_puzzles').select('*').order('play_date').order('level');
+      if (f.lang !== 'both') q = q.eq('language', f.lang);
+      if (f.dateFrom) q = q.gte('play_date', f.dateFrom);
+      if (f.dateTo)   q = q.lte('play_date', f.dateTo);
+      const { data: rows } = await q.limit(200);
+      const items = (rows || []).map(r => ({ ...r, _source: 'crossword', _rowKey: `cw_${r.id}` }));
+      setResults(items); setLoading(false); return;
+    }
+
+    // ── Wordsearch ───────────────────────────────────────────────
+    if (f.source === 'wordsearch') {
+      let q = supabase.from('wordsearch_puzzles').select('*').order('play_date');
+      if (f.lang !== 'both') q = q.eq('language', f.lang);
+      if (f.dateFrom) q = q.gte('play_date', f.dateFrom);
+      if (f.dateTo)   q = q.lte('play_date', f.dateTo);
+      const { data: rows } = await q.limit(200);
+      const items = (rows || []).map(r => ({ ...r, _source: 'wordsearch', _rowKey: `ws_${r.id}` }));
+      setResults(items); setLoading(false); return;
+    }
+
     // ── Exercises (existing logic) ────────────────────────────────────────────
     const newThreshold = maxQNumber != null ? maxQNumber - NEW_COUNT + 1 : null;
     const all = [];
@@ -1338,6 +1365,10 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       setConnectionsFocus({ groups: item.groups, title: item.title, playDate: item.play_date });
     } else if (item._source === 'wordle') {
       setWordleFocus({ word: item.word, language: item.language, playDate: item.play_date });
+    } else if (item._source === 'crossword') {
+      setCrosswordFocus(item);
+    } else if (item._source === 'wordsearch') {
+      setWordsearchFocus(item);
     } else if (item._source === 'wotd') {
       setWotdExpanded(prev => {
         const next = new Set(prev);
@@ -1404,7 +1435,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
 
       {/* Content group */}
       <div style={{ fontSize: 9, fontWeight: 700, color: '#a0aec0', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>Content</div>
-      {[['connections', '🟨 Connections'], ['wotd', '📖 Word of the Day'], ['wordle', '🟩 Wordle']].map(([val, lbl]) => (
+      {[['connections', '🟨 Connections'], ['wotd', '📖 Word of the Day'], ['wordle', '🟩 Wordle'], ['crossword', '✜ Crossword'], ['wordsearch', '🔎 Wordsearch']].map(([val, lbl]) => (
         <button key={val} onClick={() => setFilter('source', val)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '5px 8px', borderRadius: 6, border: 'none', background: filters.source === val ? '#667eea' : 'transparent', color: filters.source === val ? 'white' : '#4a5568', cursor: 'pointer', marginBottom: 1, fontSize: 13 }}>{lbl}</button>
       ))}
 
@@ -1703,6 +1734,42 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
           );
         }
 
+        // ── Crossword item ────────────────────────────────────────
+        if (item._source === 'crossword') {
+          return (
+            <div
+              key={item._rowKey}
+              onClick={() => handleItemClick(item, -1)}
+              style={{ padding: '10px 14px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 5, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}
+            >
+              <span style={{ background: '#e9d8fd', color: '#553c9a', borderRadius: 5, padding: '2px 7px', fontSize: 12, fontWeight: 700 }}>✜ Crossword</span>
+              <span style={{ fontSize: 13, color: '#718096' }}>{item.play_date ? fmtDate(item.play_date) : (item.title || 'Themed')}</span>
+              <span style={{ fontSize: 13 }}>{item.language === 'es' ? '🇪🇸' : '🇬🇧'}</span>
+              <span style={{ background: LEVEL_COLORS[item.level + '1'] || '#718096', color: 'white', borderRadius: 5, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>Level {item.level}</span>
+              <span style={{ fontSize: 13, color: '#4a5568' }}>★ {item.star_word}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 13, color: '#667eea', fontWeight: 700 }}>▶ Play</span>
+            </div>
+          );
+        }
+
+        // ── Wordsearch item ─────────────────────────────────────
+        if (item._source === 'wordsearch') {
+          return (
+            <div
+              key={item._rowKey}
+              onClick={() => handleItemClick(item, -1)}
+              style={{ padding: '10px 14px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 5, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}
+            >
+              <span style={{ background: '#e2e8f0', color: '#2d3748', borderRadius: 5, padding: '2px 7px', fontSize: 12, fontWeight: 700 }}>🔎 Wordsearch</span>
+              <span style={{ fontSize: 13, color: '#718096' }}>{item.play_date ? fmtDate(item.play_date) : 'Themed'}</span>
+              <span style={{ fontSize: 13 }}>{item.language === 'es' ? '🇪🇸' : '🇬🇧'}</span>
+              <span style={{ fontSize: 13, color: '#4a5568', fontWeight: 600 }}>{item.theme}</span>
+              <span style={{ fontSize: 13, color: '#4a5568' }}>★ {item.star_word}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 13, color: '#667eea', fontWeight: 700 }}>▶ Play</span>
+            </div>
+          );
+        }
+
         // ── Exercise item (existing) ─────────────────────────────────────────
         exerciseIdx++;
         const thisExerciseIdx = exerciseIdx;
@@ -1783,6 +1850,18 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
           playDate={wordleFocus.playDate}
           onClose={() => setWordleFocus(null)}
         />
+      )}
+      {/* Crossword Class Play overlay — the real student component; teacher mode writes no stars */}
+      {crosswordFocus && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#f8f9fa', overflowY: 'auto' }}>
+          <CrosswordGame classPuzzle={crosswordFocus} onBack={() => setCrosswordFocus(null)} />
+        </div>
+      )}
+      {/* Wordsearch Class Play overlay — the real student component; teacher mode writes no stars */}
+      {wordsearchFocus && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#f8f9fa', overflowY: 'auto' }}>
+          <WordSearchGame classPuzzle={wordsearchFocus} onBack={() => setWordsearchFocus(null)} />
+        </div>
       )}
       <div style={{ maxWidth: 1300, margin: '0 auto', padding: '12px 1rem 2rem', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         {sidebar}
