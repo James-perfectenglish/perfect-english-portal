@@ -7,6 +7,7 @@ import CrosswordGame from './CrosswordGame';
 import WordSearchGame from './WordSearchGame';
 import WordleGame from './WordleGame';
 import ConnectionsGame from './ConnectionsGame';
+import GrammarOfTheDay from './GrammarOfTheDay';
 
 const TYPE_INFO = {
   gap_fill:          { emoji: '✏️',  label: 'Gap Fill' },
@@ -39,19 +40,6 @@ const RANK_STYLE = {
   3: { bg: '#b0c4ef', text: '#0a1f4d', border: '#7a9de0', label: 'Tricky' },
   4: { bg: '#ba81c5', text: '#2d0040', border: '#9a55a8', label: 'Hardest' },
 };
-
-// Wordle keyboard layouts and tile colours
-const EN_KB = [
-  ['Q','W','E','R','T','Y','U','I','O','P'],
-  ['A','S','D','F','G','H','J','K','L'],
-  ['ENTER','Z','X','C','V','B','N','M','⌫'],
-];
-const ES_KB = [
-  ['Q','W','E','R','T','Y','U','I','O','P'],
-  ['A','S','D','F','G','H','J','K','L','Ñ'],
-  ['ENTER','Z','X','C','V','B','N','M','⌫'],
-];
-const WC = { correct: '#538d4e', present: '#b59f3b', absent: '#787c7e' };
 
 const NEW_COUNT = 50;
 
@@ -768,338 +756,10 @@ function InteractiveQuestion({ item: q }) {
 }
 
 // ─── Connections Focus Overlay ────────────────────────────────────────────────
-function ConnectionsFocus({ groups, title, playDate, onClose }) {
-  const MAX_MISTAKES = 4;
-  const initialTiles = () => shuffle(groups.flatMap(g => g.words.map(w => ({ word: w, rank: g.colour_rank }))));
-
-  const [tiles,       setTiles]       = useState(initialTiles);
-  const [selected,    setSelected]    = useState(new Set());
-  const [solvedRanks, setSolvedRanks] = useState(new Set());
-  const [mistakes,    setMistakes]    = useState(0);
-  const [gameState,   setGameState]   = useState('playing');
-  const [message,     setMessage]     = useState('');
-  const [shaking,     setShaking]     = useState(false);
-  const [locked,      setLocked]      = useState(false);
-
-  function toggleTile(word) {
-    if (gameState !== 'playing' || locked) return;
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(word)) { next.delete(word); return next; }
-      if (next.size >= 4) return prev;
-      next.add(word);
-      return next;
-    });
-  }
-
-  function submitGuess() {
-    if (selected.size !== 4 || locked) return;
-    setLocked(true);
-    const selArr = [...selected];
-    const ranks = selArr.map(w => groups.find(g => g.words.includes(w))?.colour_rank);
-    const allSame = ranks.every(r => r === ranks[0]);
-
-    if (allSame) {
-      const rank = ranks[0];
-      const newSolved = new Set([...solvedRanks, rank]);
-      setSolvedRanks(newSolved);
-      setSelected(new Set());
-      if (newSolved.size === 4) {
-        setGameState('won');
-        setMessage('Solved! 🎉');
-      } else {
-        setMessage(`✅ ${RANK_STYLE[rank].label} group found!`);
-        setTimeout(() => setMessage(''), 2000);
-      }
-      setLocked(false);
-    } else {
-      const rankCounts = {};
-      ranks.forEach(r => { rankCounts[r] = (rankCounts[r] || 0) + 1; });
-      const maxCount = Math.max(...Object.values(rankCounts));
-      const newMistakes = mistakes + 1;
-      setMistakes(newMistakes);
-      setShaking(true);
-      setTimeout(() => { setShaking(false); setLocked(false); }, 600);
-      setMessage(maxCount === 3 ? 'One away! 🤔' : 'Not quite — try again');
-      setTimeout(() => setMessage(''), 2000);
-      if (newMistakes >= MAX_MISTAKES) {
-        setSolvedRanks(new Set([1, 2, 3, 4]));
-        setGameState('lost');
-        setMessage('Hard luck! Here are the answers.');
-      }
-    }
-  }
-
-  function resetGame() {
-    setTiles(initialTiles());
-    setSelected(new Set());
-    setSolvedRanks(new Set());
-    setMistakes(0);
-    setGameState('playing');
-    setMessage('');
-    setLocked(false);
-  }
-
-  const mistakeDots = Array.from({ length: MAX_MISTAKES }, (_, i) => (
-    <span key={i} style={{ fontSize: 14, color: i < mistakes ? '#cbd5e0' : '#667eea' }}>
-      {i < mistakes ? '○' : '●'}
-    </span>
-  ));
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#f8f9fa', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-      {/* Header */}
-      <div style={{ background: 'white', borderBottom: '1px solid #e2e8f0', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, flexWrap: 'wrap' }}>
-        <div>
-          <span style={{ fontWeight: 700, fontSize: 16 }}>🟨 {title}</span>
-          {playDate && <span style={{ color: '#718096', fontSize: 13, marginLeft: 8 }}>{fmtDate(playDate)}</span>}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
-          <span style={{ display: 'flex', gap: 4 }}>{mistakeDots}</span>
-          <button onClick={resetGame} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13 }}>↺ Reset</button>
-          <button onClick={onClose} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13 }}>✕ Close</button>
-        </div>
-      </div>
-
-      {/* Game area */}
-      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '2rem 1rem' }}>
-        <div style={{ width: '100%', maxWidth: 580 }}>
-          {/* Solved / revealed groups */}
-          {[1, 2, 3, 4].filter(r => solvedRanks.has(r)).map(rank => {
-            const grp = groups.find(g => g.colour_rank === rank);
-            if (!grp) return null;
-            const s = RANK_STYLE[rank];
-            return (
-              <div key={rank} style={{ background: s.bg, border: `2px solid ${s.border}`, borderRadius: 10, padding: '12px 16px', marginBottom: 8, textAlign: 'center' }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: s.text, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>{grp.category}</div>
-                <div style={{ fontSize: 14, color: s.text, fontWeight: 600 }}>{grp.words.join('  ·  ')}</div>
-              </div>
-            );
-          })}
-
-          {/* Unsolved tiles */}
-          {gameState === 'playing' && (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
-                {tiles.filter(t => !solvedRanks.has(t.rank)).map(({ word }) => {
-                  const isSel = selected.has(word);
-                  return (
-                    <button
-                      key={word}
-                      onClick={() => toggleTile(word)}
-                      style={{
-                        padding: '14px 4px', borderRadius: 8,
-                        border: `2px solid ${isSel ? '#667eea' : '#e2e8f0'}`,
-                        background: isSel ? '#667eea' : 'white',
-                        color: isSel ? 'white' : '#2d3748',
-                        fontWeight: 700, fontSize: 'clamp(11px, 2.5vw, 14px)',
-                        cursor: 'pointer', textAlign: 'center', lineHeight: 1.3,
-                        animation: shaking && isSel ? 'tb-shake 0.5s' : 'none',
-                        transition: 'background 0.15s, border-color 0.15s',
-                      }}
-                    >{word}</button>
-                  );
-                })}
-              </div>
-
-              {message && (
-                <div style={{ textAlign: 'center', fontWeight: 600, color: '#4a5568', marginBottom: 12, fontSize: 15 }}>{message}</div>
-              )}
-
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                <button
-                  onClick={() => {
-                    const unsolved = tiles.filter(t => !solvedRanks.has(t.rank));
-                    const sel = unsolved.filter(t => selected.has(t.word));
-                    const unsel = shuffle(unsolved.filter(t => !selected.has(t.word)));
-                    setTiles([...sel, ...unsel]);
-                  }}
-                  style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer', fontSize: 14 }}
-                >Shuffle</button>
-                <button
-                  onClick={() => setSelected(new Set())}
-                  style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer', fontSize: 14 }}
-                >Deselect</button>
-                <button
-                  onClick={submitGuess}
-                  disabled={selected.size !== 4}
-                  style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: selected.size === 4 ? '#2d3748' : '#e2e8f0', color: selected.size === 4 ? 'white' : '#a0aec0', cursor: selected.size === 4 ? 'pointer' : 'default', fontSize: 14, fontWeight: 700 }}
-                >Submit</button>
-              </div>
-            </>
-          )}
-
-          {(gameState === 'won' || gameState === 'lost') && (
-            <div style={{ textAlign: 'center', marginTop: 24 }}>
-              <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>{message}</div>
-              <button onClick={resetGame} style={{ padding: '10px 28px', borderRadius: 8, background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 15 }}>↺ Play Again</button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+// (removed — Class Play now renders the real ConnectionsGame in an overlay)
 
 // ─── Wordle Focus Overlay ─────────────────────────────────────────────────────
-function WordleFocus({ word, language, playDate, onClose }) {
-  const WORD = word.toUpperCase();
-  const KB   = language === 'es' ? ES_KB : EN_KB;
-
-  const [guesses,   setGuesses]   = useState([]);
-  const [current,   setCurrent]   = useState('');
-  const [gameState, setGameState] = useState('playing');
-  const [message,   setMessage]   = useState('');
-  const [shaking,   setShaking]   = useState(false);
-
-  const currentRef  = useRef(current);
-  const guessesRef  = useRef(guesses);
-  const gameStRef   = useRef(gameState);
-  useEffect(() => { currentRef.current = current; }, [current]);
-  useEffect(() => { guessesRef.current = guesses; }, [guesses]);
-  useEffect(() => { gameStRef.current = gameState; }, [gameState]);
-
-  function getTileResult(guess, col) {
-    const letter = guess[col];
-    if (letter === WORD[col]) return 'correct';
-    if (WORD.includes(letter)) return 'present';
-    return 'absent';
-  }
-
-  function getLetterStates() {
-    const priority = { correct: 3, present: 2, absent: 1 };
-    const states = {};
-    guesses.forEach(g => {
-      for (let i = 0; i < 5; i++) {
-        const letter = g[i];
-        const result = getTileResult(g, i);
-        if (!states[letter] || priority[result] > priority[states[letter]]) states[letter] = result;
-      }
-    });
-    return states;
-  }
-
-  function submitGuess() {
-    const cur = currentRef.current;
-    if (cur.length < 5) {
-      setMessage('Not enough letters');
-      setShaking(true);
-      setTimeout(() => { setShaking(false); setMessage(''); }, 1000);
-      return;
-    }
-    const newGuesses = [...guessesRef.current, cur];
-    setGuesses(newGuesses);
-    setCurrent('');
-    if (cur === WORD) {
-      setGameState('won');
-      const msgs = ['Genius! 🧠', 'Magnificent! ✨', 'Impressive! 🌟', 'Splendid! 👏', 'Great! 🎉', 'Phew! 😅'];
-      setMessage(msgs[newGuesses.length - 1] || 'Well done!');
-    } else if (newGuesses.length >= 6) {
-      setGameState('lost');
-      setMessage(`The word was ${WORD}`);
-    }
-  }
-
-  function handleKey(key) {
-    if (gameStRef.current !== 'playing') return;
-    if (key === '⌫' || key === 'BACKSPACE') { setCurrent(c => c.slice(0, -1)); return; }
-    if (key === 'ENTER') { submitGuess(); return; }
-    if (/^[A-ZÁÉÍÓÚÑÜ]$/.test(key) && currentRef.current.length < 5) setCurrent(c => c + key);
-  }
-
-  useEffect(() => {
-    const handler = (e) => {
-      const k = e.key.toUpperCase();
-      if (k === 'BACKSPACE') { handleKey('BACKSPACE'); return; }
-      if (k === 'ENTER') { handleKey('ENTER'); return; }
-      if (/^[A-ZÁÉÍÓÚÑÜ]$/.test(k)) handleKey(k);
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
-
-  const letterStates = getLetterStates();
-
-  function resetGame() {
-    setGuesses([]); setCurrent(''); setGameState('playing'); setMessage(''); setShaking(false);
-  }
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#f8f9fa', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <div style={{ background: 'white', borderBottom: '1px solid #e2e8f0', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, flexWrap: 'wrap' }}>
-        <div>
-          <span style={{ fontWeight: 700, fontSize: 16 }}>🟩 Wordle</span>
-          {playDate && <span style={{ color: '#718096', fontSize: 13, marginLeft: 8 }}>{fmtDate(playDate)}</span>}
-          <span style={{ marginLeft: 8, fontSize: 13 }}>{language === 'es' ? '🇪🇸' : '🇬🇧'}</span>
-        </div>
-        {/* Show answer for teacher reference */}
-        <div style={{ background: '#f0fff4', border: '1px solid #48bb78', borderRadius: 6, padding: '3px 10px', fontSize: 13, fontWeight: 700, color: '#276749', letterSpacing: 2 }}>
-          {WORD}
-        </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          <button onClick={resetGame} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13 }}>↺ Reset</button>
-          <button onClick={onClose} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13 }}>✕ Close</button>
-        </div>
-      </div>
-
-      {/* Game area */}
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem 1rem', gap: '1rem' }}>
-        {/* Grid */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          {Array.from({ length: 6 }, (_, row) => {
-            const isCurrentRow = row === guesses.length && gameState === 'playing';
-            const guess = row < guesses.length ? guesses[row] : (isCurrentRow ? current : '');
-            const isSubmitted = row < guesses.length;
-            return (
-              <div key={row} style={{ display: 'flex', gap: 5, animation: shaking && isCurrentRow ? 'tb-shake 0.5s' : 'none' }}>
-                {Array.from({ length: 5 }, (_, col) => {
-                  const letter = guess[col] || '';
-                  const result = isSubmitted ? getTileResult(guess, col) : null;
-                  const bg = result ? WC[result] : letter ? '#e2e8f0' : '#f7fafc';
-                  const color = result ? 'white' : '#2d3748';
-                  const border = result ? 'transparent' : letter ? '#a0aec0' : '#e2e8f0';
-                  return (
-                    <div key={col} style={{ width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${border}`, borderRadius: 6, background: bg, color, fontWeight: 700, fontSize: 22, textTransform: 'uppercase', transition: 'background 0.3s' }}>
-                      {letter}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-
-        {message && (
-          <div style={{ fontWeight: 700, fontSize: 16, color: gameState === 'lost' ? '#c53030' : '#2d3748', textAlign: 'center', padding: '8px 16px', background: 'white', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-            {message}
-          </div>
-        )}
-
-        {/* Keyboard */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
-          {KB.map((row, ri) => (
-            <div key={ri} style={{ display: 'flex', gap: 5 }}>
-              {row.map(key => {
-                const state = letterStates[key];
-                const bg    = state ? WC[state] : '#d3d6da';
-                const color = state ? 'white' : '#2d3748';
-                const isWide = key === 'ENTER' || key === '⌫';
-                return (
-                  <button
-                    key={key}
-                    onClick={() => handleKey(key)}
-                    style={{ padding: isWide ? '14px 8px' : '14px 0', width: isWide ? 58 : 38, borderRadius: 6, border: 'none', background: bg, color, fontWeight: 700, fontSize: isWide ? 11 : 14, cursor: 'pointer', transition: 'background 0.2s' }}
-                  >{key}</button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+// (removed — Class Play now renders the real WordleGame in an overlay)
 
 // ─── Exercise Focus Mode ──────────────────────────────────────────────────────
 function FocusMode({ items, index, onChangeIndex, previewMode, setPreviewMode, onExit }) {
@@ -1130,7 +790,7 @@ function FocusMode({ items, index, onChangeIndex, previewMode, setPreviewMode, o
 }
 
 // ─── Main TeacherBrowse Component ─────────────────────────────────────────────
-const CONTENT_SOURCES = ['connections', 'wotd', 'wordle', 'crossword', 'wordsearch'];
+const CONTENT_SOURCES = ['connections', 'wotd', 'wordle', 'crossword', 'wordsearch', 'gotd'];
 const EXERCISE_SOURCES = ['all', 'question_bank', 'listening', 'dictation'];
 
 export default function TeacherBrowse({ user, globalLang = 'en' }) {
@@ -1164,6 +824,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
   const [wordleFocus,        setWordleFocus]        = useState(null); // full wordle_words row → Class Play
   const [crosswordFocus,     setCrosswordFocus]     = useState(null); // full crossword_puzzles row → Class Play
   const [wordsearchFocus,    setWordsearchFocus]    = useState(null); // full wordsearch_puzzles row → Class Play
+  const [gotdFocus,          setGotdFocus]          = useState(null); // full grammar_of_the_day row → Class Play
   const [wotdExpanded,       setWotdExpanded]       = useState(new Set());
 
   const isContentSource = CONTENT_SOURCES.includes(filters.source);
@@ -1298,6 +959,16 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       setResults(items); setLoading(false); return;
     }
 
+    // ── Grammar of the Day ──────────────────────────────
+    // Class Play: list active grammar points (a pool, no dates) to run live in class.
+    if (f.source === 'gotd') {
+      let q = supabase.from('grammar_of_the_day').select('*').eq('active', true).order('level').order('grammar_point');
+      if (f.lang !== 'both') q = q.eq('language', f.lang);
+      const { data: rows } = await q.limit(200);
+      const items = (rows || []).map(r => ({ ...r, _source: 'gotd', _rowKey: `gotd_${r.id}` }));
+      setResults(items); setLoading(false); return;
+    }
+
     // ── Exercises (existing logic) ────────────────────────────────────────────
     const newThreshold = maxQNumber != null ? maxQNumber - NEW_COUNT + 1 : null;
     const all = [];
@@ -1371,6 +1042,8 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       setCrosswordFocus(item);
     } else if (item._source === 'wordsearch') {
       setWordsearchFocus(item);
+    } else if (item._source === 'gotd') {
+      setGotdFocus(item);
     } else if (item._source === 'wotd') {
       setWotdExpanded(prev => {
         const next = new Set(prev);
@@ -1437,7 +1110,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
 
       {/* Content group */}
       <div style={{ fontSize: 9, fontWeight: 700, color: '#a0aec0', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>Content</div>
-      {[['connections', '🟨 Connections'], ['wotd', '📖 Word of the Day'], ['wordle', '🟩 Wordle'], ['crossword', '✜ Crossword'], ['wordsearch', '🔎 Wordsearch']].map(([val, lbl]) => (
+      {[['connections', '🟨 Connections'], ['wotd', '📖 Word of the Day'], ['wordle', '🟩 Wordle'], ['crossword', '✜ Crossword'], ['wordsearch', '🔎 Wordsearch'], ['gotd', '📝 Grammar of the Day']].map(([val, lbl]) => (
         <button key={val} onClick={() => setFilter('source', val)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '5px 8px', borderRadius: 6, border: 'none', background: filters.source === val ? '#667eea' : 'transparent', color: filters.source === val ? 'white' : '#4a5568', cursor: 'pointer', marginBottom: 1, fontSize: 13 }}>{lbl}</button>
       ))}
 
@@ -1772,6 +1445,24 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
           );
         }
 
+        // ── Grammar of the Day item ─────────────
+        if (item._source === 'gotd') {
+          return (
+            <div
+              key={item._rowKey}
+              onClick={() => handleItemClick(item, -1)}
+              style={{ padding: '10px 14px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 5, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}
+            >
+              <span style={{ background: '#EDE9FE', color: '#553C9A', borderRadius: 5, padding: '2px 7px', fontSize: 12, fontWeight: 700 }}>📝 Grammar</span>
+              <span style={{ fontSize: 13 }}>{item.language === 'es' ? '🇪🇸' : '🇬🇧'}</span>
+              <span style={{ background: LEVEL_COLORS[item.level?.split('/')[0]] || '#718096', color: 'white', borderRadius: 5, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{item.level}</span>
+              <span style={{ fontSize: 14, color: '#2d3748', fontWeight: 600 }}>{item.grammar_point}</span>
+              {item.category && <span style={{ fontSize: 12, color: '#a0aec0', fontStyle: 'italic' }}>{item.category}</span>}
+              <span style={{ marginLeft: 'auto', fontSize: 13, color: '#667eea', fontWeight: 700 }}>▶ Play</span>
+            </div>
+          );
+        }
+
         // ── Exercise item (existing) ─────────────────────────────────────────
         exerciseIdx++;
         const thisExerciseIdx = exerciseIdx;
@@ -1861,6 +1552,15 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
         <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#f8f9fa', overflowY: 'auto' }}>
           <button onClick={() => setWordsearchFocus(null)} style={{ position: 'fixed', top: 12, right: 12, zIndex: 3001, padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>✕ Close</button>
           <WordSearchGame classPuzzle={wordsearchFocus} onBack={() => setWordsearchFocus(null)} />
+        </div>
+      )}
+      {/* Grammar of the Day Class Play overlay — the real student card; teacher mode writes no submission/stars */}
+      {gotdFocus && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#f8f9fa', overflowY: 'auto' }}>
+          <button onClick={() => setGotdFocus(null)} style={{ position: 'fixed', top: 12, right: 12, zIndex: 3001, padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>✕ Close</button>
+          <div style={{ maxWidth: 560, margin: '0 auto', padding: '3.5rem 1rem 2rem' }}>
+            <GrammarOfTheDay classItem={gotdFocus} collapsible={false} />
+          </div>
         </div>
       )}
       <div style={{ maxWidth: 1300, margin: '0 auto', padding: '12px 1rem 2rem', display: 'flex', gap: 10, alignItems: 'flex-start' }}>

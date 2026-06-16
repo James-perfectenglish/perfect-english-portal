@@ -27,7 +27,8 @@ function daysSinceEpoch() {
   return Math.floor(Date.now() / (1000 * 60 * 60 * 24))
 }
 
-export default function GrammarOfTheDay({ profile, collapsible = true }) {
+export default function GrammarOfTheDay({ profile, collapsible = true, classItem = null }) {
+  const teacherMode = !!classItem  // Class Play: run a specific grammar point, no submission/stars
   const [item, setItem]                   = useState(null)
   const [submission, setSubmission]       = useState(null)
   const [loading, setLoading]             = useState(true)
@@ -35,8 +36,10 @@ export default function GrammarOfTheDay({ profile, collapsible = true }) {
   const [expanded, setExpanded]           = useState(!collapsible)
   const [showChallenge, setShowChallenge] = useState(false)
 
-  const isSpanish = (Array.isArray(profile?.tracks) && profile.tracks.includes('spanish')) || profile?.level === 'Spanish'
-  const bucket    = levelBucket(profile?.level)
+  const isSpanish = teacherMode
+    ? classItem.language === 'es'
+    : ((Array.isArray(profile?.tracks) && profile.tracks.includes('spanish')) || profile?.level === 'Spanish')
+  const bucket    = teacherMode ? classItem.level : levelBucket(profile?.level)
   const language  = isSpanish ? 'es' : 'en'
   const level     = isSpanish ? 'A1/A2' : bucket
 
@@ -44,6 +47,13 @@ export default function GrammarOfTheDay({ profile, collapsible = true }) {
 
   const fetchItem = async () => {
     setLoading(true)
+
+    // Class Play: a specific grammar row is supplied; show it directly, no submission lookup.
+    if (teacherMode) {
+      setItem(classItem)
+      setLoading(false)
+      return
+    }
 
     // Count active rows at this level + language, then pick by day index.
     const { data: pool, error } = await supabase
@@ -88,7 +98,7 @@ export default function GrammarOfTheDay({ profile, collapsible = true }) {
     // SentenceChallenge has already written to sentence_challenges (star logged).
     // Our job: persist to grammar_of_the_day_submissions so the card shows the
     // student's answer on return.
-    if (!item) return
+    if (!item || teacherMode) return
     const isCorrect = result?.valid === true
     const feedbackText = result?.feedback || result?.reason || (isCorrect
       ? (isSpanish ? '¡Buena frase!' : 'Great sentence!')
@@ -274,6 +284,7 @@ export default function GrammarOfTheDay({ profile, collapsible = true }) {
           usage:        item.usage,
         }}
         dedupeKey={`gotd:${item.id}:${new Date().toISOString().slice(0, 10)}`}
+        noStars={teacherMode}
         headerLabel={isSpanish ? '📝 Gramática del día' : '📝 Grammar of the Day'}
         promptText={isSpanish ? 'Úsala en una frase:' : 'Use it in a sentence:'}
         onMarkResult={onMarked}
