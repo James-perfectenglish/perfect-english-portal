@@ -52,12 +52,12 @@ function computeLetterStates(guesses, word) {
   return states
 }
 
-export default function WordleGame({ onBack }) {
+export default function WordleGame({ onBack, classPuzzle = null }) {
   const location  = useLocation()
-  const [isSpanish, setIsSpanish] = useState(location.state?.isSpanish || false)
+  const teacherMode = !!classPuzzle  // Class Play: specific word, no stars/session writes
+  const [isSpanish, setIsSpanish] = useState(classPuzzle ? classPuzzle.language === 'es' : (location.state?.isSpanish || false))
   const language = isSpanish ? 'es' : 'en'
 
-  const [mode, setMode]           = useState('daily')
   const [word, setWord]           = useState('')
   const [guesses, setGuesses]     = useState([])
   const [current, setCurrent]     = useState('')
@@ -93,7 +93,12 @@ export default function WordleGame({ onBack }) {
   }, [gameState, sentenceDone])
 
   async function initDaily() {
-    setMode('daily')
+    // Class Play: a specific word is supplied; play it fresh, no session/stars.
+    if (teacherMode) {
+      setWord((classPuzzle.word || '').toUpperCase())
+      setGameState('playing')
+      return
+    }
 
     // language: use location.state if set (teacher track simulation),
     // otherwise detect from real profile tracks
@@ -139,25 +144,6 @@ export default function WordleGame({ onBack }) {
     setGameState('playing')
   }
 
-  async function startPractice() {
-    setGameState('loading')
-    setGuesses([]); setCurrent(''); setMessage('')
-    setSentenceDone(false); setSentenceFeedback(null)
-    setShowChallenge(false)
-    setSolveStar(false); setSentenceStar(false)
-    setMode('practice')
-
-    const { data } = await supabase
-      .from('wordle_words').select('word')
-      .eq('language', language)
-      .or(`play_date.is.null,play_date.lt.${today}`)
-
-    if (!data || data.length === 0) { setGameState('noword'); return }
-    const pool = data.map(r => r.word.toUpperCase())
-    setWord(pool[Math.floor(Math.random() * pool.length)])
-    setGameState('playing')
-  }
-
   function handleKeyDown(e) {
     const { gameState } = stateRef.current
     if (gameState !== 'playing') return
@@ -199,7 +185,7 @@ export default function WordleGame({ onBack }) {
       setGameState('won')
       if (earnedSolve) setSolveStar(true)
       await saveSession(newGuesses, true, false, false, earnedSolve, false)
-      if (earnedSolve) await insertStar('solve', word, mode === 'practice')
+      if (earnedSolve) await insertStar('solve', word)
     } else if (lost) {
       setMessage(isSpanish ? `La palabra era ${word}` : `The word was ${word}`)
       setGameState('lost')
@@ -209,8 +195,9 @@ export default function WordleGame({ onBack }) {
   }
 
   async function saveSession(g, solved, sentDone, sentStar, solStar) {
+    if (teacherMode) return
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user || mode === 'practice') return
+    if (!user) return
     await supabase.from('wordle_sessions').upsert({
       student_id: user.id, play_date: today,
       guesses: g, solved,
@@ -219,22 +206,19 @@ export default function WordleGame({ onBack }) {
     }, { onConflict: 'student_id,play_date' })
   }
 
-  async function insertStar(type, w, isPractice) {
+  async function insertStar(type, w) {
     // 'sentence' is now handled by SentenceChallenge directly — skip.
-    if (type === 'sentence') return
+    if (type === 'sentence' || teacherMode) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     // Anti-farming via ux_stars_dedupe partial unique index.
     // Daily: one star per day per language (regardless of which word).
-    // Practice: one star per word per language ever (so you can't farm replays of the same word).
-    const dedupe_key = isPractice
-      ? `practice:${language}:${w.toLowerCase()}`
-      : `daily:${today}:${language}`
+    const dedupe_key = `daily:${today}:${language}`
     const { error } = await supabase.from('stars').insert({
       student_id: user.id,
       source:     'wordle',
       subtype:    type,
-      context:    { word: w.toLowerCase(), language, is_practice: isPractice, play_date: today, dedupe_key },
+      context:    { word: w.toLowerCase(), language, play_date: today, dedupe_key },
     })
     if (error && error.code !== '23505') console.warn('Wordle star insert failed:', error)
   }
@@ -246,7 +230,7 @@ export default function WordleGame({ onBack }) {
     setSentenceFeedback(data)
     if (data.valid) {
       setSentenceStar(true)
-      await insertStar('sentence', word, mode === 'practice')
+      await insertStar('sentence', word)
     }
     await saveSession(guesses, gameState === 'won', true, data.valid, solveStar)
     setSentenceDone(true)
@@ -284,9 +268,7 @@ export default function WordleGame({ onBack }) {
           {isSpanish && <span style={{ fontSize: '1.2rem' }}>🇪🇸</span>}
         </div>
         <p style={{ margin: '4px 0 0', opacity: 0.85, fontSize: '0.82rem' }}>
-          {mode === 'practice'
-            ? (isSpanish ? 'Modo práctica' : 'Practice mode')
-            : (isSpanish ? 'Adivina la palabra de hoy en 6 intentos' : 'Guess today\'s 5-letter word in 6 tries')}
+          {isSpanish ? 'Adivina la palabra de hoy en 6 intentos' : 'Guess today\'s 5-letter word in 6 tries'}
         </p>
       </div>
 
@@ -433,9 +415,6 @@ export default function WordleGame({ onBack }) {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <button onClick={startPractice} style={{ padding: '0.75rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
-              🎮 {isSpanish ? 'Jugar otra vez (práctica)' : 'Play again (practice)'}
-            </button>
             {onBack && (
               <button onClick={onBack} style={{ padding: '0.75rem', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '8px', fontWeight: 500, cursor: 'pointer', fontSize: '0.9rem' }}>
                 ← {isSpanish ? 'Volver' : 'Back'}
@@ -452,10 +431,9 @@ export default function WordleGame({ onBack }) {
         language={language}
         exercise="wordle"
         apiContext="challenge"
-        dedupeKey={mode === 'practice'
-          ? `practice:${language}:${word.toLowerCase()}`
-          : `daily:${today}:${language}`}
+        dedupeKey={`daily:${today}:${language}`}
         onMarkResult={handleSentenceMarked}
+        noStars={teacherMode}
         onClose={() => setShowChallenge(false)}
       />
     )}

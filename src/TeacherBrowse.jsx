@@ -5,6 +5,8 @@ import { LevelBadge, TypeBadge, AiMarkedBadge, TagBadges } from './components/Ba
 import MatchingPairs from './components/MatchingPairs';
 import CrosswordGame from './CrosswordGame';
 import WordSearchGame from './WordSearchGame';
+import WordleGame from './WordleGame';
+import ConnectionsGame from './ConnectionsGame';
 
 const TYPE_INFO = {
   gap_fill:          { emoji: '✏️',  label: 'Gap Fill' },
@@ -1158,8 +1160,8 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
   const [availableTags,      setAvailableTags]      = useState([]);
   const searchRef = useRef(null);
   // Content type overlays
-  const [connectionsFocus,   setConnectionsFocus]   = useState(null); // { groups, title, playDate }
-  const [wordleFocus,        setWordleFocus]        = useState(null); // { word, language, playDate }
+  const [connectionsFocus,   setConnectionsFocus]   = useState(null); // full connections puzzle row (with groups) → Class Play
+  const [wordleFocus,        setWordleFocus]        = useState(null); // full wordle_words row → Class Play
   const [crosswordFocus,     setCrosswordFocus]     = useState(null); // full crossword_puzzles row → Class Play
   const [wordsearchFocus,    setWordsearchFocus]    = useState(null); // full wordsearch_puzzles row → Class Play
   const [wotdExpanded,       setWotdExpanded]       = useState(new Set());
@@ -1362,9 +1364,9 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
 
   function handleItemClick(item, exerciseIdx) {
     if (item._source === 'connections') {
-      setConnectionsFocus({ groups: item.groups, title: item.title, playDate: item.play_date });
+      setConnectionsFocus(item);
     } else if (item._source === 'wordle') {
-      setWordleFocus({ word: item.word, language: item.language, playDate: item.play_date });
+      setWordleFocus(item);
     } else if (item._source === 'crossword') {
       setCrosswordFocus(item);
     } else if (item._source === 'wordsearch') {
@@ -1833,33 +1835,31 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       {focusMode && (
         <FocusMode items={focusItems} index={focusIndex} onChangeIndex={setFocusIndex} previewMode={previewMode} setPreviewMode={setPreviewMode} onExit={() => setFocusMode(false)} />
       )}
-      {/* Connections game overlay */}
+      {/* Connections Class Play overlay — the real student component; teacher mode writes no stars */}
       {connectionsFocus && (
-        <ConnectionsFocus
-          groups={connectionsFocus.groups}
-          title={connectionsFocus.title}
-          playDate={connectionsFocus.playDate}
-          onClose={() => setConnectionsFocus(null)}
-        />
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#f8f9fa', overflowY: 'auto' }}>
+          <button onClick={() => setConnectionsFocus(null)} style={{ position: 'fixed', top: 12, right: 12, zIndex: 3001, padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>✕ Close</button>
+          <ConnectionsGame classPuzzle={connectionsFocus} onBack={() => setConnectionsFocus(null)} />
+        </div>
       )}
-      {/* Wordle game overlay */}
+      {/* Wordle Class Play overlay — the real student component; teacher mode writes no stars */}
       {wordleFocus && (
-        <WordleFocus
-          word={wordleFocus.word}
-          language={wordleFocus.language}
-          playDate={wordleFocus.playDate}
-          onClose={() => setWordleFocus(null)}
-        />
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#f8f9fa', overflowY: 'auto' }}>
+          <button onClick={() => setWordleFocus(null)} style={{ position: 'fixed', top: 12, right: 12, zIndex: 3001, padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>✕ Close</button>
+          <WordleGame classPuzzle={wordleFocus} onBack={() => setWordleFocus(null)} />
+        </div>
       )}
       {/* Crossword Class Play overlay — the real student component; teacher mode writes no stars */}
       {crosswordFocus && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#f8f9fa', overflowY: 'auto' }}>
+          <button onClick={() => setCrosswordFocus(null)} style={{ position: 'fixed', top: 12, right: 12, zIndex: 3001, padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>✕ Close</button>
           <CrosswordGame classPuzzle={crosswordFocus} onBack={() => setCrosswordFocus(null)} />
         </div>
       )}
       {/* Wordsearch Class Play overlay — the real student component; teacher mode writes no stars */}
       {wordsearchFocus && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#f8f9fa', overflowY: 'auto' }}>
+          <button onClick={() => setWordsearchFocus(null)} style={{ position: 'fixed', top: 12, right: 12, zIndex: 3001, padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>✕ Close</button>
           <WordSearchGame classPuzzle={wordsearchFocus} onBack={() => setWordsearchFocus(null)} />
         </div>
       )}

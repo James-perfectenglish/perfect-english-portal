@@ -24,8 +24,9 @@ function shuffleArray(arr) {
   return a
 }
 
-export default function ConnectionsGame({ onBack, userProfile }) {
+export default function ConnectionsGame({ onBack, userProfile, classPuzzle = null }) {
   const location = useLocation()
+  const teacherMode = !!classPuzzle  // Class Play: specific puzzle, no stars/session writes
 
   const [groups, setGroups]           = useState([])
   const [tiles, setTiles]             = useState([])
@@ -37,7 +38,6 @@ export default function ConnectionsGame({ onBack, userProfile }) {
   const [shaking, setShaking]         = useState(false)
   const [locked, setLocked]           = useState(false)
   const [allWords, setAllWords]       = useState([])
-  const [mode, setMode]               = useState('daily')
   const [puzzleTitle, setPuzzleTitle] = useState('')
   const [language, setLanguage]       = useState('en')
 
@@ -64,6 +64,20 @@ export default function ConnectionsGame({ onBack, userProfile }) {
   }
 
   async function initDaily() {
+    // Class Play: a specific puzzle (with its groups) is supplied; play it fresh, no session/stars.
+    if (teacherMode) {
+      setLanguage(classPuzzle.language || 'en')
+      setPuzzleTitle(classPuzzle.title || '')
+      const grps = (classPuzzle.groups || []).slice().sort((a, b) => a.colour_rank - b.colour_rank)
+      if (grps.length === 0) { setGameState('noword'); return }
+      setGroups(grps)
+      const tilesArr = grps.flatMap(g => g.words.map(w => ({ word: w, rank: g.colour_rank })))
+      setAllWords(tilesArr.map(t => t.word))
+      setTiles(shuffleArray(tilesArr))
+      setGameState('playing')
+      return
+    }
+
     const lang = detectLanguage()
     setLanguage(lang)
 
@@ -149,7 +163,7 @@ export default function ConnectionsGame({ onBack, userProfile }) {
       if (won) {
         setGameState('won')
         setMessage('Brilliant! You got them all! 🎉')
-        if (mode === 'daily') {
+        if (!teacherMode) {
           setSolveStar(true)
           await insertStar('solve')
           if (mistakes === 0) {
@@ -158,7 +172,7 @@ export default function ConnectionsGame({ onBack, userProfile }) {
           }
         }
       }
-      if (mode === 'daily') await saveSession(newSolved, mistakes, won, won, won, false, false)
+      if (!teacherMode) await saveSession(newSolved, mistakes, won, won, won, false, false)
       setLocked(false)
     } else {
       const rankCounts = {}
@@ -182,11 +196,12 @@ export default function ConnectionsGame({ onBack, userProfile }) {
         setLocked(false)
       }, 600)
 
-      if (mode === 'daily') await saveSession(solvedRanks, newMistakes, newMistakes >= MAX_MISTAKES, false, false, false, false)
+      if (!teacherMode) await saveSession(solvedRanks, newMistakes, newMistakes >= MAX_MISTAKES, false, false, false, false)
     }
   }
 
   async function saveSession(solved, mist, completed, won, solStar, sentDone, sentStar) {
+    if (teacherMode) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     await supabase.from('connections_sessions').upsert({
@@ -203,41 +218,8 @@ export default function ConnectionsGame({ onBack, userProfile }) {
     }, { onConflict: 'student_id,play_date' })
   }
 
-  async function startPractice() {
-    setGameState('loading')
-    setGroups([]); setTiles([]); setSelected(new Set())
-    setSolvedRanks(new Set()); setMistakes(0)
-    setMessage(''); setAllWords([])
-    setSentenceDone(false); setChosenWord(null)
-    setSentenceFeedback(null); setShowChallenge(false)
-    setSolveStar(false); setSentenceStar(false)
-    setMode('practice')
-
-    const { data: puzzles } = await supabase
-      .from('connections_puzzles')
-      .select('id, title, play_date')
-      .eq('language', language)
-      .lt('play_date', today)
-
-    if (!puzzles || puzzles.length === 0) { setGameState('noword'); return }
-
-    const puzzle = puzzles[Math.floor(Math.random() * puzzles.length)]
-    setPuzzleTitle(puzzle.title || puzzle.play_date)
-
-    const { data: grps } = await supabase
-      .from('connections_groups').select('*').eq('puzzle_id', puzzle.id).order('colour_rank')
-
-    if (!grps || grps.length === 0) { setGameState('noword'); return }
-
-    setGroups(grps)
-    const allTiles = grps.flatMap(g => g.words.map(w => ({ word: w, rank: g.colour_rank })))
-    setAllWords(allTiles.map(t => t.word))
-    setTiles(shuffleArray(allTiles))
-    setGameState('playing')
-  }
-
   async function insertStar(type) {
-    if (type === 'sentence') return  // handled by SentenceChallenge
+    if (type === 'sentence' || teacherMode) return  // handled by SentenceChallenge
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const dedupe_key = `${today}:${language}`
@@ -259,9 +241,9 @@ export default function ConnectionsGame({ onBack, userProfile }) {
     setSentenceFeedback(data)
     if (data.valid === true) {
       setSentenceStar(true)
-      if (mode === 'daily') await insertStar('sentence')
+      if (!teacherMode) await insertStar('sentence')
     }
-    if (mode === 'daily') {
+    if (!teacherMode) {
       await saveSession(new Set([1,2,3,4]), mistakes, true, gameState === 'won', solveStar, true, data.valid === true)
     }
     setSentenceDone(true)
@@ -300,11 +282,9 @@ export default function ConnectionsGame({ onBack, userProfile }) {
       <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.7rem', fontWeight: 800, letterSpacing: '2px' }}>CONNECTIONS</h1>
         <p style={{ margin: '4px 0 0', opacity: 0.85, fontSize: '0.82rem' }}>
-          {mode === 'practice'
-            ? `${language === 'es' ? 'Práctica' : 'Practice'}: ${puzzleTitle}`
-            : puzzleTitle
-              ? puzzleTitle
-              : (language === 'es' ? 'Agrupa las 16 palabras en 4 categorías' : 'Group the 16 words into 4 categories')}
+          {puzzleTitle
+            ? puzzleTitle
+            : (language === 'es' ? 'Agrupa las 16 palabras en 4 categorías' : 'Group the 16 words into 4 categories')}
         </p>
       </div>
 
@@ -470,14 +450,11 @@ export default function ConnectionsGame({ onBack, userProfile }) {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {mode === 'daily' && (
+            {!teacherMode && (
               <p style={{ color: '#718096', fontSize: '0.82rem', textAlign: 'center', margin: '0 0 4px' }}>
                 {language === 'es' ? '¡Vuelve mañana para un nuevo puzzle! 🔗' : 'Come back tomorrow for a new puzzle! 🔗'}
               </p>
             )}
-            <button onClick={startPractice} style={{ padding: '0.75rem', background: GRADIENT, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
-              🎮 {language === 'es' ? 'Jugar de nuevo (práctica)' : 'Play again (practice)'}
-            </button>
             {onBack && (
               <button onClick={onBack} style={{ padding: '0.75rem', background: 'transparent', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '8px', fontWeight: 500, cursor: 'pointer', fontSize: '0.9rem' }}>
                 ← Back
@@ -503,8 +480,9 @@ export default function ConnectionsGame({ onBack, userProfile }) {
         language={language}
         exercise="connections"
         apiContext="challenge"
-        dedupeKey={mode === 'daily' ? `daily:${today}:${language}:sentence` : undefined}
+        dedupeKey={`daily:${today}:${language}:sentence`}
         onMarkResult={handleSentenceMarked}
+        noStars={teacherMode}
         onClose={() => setShowChallenge(false)}
       />
     )}
