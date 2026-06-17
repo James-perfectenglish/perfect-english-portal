@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import WordOfTheDay from './WordOfTheDay'
 import GrammarOfTheDay from './GrammarOfTheDay'
+import PhrasalVerbOfTheDay from './PhrasalVerbOfTheDay'
 
 const LEVEL_GRADIENT = {
   A1: 'linear-gradient(135deg, #43b581, #2ecc71)',
@@ -139,6 +140,9 @@ export default function StudentDashboard({ profile, session }) {
 
       {/* GRAMMAR OF THE DAY */}
       <GrammarOfTheDay profile={profile} collapsible={true} />
+
+      {/* PHRASAL VERB OF THE DAY — English learners only (not Spanish track) */}
+      {!isSpanish && <PhrasalVerbOfTheDay profile={profile} collapsible={true} />}
 
       {/* QUICK START */}
       <div style={{ marginTop: '0.5rem' }}>

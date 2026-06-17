@@ -8,6 +8,7 @@ import WordSearchGame from './WordSearchGame';
 import WordleGame from './WordleGame';
 import ConnectionsGame from './ConnectionsGame';
 import GrammarOfTheDay from './GrammarOfTheDay';
+import PhrasalVerbOfTheDay from './PhrasalVerbOfTheDay';
 
 const TYPE_INFO = {
   gap_fill:          { emoji: '✏️',  label: 'Gap Fill' },
@@ -790,7 +791,7 @@ function FocusMode({ items, index, onChangeIndex, previewMode, setPreviewMode, o
 }
 
 // ─── Main TeacherBrowse Component ─────────────────────────────────────────────
-const CONTENT_SOURCES = ['connections', 'wotd', 'wordle', 'crossword', 'wordsearch', 'gotd'];
+const CONTENT_SOURCES = ['wordle', 'connections', 'crossword', 'wordsearch', 'wotd', 'gotd', 'pvotd'];
 const EXERCISE_SOURCES = ['all', 'question_bank', 'listening', 'dictation'];
 
 export default function TeacherBrowse({ user, globalLang = 'en' }) {
@@ -825,6 +826,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
   const [crosswordFocus,     setCrosswordFocus]     = useState(null); // full crossword_puzzles row → Class Play
   const [wordsearchFocus,    setWordsearchFocus]    = useState(null); // full wordsearch_puzzles row → Class Play
   const [gotdFocus,          setGotdFocus]          = useState(null); // full grammar_of_the_day row → Class Play
+  const [pvotdFocus,         setPvotdFocus]         = useState(null); // full phrasal_verb_of_the_day row → Class Play
   const [wotdExpanded,       setWotdExpanded]       = useState(new Set());
 
   const isContentSource = CONTENT_SOURCES.includes(filters.source);
@@ -969,6 +971,16 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       setResults(items); setLoading(false); return;
     }
 
+    // ── Phrasal Verb of the Day ───────────────────
+    // Class Play: list active phrasal verbs (English-only pool, no dates).
+    if (f.source === 'pvotd') {
+      let q = supabase.from('phrasal_verb_of_the_day').select('*').eq('active', true).order('level').order('phrasal_verb');
+      if (f.lang !== 'both') q = q.eq('language', f.lang);
+      const { data: rows } = await q.limit(300);
+      const items = (rows || []).map(r => ({ ...r, _source: 'pvotd', _rowKey: `pvotd_${r.id}` }));
+      setResults(items); setLoading(false); return;
+    }
+
     // ── Exercises (existing logic) ────────────────────────────────────────────
     const newThreshold = maxQNumber != null ? maxQNumber - NEW_COUNT + 1 : null;
     const all = [];
@@ -1044,6 +1056,8 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       setWordsearchFocus(item);
     } else if (item._source === 'gotd') {
       setGotdFocus(item);
+    } else if (item._source === 'pvotd') {
+      setPvotdFocus(item);
     } else if (item._source === 'wotd') {
       setWotdExpanded(prev => {
         const next = new Set(prev);
@@ -1110,7 +1124,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
 
       {/* Content group */}
       <div style={{ fontSize: 9, fontWeight: 700, color: '#a0aec0', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>Content</div>
-      {[['connections', '🟨 Connections'], ['wotd', '📖 Word of the Day'], ['wordle', '🟩 Wordle'], ['crossword', '✜ Crossword'], ['wordsearch', '🔎 Wordsearch'], ['gotd', '📝 Grammar of the Day']].map(([val, lbl]) => (
+      {[['wordle', '🟩 Wordle'], ['connections', '🟨 Connections'], ['crossword', '✜ Crossword'], ['wordsearch', '🔎 Wordsearch'], ['wotd', '📖 Word of the Day'], ['gotd', '📝 Grammar of the Day'], ['pvotd', '📚 Phrasal Verb of the Day']].map(([val, lbl]) => (
         <button key={val} onClick={() => setFilter('source', val)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '5px 8px', borderRadius: 6, border: 'none', background: filters.source === val ? '#667eea' : 'transparent', color: filters.source === val ? 'white' : '#4a5568', cursor: 'pointer', marginBottom: 1, fontSize: 13 }}>{lbl}</button>
       ))}
 
@@ -1463,6 +1477,23 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
           );
         }
 
+        // ── Phrasal Verb of the Day item ─────────────
+        if (item._source === 'pvotd') {
+          return (
+            <div
+              key={item._rowKey}
+              onClick={() => handleItemClick(item, -1)}
+              style={{ padding: '10px 14px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 5, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}
+            >
+              <span style={{ background: '#FEEBC8', color: '#7B341E', borderRadius: 5, padding: '2px 7px', fontSize: 12, fontWeight: 700 }}>📚 Phrasal Verb</span>
+              <span style={{ background: LEVEL_COLORS[item.level?.split('/')[0]] || '#718096', color: 'white', borderRadius: 5, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{item.level}</span>
+              <span style={{ fontSize: 14, color: '#2d3748', fontWeight: 600 }}>{item.phrasal_verb}</span>
+              <span style={{ fontSize: 12, color: item.separable ? '#dd6b20' : '#3182ce', fontWeight: 600 }}>{item.separable ? 'separable' : 'inseparable'}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 13, color: '#667eea', fontWeight: 700 }}>▶ Play</span>
+            </div>
+          );
+        }
+
         // ── Exercise item (existing) ─────────────────────────────────────────
         exerciseIdx++;
         const thisExerciseIdx = exerciseIdx;
@@ -1560,6 +1591,15 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
           <button onClick={() => setGotdFocus(null)} style={{ position: 'fixed', top: 12, right: 12, zIndex: 3001, padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>✕ Close</button>
           <div style={{ maxWidth: 560, margin: '0 auto', padding: '3.5rem 1rem 2rem' }}>
             <GrammarOfTheDay classItem={gotdFocus} collapsible={false} />
+          </div>
+        </div>
+      )}
+      {/* Phrasal Verb of the Day Class Play overlay — the real student card; teacher mode writes no submission/stars */}
+      {pvotdFocus && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#f8f9fa', overflowY: 'auto' }}>
+          <button onClick={() => setPvotdFocus(null)} style={{ position: 'fixed', top: 12, right: 12, zIndex: 3001, padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>✕ Close</button>
+          <div style={{ maxWidth: 560, margin: '0 auto', padding: '3.5rem 1rem 2rem' }}>
+            <PhrasalVerbOfTheDay classItem={pvotdFocus} collapsible={false} />
           </div>
         </div>
       )}

@@ -13,7 +13,8 @@ export default async function handler(req, res) {
 // ── SENTENCE (WOTD + Wordle) ──────────────────────────────────────────────────
 async function handleSentence(req, res) {
   const { word, partOfSpeech, definition, studentSentence, sentence, language, context,
-          grammarPoint, structure, example, usage } = req.body
+          grammarPoint, structure, example, usage,
+          phrasalVerb, meaning, separable } = req.body
 
   // Challenge mode: called with { word, sentence, context: 'challenge', language }
   // Wordle mode:    called with { word, sentence, language } — no definition, no context
@@ -21,8 +22,9 @@ async function handleSentence(req, res) {
   // GOTD mode:      called with { word: grammarPoint, sentence, grammarPoint, structure, example, usage, context: 'gotd', language }
   const isChallenge = context === 'challenge'
   const isGotd      = context === 'gotd'
-  const isWotd      = !isGotd && (context === 'wotd' || (!!definition && !isChallenge))
-  const isWordle    = !isChallenge && !isGotd && !isWotd
+  const isPvotd     = context === 'pvotd'
+  const isWotd      = !isGotd && !isPvotd && (context === 'wotd' || (!!definition && !isChallenge))
+  const isWordle    = !isChallenge && !isGotd && !isPvotd && !isWotd
   const thesentence = sentence || studentSentence
   const isSpanish   = language === 'es'
 
@@ -85,6 +87,35 @@ Reply ONLY with JSON:
 or
 {"valid": false, "feedback": "kind explanation of why the structure isn't quite there, plus a small nudge if helpful"}`
     return callAI(prompt, 200, res, 'mark-free.gotd')
+  }
+
+  if (isPvotd) {
+    prompt = `You are marking a student's "Phrasal Verb of the Day" exercise.
+
+Phrasal verb: "${word}"
+Meaning: ${meaning}
+Example of correct use: "${example}"
+This phrasal verb is ${separable ? 'SEPARABLE' : 'INSEPARABLE (the verb and particle must stay together)'}.
+
+Student's sentence: "${thesentence}"
+
+The student must write an English sentence that uses the phrasal verb "${word}" correctly, with the meaning given above.
+
+ASSESSMENT RULES — apply in this order:
+1. Is the phrasal verb "${word}" actually used (the verb AND its particle/s), with the meaning given above? A literal or different-meaning use of the same words does NOT count. If it is missing or used with the wrong meaning → valid=false, kind brief explanation.
+2. SEPARABILITY:
+   - INSEPARABLE phrasal verbs must keep the verb and particle together (e.g. "look after the children", never "look the children after"). If the student splits an inseparable phrasal verb → valid=false, briefly explain it stays together.
+   - SEPARABLE phrasal verbs may place a NOUN object either after the particle or between the verb and particle (e.g. "turn on the light" / "turn the light on" are both fine). BUT a PRONOUN object (it, them, him, her, me, us, you) MUST go in the middle: "turn it on", never "turn on it". A pronoun after the particle → valid=false, briefly explain the pronoun goes in the middle.
+3. If the phrasal verb is used with the right meaning and separability is respected → valid=true. Warm, brief praise.
+4. Minor errors elsewhere (punctuation, capitalisation, an article, a spelling typo) are NEVER grounds for rejection — still valid=true; you may note the detail very briefly.
+
+Be generous, warm and encouraging. This is a learning exercise, not a test. Keep it to 1–2 sentences.
+
+Reply ONLY with JSON:
+{"valid": true, "feedback": "warm brief praise, optionally a small note"}
+or
+{"valid": false, "feedback": "kind explanation of the problem with a small nudge"}`
+    return callAI(prompt, 200, res, 'mark-free.pvotd')
   }
 
   if (isChallenge) {
