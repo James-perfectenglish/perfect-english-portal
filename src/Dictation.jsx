@@ -110,6 +110,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
   // ── Sentence challenge ──
   const [showChallenge, setShowChallenge] = useState(false);
   const [challengeWord, setChallengeWord] = useState('');
+  const [challengeLevel, setChallengeLevel] = useState(null);
   const challengeFiredRef = useRef(false);
 
   const audioRef = useRef(null);
@@ -321,10 +322,30 @@ export default function Dictation({ onBack, userTracks = [] }) {
     return pool.reduce((a, b) => b.length > a.length ? b : a).replace(/[.,!?;:'"]/g, '');
   };
 
+  // Harvest the SC sentence (text + AI verdict) for teacher review — see sc_sentences table.
+  const onChallengeMarked = async ({ sentence, inputMethod, result }) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from('sc_sentences').insert({
+        student_id:   user.id,
+        source:       'dictation',
+        target:       challengeWord,
+        sentence:     sentence.trim(),
+        is_correct:   result?.valid === true,
+        ai_feedback:  result?.feedback || result?.reason || '',
+        input_method: inputMethod || 'text',
+        language:     currentExercise?.language || 'en',
+        level:        challengeLevel,
+      });
+    } catch (e) { console.warn('dictation: could not save sc sentence:', e); }
+  };
+
   const handleMoreExercises = () => {
     if (!challengeFiredRef.current && feedback?.isCorrect && currentExercise?.answer) {
       challengeFiredRef.current = true;
       setChallengeWord(getDictationChallengeWord(currentExercise.answer));
+      setChallengeLevel(currentExercise?.level || null);
       setShowChallenge(true);
       return;
     }
@@ -634,6 +655,7 @@ export default function Dictation({ onBack, userTracks = [] }) {
           word={challengeWord}
           language={currentExercise?.language || 'en'}
           exercise="dictation"
+          onMarkResult={onChallengeMarked}
           onClose={() => { setShowChallenge(false); backToExerciseList(); }}
         />
       )}

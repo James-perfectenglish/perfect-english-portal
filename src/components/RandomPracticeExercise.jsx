@@ -248,6 +248,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const challengePositionsRef = useRef(new Set());
   const [showChallenge, setShowChallenge] = useState(false);
   const [challengeWord, setChallengeWord] = useState('');
+  const [challengeLevel, setChallengeLevel] = useState(null);
 
   useEffect(() => { window.scrollTo(0, 0); }, [stage]);
 
@@ -834,6 +835,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       const word = getChallengeWord(questions[currentQuestionIndex]);
       if (word) {
         setChallengeWord(word);
+        setChallengeLevel(questions[currentQuestionIndex]?.level || null);
         setShowChallenge(true);
         return;
       }
@@ -845,6 +847,25 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     setShowChallenge(false);
     window.scrollTo({ top: 0, behavior: 'instant' });
     advanceQuestion(); // Stars are tracked separately — no score bonus
+  };
+
+  // Harvest the SC sentence (text + AI verdict) for teacher review — see sc_sentences table.
+  const onChallengeMarked = async ({ sentence, inputMethod, result }) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from('sc_sentences').insert({
+        student_id:   user.id,
+        source:       'rpe',
+        target:       challengeWord,
+        sentence:     sentence.trim(),
+        is_correct:   result?.valid === true,
+        ai_feedback:  result?.feedback || result?.reason || '',
+        input_method: inputMethod || 'text',
+        language:     isSpanish ? 'es' : 'en',
+        level:        challengeLevel,
+      });
+    } catch (e) { console.warn('RPE: could not save sc sentence:', e); }
   };
 
   const retry = () => { startExercise(); };
@@ -1327,6 +1348,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         word={challengeWord}
         language={isSpanish ? 'es' : 'en'}
         exercise="rpe"
+        onMarkResult={onChallengeMarked}
         onClose={handleChallengeClose}
       />
     )}

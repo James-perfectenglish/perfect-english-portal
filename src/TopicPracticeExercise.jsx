@@ -218,6 +218,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   // ── Sentence challenge ──
   const [showChallenge, setShowChallenge] = useState(false)
   const [challengeWord, setChallengeWord] = useState('')
+  const [challengeLevel, setChallengeLevel] = useState(null)
   const challengePositionsRef = useRef([])
   const challengeFiredRef = useRef(false)
 
@@ -444,11 +445,31 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
       if (word) {
         challengeFiredRef.current = true
         setChallengeWord(word)
+        setChallengeLevel(questions[currentQ]?.level || null)
         setShowChallenge(true)
         return
       }
     }
     doAdvance()
+  }
+
+  // Harvest the SC sentence (text + AI verdict) for teacher review — see sc_sentences table.
+  const onChallengeMarked = async ({ sentence, inputMethod, result }) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      await supabase.from('sc_sentences').insert({
+        student_id:   user.id,
+        source:       'topic_practice',
+        target:       challengeWord,
+        sentence:     sentence.trim(),
+        is_correct:   result?.valid === true,
+        ai_feedback:  result?.feedback || result?.reason || '',
+        input_method: inputMethod || 'text',
+        language:     isSpanishTP ? 'es' : 'en',
+        level:        challengeLevel,
+      })
+    } catch (e) { console.warn('TPE: could not save sc sentence:', e) }
   }
 
   const handleKeyDown = (e) => { if (e.key === 'Enter') { if (feedback) nextQuestion(); else checkAnswer() } }
@@ -814,6 +835,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
           word={challengeWord}
           language={exercise?.topic === 'spanish' ? 'es' : 'en'}
           exercise="topic_practice"
+          onMarkResult={onChallengeMarked}
           onClose={() => { setShowChallenge(false); doAdvance() }}
         />
       )}

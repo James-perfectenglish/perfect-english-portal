@@ -41,6 +41,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
   // ── Sentence challenge ──
   const [showChallenge, setShowChallenge] = useState(false);
   const [challengeWord, setChallengeWord] = useState('');
+  const [challengeLevel, setChallengeLevel] = useState(null);
   const challengeFiredRef = useRef(false);
 
   const audioRef = useRef(null);
@@ -238,6 +239,25 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
+  // Harvest the SC sentence (text + AI verdict) for teacher review — see sc_sentences table.
+  const onChallengeMarked = async ({ sentence, inputMethod, result }) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from('sc_sentences').insert({
+        student_id:   user.id,
+        source:       'listening',
+        target:       challengeWord,
+        sentence:     sentence.trim(),
+        is_correct:   result?.valid === true,
+        ai_feedback:  result?.feedback || result?.reason || '',
+        input_method: inputMethod || 'text',
+        language:     'en',
+        level:        challengeLevel,
+      });
+    } catch (e) { console.warn('listening: could not save sc sentence:', e); }
+  };
+
   const moveToReview = () => {
     if (!challengeFiredRef.current) {
       const gapQ = detailQuestions.find(q => q.type === 'gap_fill');
@@ -245,6 +265,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
       if (word.trim()) {
         challengeFiredRef.current = true;
         setChallengeWord(word.trim());
+        setChallengeLevel(currentExercise?.level || null);
         setShowChallenge(true);
         return;
       }
@@ -559,6 +580,7 @@ export default function ListeningExercise({ onBack, userTracks = [] }) {
           word={challengeWord}
           language="en"
           exercise="listening"
+          onMarkResult={onChallengeMarked}
           onClose={() => { setShowChallenge(false); doMoveToReview(); }}
         />
       )}

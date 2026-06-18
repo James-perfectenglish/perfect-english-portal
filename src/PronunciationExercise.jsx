@@ -27,6 +27,7 @@ export default function PronunciationExercise({ profile }) {
 
   const [showChallenge, setShowChallenge] = useState(false)
   const [challengeWord, setChallengeWord] = useState('')
+  const [challengeLevel, setChallengeLevel] = useState(null)
   const challengeFiredRef = useRef(false)
 
   const [screen, setScreen]               = useState(isSpanish ? 'exercise' : 'level_select')
@@ -266,10 +267,30 @@ export default function PronunciationExercise({ profile }) {
     setScreen('exercise')
   }
 
+  // Harvest the SC sentence (text + AI verdict) for teacher review — see sc_sentences table.
+  const onChallengeMarked = async ({ sentence, inputMethod, result }) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      await supabase.from('sc_sentences').insert({
+        student_id:   user.id,
+        source:       'pronunciation',
+        target:       challengeWord,
+        sentence:     sentence.trim(),
+        is_correct:   result?.valid === true,
+        ai_feedback:  result?.feedback || result?.reason || '',
+        input_method: inputMethod || 'text',
+        language:     isSpanish ? 'es' : 'en',
+        level:        challengeLevel,
+      })
+    } catch (e) { console.warn('pronunciation: could not save sc sentence:', e) }
+  }
+
   function handleNextPhrase() {
     if (!challengeFiredRef.current && feedback?.valid === true && exercise?.answer) {
       challengeFiredRef.current = true
       setChallengeWord(exercise.answer)
+      setChallengeLevel(exercise?.level || null)
       setShowChallenge(true)
       return
     }
@@ -491,6 +512,7 @@ export default function PronunciationExercise({ profile }) {
         word={challengeWord}
         language={isSpanish ? 'es' : 'en'}
         exercise="pronunciation"
+        onMarkResult={onChallengeMarked}
         onClose={() => { setShowChallenge(false); nextSentence(); }}
       />
     )}

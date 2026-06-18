@@ -70,6 +70,7 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter, user
   // ── Sentence challenge ──
   const [showChallenge, setShowChallenge] = useState(false);
   const [challengeWord, setChallengeWord] = useState('');
+  const [challengeLevel, setChallengeLevel] = useState(null);
   const challengePositionRef = useRef(null);
   const challengeFiredRef = useRef(false);
 
@@ -169,6 +170,25 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter, user
     else { setCurrentQ(nextIdx); }
   };
 
+  // Harvest the SC sentence (text + AI verdict) for teacher review — see sc_sentences table.
+  const onChallengeMarked = async ({ sentence, inputMethod, result }) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from('sc_sentences').insert({
+        student_id:   user.id,
+        source:       'matching',
+        target:       challengeWord,
+        sentence:     sentence.trim(),
+        is_correct:   result?.valid === true,
+        ai_feedback:  result?.feedback || result?.reason || '',
+        input_method: inputMethod || 'text',
+        language:     isSpanish ? 'es' : 'en',
+        level:        challengeLevel,
+      });
+    } catch (e) { console.warn('matching: could not save sc sentence:', e); }
+  };
+
   const nextQuestion = () => {
     if (
       !challengeFiredRef.current &&
@@ -180,6 +200,7 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter, user
       if (word) {
         challengeFiredRef.current = true;
         setChallengeWord(word);
+        setChallengeLevel(questions[currentQ]?.level || null);
         setShowChallenge(true);
         return;
       }
@@ -338,6 +359,7 @@ export default function MatchingExercise({ onBack, onComplete, topicFilter, user
         word={challengeWord}
         language={isSpanish ? 'es' : 'en'}
         exercise="matching"
+        onMarkResult={onChallengeMarked}
         onClose={() => { setShowChallenge(false); doAdvanceMatch(); }}
       />
     )}
