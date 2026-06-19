@@ -131,7 +131,8 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
             sentence:   sentence.trim(),
             is_correct: isCorrect,
             is_soft_pass: false,
-            ai_feedback: feedbackText
+            ai_feedback: feedbackText,
+            input_method: inputMethod || 'text'
           })
           .select().single()
         if (saved) { setSubmission(saved); fetchCommunity(word.id) }
