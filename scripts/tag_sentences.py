@@ -36,7 +36,7 @@ import requests
 
 API_URL = "https://api.anthropic.com/v1/messages"
 DEFAULT_MODEL = "claude-sonnet-4-6"
-VALID_CATEGORIES = {"correct", "genuine_error", "off_target", "marker_noise"}
+VALID_CATEGORIES = {"correct", "genuine_error", "off_target", "marker_noise", "input_artifact"}
 
 SYSTEM_PROMPT = """You are an expert ESL assessment analyst for an English-learning platform used by adult hospitality-sector learners. You classify a single sentence-challenge submission into one tag.
 
@@ -50,10 +50,12 @@ category is exactly one of:
 - "genuine_error": a real language mistake a teacher would correct.
 - "off_target": valid English that didn't use the required target structure/word, where this does NOT reveal a misunderstanding of the target (e.g. a fragment when a full sentence was asked for, or correct English that simply sidestepped the structure).
 - "marker_noise": the marker failed it but it is NOT the student's fault.
+- "input_artifact": the sentence was entered by VOICE and the only fault is a plausible speech-to-text mis-transcription, where the word the student clearly intended would make the sentence correct.
 
 subtype:
 - For genuine_error, the single most substantive error type: verb_form, verb_tense, subject_verb_agreement, word_order, article, preposition, pronoun, plural, spelling, typo_function_word, word_meaning, word_choice, target_concept, other. If several errors exist, pick the most substantive and mention the rest in the note.
 - For marker_noise, the reason: marker_fail, pos_overstrict, over_strict, cosmetic.
+- For input_artifact: asr_substitution.
 - For off_target and correct: null.
 
 Rules (follow exactly):
@@ -64,6 +66,7 @@ Rules (follow exactly):
 5. marker_fail: marker feedback like "Could not check", "Try again", or a generic non-specific rejection = marker_noise/marker_fail.
 6. cosmetic: ignore spacing, missing capitals, and obvious phone typos when judging correctness — these alone are marker_noise/cosmetic, never genuine_error.
 7. Fragments (noun phrases where a full sentence was required) where the target word/structure is otherwise used correctly = off_target.
+8. input_artifact: ONLY when input_method is "voice". If the sentence's single fault is a plausible acoustic mis-hearing (e.g. "to"->"the", "their"->"there", "won"->"one") AND the intended word is obvious from context AND using it would make the sentence correct, classify input_artifact/asr_substitution and name the intended word in the note. Be strict: if input_method is not "voice", or the intended word is not obvious, or there is any other genuine error present, do NOT use input_artifact — use genuine_error. Voice input never excuses real grammar mistakes.
 
 The note is one short sentence (max ~20 words) explaining the call, written for the teacher."""
 
@@ -95,7 +98,7 @@ def fetch_rows(conn, args):
     limit = f"LIMIT {int(args.limit)}" if args.limit else ""
     sql = f"""
         SELECT source, row_id, student_name, student_level, language,
-               item_level, target, sentence, is_correct, ai_feedback
+               item_level, target, sentence, is_correct, ai_feedback, input_method
         FROM student_sentences_tagged
         {clause}
         ORDER BY submitted_at
@@ -115,6 +118,7 @@ def classify(row, model, api_key):
         "language": row["language"],
         "marker_verdict": "pass" if row["is_correct"] else "fail",
         "marker_feedback": row["ai_feedback"],
+        "input_method": row["input_method"] or "text",
         "sentence": row["sentence"],
     }
     body = {
