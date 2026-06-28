@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import RandomPracticeExercise from './RandomPracticeExercise.jsx';
 import SurvivalMode from './SurvivalMode.jsx';
-import TenseTagger from './TenseTagger.jsx';
 import Breadcrumb from './Breadcrumb';
 
 const LEVEL_CONFIG = [
@@ -60,7 +59,6 @@ function getLevelConfigForProfile(profileLevel) {
 export default function PracticePage({ profile, isTeacher = false }) {
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [survivalMode, setSurvivalMode] = useState(false);
-  const [tenseMode, setTenseMode] = useState(false);
   const [weakSpotsMode, setWeakSpotsMode] = useState(false);
   const [weakTypes, setWeakTypes] = useState([]);
 
@@ -76,7 +74,6 @@ export default function PracticePage({ profile, isTeacher = false }) {
   useEffect(() => {
     setSelectedLevel(null);
     setSurvivalMode(false);
-    setTenseMode(false);
     setWeakSpotsMode(false);
     setWeakTypes([]);
 
@@ -90,15 +87,6 @@ export default function PracticePage({ profile, isTeacher = false }) {
       setSelectedLevel(levelConfig);
     }
   }, [location.key]);
-
-  if (tenseMode) {
-    return (
-      <>
-        <Breadcrumb section="Practise" title="Tense Tagger" onExit={() => setTenseMode(false)} />
-        <TenseTagger profile={profile} />
-      </>
-    );
-  }
 
   if (survivalMode) {
     return <SurvivalMode onBack={() => setSurvivalMode(false)} />;
@@ -223,51 +211,6 @@ export default function PracticePage({ profile, isTeacher = false }) {
               </button>
             );
           })}
-        </div>
-
-        <div style={{ marginBottom: '1rem' }}>
-          <button
-            onClick={() => setTenseMode(true)}
-            style={{
-              display: 'flex', alignItems: 'center',
-              gap: 'clamp(0.75rem, 3vw, 1.25rem)',
-              padding: 'clamp(1rem, 3vw, 1.5rem)',
-              backgroundColor: 'white',
-              border: '1px solid #e2e8f0', borderRadius: '16px',
-              cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s',
-              boxShadow: '0 4px 12px rgba(14, 124, 107, 0.18)',
-              width: '100%', boxSizing: 'border-box'
-            }}
-          >
-            <div style={{
-              background: 'linear-gradient(135deg, #0E7C6B, #14B8A6)',
-              borderRadius: '12px',
-              width: 'clamp(55px, 15vw, 70px)', height: 'clamp(55px, 15vw, 70px)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 'clamp(1.5rem, 5vw, 2rem)', flexShrink: 0
-            }}>
-              🏷️
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.3rem' }}>
-                <span style={{ fontSize: 'clamp(1.15rem, 4vw, 1.35rem)', fontWeight: '700', color: '#2C3E50' }}>
-                  Tense Tagger
-                </span>
-                <span style={{
-                  fontSize: 'clamp(0.75rem, 2vw, 0.8rem)', fontWeight: '600',
-                  color: '#0E7C6B', backgroundColor: 'rgba(14, 124, 107, 0.12)',
-                  padding: '2px 8px', borderRadius: '6px',
-                  textTransform: 'uppercase', letterSpacing: '0.5px'
-                }}>
-                  Grammar
-                </span>
-              </div>
-              <p style={{ fontSize: 'clamp(0.85rem, 2.5vw, 0.95rem)', color: '#666', margin: 0, lineHeight: '1.4' }}>
-                Spot the tense — time, aspect, voice — then use it yourself.
-              </p>
-            </div>
-            <div style={{ fontSize: '1.5rem', color: '#ccc', flexShrink: 0 }}>→</div>
-          </button>
         </div>
 
         <div style={{ marginTop: '0.5rem' }}>

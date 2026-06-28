@@ -15,6 +15,7 @@ import MatchingExercise from './MatchingExercise'
 import SentenceAuction from './SentenceAuction'
 import FlashcardTemplate from './FlashcardTemplate'
 import MemoryGame from './MemoryGame'
+import TenseTagger from './components/TenseTagger'
 import { BORRAS_CARDS } from './data/BorrasCards'
 import { HOTEL_CARDS } from './data/HotelCards'
 import { VERB_CARDS } from './data/VerbCards'
@@ -33,6 +34,7 @@ const ACTIVE_EXERCISES = new Set([
   'Odd One Out', 'Error Correction',
   'Matching', 'Sentence Auction', 'Lyrics Mixer', 'Blurt!', 'Word Snake', 'Real Talk',
   'Travel 🧳', 'Sport ⚽️', 'Wordle', 'Connections', 'Spelling Bee', 'Wordsearch', 'Crossword',
+  'Tense Tagger',
 ])
 
 const EXERCISE_ICONS = {
@@ -69,6 +71,7 @@ const EXERCISE_ICONS = {
   'Spelling Bee':              '🐝',
   'Wordsearch':                '🔎',
   'Crossword':                 '✜',
+  'Tense Tagger':              '🏷️',
 }
 
 // Play removed from tabs — students use bottom nav, teachers use sidebar
@@ -211,6 +214,7 @@ export default function ExerciseList({
     else if (t === 'Matching')                       exerciseComponent = <MatchingExercise onComplete={back} onBack={back} />
     else if (t === 'Sentence Auction')               exerciseComponent = <SentenceAuction onComplete={back} onBack={back} />
     else if (t === 'Real Talk')                      exerciseComponent = <RealTalkExercise onBack={back} userTracks={userTracks} />
+    else if (t === 'Tense Tagger')                   exerciseComponent = <TenseTagger profile={{ level: userLevel, tracks: userTracks }} />
 
     if (exerciseComponent) {
       return (

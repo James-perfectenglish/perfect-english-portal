@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../supabaseClient';
 
 /* ============================================================
-   Tense Tagger 🏷️  — standalone Practise activity (English, ship 1)
+   Tense Tagger 🏷️  — standalone Activities exercise (English, ship 1)
    Recognition is fully generated client-side (grammar composed
    from the tags, so the answer key is free). Production is checked
    by a client-side structural rule (the AI-naturalness layer and
@@ -65,6 +65,14 @@ const VERBS = [
 ].map(([base, s, past, pp, ing, transitive, stative, objects, min]) =>
   ({ base, s, past, pp, ing, transitive: !!transitive, stative: !!stative, objects, min }));
 
+// Semantic gates (keep generated sentences natural):
+//  ACTIVITY        — sustained activities that read well in the perfect continuous
+//  PROCESS_PASSIVE — things naturally described as a process "being done" (continuous passive)
+//  PUNCTUAL        — instantaneous verbs that read oddly in any continuous ("is finding")
+const ACTIVITY = new Set(['clean','cook','serve','prepare','build','paint','fix','deliver','drive','watch','read','write','teach','work','wait','stay','run','sing']);
+const PROCESS_PASSIVE = new Set(['clean','cook','serve','prepare','build','paint','fix','deliver']);
+const PUNCTUAL = new Set(['find','lose']);
+
 const SUBJECTS = [
   ['I', 1, 'sg'], ['you', 2, 'pl'], ['he', 3, 'sg'], ['she', 3, 'sg'], ['we', 1, 'pl'],
   ['they', 3, 'pl'], ['the manager', 3, 'sg'], ['the guests', 3, 'pl'], ['the team', 3, 'sg'], ['my friend', 3, 'sg'],
@@ -83,9 +91,10 @@ const ADVERBIALS = [
 ].map(([text, tags]) => ({ text, tags }));
 
 function adverbTagsFor(time, aspect) {
+  if (aspect === 'perfect_continuous') return ['duration'];      // always a duration phrase
   if (time === 'present' && aspect === 'simple') return ['habitual', 'present_simple'];
   if (time === 'present' && aspect === 'continuous') return ['now'];
-  if (aspect === 'perfect' || aspect === 'perfect_continuous') {
+  if (aspect === 'perfect') {
     if (time === 'future') return ['future_perfect'];
     return ['duration'];
   }
@@ -159,7 +168,9 @@ function gridSpecs() {
   for (const time of TIMES)
     for (const [aspect, perfect, progressive] of ASPECTS)
       for (const voice of ['active', 'passive']) {
-        if (perfect && progressive && voice === 'passive') continue; // "has been being cleaned" — excluded
+        if (perfect && progressive && voice === 'passive') continue;             // "has been being cleaned" — excluded
+        if (time === 'future' && perfect && progressive) continue;              // future perfect continuous — too awkward to generate naturally
+        if (time === 'future' && progressive && voice === 'passive') continue;  // "will be being driven" — never used
         out.push({ time, aspect, perfect, progressive, voice, modal: null,
           answer: { time, aspect, voice, modality: 'none' } });
       }
@@ -213,13 +224,17 @@ function tenseName(item) {
 
 function makeGenerated(level) {
   const specs = allowedSpecs(level);
-  for (let tries = 0; tries < 40; tries++) {
+  for (let tries = 0; tries < 50; tries++) {
     const spec = rand(specs);
     const passive = spec.voice === 'passive';
     const continuous = spec.progressive;
+    const perfCont = spec.perfect && spec.progressive;
+
     let pool = VERBS;
     if (passive) pool = pool.filter(v => v.transitive);
-    if (continuous) pool = pool.filter(v => !v.stative);
+    if (continuous) pool = pool.filter(v => !v.stative && !PUNCTUAL.has(v.base));
+    if (perfCont) pool = pool.filter(v => ACTIVITY.has(v.base));            // sustained activities only
+    if (continuous && passive) pool = pool.filter(v => PROCESS_PASSIVE.has(v.base)); // natural "being done" verbs
     if (!pool.length) continue;
     const verb = rand(pool);
 
@@ -230,13 +245,16 @@ function makeGenerated(level) {
     } else {
       const subj = rand(SUBJECTS);
       subjectText = subj.text; person = subj.person; number = subj.number;
-      if (verb.transitive && verb.objects.length) objectText = rand(verb.objects);
+      // perfect continuous reads best with no object ("I have been working for ages")
+      if (verb.transitive && verb.objects.length && !perfCont) objectText = rand(verb.objects);
     }
 
     const vp = buildVP(verb, spec, person, number);
     const tags = adverbTagsFor(spec.time, spec.aspect);
     const advChoices = ADVERBIALS.filter(a => a.tags.some(t => tags.includes(t)));
-    const adv = advChoices.length && Math.random() < 0.7 ? rand(advChoices).text : '';
+    let adv = '';
+    if (perfCont) adv = advChoices.length ? rand(advChoices).text : 'for ages';   // always a duration phrase
+    else if (advChoices.length && Math.random() < 0.7) adv = rand(advChoices).text;
 
     const pre = cap(subjectText) + ' ';
     const post = (objectText ? ' ' + objectText : '') + (adv ? ' ' + adv : '') + '.';
@@ -271,6 +289,9 @@ function productionResult(text, item) {
   const ING = '[a-z]+ing', PP = "[a-z]+(?:ed|en|n|t|ne|wn|ought|aught|ung|ang)";
   const BEp = "(?:am|is|are|'m|'re|'s)", BEq = '(?:was|were)';
   const HVp = "(?:have|has|'ve|'s)", HVq = "(?:had|'d)", WL = "(?:will|'ll)";
+  // a perfect verb phrase may legitimately use "been" as a main-verb participle
+  // ("will have been there"); only exclude "been + V-ing" (that is the continuous).
+  const NOT_CONT = '(?!been\\s+[a-z]+ing)';
   let re = null;
   if (voice === 'active') {
     if (aspect === 'perfect_continuous')
@@ -278,7 +299,7 @@ function productionResult(text, item) {
     else if (aspect === 'continuous')
       re = time === 'present' ? `${BEp}\\s+${ING}` : time === 'past' ? `${BEq}\\s+${ING}` : `${WL}\\s+be\\s+${ING}`;
     else if (aspect === 'perfect')
-      re = time === 'present' ? `${HVp}\\s+(?!been\\s)[a-z]+` : time === 'past' ? `${HVq}\\s+[a-z]+` : `${WL}\\s+have\\s+(?!been)[a-z]+`;
+      re = time === 'present' ? `${HVp}\\s+${NOT_CONT}[a-z]+` : time === 'past' ? `${HVq}\\s+[a-z]+` : `${WL}\\s+have\\s+${NOT_CONT}[a-z]+`;
     else if (time === 'future') re = `${WL}\\s+(?!be\\b|have\\b)[a-z]+`;
   } else {
     if (aspect === 'continuous')
@@ -560,6 +581,7 @@ export default function TenseTagger({ profile }) {
             </div>
             <textarea value={draft} onChange={e => { setDraft(e.target.value); setProd(null); }} rows={2}
               placeholder="Type a sentence…" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && draft.trim()) { e.preventDefault(); checkProduction(); } }}
               style={{
                 width: '100%', padding: '0.85rem', fontSize: '1rem', boxSizing: 'border-box', resize: 'none',
                 fontFamily: 'inherit', borderRadius: '10px', backgroundColor: '#f7f7ff',
