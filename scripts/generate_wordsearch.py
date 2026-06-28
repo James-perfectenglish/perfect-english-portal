@@ -215,6 +215,46 @@ THEMES_EN = {
         "BOIL", "ROAST", "BAKE", "GRILL", "SIMMER", "STEAM",
         "KNEAD", "MARINATE", "SEASON", "CHILL", "GLAZE", "BRAISE",
     ],
+    "Fruit and Vegetables": [
+        "APPLE", "BANANA", "ORANGE", "GRAPE", "STRAWBERRY", "PINEAPPLE",
+        "CARROT", "POTATO", "ONION", "BROCCOLI", "LETTUCE", "SPINACH",
+        "CUCUMBER", "PEPPER", "MUSHROOM", "CHERRY", "LEMON", "CABBAGE",
+    ],
+    "Drinks": [
+        "WATER", "COFFEE", "JUICE", "MILK", "LEMONADE", "SMOOTHIE",
+        "COCOA", "CIDER", "SODA", "MILKSHAKE", "ESPRESSO", "COCKTAIL",
+        "SQUASH", "WINE", "BEER", "CHAMPAGNE",
+    ],
+    "Furniture": [
+        "SOFA", "TABLE", "WARDROBE", "CUPBOARD", "ARMCHAIR", "BOOKSHELF",
+        "DRESSER", "STOOL", "BENCH", "DESK", "COUCH", "CABINET",
+        "MIRROR", "SHELF", "MATTRESS", "CARPET",
+    ],
+    "Colours": [
+        "RED", "BLUE", "GREEN", "YELLOW", "ORANGE", "PURPLE",
+        "PINK", "BROWN", "BLACK", "WHITE", "SCARLET", "TURQUOISE",
+        "MAROON", "BEIGE", "CRIMSON", "VIOLET", "INDIGO",
+    ],
+    "Countries": [
+        "SPAIN", "FRANCE", "GERMANY", "ITALY", "PORTUGAL", "ENGLAND",
+        "BRAZIL", "JAPAN", "CHINA", "CANADA", "MEXICO", "EGYPT",
+        "SWEDEN", "GREECE", "INDIA", "IRELAND", "NORWAY",
+    ],
+    "Celebrations": [
+        "BIRTHDAY", "WEDDING", "PARTY", "PRESENT", "BALLOON", "CANDLE",
+        "CAKE", "GUEST", "INVITATION", "FIREWORKS", "CONFETTI", "BANNER",
+        "TOAST", "ANNIVERSARY", "FESTIVAL", "CELEBRATION",
+    ],
+    "Tools and DIY": [
+        "HAMMER", "SCREWDRIVER", "DRILL", "WRENCH", "NAIL", "SCREW",
+        "LADDER", "PLIERS", "SANDPAPER", "SAW", "TAPE", "CHISEL",
+        "SPANNER", "TOOLBOX", "WORKBENCH", "BOLT",
+    ],
+    "On the Farm": [
+        "TRACTOR", "BARN", "FIELD", "HARVEST", "SHEEP", "CHICKEN",
+        "COW", "PIG", "HAYSTACK", "ORCHARD", "FARMER", "STABLE",
+        "MEADOW", "SCARECROW", "PLOUGH", "GOAT", "DUCK",
+    ],
 }
 
 THEMES_ES = {
@@ -308,6 +348,56 @@ THEMES_ES = {
         "SANO", "EJERCICIO", "VITAMINA", "FARMACIA", "MEDICINA", "SINTOMA",
         "PACIENTE", "CLINICA", "CIRUJANO", "REMEDIO", "ALERGIA", "DOLOR",
     ],
+    "Frutas y verduras": [
+        "MANZANA", "PLATANO", "NARANJA", "FRESA", "UVA", "PERA",
+        "MELOCOTON", "ZANAHORIA", "LECHUGA", "CEBOLLA", "TOMATE", "PIMIENTO",
+        "ESPINACA", "PEPINO", "BROCOLI", "LIMON", "PATATA", "CALABAZA",
+    ],
+    "Bebidas": [
+        "AGUA", "CAFE", "LECHE", "ZUMO", "REFRESCO", "BATIDO",
+        "INFUSION", "LIMONADA", "CERVEZA", "VINO", "SIDRA", "COLA",
+        "HORCHATA", "GASEOSA", "CHOCOLATE", "MOSTO",
+    ],
+    "Muebles": [
+        "SOFA", "MESA", "ARMARIO", "ESTANTERIA", "COMODA", "SILLON",
+        "TABURETE", "CAMA", "ESCRITORIO", "BANCO", "ESPEJO", "ALFOMBRA",
+        "ESTANTE", "COLCHON", "VITRINA", "PERCHA",
+    ],
+    "Colores": [
+        "ROJO", "AZUL", "VERDE", "AMARILLO", "MORADO", "ROSA",
+        "MARRON", "NEGRO", "BLANCO", "NARANJA", "GRIS", "VIOLETA",
+        "TURQUESA", "BEIGE", "DORADO", "PLATEADO",
+    ],
+    "Países": [
+        "ESPAÑA", "FRANCIA", "ALEMANIA", "ITALIA", "PORTUGAL", "INGLATERRA",
+        "BRASIL", "JAPON", "CHINA", "MEXICO", "ARGENTINA", "EGIPTO",
+        "GRECIA", "IRLANDA", "SUECIA", "MARRUECOS",
+    ],
+    "Celebraciones": [
+        "CUMPLEAÑOS", "BODA", "FIESTA", "REGALO", "GLOBO", "VELA",
+        "TARTA", "INVITADO", "INVITACION", "FUEGOS", "CONFETI", "PANCARTA",
+        "BRINDIS", "ANIVERSARIO", "FESTIVAL", "CELEBRACION",
+    ],
+    "Tecnología": [
+        "ORDENADOR", "MOVIL", "PANTALLA", "TECLADO", "RATON", "INTERNET",
+        "CONTRASEÑA", "BATERIA", "TABLETA", "NAVEGADOR", "CABLE", "ALTAVOZ",
+        "CARGADOR", "ARCHIVO", "CORREO", "PROGRAMA",
+    ],
+    "La escuela": [
+        "PROFESOR", "ALUMNO", "PIZARRA", "EXAMEN", "DEBERES", "CUADERNO",
+        "TIZA", "RECREO", "LECCION", "MOCHILA", "BOLIGRAFO", "LAPIZ",
+        "REGLA", "GOMA", "PUPITRE", "UNIFORME",
+    ],
+    "Aficiones": [
+        "LEER", "COCINAR", "PINTAR", "BAILAR", "NADAR", "PESCAR",
+        "COSER", "DIBUJAR", "CANTAR", "FOTOGRAFIA", "JARDINERIA", "AJEDREZ",
+        "TEJER", "ESCALAR", "PATINAR", "VIAJAR",
+    ],
+    "Viajes": [
+        "AEROPUERTO", "BILLETE", "PASAPORTE", "MALETA", "HOTEL", "PLAYA",
+        "TURISTA", "VUELO", "EQUIPAJE", "MAPA", "ADUANA", "FRONTERA",
+        "RESERVA", "EXCURSION", "BRUJULA", "RECUERDO",
+    ],
 }
 
 
@@ -320,6 +410,14 @@ def place_word(grid, word, rng, max_attempts=300):
     rows, cols = len(grid), len(grid[0])
     for _ in range(max_attempts):
         dr, dc = rng.choice(DIRECTIONS)
+        # Skip any direction that can't physically hold the word: a vertical
+        # run needs len(word) rows, a horizontal run needs len(word) cols.
+        # Without this guard randint() gets an empty range and raises (e.g. an
+        # 11-letter word dropped into a 10-row grid variant).
+        if dr != 0 and len(word) > rows:
+            continue
+        if dc != 0 and len(word) > cols:
+            continue
         if dr > 0:
             r0 = rng.randint(0, rows - len(word))
         elif dr < 0:
