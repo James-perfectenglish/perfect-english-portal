@@ -128,6 +128,14 @@ const TENSES = ['presente', 'presente_continuo', 'preterito', 'imperfecto'];
 const TIEMPO_LABEL = { presente: 'Presente', presente_continuo: 'Presente continuo', preterito: 'Pretérito', imperfecto: 'Imperfecto' };
 const TIEMPO_ES = { presente: 'presente', presente_continuo: 'presente continuo', preterito: 'pretérito', imperfecto: 'imperfecto' };
 
+// production scaffold: the form of each tense + a one-line use note (shown in produce mode)
+const FORMULAS_ES = {
+  presente:          { formula: 'stem + -o, -as, -a, -amos, -áis, -an  (hablo, comes, vive)', use: 'habits and general facts' },
+  presente_continuo: { formula: 'estar + gerundio  (estoy hablando, está comiendo)', use: 'an action happening right now' },
+  preterito:         { formula: 'stem + -é, -aste, -ó…  (hablé, comió)', use: 'a completed, finished past action' },
+  imperfecto:        { formula: 'stem + -aba / -ía…  (hablaba, comía)', use: 'an ongoing or habitual past action' },
+};
+
 /* ---------- helpers ---------- */
 const rand = a => a[Math.floor(Math.random() * a.length)];
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
@@ -318,7 +326,7 @@ export default function TenseTaggerES({ profile }) {
 
         {/* specimen */}
         <div style={{ ...cardStyle, padding: '1.5rem' }}>
-          <div style={{ ...labelStyle, marginBottom: '0.75rem' }}>Specimen</div>
+          <div style={{ ...labelStyle, marginBottom: '0.75rem' }}>Sentence</div>
           <p style={{ fontSize: '1.4rem', lineHeight: 1.45, color: C.ink, margin: 0, fontWeight: 400 }}>
             {item.pre}
             <span style={{ background: C.mark, padding: '1px 5px', borderRadius: '5px', fontWeight: 700 }}>{item.vp}</span>
@@ -383,7 +391,13 @@ export default function TenseTaggerES({ profile }) {
             <div style={{ fontSize: '1rem', color: C.ink, marginBottom: '0.75rem' }}>
               Now write your own Spanish sentence in the <b>{label}</b>.
             </div>
-            <textarea value={draft} onChange={e => { setDraft(e.target.value); setProd(null); }} rows={2}
+            {FORMULAS_ES[item.tense] && (
+              <div style={{ background: '#f7fafc', border: `1px solid ${C.line}`, borderRadius: '10px', padding: '0.6rem 0.8rem', marginBottom: '0.75rem' }}>
+                <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, monospace', fontSize: '0.82rem', fontWeight: 600, color: C.ink }}>{FORMULAS_ES[item.tense].formula}</span>
+                <span style={{ display: 'block', marginTop: '0.3rem', fontSize: '0.8rem', color: C.muted, lineHeight: 1.4 }}>{FORMULAS_ES[item.tense].use}</span>
+              </div>
+            )}
+            <textarea value={draft} onChange={e => { setDraft(e.target.value); setProd(null); }} rows={2} autoFocus
               placeholder="Escribe una frase…" autoCorrect="off" autoCapitalize="off" spellCheck={false} disabled={checking}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && draft.trim()) { e.preventDefault(); checkProduction(); } }}
               style={{

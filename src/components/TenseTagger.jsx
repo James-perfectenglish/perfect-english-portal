@@ -187,15 +187,15 @@ function allowedSpecs(level) {
 
 /* ---------- curated form ≠ function bank (served at C1) ---------- */
 const CURATED = [
-  { sentence: 'We are going to Scotland on the train.', vp: 'are going',
+  { sentence: 'We are meeting the new supplier next Tuesday.', vp: 'are meeting',
     answer: { time: 'present', aspect: 'continuous', voice: 'active', modality: 'none' },
     functionTime: 'future', note: 'Present continuous for a fixed future arrangement.' },
-  { sentence: 'The train leaves at six.', vp: 'leaves',
+  { sentence: 'The train leaves at six tomorrow morning.', vp: 'leaves',
     answer: { time: 'present', aspect: 'simple', voice: 'active', modality: 'none' },
-    functionTime: 'future', note: 'Present simple for timetables and schedules.' },
-  { sentence: 'When the guests arrive, we greet them at the door.', vp: 'arrive',
+    functionTime: 'future', note: 'Present simple for a timetabled future event.' },
+  { sentence: 'The conference starts next Thursday.', vp: 'starts',
     answer: { time: 'present', aspect: 'simple', voice: 'active', modality: 'none' },
-    functionTime: 'future', note: 'Present simple in a time clause that refers to the future.' },
+    functionTime: 'future', note: 'Present simple for a scheduled future event.' },
   { sentence: 'If I had more time, I would help.', vp: 'had',
     answer: { time: 'past', aspect: 'simple', voice: 'active', modality: 'none' },
     functionTime: 'present', note: 'Past form for an unreal present situation (2nd conditional).' },
@@ -353,6 +353,29 @@ const labelStyle = { fontSize: '0.7rem', fontWeight: 700, color: C.faint, textTr
 // human-readable time reference for the production instruction on form≠function items
 const FN_LABEL = { past: 'the past', present: 'the present', future: 'the future', general: 'a general truth' };
 
+// production scaffold: the form of each tense + a one-line use note (shown in produce mode)
+const FORMULAS = {
+  'present simple':             { formula: 'subject + infinitive (add -s for he/she/it)', use: 'habits, routines and general facts' },
+  'present continuous':         { formula: 'subject + am/is/are + verb-ing', use: 'actions happening now (or a fixed future arrangement)' },
+  'present perfect':            { formula: 'subject + have/has + past participle', use: 'past actions with present relevance or a present result' },
+  'present perfect continuous': { formula: 'subject + have/has + been + verb-ing', use: 'an action continuing up to now' },
+  'past simple':                { formula: 'subject + past verb (-ed or irregular)', use: 'finished actions at a definite past time' },
+  'past continuous':            { formula: 'subject + was/were + verb-ing', use: 'an action in progress at a past moment' },
+  'past perfect':               { formula: 'subject + had + past participle', use: 'an action completed before another past action' },
+  'past perfect continuous':    { formula: 'subject + had + been + verb-ing', use: 'an action continuing up to a point in the past' },
+  'future simple':              { formula: 'subject + will + infinitive', use: 'predictions, offers and decisions made now' },
+  'future continuous':          { formula: 'subject + will be + verb-ing', use: 'an action in progress at a future moment' },
+  'future perfect':             { formula: 'subject + will have + past participle', use: 'an action completed before a point in the future' },
+  'past simple passive':        { formula: 'subject + was/were + past participle', use: 'a finished past action — focus on what was done' },
+  'past continuous passive':    { formula: 'subject + was/were + being + past participle', use: 'an action in progress in the past — passive' },
+  'past perfect passive':       { formula: 'subject + had been + past participle', use: 'an action completed before another past action — passive' },
+  'present simple passive':     { formula: 'subject + am/is/are + past participle', use: 'a habit or fact — focus on what is done' },
+  'present continuous passive': { formula: 'subject + am/is/are + being + past participle', use: 'an action happening now — passive' },
+  'present perfect passive':    { formula: 'subject + have/has + been + past participle', use: 'a past action with present relevance — passive' },
+  'future simple passive':      { formula: 'subject + will be + past participle', use: 'a future action — passive' },
+  'future perfect passive':     { formula: 'subject + will have been + past participle', use: 'an action completed before a future point — passive' },
+};
+
 // status pill for the AI marking layer (matches the app's AI purple convention)
 function StatusPill({ tone, children }) {
   const t = {
@@ -396,7 +419,7 @@ export default function TenseTagger({ profile }) {
 
   const axisDef = {
     time: { label: 'Time', opts: ['past', 'present', 'future'] },
-    aspect: { label: 'Aspect', opts: gate.aspect },
+    aspect: { label: 'Type', opts: gate.aspect },
     voice: { label: 'Voice', opts: gate.voice },
   };
 
@@ -541,7 +564,7 @@ export default function TenseTagger({ profile }) {
 
         {/* specimen */}
         <div style={{ ...cardStyle, padding: '1.5rem' }}>
-          <div style={{ ...labelStyle, marginBottom: '0.75rem' }}>Specimen</div>
+          <div style={{ ...labelStyle, marginBottom: '0.75rem' }}>Sentence</div>
           <p style={{ fontSize: '1.4rem', lineHeight: 1.45, color: C.ink, margin: 0, fontWeight: 400 }}>
             {item.pre}
             <span style={{ background: C.mark, padding: '1px 5px', borderRadius: '5px', fontWeight: 700 }}>{item.vp}</span>
@@ -666,7 +689,13 @@ export default function TenseTagger({ profile }) {
               <div style={{ background: '#ebf4ff', borderRadius: '10px', color: C.ink, fontSize: '0.85rem',
                 padding: '0.6rem 0.8rem', marginBottom: '0.75rem', lineHeight: 1.5 }}>💡 {item.note}</div>
             )}
-            <textarea value={draft} onChange={e => { setDraft(e.target.value); setProd(null); }} rows={2}
+            {FORMULAS[name] && (
+              <div style={{ background: '#f7fafc', border: `1px solid ${C.line}`, borderRadius: '10px', padding: '0.6rem 0.8rem', marginBottom: '0.75rem' }}>
+                <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, monospace', fontSize: '0.82rem', fontWeight: 600, color: C.ink }}>{FORMULAS[name].formula}</span>
+                <span style={{ display: 'block', marginTop: '0.3rem', fontSize: '0.8rem', color: C.muted, lineHeight: 1.4 }}>{FORMULAS[name].use}</span>
+              </div>
+            )}
+            <textarea value={draft} onChange={e => { setDraft(e.target.value); setProd(null); }} rows={2} autoFocus
               placeholder="Type a sentence…" autoCorrect="off" autoCapitalize="off" spellCheck={false} disabled={checking}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && draft.trim()) { e.preventDefault(); checkProduction(); } }}
               style={{
