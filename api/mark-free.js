@@ -7,6 +7,7 @@ export default async function handler(req, res) {
   const { type } = req.body;
   if (type === 'word_order') return handleWordOrder(req, res);
   if (type === 'correction') return handleCorrection(req, res);
+  if (type === 'tense') return handleTense(req, res);
   return handleSentence(req, res);
 }
 
@@ -438,6 +439,48 @@ JSON:
 or
 {"valid": false, "reason": "short explanation at the right level"}`;
   return callAI(prompt, 150, res, 'mark-free.correction');
+}
+
+// ── TENSE TAGGER (production: naturalness + form, and form-vs-function at C1) ──
+// Layer 2 of the Tense Tagger production check. The client runs a structural
+// regex first (layer 1, also the offline fallback); this is the arbiter when
+// reachable. Generous like the other prompts: cosmetic slips never fail; only a
+// wrong/absent form, unnatural English, or (on form≠function items) a wrong time
+// reference fails.
+async function handleTense(req, res) {
+  const { sentence, tenseName, isMismatch, functionTime, note, level = 'B1' } = req.body;
+  if (!sentence || !tenseName) return res.status(400).json({ error: 'Missing required fields' });
+
+  const FN = { past: 'the past', present: 'the present', future: 'the future', general: 'a general, timeless truth' };
+  const fnText = FN[functionTime] || functionTime;
+
+  const functionBlock = isMismatch
+    ? `THIS IS A FORM-vs-MEANING ITEM. The ${tenseName} FORM is being used to refer to ${fnText}.${note ? ` (${note})` : ''} So the student must do BOTH: use the ${tenseName} form AND have the sentence genuinely refer to ${fnText}.
+   - Right form, but it clearly refers to a different time → valid=false. Be warm and name the gap, e.g. "The form is spot on, but this is talking about the present, not ${fnText} — try once more with that meaning."
+   - When the time reference is plausibly ${fnText}, give the benefit of the doubt and accept.`
+    : `Here the form carries its ordinary meaning, so there is no separate time-reference check — just judge the form and whether it is natural English.`;
+
+  const prompt = `You are marking a "Tense Tagger" production task for an adult English learner at level ${level}. They have just correctly recognised a tense and must now WRITE their own sentence using it.
+
+Student's sentence: "${sentence}"
+Target tense (FORM): ${tenseName}
+
+${functionBlock}
+
+ASSESSMENT RULES — apply in order:
+1. EXPAND CONTRACTIONS FIRST: "isn't"=is not, "aren't"=are not, "wasn't"=was not, "hasn't"=has not, "haven't"=have not, "didn't"=did not, "won't"=will not, "'ll"=will, "'ve"=have, "'re"=are, "'s"=is or has. A contraction conceals the auxiliary, it does not remove it.
+2. FORM: does the verb phrase match the ${tenseName}? Negatives ("isn't being cleaned"), questions ("Has it been booked?") and contractions are full, valid uses of the form. If the form is genuinely missing or malformed → valid=false with a short, kind reason.
+3. NATURALNESS: a sentence that is the right shape but unnatural English — a wrong collocation, a verb that does not work in this aspect ("I am knowing"), broken phrasing — is NOT a pass → valid=false with a gentle fix.
+4. Cosmetic only — punctuation, capitalisation, a missing full stop, a typo on a non-target word — is NEVER grounds for rejection → valid=true; you may note it in one short clause.
+
+Be warm and encouraging — this is practice, not an exam. Keep feedback to 1–2 short sentences, with no grammar-jargon codes.
+
+Reply ONLY with JSON:
+{"valid": true, "feedback": "warm brief praise, optionally a tiny note"}
+or
+{"valid": false, "feedback": "kind, specific reason and a small nudge"}`;
+
+  return callAI(prompt, 200, res, 'mark-free.tense');
 }
 
 // ── SHARED AI CALLER ─────────────────────────────────────────────────────────

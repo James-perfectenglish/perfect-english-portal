@@ -5,9 +5,10 @@ import { supabase } from '../supabaseClient';
    Tense Tagger 🏷️  — standalone Activities exercise (English, ship 1)
    Recognition is fully generated client-side (grammar composed
    from the tags, so the answer key is free). Production is checked
-   by a client-side structural rule (the AI-naturalness layer and
-   the sc_sentences harvest are a later ship). Recognition attempts
-   write to tense_attempts; a passed production writes a star.
+   by an AI arbiter (mark-free.js, type:'tense') with the client-side
+   structural rule as the offline fallback. Recognition attempts write
+   to tense_attempts; every production submission is harvested to
+   sc_sentences; a passed production writes a star.
    ============================================================ */
 
 /* ---------- palette (matches the app) ---------- */
@@ -349,6 +350,26 @@ function chipStyle(state) {
 const cardStyle = { background: C.card, border: `1px solid ${C.line}`, borderRadius: '16px', padding: '1.25rem', marginBottom: '1rem' };
 const labelStyle = { fontSize: '0.7rem', fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.5px' };
 
+// human-readable time reference for the production instruction on form≠function items
+const FN_LABEL = { past: 'the past', present: 'the present', future: 'the future', general: 'a general truth' };
+
+// status pill for the AI marking layer (matches the app's AI purple convention)
+function StatusPill({ tone, children }) {
+  const t = {
+    ai:   { bg: '#EDE9FE', fg: '#553C9A', bd: '#C4B5FD' },
+    good: { bg: C.goodBg,  fg: C.good,    bd: C.goodLine },
+    bad:  { bg: C.badBg,   fg: C.bad,     bd: C.badLine },
+    warn: { bg: '#fffaf0', fg: '#b7791f', bd: '#f6e05e' },
+  }[tone] || { bg: '#edf2f7', fg: C.slate, bd: C.line };
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '4px 12px',
+      borderRadius: '20px', fontSize: '0.78rem', fontWeight: 600,
+      background: t.bg, color: t.fg, border: `1px solid ${t.bd}`,
+    }}>{children}</span>
+  );
+}
+
 /* ---------- component ---------- */
 export default function TenseTagger({ profile }) {
   const [level, setLevel] = useState(() => startLevel(profile));
@@ -359,6 +380,7 @@ export default function TenseTagger({ profile }) {
   const [fnPick, setFnPick] = useState(null);
   const [draft, setDraft] = useState('');
   const [prod, setProd] = useState(null);
+  const [checking, setChecking] = useState(false);
   const [stars, setStars] = useState(0);
   const [tagged, setTagged] = useState(0);
 
@@ -397,16 +419,32 @@ export default function TenseTagger({ profile }) {
     } catch (e) { console.warn('TenseTagger: tense_attempts insert failed', e); }
   }
 
-  async function awardStar(sentence) {
+  async function awardStar(sentence, aiFeedback) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { error } = await supabase.from('stars').insert({
         student_id: user.id, source: 'tense_tagger', subtype: 'production',
-        context: { tense: name, sentence, language: 'en', level, input_method: 'text' },
+        context: { tense: name, sentence, language: 'en', level, input_method: 'text', ai_feedback: aiFeedback || '' },
       });
       if (error && error.code !== '23505') console.warn('TenseTagger: could not save star:', error);
     } catch (e) { console.warn('TenseTagger: could not save star:', e); }
+  }
+
+  // Harvest every production submission (pass AND fail) into sc_sentences, so the
+  // tagging classifier sees Tense Tagger like every other "record" surface.
+  // target = the tense name; is_correct = the final verdict; ai_feedback when the AI ran.
+  async function harvestSentence(sentence, isCorrect, aiFeedback) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { error } = await supabase.from('sc_sentences').insert({
+        student_id: user.id, source: 'tense_tagger', target: name, sentence,
+        is_correct: isCorrect, ai_feedback: aiFeedback || null,
+        input_method: 'text', language: 'en', level,
+      });
+      if (error) console.warn('TenseTagger: sc_sentences insert failed', error);
+    } catch (e) { console.warn('TenseTagger: sc_sentences insert failed', e); }
   }
 
   function checkTags() {
@@ -426,10 +464,53 @@ export default function TenseTagger({ profile }) {
     logAttempt(item.functionTime, opt);
   }
 
-  function checkProduction() {
-    const r = productionResult(draft, item);
-    setProd(r);
-    if (r.ok) { awardStar(draft.trim()); setStars(s => s + 1); setPhase('done'); }
+  // Production marking: AI is the arbiter (mark-free.js, type:'tense'); the
+  // client-side structural regex is the offline fallback so a star is never lost
+  // to an AI outage. Every submission (pass or fail) is harvested to sc_sentences.
+  async function checkProduction() {
+    const sentence = draft.trim();
+    if (!sentence || checking) return;
+
+    const structural = productionResult(sentence, item);  // layer 1 + fallback verdict
+
+    const useStructuralFallback = () => {
+      if (structural.ok) {
+        setProd({ ok: true, layer: 'structure', soft: structural.soft });
+        harvestSentence(sentence, true, null);
+        awardStar(sentence, null); setStars(s => s + 1); setPhase('done');
+      } else {
+        setProd({ ok: false, layer: 'structure', hint: structural.hint });
+        harvestSentence(sentence, false, null);
+      }
+    };
+
+    setChecking(true); setProd(null);
+    try {
+      const res = await fetch('/api/mark-free', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'tense', sentence, tenseName: name,
+          time: item.answer.time, aspect: item.answer.aspect, voice: item.answer.voice,
+          isMismatch: item.isMismatch, functionTime: item.functionTime,
+          note: item.note || null, level, language: 'en',
+        }),
+      });
+      const data = res.ok ? await res.json() : null;
+      // valid must be an explicit boolean; valid:null (timeout / 529 overload) → fallback
+      if (data && (data.valid === true || data.valid === false)) {
+        const ok = data.valid === true;
+        const feedback = data.feedback || data.reason || '';
+        setProd({ ok, layer: 'ai', feedback });
+        harvestSentence(sentence, ok, feedback);
+        if (ok) { awardStar(sentence, feedback); setStars(s => s + 1); setPhase('done'); }
+      } else {
+        useStructuralFallback();
+      }
+    } catch (e) {
+      useStructuralFallback();
+    } finally {
+      setChecking(false);
+    }
   }
 
   const accepts = functionAccepts(item);
@@ -576,29 +657,50 @@ export default function TenseTagger({ profile }) {
         {phase === 'produce' && (
           <div style={cardStyle}>
             <div style={{ ...labelStyle, marginBottom: '0.6rem' }}>✏️ Your turn — earn the star</div>
-            <div style={{ fontSize: '1rem', color: C.ink, marginBottom: '0.75rem' }}>
-              Now write your own sentence in the <b>{name}</b>.
+            <div style={{ fontSize: '1rem', color: C.ink, marginBottom: item.isMismatch ? '0.5rem' : '0.75rem' }}>
+              {item.isMismatch
+                ? <>Now write your own <b>{name}</b> sentence that refers to <b>{FN_LABEL[item.functionTime] || item.functionTime}</b>.</>
+                : <>Now write your own sentence in the <b>{name}</b>.</>}
             </div>
+            {item.isMismatch && item.note && (
+              <div style={{ background: '#ebf4ff', borderRadius: '10px', color: C.ink, fontSize: '0.85rem',
+                padding: '0.6rem 0.8rem', marginBottom: '0.75rem', lineHeight: 1.5 }}>💡 {item.note}</div>
+            )}
             <textarea value={draft} onChange={e => { setDraft(e.target.value); setProd(null); }} rows={2}
-              placeholder="Type a sentence…" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+              placeholder="Type a sentence…" autoCorrect="off" autoCapitalize="off" spellCheck={false} disabled={checking}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && draft.trim()) { e.preventDefault(); checkProduction(); } }}
               style={{
                 width: '100%', padding: '0.85rem', fontSize: '1rem', boxSizing: 'border-box', resize: 'none',
                 fontFamily: 'inherit', borderRadius: '10px', backgroundColor: '#f7f7ff',
                 border: `2px solid ${prod && !prod.ok ? C.badLine : C.brand}`, color: '#2d3748', WebkitTextFillColor: '#2d3748',
               }} />
-            {prod && !prod.ok && (
-              <div style={{ color: C.bad, fontSize: '0.85rem', marginTop: '0.5rem' }}>{prod.hint}</div>
+
+            {/* AI marking pill + feedback (layer 2) */}
+            {checking && (
+              <div style={{ marginTop: '0.6rem' }}>
+                <StatusPill tone="ai">🤖 AI is checking…</StatusPill>
+              </div>
             )}
+            {!checking && prod && !prod.ok && (
+              <div style={{ marginTop: '0.6rem' }}>
+                {prod.layer === 'ai'
+                  ? <StatusPill tone="bad">🤖 Not yet</StatusPill>
+                  : <StatusPill tone="warn">⚠️ AI busy — checked structure only</StatusPill>}
+                <div style={{ color: C.bad, fontSize: '0.85rem', marginTop: '0.5rem', lineHeight: 1.5 }}>
+                  {prod.layer === 'ai' ? prod.feedback : prod.hint}
+                </div>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-              <button onClick={checkProduction} disabled={!draft.trim()} style={{
+              <button onClick={checkProduction} disabled={!draft.trim() || checking} style={{
                 flex: 1, padding: '0.85rem', borderRadius: '10px', border: 'none',
-                background: draft.trim() ? PG : '#cbd5e0', color: 'white', fontSize: '0.95rem', fontWeight: 700,
-                cursor: draft.trim() ? 'pointer' : 'not-allowed',
-              }}>⭐️ Submit for a star</button>
-              <button onClick={() => reset()} style={{
+                background: draft.trim() && !checking ? PG : '#cbd5e0', color: 'white', fontSize: '0.95rem', fontWeight: 700,
+                cursor: draft.trim() && !checking ? 'pointer' : 'not-allowed',
+              }}>{checking ? '🤖 Checking…' : '⭐️ Submit for a star'}</button>
+              <button onClick={() => reset()} disabled={checking} style={{
                 padding: '0.85rem 1rem', borderRadius: '10px', background: 'transparent', color: C.muted,
-                border: `1px solid ${C.line}`, fontSize: '0.9rem', cursor: 'pointer',
+                border: `1px solid ${C.line}`, fontSize: '0.9rem', cursor: checking ? 'not-allowed' : 'pointer',
               }}>Skip</button>
             </div>
           </div>
@@ -612,9 +714,17 @@ export default function TenseTagger({ profile }) {
             <div style={{ color: C.muted, fontSize: '0.88rem', marginBottom: '0.25rem' }}>
               You recognised <i>and</i> produced the {name}.
             </div>
-            {prod?.soft && (
-              <div style={{ color: C.faint, fontSize: '0.78rem', marginBottom: '0.75rem' }}>
-                (Structure looks right — the AI naturalness check comes in a later update.)
+            {prod?.layer === 'ai' && (
+              <div style={{ marginBottom: '0.6rem' }}>
+                <StatusPill tone="ai">🤖 AI checked</StatusPill>
+              </div>
+            )}
+            {prod?.layer === 'ai' && prod.feedback && (
+              <div style={{ color: C.good, fontSize: '0.88rem', marginBottom: '0.75rem', lineHeight: 1.5 }}>{prod.feedback}</div>
+            )}
+            {prod?.layer === 'structure' && (
+              <div style={{ marginBottom: '0.75rem' }}>
+                <StatusPill tone="warn">⚠️ AI unavailable — structure verified</StatusPill>
               </div>
             )}
             <button onClick={() => reset()} style={{
