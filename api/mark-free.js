@@ -448,8 +448,32 @@ or
 // wrong/absent form, unnatural English, or (on form≠function items) a wrong time
 // reference fails.
 async function handleTense(req, res) {
-  const { sentence, tenseName, isMismatch, functionTime, note, level = 'B1' } = req.body;
+  const { sentence, tenseName, isMismatch, functionTime, note, level = 'B1', language = 'en' } = req.body;
   if (!sentence || !tenseName) return res.status(400).json({ error: 'Missing required fields' });
+
+  // Spanish track: native-English learners of Spanish. No form≠function second
+  // question; feedback in English (the learner's L1) for the pretérito/imperfecto
+  // contrast; tildes and other cosmetics never fail.
+  if (language === 'es') {
+    const promptEs = `You are marking a "Tense Tagger" production task. The learner is a native English speaker learning SPANISH (level ${level}). They recognised a Spanish tense and must now WRITE their own SPANISH sentence in it.
+
+Student's sentence: "${sentence}"
+Target tense: ${tenseName} (Spanish)
+
+ASSESSMENT RULES — apply in order:
+1. Is the sentence in Spanish, with the main verb in the ${tenseName}? Identify the conjugated verb and its tense.
+   Reference: presente (hablo / come), presente continuo (estoy hablando), pretérito (hablé / comió — a completed past action), imperfecto (hablaba / comía — an ongoing or habitual past). Pretérito vs imperfecto is the key contrast: both are past, but only the ${tenseName} is accepted here. A correct verb in the WRONG past tense → valid=false, and say which tense they actually used.
+2. Is it natural, grammatical Spanish? Right tense but broken or unnatural → valid=false with a gentle fix.
+3. Cosmetic only — a missing or wrong accent/tilde, capitalisation, punctuation, an opening ¿ or ¡ — is NEVER grounds for rejection → valid=true; you may note it in one short clause.
+
+Give the feedback in ENGLISH (the learner's first language) — it's clearer for the contrast. Be warm and encouraging; 1–2 short sentences.
+
+Reply ONLY with JSON:
+{"valid": true, "feedback": "warm brief praise in English, optionally a tiny note"}
+or
+{"valid": false, "feedback": "kind, specific reason in English and a small nudge"}`;
+    return callAI(promptEs, 200, res, 'mark-free.tense.es');
+  }
 
   const FN = { past: 'the past', present: 'the present', future: 'the future', general: 'a general, timeless truth' };
   const fnText = FN[functionTime] || functionTime;

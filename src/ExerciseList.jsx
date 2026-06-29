@@ -16,6 +16,7 @@ import SentenceAuction from './SentenceAuction'
 import FlashcardTemplate from './FlashcardTemplate'
 import MemoryGame from './MemoryGame'
 import TenseTagger from './components/TenseTagger'
+import TenseTaggerES from './components/TenseTaggerES'
 import { BORRAS_CARDS } from './data/BorrasCards'
 import { HOTEL_CARDS } from './data/HotelCards'
 import { VERB_CARDS } from './data/VerbCards'
@@ -214,7 +215,9 @@ export default function ExerciseList({
     else if (t === 'Matching')                       exerciseComponent = <MatchingExercise onComplete={back} onBack={back} />
     else if (t === 'Sentence Auction')               exerciseComponent = <SentenceAuction onComplete={back} onBack={back} />
     else if (t === 'Real Talk')                      exerciseComponent = <RealTalkExercise onBack={back} userTracks={userTracks} />
-    else if (t === 'Tense Tagger')                   exerciseComponent = <TenseTagger profile={{ level: userLevel, tracks: userTracks }} />
+    else if (t === 'Tense Tagger')                   exerciseComponent = isSpanishTrack
+      ? <TenseTaggerES profile={{ level: userLevel, tracks: userTracks }} />
+      : <TenseTagger profile={{ level: userLevel, tracks: userTracks }} />
 
     if (exerciseComponent) {
       return (
