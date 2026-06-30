@@ -181,8 +181,11 @@ function tenseName(item) {
   return n;
 }
 
-function makeGenerated(level) {
-  const specs = allowedSpecs(level);
+function makeGenerated(level, only = null) {
+  let specs = allowedSpecs(level);
+  // locked-tense mode (Tense Tagger "Practise this"): generate only that tense
+  if (only) specs = specs.filter(s => s.time === only.time && s.aspect === only.aspect && s.voice === only.voice);
+  if (!specs.length) return null;
   for (let tries = 0; tries < 50; tries++) {
     const spec = rand(specs);
     const passive = spec.voice === 'passive';

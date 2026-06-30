@@ -17,6 +17,7 @@ import FlashcardTemplate from './FlashcardTemplate'
 import MemoryGame from './MemoryGame'
 import TenseTagger from './components/TenseTagger'
 import TenseTaggerES from './components/TenseTaggerES'
+import TenseExplainer from './components/TenseExplainer'
 import { BORRAS_CARDS } from './data/BorrasCards'
 import { HOTEL_CARDS } from './data/HotelCards'
 import { VERB_CARDS } from './data/VerbCards'
@@ -35,7 +36,7 @@ const ACTIVE_EXERCISES = new Set([
   'Odd One Out', 'Error Correction',
   'Matching', 'Sentence Auction', 'Lyrics Mixer', 'Blurt!', 'Word Snake', 'Real Talk',
   'Travel 🧳', 'Sport ⚽️', 'Wordle', 'Connections', 'Spelling Bee', 'Wordsearch', 'Crossword',
-  'Tense Tagger',
+  'Tense Tagger', 'Tense Explainer',
 ])
 
 const EXERCISE_ICONS = {
@@ -73,6 +74,7 @@ const EXERCISE_ICONS = {
   'Wordsearch':                '🔎',
   'Crossword':                 '✜',
   'Tense Tagger':              '🏷️',
+  'Tense Explainer':           '📖',
 }
 
 // Play removed from tabs — students use bottom nav, teachers use sidebar
@@ -120,11 +122,12 @@ export default function ExerciseList({
   const [activeExercise, setActiveExercise]   = useState(null)
   const [openedTitles, setOpenedTitles]       = useState(new Set())
   const [hasNewListening, setHasNewListening] = useState(false)
+  const [taggerTense, setTaggerTense]         = useState(null)  // locked tense from "Practise this"
 
   const location = useLocation()
   const navigate = useNavigate()
 
-  useEffect(() => { setActiveExercise(null) }, [location.key])
+  useEffect(() => { setActiveExercise(null); setTaggerTense(null) }, [location.key])
   useEffect(() => { fetchAll() }, [userTracks])
 
   const fetchAll = async () => {
@@ -172,6 +175,7 @@ export default function ExerciseList({
 
   const startExercise = (exercise) => {
     if (!ACTIVE_EXERCISES.has(exercise.title)) return
+    setTaggerTense(null)
     recordOpen(exercise.title)
     if (exercise.title === 'Lyrics Mixer') { navigate('/lyrics');    return }
     if (exercise.type === 'blurt')         { navigate('/blurt');     return }
@@ -184,7 +188,7 @@ export default function ExerciseList({
     setActiveExercise(exercise)
   }
 
-  const back = () => setActiveExercise(null)
+  const back = () => { setActiveExercise(null); setTaggerTense(null) }
 
   const isNew = (exercise) => {
     if (exercise.title === 'Listening Exercises') return hasNewListening
@@ -217,7 +221,19 @@ export default function ExerciseList({
     else if (t === 'Real Talk')                      exerciseComponent = <RealTalkExercise onBack={back} userTracks={userTracks} />
     else if (t === 'Tense Tagger')                   exerciseComponent = isSpanishTrack
       ? <TenseTaggerES profile={{ level: userLevel, tracks: userTracks }} />
-      : <TenseTagger profile={{ level: userLevel, tracks: userTracks }} />
+      : <TenseTagger profile={{ level: userLevel, tracks: userTracks }} initialTense={taggerTense} />
+    else if (t === 'Tense Explainer' && !isSpanishTrack) exerciseComponent = (
+      <TenseExplainer
+        profile={{ level: userLevel, tracks: userTracks }}
+        onPractise={(tense) => {
+          const taggerEx = exercises.find(e => e.title === 'Tense Tagger')
+          if (!taggerEx) return
+          setTaggerTense(tense)
+          recordOpen('Tense Tagger')
+          setActiveExercise(taggerEx)
+        }}
+      />
+    )
 
     if (exerciseComponent) {
       return (
