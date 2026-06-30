@@ -18,6 +18,7 @@ import MemoryGame from './MemoryGame'
 import TenseTagger from './components/TenseTagger'
 import TenseTaggerES from './components/TenseTaggerES'
 import TenseExplainer from './components/TenseExplainer'
+import TenseExplainerES from './components/TenseExplainerES'
 import { BORRAS_CARDS } from './data/BorrasCards'
 import { HOTEL_CARDS } from './data/HotelCards'
 import { VERB_CARDS } from './data/VerbCards'
@@ -220,20 +221,20 @@ export default function ExerciseList({
     else if (t === 'Sentence Auction')               exerciseComponent = <SentenceAuction onComplete={back} onBack={back} />
     else if (t === 'Real Talk')                      exerciseComponent = <RealTalkExercise onBack={back} userTracks={userTracks} />
     else if (t === 'Tense Tagger')                   exerciseComponent = isSpanishTrack
-      ? <TenseTaggerES profile={{ level: userLevel, tracks: userTracks }} />
+      ? <TenseTaggerES profile={{ level: userLevel, tracks: userTracks }} initialTense={taggerTense} />
       : <TenseTagger profile={{ level: userLevel, tracks: userTracks }} initialTense={taggerTense} />
-    else if (t === 'Tense Explainer' && !isSpanishTrack) exerciseComponent = (
-      <TenseExplainer
-        profile={{ level: userLevel, tracks: userTracks }}
-        onPractise={(tense) => {
-          const taggerEx = exercises.find(e => e.title === 'Tense Tagger')
-          if (!taggerEx) return
-          setTaggerTense(tense)
-          recordOpen('Tense Tagger')
-          setActiveExercise(taggerEx)
-        }}
-      />
-    )
+    else if (t === 'Tense Explainer') {
+      const onPractise = (tense) => {
+        const taggerEx = exercises.find(e => e.title === 'Tense Tagger')
+        if (!taggerEx) return
+        setTaggerTense(tense)
+        recordOpen('Tense Tagger')
+        setActiveExercise(taggerEx)
+      }
+      exerciseComponent = isSpanishTrack
+        ? <TenseExplainerES profile={{ level: userLevel, tracks: userTracks }} onPractise={onPractise} />
+        : <TenseExplainer profile={{ level: userLevel, tracks: userTracks }} onPractise={onPractise} />
+    }
 
     if (exerciseComponent) {
       return (

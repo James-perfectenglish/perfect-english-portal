@@ -100,9 +100,9 @@ const TIEMPO_ES = { presente: 'presente', presente_continuo: 'presente continuo'
 const rand = a => a[Math.floor(Math.random() * a.length)];
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 
-function makeES(level) {
+function makeES(level, only = null) {
   const pool = VERBS.filter(v => (level === 'B1' ? true : v.min === 'A2'));
-  const tense = rand(TENSES);
+  const tense = (only && TENSES.includes(only)) ? only : rand(TENSES);
   let p = pool;
   if (tense === 'presente_continuo') p = p.filter(v => v.cont);
   const v = rand(p);

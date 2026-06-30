@@ -73,9 +73,11 @@ function StatusPill({ tone, children }) {
 }
 
 /* ---------- component ---------- */
-export default function TenseTaggerES({ profile }) {
+export default function TenseTaggerES({ profile, initialTense = null }) {
+  const lockedInit = initialTense?.tiempo || null;
+  const [lockedTiempo, setLockedTiempo] = useState(() => lockedInit);
   const [level, setLevel] = useState(() => startLevel(profile));
-  const [item, setItem] = useState(() => makeES(startLevel(profile)));
+  const [item, setItem] = useState(() => makeES(startLevel(profile), lockedInit));
   const [phase, setPhase] = useState('tag'); // tag | produce | done
   const [pick, setPick] = useState(null);
   const [graded, setGraded] = useState(false);
@@ -91,6 +93,8 @@ export default function TenseTaggerES({ profile }) {
   const deckRef = useRef([]);
   const levelRef = useRef(level);
   levelRef.current = level;
+  const lockedRef = useRef(lockedTiempo);
+  lockedRef.current = lockedTiempo;
 
   const bankRowToItem = (row) => ({
     sentence: row.pre + row.vp + row.post,
@@ -99,14 +103,29 @@ export default function TenseTaggerES({ profile }) {
 
   async function loadDeck(lvl) {
     try {
-      const { data, error } = await supabase.rpc('tense_specimen_deck',
-        { p_language: 'es', p_level: lvl, p_limit: 40 });
-      if (error || !Array.isArray(data) || lvl !== levelRef.current) return;
-      deckRef.current = deckRef.current.concat(data.map(bankRowToItem));
+      const lock = lockedRef.current;
+      let rows;
+      if (lock) {
+        // locked "Practise this" mode — a tense-filtered deck straight from the bank
+        const { data, error } = await supabase
+          .from('tense_specimens')
+          .select('pre,vp,post,answer')
+          .eq('language', 'es').eq('level', lvl)
+          .eq('answer->>tiempo', lock)
+          .limit(40);
+        if (error || !Array.isArray(data) || lvl !== levelRef.current || lock !== lockedRef.current) return;
+        rows = data.slice().sort(() => Math.random() - 0.5);
+      } else {
+        const { data, error } = await supabase.rpc('tense_specimen_deck',
+          { p_language: 'es', p_level: lvl, p_limit: 40 });
+        if (error || !Array.isArray(data) || lvl !== levelRef.current || lockedRef.current) return;
+        rows = data;
+      }
+      deckRef.current = deckRef.current.concat(rows.map(bankRowToItem));
     } catch { /* offline — the live conjugator fallback covers it */ }
   }
 
-  useEffect(() => { deckRef.current = []; loadDeck(level); }, [level]);
+  useEffect(() => { deckRef.current = []; loadDeck(level); }, [level, lockedTiempo]);
 
   function drawES(lvl) {
     if (deckRef.current.length) {
@@ -114,7 +133,7 @@ export default function TenseTaggerES({ profile }) {
       if (deckRef.current.length < 8) loadDeck(lvl);   // refill in the background
       return it;
     }
-    return makeES(lvl);                                 // bank empty/offline → live engine
+    return makeES(lvl, lockedTiempo);                   // bank empty/offline → live engine (on-tense when locked)
   }
 
   const label = TIEMPO_LABEL[item.tense];
@@ -125,6 +144,16 @@ export default function TenseTaggerES({ profile }) {
     setGraded(false); setDraft(''); setProd(null);
   }
   function changeLevel(l) { deckRef.current = []; setLevel(l); reset(l); }
+
+  function clearLock() {
+    const lvl = startLevel(profile);
+    lockedRef.current = null;
+    deckRef.current = [];
+    setLockedTiempo(null);
+    setLevel(lvl);
+    setItem(makeES(lvl));
+    setPhase('tag'); setPick(null); setGraded(false); setDraft(''); setProd(null);
+  }
 
   async function logAttempt() {
     try {
@@ -222,17 +251,29 @@ export default function TenseTaggerES({ profile }) {
           <div style={{ color: C.brandDark, fontWeight: 700, fontSize: '0.95rem' }}>⭐️ {stars}</div>
         </div>
 
-        {/* level pills */}
-        <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem' }}>
-          {['A2', 'B1'].map(l => (
-            <button key={l} onClick={() => changeLevel(l)} style={{
-              padding: '0.35rem 0.9rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 600,
-              letterSpacing: '0.04em', cursor: 'pointer', transition: 'all 0.12s',
-              background: level === l ? C.ink : 'transparent', color: level === l ? 'white' : C.muted,
-              border: `1px solid ${level === l ? C.ink : C.line}`,
-            }}>{l}</button>
-          ))}
-        </div>
+        {/* level pills (normal) OR locked-tense strip ("Practise this") */}
+        {lockedTiempo ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '1rem', background: '#EDE9FE', border: '1px solid #C4B5FD', borderRadius: '999px', padding: '0.3rem 0.4rem 0.3rem 0.9rem' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: C.brandDark }}>
+              Practising: {TIEMPO_LABEL[lockedTiempo]}
+            </span>
+            <button onClick={clearLock} style={{
+              padding: '0.3rem 0.8rem', borderRadius: '999px', fontSize: '0.78rem', fontWeight: 600,
+              cursor: 'pointer', background: 'white', color: C.brandDark, border: '1px solid #C4B5FD',
+            }}>← all tenses</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem' }}>
+            {['A2', 'B1'].map(l => (
+              <button key={l} onClick={() => changeLevel(l)} style={{
+                padding: '0.35rem 0.9rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 600,
+                letterSpacing: '0.04em', cursor: 'pointer', transition: 'all 0.12s',
+                background: level === l ? C.ink : 'transparent', color: level === l ? 'white' : C.muted,
+                border: `1px solid ${level === l ? C.ink : C.line}`,
+              }}>{l}</button>
+            ))}
+          </div>
+        )}
 
         {/* specimen */}
         <div style={{ ...cardStyle, padding: '1.5rem' }}>
