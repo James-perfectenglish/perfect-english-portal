@@ -1,77 +1,110 @@
 # Handover — 1 July 2026
 
-## This session: Teacher Dashboard redesign — activity data layer, per-student panel, usage map, rebuilt student table
+## This session: Modal Chooser — designed + first content batch built & live
 
-The dashboard previously read almost entirely from `student_answers` (written question types) plus a narrow "passed" aggregate, so a games-only student looked idle and ~20 activity surfaces went uncounted. This session built a unified activity data layer and three features on top of it: a per-student detail panel, a product-level usage map, and a rebuilt student table. Public/private modes were collapsed into one view.
+A new practice exercise, **Modal Chooser**, to reuse the modal-verb work that was stripped out of the Tense Tagger. It's the practice half of a planned pair, mirroring the Tense Explainer → Tense Tagger bridge:
 
-Everything is built and validated (JSX parses via esbuild). **The database layer is live**; the **code changes need James's push + deploy + PWA refresh**. James is sitting with it before iterating.
+- **Modal Explainer** (a Learn reference, card per modal — *not built yet*) → links to
+- **Modal Chooser** (this session): a sentence with a blank where the modal goes; the student assembles a modal from a fixed on-screen palette; each item is tagged with a **function pill** (advice / prohibition / deduction …) shown as a badge.
 
----
+The reframe that shapes everything: because the pill is shown, the task is **"use the appropriate modal for function X"**, not "intuit the function from a short sentence." The pill *is* the boundary that keeps every accept-set defensible.
 
-## Database (live via MCP — no migration step for James)
-
-All objects are `security_invoker` / `SECURITY INVOKER`. **Caveat:** MCP runs as the service role and bypasses RLS, so the authenticated-teacher read path is only verifiable **in-app**. The existing dashboard already does cross-student reads on these base tables, so it's expected to work; if the panel / usage map / table come up empty for the teacher, it's a base-table read policy, not the views.
-
-- **`clean_surface(text)`** — immutable helper; strips emoji/symbols and collapses whitespace. Used where a surface label comes from data (exercise titles carry emoji, e.g. "Vocabulary 📒").
-- **`student_activity`** (view) — the spine. One row per activity event, unified across 22 surfaces: `student_id, category, surface, occurred_at, is_success, score`.
-  - `is_success` is **tri-state**: boolean where a right/wrong exists; `null` + a `score` for score-only surfaces (Spelling Bee, Word Snake, Blurt, Sentence Auction, Lyrics); both `null` for pure-effort surfaces (Memory, Flashcards).
-  - Three tables key on **`user_id`** (aliased to `student_id`): `crossword_scores`, `spelling_bee_scores`, `wordsearch_scores`.
-  - Exercises are **answer-grain** from `student_answers`. `topic_sessions` and `student_attempts` are **deliberately excluded** as event arms — topic-practice answers already live in `student_answers`, so counting the session too would double-count.
-  - `answered_at` (naive timestamp) is cast `AT TIME ZONE 'UTC'`; wordle/connections use `COALESCE(completed_at, play_date)`.
-- **`student_activity_summary`** (view) — `student_activity` grouped by `(student_id, category, surface)`: `events, last_active, success_count, graded_count, scored_count, avg_score, best_score`. Powers the panel (filter by student) and could back the usage map.
-- **`daily_sentence_feed`** (view) — unifies the three daily-prompt submission tables (WOTD + GOTD + PVOTD) with their parent prompt: `student_id, prompt_type (word|grammar|phrasal), prompt, prompt_detail, level, language, sentence, is_correct, is_soft_pass (WOTD only), ai_feedback, submitted_at`. This is the PVOTD/GOTD fold-in James asked for. **Currently only the panel consumes it** — see Outstanding #5.
-- **`usage_map(p_days int DEFAULT NULL)`** (function) — per-surface rollup, windowed (`null` = all time): `category, surface, events, students, success_pct, scored_avg, last_active`. Powers UsageMap's All-time / Last-30-days toggle.
-- **`student_overview()`** (function) — per-student rollup: `total_events, events_7d, events_30d, success_pct, last_active`, plus `cat_exercises / cat_speaking_listening / cat_games / cat_daily_prompt / cat_flashcards` counts. Feeds the rebuilt table columns.
-
-To remove the whole layer: `DROP VIEW daily_sentence_feed, student_activity_summary, student_activity; DROP FUNCTION usage_map(int), student_overview(); DROP FUNCTION clean_surface(text);` (drop views before the function they depend on).
+**This session delivered the design + the first content batch (39 items, live in `question_bank`).** The frontend component and the Modal Explainer cards are **not built yet** — that's tomorrow.
 
 ---
 
-## Code (built + validated — needs push/deploy/refresh)
+## What shipped
 
-### New files
-- **`src/components/StudentPanel.jsx`** — click any student row → slide-over. Header (level, last active, total activities, overall correct %), a category-mix bar, then each of the five categories broken down surface-by-surface (`count · last active · %` where graded / `avg N` where score-only / nothing for effort), then their recent daily-prompt sentences with AI feedback, colour-coded by pass/fail and badged word/grammar/phrasal. Fetches `student_activity_summary` + `daily_sentence_feed` by `student_id`.
-- **`src/components/UsageMap.jsx`** — collapsible product-level section under the table. **All-time / Last-30-days** toggle (reswitches bar sizing), per-category surface rows with volume bar, reach (student count), success% or ~avg score, last-active, and a **"dormant" tag** on anything with zero activity in 30 days. Calls `usage_map(null)` + `usage_map(30)`.
+### Database (live)
 
-### Modified file — `src/TeacherDashboard.jsx`
-- Imports both new components; renders `<UsageMap />` beneath the table.
-- **Rows are clickable** → open StudentPanel (`viewingStudent` state). Award-star button uses `e.stopPropagation()` so it doesn't also open the panel.
-- **Public/private collapsed into one always-on table.** `privateMode` removed. Replaced by a lightweight **"Hide names"** toggle (swaps names → initials for screen-share). CSV export is now always available (and keeps real names regardless of Hide-names, since it's for records/reports).
-- **New columns:** Student (with dropoff dot) · Level · **Mix** (`MixBar`) · **Activity** (all surfaces) · **Last 7d** · **Success** (all graded surfaces) · Last active · ⭐. Retired: Questions, Passed, Best Type, Worst Type (depth now lives in the panel).
-- `fetchAllData` merges `student_overview()` into each student (`activityTotal, events7d, events30d, successAll, mix, dropped`) and now sets `lastActive` from the activity view via `latestOf` — so it reflects **all 22 surfaces**, not the nine the old client-side calc checked.
-- `MixBar` component + `MIX_CATS` added (thin 5-segment category bar). `exportCSV` rewritten to the new columns.
-- **Dropoff dot** (amber, beside name): `activityTotal >= 20 && events7d === 0 && 7 <= daysQuiet <= 60`. Thresholds inline in `fetchAllData`, easy to tune.
+- **39 rows inserted into `question_bank`, `question_number` 2370–2408**, contiguous, verified (39/39, 0 missing explanation, 0 missing answer, 14 distinct pills). English only.
+- New exercise `type` value: **`modal_chooser`**.
+- Per row: `topic = 'modals'`, `language = 'en'`, `is_idiomatic = false`, `options = '[]'` (unused — palette is a frontend constant), `hint = NULL` (the pill is the scaffold — decided this session), function pill in **`tags[0]`**.
+- `correct_answer` = the primary form; `acceptable_alternatives` (JSONB `[{"answer":…,"feedback":…}]`) carries (a) true synonyms within the same function and (b) register notes. Example: prohibition items have `correct_answer = 'mustn't'` with `can't` in alternatives + feedback "…though *mustn't* is more typical for written rules and notices."
+
+### Schema migration (live — needs local sync)
+
+- Migration **`add_modal_chooser_to_question_bank_type_check`** applied. The `question_bank_type_check` CHECK constraint whitelists allowed `type` values and rejected `modal_chooser` on first insert. Dropped and recreated it with all seven existing types **plus** `modal_chooser`.
+- **This is live on the DB but not in your local migration history** — do a `supabase db pull` (or your usual sync) so the constraint change is captured in the repo.
+- To reverse the whole session: `DELETE FROM question_bank WHERE type = 'modal_chooser';` (and revert the constraint if desired). Nothing else references these yet.
 
 ---
 
-## Architecture notes / gotchas
+## The taxonomy (14 pills)
 
-- **`student_answers.exercise_id` is essentially unpopulated** — answers carry `question_id`, not `exercise_id`. So all question work collapses into a single **"Question bank"** surface in the view. Per-pack/topic granularity was **deferred by decision (whole for v1)**; when wanted, join `question_id → question_bank` and group by `topic` (or `type`), not `exercise_id`.
-- **No time-on-task data.** Session tables store only `completed_at` (no start), so all metrics are **frequency/volume**, not minutes. Parked deliberately — even a start+end pair can't distinguish focus from a tab left open.
-- **`exercise_opens` is reach-only** (records first opens per student, not frequency) and has emoji **title drift** ("Wordle 🟩" vs "Wordle"). It is **not** used for the usage map — usage is driven off the session tables via `student_activity`. `clean_surface()` handles drift where data-derived names appear.
-- **Class Accuracy summary card** still reflects question-only accuracy (unchanged); the table's **Success** column is all-graded. They measure different things by design — align later if it confuses.
-- Editing pattern held: `dryRun` on every `edit_file`, whole-file `write_file` for the two new components, esbuild parse-check after each change.
+Each item keys to exactly one function; the Modal Explainer cards should teach these same names.
+
+| Pill | Core forms |
+|---|---|
+| ability | can / could |
+| permission | can / could / may |
+| possibility | may / might / could |
+| deduction | must (+ must have) |
+| deduction — negative | can't / couldn't (+ can't have) |
+| obligation | must / have to |
+| prohibition | **mustn't** (primary) / can't *(register note)* |
+| absence of obligation | don't have to / needn't |
+| advice | should / ought to / might want to / may want to |
+| warning | had better / 'd better |
+| request | could / can / would |
+| offer | shall / can |
+| annoying habit (wish) | wouldn't |
+| hypothetical wish | could |
+
+Level spread across the 39: A2 ≈ ability/permission/obligation/request basics; B1 ≈ most present functions; B2 ≈ deduction (both), warning, wish frames, hedged advice.
+
+---
+
+## Design decisions & principles (established this session)
+
+- **Accept-set rule (the core one):** *same function → accept all true synonyms* (flag register differences via feedback); *different function → reject, however natural it sounds.* e.g. "You ___ drink and drive" tagged **prohibition** accepts mustn't/can't but **not** shouldn't — shouldn't is advice, a different pill. Accepting cross-function "reasonable" answers would stop the item teaching anything.
+- **Deduction frames must earn the pill.** Each deduction/neg-deduction item supplies evidence that points one way ("lights off and the car's gone → they must be away"), so *must* is the only reasonable conclusion and a student trying *might* has no fair grievance. Weak-evidence frames were rejected for this reason (see 2389 note below).
+- **Fixed global palette, not per-item tiles.** Same "keyboard" every item; the other modals on the board are automatically fair distractors (no defensibility problem), and discrimination *is* the skill. **Level gates which toggles are live**, not which tiles show.
+- **Contraction assembly is a lookup, not string concat** — will→won't, shall→shan't, can→can't. And **`have to` / `needn't` / `had better` / `ought to` are lexical tiles**, kept separate from the perfect **have** toggle (B2+), or you get "must have to" nonsense.
+- **`had better` is its own pill ("warning"), taught *with* its consequence meaning** — per James: "an outright threat, English people playing at being polite." Explanations spell out the "…or [bad thing]" implication rather than treating it as strong advice.
+- **`deduction — negative` is its own pill** (can't / couldn't, + can't have). Shares the `can't` tile with prohibition but does a different job — this *concludes*, prohibition *forbids*. The explanations lean into that contrast (2383 is the sharpest teaching moment in the batch).
+- **Marking is client-side deterministic** against `correct_answer` + `acceptable_alternatives[].answer` (compare the assembled tile string, case-insensitive). **No new Vercel endpoint** — function count stays at 8/12.
+
+### Two edits from James's review (both applied before insert)
+
+- **2389 frame swapped.** Original "Passengers ___ lean out of the window" let `can't` read as *ability* (unable to) rather than prohibition. Replaced with **"Visitors ___ take photographs inside the gallery"** — photographing is obviously possible, so `can't` there can only mean "not permitted." Explanation nudges that distinction.
+- **`will` dropped from the request pill.** On 2401/2402, "Will you…?" reads abrupt/commanding (and frustrated with "please"). Request accept-set is now **could / can / would**. **Carry this into the Modal Explainer request card** so card and Chooser agree.
 
 ---
 
 ## Outstanding / next
 
-1. **Observe before iterating.** James is sitting with the redesign to see how it reads against real people.
-2. **Tune the dropoff dot** (20+ lifetime / quiet 7d / 60d cap) once watched for a few days — may be too trigger-happy or too quiet.
-3. **Deferred:** per-pack / per-topic breakdown of the "Question bank" surface (v1 keeps it whole).
-4. **Parked (future, B2B):** segment students by **employer / course** for progress reports to the orgs paying for courses (ties to the GET21 channel). Data is already per-student; needs an `employer`/`course` field on `profiles` + group/filter in the table and CSV.
-5. **Optional:** rewire the dashboard's existing **Word-of-the-Day section** to the unified `daily_sentence_feed`, so GOTD + PVOTD sentences surface there too (the view exists; only the panel uses it so far).
+1. **Build the frontend (tomorrow's main job).**
+   - **Modal Chooser component.** Contract: `type = 'modal_chooser'`; `tags[0]` = function pill (badge); `question` has the `___`; fixed palette = global constant with **level-gated toggles** (A2/B1 base modals; B2+ unlocks the perfect **have** toggle); lexical tiles for have to / needn't / had better / ought to / don't have to; contraction lookup for n't. Marking client-side deterministic vs `correct_answer` + `acceptable_alternatives`. If these ever share a fetch path with topic practice, apply the usual `sequence_group IS NULL` awareness (though as a dedicated type routed to its own component, likely N/A).
+   - **Register these as an exercise** (new `exercises` row) once the component exists — not done yet.
+   - **Modal Explainer cards** (the Learn half): one card per modal, most important uses incl. negatives (mustn't vs don't have to, needn't vs mustn't). Card function names must match the 14 pills; `watchOut` lines are **teacherly turf** — James drafts/reviews.
+2. **`watchOut` review on the Tense Explainer** — still open from 30 June (`tenseExplainEn.js` / `tenseExplainEs.js`). Unchanged this session.
+3. **Local migration sync** for the `type` constraint change (see above).
 
-### Standing state (carried, verified 30 Jun)
-- **`question_bank` MAX(question_number) = 2369** → next content batch starts at **2370**. (Always re-verify live at session start.)
+### Parked — Spanish modals (revisit during Tense Explainer expansion)
+
+Decided **not** to build a Spanish Modal Chooser now. Spanish has a thinner true-modal set (poder, deber/deber de, tener que, hay que, saber, soler) and routes most "modal" meaning through the **subjunctive / conditional / future-of-probability** — the wish frames become subjunctive ("ojalá hablaras español"), not a modal slot at all. A Spanish version now would be thin *and* would collide with the subjunctive/conditional/future work already scoped into the Tense Explainer expansion.
+
+Where the real Spanish value sits — a small focused module of error-prone contrasts, to build **after** that scaffolding lands, not beside English v1:
+- **deber vs deber de** (obligation vs deduction)
+- **tener que vs hay que** (personal vs impersonal obligation)
+- **saber vs poder** (know-how vs circumstantial ability)
+
+---
+
+### Standing state (verified this session)
+
+- **`question_bank` MAX(question_number) = 2408** → next content batch starts at **2409**. (This session consumed 2370–2408. The 30 June figure of 2370 is now superseded.)
+- **Heads-up on a prior note:** the carried backlog item "Error Correction batch from Q2370 onward" must now start from **2409** — 2370–2408 are taken by Modal Chooser.
 - Legacy markers unchanged: 888–907 = A2 Spanish MC; 908–910 = A2 Spanish sentence_auction.
-- Daily-puzzle surfaces topped up to end of July 2026.
-- **Tense Explainer content pass still open** (30 Jun): review `watchOut` + `uses` examples in `tenseExplainEn.js` / `tenseExplainEs.js`.
+- `question_bank_type_check` now allows: gap_fill, multiple_choice, sentence_building, odd_one_out, error_correction, matching, sentence_auction, **modal_chooser**.
+- Vercel serverless functions: still **8/12** (Modal Chooser adds none — client-side marking).
 
-### Carried-forward backlog
-- Spanish GOTD: B1/B2 and C1/C2 tracks still empty (only A1/A2).
+### Carried-forward backlog (from prior handovers)
+
+- Spanish GOTD: B1/B2 and C1/C2 tracks still empty (only A1/A2 exists).
 - ES Word of the Day: B1+ tracks still A-level only.
 - Flashcard rebuild (long-standing).
-- Error Correction batch from Q2370 onward.
+- Error Correction batch from **Q2409** onward (leading-word deletions now permitted).
 - Marker tuning: two known biases (over-strict on correct concise answers; under-strict on errors outside the target word).
 - Monthly content top-up cadence: all surfaces should end on the last day of the month.
