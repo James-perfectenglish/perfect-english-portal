@@ -44,15 +44,14 @@ function getMondayISO() {
 }
 
 function exportCSV(students, showInactive) {
-  const headers = ['Name', 'Level', 'Questions', 'Success %', 'Passed', 'Best Type', 'Worst Type', 'Last Active']
+  const headers = ['Name', 'Level', 'Activity', 'Last 7d', 'Last 30d', 'Success %', 'Last Active']
   const rows = students.filter(s => showInactive || s.lastActive).map(s => [
     s.full_name || 'Unknown',
     s.level || '—',
-    s.totalAnswers,
-    s.accuracy,
-    s.passedTotal,
-    s.bestType ? (TYPE_INFO[s.bestType]?.label || s.bestType) : '—',
-    s.worstType ? (TYPE_INFO[s.worstType]?.label || s.worstType) : '—',
+    s.activityTotal || 0,
+    s.events7d || 0,
+    s.events30d || 0,
+    s.successAll == null ? '' : s.successAll,
     s.lastActive ? new Date(s.lastActive).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'
   ])
   const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
@@ -68,7 +67,7 @@ function exportCSV(students, showInactive) {
 export default function TeacherDashboard({ profile, handleLogout }) {
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
-  const [privateMode, setPrivateMode] = useState(false)
+  const [hideNames, setHideNames] = useState(false)
   const [sortKey, setSortKey] = useState('lastActive')
   const [sortDir, setSortDir] = useState('desc')
   const [wotdSubmissions, setWotdSubmissions] = useState([])
@@ -246,6 +245,27 @@ export default function TeacherDashboard({ profile, handleLogout }) {
         s.bestType  = typeEntries[0].type
         s.worstType = typeEntries[typeEntries.length - 1].type
       }
+    })
+
+    const { data: overview } = await supabase.rpc('student_overview')
+    const ovMap = {}
+    ;(overview || []).forEach(o => { ovMap[o.student_id] = o })
+    Object.values(studentMap).forEach(s => {
+      const o = ovMap[s.id]
+      s.activityTotal = o ? Number(o.total_events) : 0
+      s.events7d      = o ? Number(o.events_7d)     : 0
+      s.events30d     = o ? Number(o.events_30d)    : 0
+      s.successAll    = o ? o.success_pct : null
+      s.mix = o ? {
+        exercises:          Number(o.cat_exercises),
+        speaking_listening: Number(o.cat_speaking_listening),
+        games:              Number(o.cat_games),
+        daily_prompt:       Number(o.cat_daily_prompt),
+        flashcards:         Number(o.cat_flashcards),
+      } : null
+      if (o && o.last_active) s.lastActive = latestOf(s.lastActive, o.last_active)
+      const daysQuiet = s.lastActive ? Math.floor((Date.now() - new Date(s.lastActive)) / 86400000) : Infinity
+      s.dropped = s.activityTotal >= 20 && s.events7d === 0 && daysQuiet >= 7 && daysQuiet <= 60
     })
 
     setStudents(Object.values(studentMap))
@@ -442,16 +462,15 @@ export default function TeacherDashboard({ profile, handleLogout }) {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ width: '1px', height: '24px', background: '#e2e8f0', margin: '0 2px' }} />
-          <button onClick={() => setPrivateMode(m => !m)}
-            style={{ height: '34px', padding: '0 10px', borderRadius: '8px', border: `2px solid ${privateMode ? '#667eea' : '#e2e8f0'}`, background: privateMode ? '#667eea' : 'white', color: privateMode ? 'white' : '#718096', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
-            {privateMode ? '🔒 Private' : 'Public'}
+          <button onClick={() => setHideNames(m => !m)}
+            title="Swap names for initials — handy when sharing your screen"
+            style={{ height: '34px', padding: '0 10px', borderRadius: '8px', border: `2px solid ${hideNames ? '#667eea' : '#e2e8f0'}`, background: hideNames ? '#667eea' : 'white', color: hideNames ? 'white' : '#718096', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
+            {hideNames ? '🙈 Names hidden' : 'Hide names'}
           </button>
-          {privateMode && (
-            <button onClick={() => exportCSV(sorted, showInactive)}
-              style={{ height: '34px', padding: '0 10px', borderRadius: '8px', border: '2px solid #48bb78', background: 'white', color: '#48bb78', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600', whiteSpace: 'nowrap' }}>
-              ⬇ CSV
-            </button>
-          )}
+          <button onClick={() => exportCSV(sorted, showInactive)}
+            style={{ height: '34px', padding: '0 10px', borderRadius: '8px', border: '2px solid #48bb78', background: 'white', color: '#48bb78', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600', whiteSpace: 'nowrap' }}>
+            ⬇ CSV
+          </button>
           <button onClick={handleLogout}
             style={{ height: '34px', padding: '0 10px', borderRadius: '8px', border: 'none', background: '#f44336', color: 'white', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600' }}>
             Logout
@@ -467,59 +486,26 @@ export default function TeacherDashboard({ profile, handleLogout }) {
         <SummaryCard emoji="📊" label="Questions Answered" value={totalQuestions.toLocaleString()} />
       </div>
 
-      {/* PUBLIC MODE */}
-      {!privateMode && (
-        <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '1rem' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: '0 0 1rem' }}>Public View — Class Overview</h2>
-          <p style={{ fontSize: '0.85rem', color: '#718096', marginBottom: '1rem', background: '#f7fafc', padding: '0.75rem', borderRadius: '8px' }}>
-            Screen-share safe — shows initials only, no individual performance data visible.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '0.75rem' }}>
-            {sorted.map(s => (
-              <div key={s.id} style={{ textAlign: 'center' }}>
-                <div style={{
-                  width: '48px', height: '48px', borderRadius: '50%',
-                  background: s.lastActive && (new Date() - new Date(s.lastActive)) < 7 * 24 * 60 * 60 * 1000
-                    ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#e2e8f0',
-                  color: s.lastActive && (new Date() - new Date(s.lastActive)) < 7 * 24 * 60 * 60 * 1000
-                    ? 'white' : '#a0aec0',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: '700', fontSize: '0.9rem', margin: '0 auto 0.3rem',
-                }}>
-                  {initials(s.full_name)}
-                </div>
-                <div style={{ fontSize: '0.7rem', color: '#718096' }}>{s.level || '—'}</div>
-              </div>
-            ))}
-          </div>
-          <p style={{ fontSize: '0.75rem', color: '#a0aec0', marginTop: '1rem', marginBottom: 0 }}>
-            Purple = active this week · Grey = not active this week
-          </p>
-        </div>
-      )}
-
-      {/* PRIVATE MODE */}
-      {privateMode && (
-        <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflowX: 'auto', marginBottom: '1rem' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: '0 0 0.5rem' }}>🔒 Private View — Full Student Data</h2>
+      {/* STUDENT TABLE */}
+      <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflowX: 'auto', marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#2C3E50', margin: '0 0 0.5rem' }}>Students</h2>
           <p style={{ fontSize: '0.78rem', color: '#718096', margin: '0 0 1rem' }}>
-            Click column headers to sort. Best/worst type needs at least 5 answers to show.
+            Click any row for the full breakdown · click a header to sort.
           </p>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                 {[
-                  ['full_name',    'Student'],
-                  ['level',        'Level'],
-                  ['totalAnswers', 'Questions'],
-                  ['accuracy',     'Success %'],
-                  ['passedTotal',  'Passed'],
-                  ['bestType',     'Best Type'],
-                  ['worstType',    'Worst Type'],
-                  ['lastActive',   'Last Active'],
+                  ['full_name',     'Student'],
+                  ['level',         'Level'],
+                  ['mix',           'Mix'],
+                  ['activityTotal', 'Activity'],
+                  ['events7d',      'Last 7d'],
+                  ['successAll',    'Success'],
+                  ['lastActive',    'Last active'],
                 ].map(([key, label]) => (
-                  <th key={key} onClick={() => handleSort(key)}
-                    style={{ padding: '0.5rem 0.75rem', textAlign: 'left', color: '#718096', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
+                  <th key={key} onClick={key === 'mix' ? undefined : () => handleSort(key)}
+                    style={{ padding: '0.5rem 0.75rem', textAlign: 'left', color: '#718096', fontWeight: '600', cursor: key === 'mix' ? 'default' : 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
                     {label} {sortKey === key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                   </th>
                 ))}
@@ -530,7 +516,12 @@ export default function TeacherDashboard({ profile, handleLogout }) {
               {sorted.map((s, i) => (
                 <tr key={s.id} onClick={() => setViewingStudent({ id: s.id, full_name: s.full_name, level: s.level })}
                   style={{ borderBottom: '1px solid #f0f0f0', background: i % 2 === 0 ? 'white' : '#fafafa', cursor: 'pointer' }}>
-                  <td style={{ padding: '0.6rem 0.75rem', fontWeight: '600', color: '#2C3E50' }}>{s.full_name || '—'}</td>
+                  <td style={{ padding: '0.6rem 0.75rem', fontWeight: '600', color: '#2C3E50' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                      {s.dropped && <span title="Was a regular, gone quiet for 7+ days" style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ed8936', flexShrink: 0 }} />}
+                      {hideNames ? initials(s.full_name) : (s.full_name || '—')}
+                    </span>
+                  </td>
                   <td style={{ padding: '0.6rem 0.75rem' }}>
                     {s.level ? (
                       <span style={{
@@ -540,18 +531,13 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                       }}>{s.level === 'Spanish' ? 'ES' : s.level}</span>
                     ) : '—'}
                   </td>
-                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568' }}>{s.totalAnswers.toLocaleString()}</td>
+                  <td style={{ padding: '0.6rem 0.75rem' }}><MixBar mix={s.mix} total={s.activityTotal} /></td>
+                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568', fontWeight: 600 }}>{(s.activityTotal || 0).toLocaleString()}</td>
+                  <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', color: s.events7d > 0 ? '#4a5568' : '#cbd5e0' }}>{s.events7d > 0 ? s.events7d.toLocaleString() : '—'}</td>
                   <td style={{ padding: '0.6rem 0.75rem' }}>
-                    <span style={{ fontWeight: '700', color: s.accuracy >= 70 ? '#38a169' : s.accuracy >= 50 ? '#dd6b20' : '#e53e3e' }}>
-                      {s.totalAnswers > 0 ? `${s.accuracy}%` : '—'}
+                    <span style={{ fontWeight: '700', color: s.successAll == null ? '#cbd5e0' : s.successAll >= 70 ? '#38a169' : s.successAll >= 50 ? '#dd6b20' : '#e53e3e' }}>
+                      {s.successAll == null ? '—' : `${s.successAll}%`}
                     </span>
-                  </td>
-                  <td style={{ padding: '0.6rem 0.75rem', color: '#4a5568', textAlign: 'center', fontWeight: s.passedTotal > 0 ? 600 : 400 }}>{s.passedTotal || '—'}</td>
-                  <td style={{ padding: '0.6rem 0.75rem', color: '#38a169', fontSize: '0.8rem' }}>
-                    {s.bestType  ? `${TYPE_INFO[s.bestType]?.emoji  || ''} ${TYPE_INFO[s.bestType]?.label  || s.bestType}`  : '—'}
-                  </td>
-                  <td style={{ padding: '0.6rem 0.75rem', color: '#e53e3e', fontSize: '0.8rem' }}>
-                    {s.worstType ? `${TYPE_INFO[s.worstType]?.emoji || ''} ${TYPE_INFO[s.worstType]?.label || s.worstType}` : '—'}
                   </td>
                   <td style={{ padding: '0.6rem 0.75rem', color: '#718096', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
                     {formatDate(s.lastActive)}
@@ -570,7 +556,6 @@ export default function TeacherDashboard({ profile, handleLogout }) {
           </table>
           {students.length === 0 && <p style={{ textAlign: 'center', color: '#a0aec0', padding: '2rem' }}>No student data yet.</p>}
         </div>
-      )}
 
       <UsageMap />
 
@@ -895,6 +880,26 @@ export default function TeacherDashboard({ profile, handleLogout }) {
       {viewingStudent && (
         <StudentPanel student={viewingStudent} onClose={() => setViewingStudent(null)} />
       )}
+    </div>
+  )
+}
+
+const MIX_CATS = [
+  { key: 'exercises',          colour: '#667eea' },
+  { key: 'speaking_listening', colour: '#9f7aea' },
+  { key: 'games',              colour: '#48bb78' },
+  { key: 'daily_prompt',       colour: '#ed8936' },
+  { key: 'flashcards',         colour: '#4299e1' },
+]
+
+function MixBar({ mix, total }) {
+  if (!mix || !total) return <span style={{ color: '#cbd5e0', fontSize: '0.8rem' }}>—</span>
+  const segs = MIX_CATS.filter(c => (mix[c.key] || 0) > 0)
+  return (
+    <div title={`${total.toLocaleString()} activities`} style={{ display: 'flex', height: '8px', width: '84px', borderRadius: '99px', overflow: 'hidden', background: '#edf2f7' }}>
+      {segs.map(c => (
+        <div key={c.key} style={{ flexGrow: mix[c.key], background: c.colour }} />
+      ))}
     </div>
   )
 }
