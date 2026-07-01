@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
+import StudentPanel from './components/StudentPanel'
 
 const TYPE_INFO = {
   gap_fill:        { label: 'Gap Fill',        emoji: '✏️' },
@@ -83,6 +84,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
   const [flagsOpen, setFlagsOpen] = useState(true)
   const [showInactive, setShowInactive] = useState(true)
   const [awardingFor, setAwardingFor] = useState(null) // { id, name } | null
+  const [viewingStudent, setViewingStudent] = useState(null) // { id, full_name, level } | null
 
   useEffect(() => { fetchAllData(); fetchWotdData(); fetchStarsLeaderboard(); fetchQueenBeeAlerts(); fetchQuestionFlags() }, [])
 
@@ -525,7 +527,8 @@ export default function TeacherDashboard({ profile, handleLogout }) {
             </thead>
             <tbody>
               {sorted.map((s, i) => (
-                <tr key={s.id} style={{ borderBottom: '1px solid #f0f0f0', background: i % 2 === 0 ? 'white' : '#fafafa' }}>
+                <tr key={s.id} onClick={() => setViewingStudent({ id: s.id, full_name: s.full_name, level: s.level })}
+                  style={{ borderBottom: '1px solid #f0f0f0', background: i % 2 === 0 ? 'white' : '#fafafa', cursor: 'pointer' }}>
                   <td style={{ padding: '0.6rem 0.75rem', fontWeight: '600', color: '#2C3E50' }}>{s.full_name || '—'}</td>
                   <td style={{ padding: '0.6rem 0.75rem' }}>
                     {s.level ? (
@@ -554,7 +557,7 @@ export default function TeacherDashboard({ profile, handleLogout }) {
                   </td>
                   <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
                     <button
-                      onClick={() => setAwardingFor({ id: s.id, name: s.full_name || 'Student' })}
+                      onClick={(e) => { e.stopPropagation(); setAwardingFor({ id: s.id, name: s.full_name || 'Student' }) }}
                       title={`Award a star to ${s.full_name || 'this student'}`}
                       style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid #fde68a', background: '#fffbeb', color: '#92400e', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
                       +⭐
@@ -884,6 +887,10 @@ export default function TeacherDashboard({ profile, handleLogout }) {
           onClose={() => setAwardingFor(null)}
           onAwarded={() => { setAwardingFor(null); fetchStarsLeaderboard() }}
         />
+      )}
+
+      {viewingStudent && (
+        <StudentPanel student={viewingStudent} onClose={() => setViewingStudent(null)} />
       )}
     </div>
   )
