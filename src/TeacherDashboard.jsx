@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import StudentPanel from './components/StudentPanel'
+import UsageMap from './components/UsageMap'
 
 const TYPE_INFO = {
   gap_fill:        { label: 'Gap Fill',        emoji: '✏️' },
@@ -570,6 +571,8 @@ export default function TeacherDashboard({ profile, handleLogout }) {
           {students.length === 0 && <p style={{ textAlign: 'center', color: '#a0aec0', padding: '2rem' }}>No student data yet.</p>}
         </div>
       )}
+
+      <UsageMap />
 
       {/* REPORTED QUESTIONS */}
       {questionFlags.length > 0 && (
