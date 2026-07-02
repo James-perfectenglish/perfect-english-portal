@@ -33,7 +33,7 @@ const ACTIVE_EXERCISES = new Set([
   'Business Vocabulary 🗂️', 'Spanish Vocabulary 🇪🇸',
   'Hotel Vocabulary 🏨', 'Bathroom Vocabulary 🛁', 'Vocabulary 📒',
   'Irregular Verbs Flashcards', 'Essential Phrasal Verbs', 'Verbs Flashcards',
-  'Sentence Building', 'Modal Chooser', 'Listening Exercises', 'Dictation',
+  'Sentence Building', 'Modal Match', 'Listening Exercises', 'Dictation',
   'Borrás Flashcards', 'Borrás Memory Game',
   'Hotel Flashcards', 'Hotel Memory Game',
   'Odd One Out', 'Error Correction',
@@ -44,7 +44,7 @@ const ACTIVE_EXERCISES = new Set([
 
 const EXERCISE_ICONS = {
   'Modal Explainer':           '📗',
-  'Modal Chooser':             '🔀',
+  'Modal Match':             '🔀',
   'Prepositions 📄':           '📄',
   'Business Phrasal Verbs 💼': '💼',
   'Phrasal Verbs 📚':          '📚',
@@ -213,7 +213,7 @@ export default function ExerciseList({
     else if (t === 'Essential Phrasal Verbs')        exerciseComponent = <FlashcardTemplate flashcardSetId={PHRASAL_VERBS_ID} setName="phrasal-verbs" onBack={back} />
     else if (t === 'Verbs Flashcards')               exerciseComponent = <FlashcardTemplate title="Verb Flashcards" subtitle="30 essential verbs — español ↔ English" setName="bilingual_verbs" cards={VERB_CARDS} onBack={back} />
     else if (t === 'Sentence Building')              exerciseComponent = <SentenceBuilding onComplete={back} onBack={back} />
-    else if (t === 'Modal Chooser')                  exerciseComponent = <ModalChooser onComplete={back} onBack={back} />
+    else if (t === 'Modal Match')                  exerciseComponent = <ModalChooser onComplete={back} onBack={back} />
     else if (t === 'Listening Exercises')            exerciseComponent = <ListeningExercise onBack={back} userTracks={listeningTracks} />
     else if (t === 'Dictation')                      exerciseComponent = <Dictation onBack={back} userTracks={listeningTracks} />
     else if (t === 'Borrás Flashcards')              exerciseComponent = <FlashcardTemplate title="Borrás Flashcards" subtitle="Bathroom vocabulary in context 🚿" setName="borras" cards={BORRAS_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
@@ -230,9 +230,9 @@ export default function ExerciseList({
       : <TenseTagger profile={{ level: userLevel, tracks: userTracks }} initialTense={taggerTense} />
     else if (t === 'Modal Explainer') {
       const onPractise = () => {
-        const chooserEx = exercises.find(e => e.title === 'Modal Chooser')
+        const chooserEx = exercises.find(e => e.title === 'Modal Match')
         if (!chooserEx) return
-        recordOpen('Modal Chooser')
+        recordOpen('Modal Match')
         setActiveExercise(chooserEx)
       }
       exerciseComponent = <ModalExplainer profile={{ level: userLevel, tracks: userTracks }} onPractise={onPractise} />

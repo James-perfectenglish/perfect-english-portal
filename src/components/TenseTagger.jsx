@@ -579,6 +579,12 @@ export default function TenseTagger({ profile, initialTense = null }) {
             <div style={{ color: C.muted, fontSize: '0.88rem', marginBottom: '0.25rem' }}>
               You recognised <i>and</i> produced the {name}.
             </div>
+            {draft && (
+              <div style={{ background: '#f7fafc', border: `1px solid ${C.line}`, borderRadius: 8, padding: '0.5rem 0.7rem', margin: '0.5rem 0 0.75rem', textAlign: 'left' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 600, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '0.25rem' }}>Your sentence</div>
+                <div style={{ fontSize: '0.9rem', color: C.ink, fontStyle: 'italic', lineHeight: 1.4 }}>“{draft}”</div>
+              </div>
+            )}
             {prod?.layer === 'ai' && (
               <div style={{ marginBottom: '0.6rem' }}>
                 <StatusPill tone="ai">🤖 AI checked</StatusPill>

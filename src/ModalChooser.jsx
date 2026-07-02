@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { LevelBadge } from './components/BadgePill';
+import SentenceChallenge from './components/SentenceChallenge';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Modal Chooser
@@ -61,6 +62,27 @@ const NEG = {
 // Lexical tiles — kept separate from the perfect `have` toggle so we never build
 // "must have to". These stand on their own.
 const LEXICAL = ['have to', "don't have to", "needn't", 'ought to', 'had better'];
+
+// Follow-up Sentence Challenge prompt phrasing, keyed by function pill.
+const FUNCTION_PHRASE = {
+  'ability': 'to talk about an ability',
+  'permission': 'to give or ask permission',
+  'possibility': 'to talk about a possibility',
+  'deduction': 'to make a confident deduction',
+  'deduction — negative': 'to say something is impossible',
+  'obligation': 'to express an obligation',
+  'prohibition': 'to forbid something',
+  'absence of obligation': "to say something isn't necessary",
+  'advice': 'to give advice',
+  'warning': 'to give a warning',
+  'request': 'to make a polite request',
+  'offer': 'to offer to help',
+  'annoying habit': 'to complain about an annoying habit (I wish you…)',
+  'hypothetical wish': 'to make a wish (If only…)',
+  'expectation': 'to say what you expect',
+  'suggestion': 'to make a suggestion (Shall we…?)',
+};
+const functionPhrase = (fn) => FUNCTION_PHRASE[fn] || 'in a natural sentence';
 
 // Function-pill palette. Keyed by the value stored in tags[0].
 const PILL_STYLES = {
@@ -235,10 +257,24 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
     setFeedback({ result: 'wrong', note: '', answer: q.correct_answer, explanation: q.explanation || '' });
   };
 
+  const harvestModalSentence = async ({ sentence, inputMethod, result }) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from('sc_sentences').insert({
+        student_id: user.id, source: 'modal_match',
+        target: (q && q.tags && q.tags[0]) || 'modal', sentence,
+        is_correct: result?.valid === true,
+        ai_feedback: result?.feedback || result?.reason || null,
+        input_method: inputMethod, language: 'en', level: q ? q.level : null,
+      });
+    } catch (e) { console.warn('ModalMatch: sc_sentences insert failed', e); }
+  };
+
   const nextQuestion = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     resetBuilder();
-    if (currentQ + 1 >= questions.length) { setStage('finished'); }
+    if (currentQ + 1 >= questions.length) { setFeedback(null); setStage('finished'); }
     else { setCurrentQ(c => c + 1); setFeedback(null); }
   };
 
@@ -294,7 +330,7 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
         <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px', padding: '2.5rem 2rem 2rem', textAlign: 'center', color: 'white' }}>
-          <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Modal Chooser</h1>
+          <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Modal Match</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Pick the right modal verb for each function</p>
         </div>
 
@@ -372,9 +408,16 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
                     {feedback.note && <div style={{ color: '#4a5568', marginBottom: '6px', fontStyle: 'italic' }}>{feedback.note}</div>}
                     {feedback.explanation && <div style={{ color: '#4a5568', lineHeight: 1.5 }}>{feedback.explanation}</div>}
                   </div>
-                  <button onClick={nextQuestion} style={{ width: '100%', padding: '1rem', marginTop: '0.75rem', fontSize: '1rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '600' }}>
-                    {currentQ + 1 >= questions.length ? 'See Results' : 'Next Question →'}
-                  </button>
+                  <SentenceChallenge
+                    key={currentQ}
+                    word={feedback.answer}
+                    language="en"
+                    exercise="modal_match"
+                    headerLabel="✏️ YOUR TURN — NOW PRODUCE IT"
+                    promptText={`Now use this modal ${functionPhrase((q.tags && q.tags[0]) || '')}:`}
+                    onMarkResult={harvestModalSentence}
+                    onClose={nextQuestion}
+                  />
                 </div>
               )}
             </>
