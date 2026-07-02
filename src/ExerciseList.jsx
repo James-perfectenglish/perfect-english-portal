@@ -7,6 +7,7 @@ import RealTalkExercise from './RealTalkExercise'
 
 import TopicPracticeExercise from './TopicPracticeExercise'
 import SentenceBuilding from './SentenceBuilding'
+import ModalChooser from './ModalChooser'
 import ListeningExercise from './ListeningExercise'
 import Dictation from './Dictation'
 import OddOneOut from './OddOneOut'
@@ -18,6 +19,7 @@ import MemoryGame from './MemoryGame'
 import TenseTagger from './components/TenseTagger'
 import TenseTaggerES from './components/TenseTaggerES'
 import TenseExplainer from './components/TenseExplainer'
+import ModalExplainer from './components/ModalExplainer'
 import TenseExplainerES from './components/TenseExplainerES'
 import { BORRAS_CARDS } from './data/BorrasCards'
 import { HOTEL_CARDS } from './data/HotelCards'
@@ -31,16 +33,18 @@ const ACTIVE_EXERCISES = new Set([
   'Business Vocabulary 🗂️', 'Spanish Vocabulary 🇪🇸',
   'Hotel Vocabulary 🏨', 'Bathroom Vocabulary 🛁', 'Vocabulary 📒',
   'Irregular Verbs Flashcards', 'Essential Phrasal Verbs', 'Verbs Flashcards',
-  'Sentence Building', 'Listening Exercises', 'Dictation',
+  'Sentence Building', 'Modal Chooser', 'Listening Exercises', 'Dictation',
   'Borrás Flashcards', 'Borrás Memory Game',
   'Hotel Flashcards', 'Hotel Memory Game',
   'Odd One Out', 'Error Correction',
   'Matching', 'Sentence Auction', 'Lyrics Mixer', 'Blurt!', 'Word Snake', 'Real Talk',
   'Travel 🧳', 'Sport ⚽️', 'Wordle', 'Connections', 'Spelling Bee', 'Wordsearch', 'Crossword',
-  'Tense Tagger', 'Tense Explainer',
+  'Tense Tagger', 'Tense Explainer', 'Modal Explainer',
 ])
 
 const EXERCISE_ICONS = {
+  'Modal Explainer':           '📗',
+  'Modal Chooser':             '🔀',
   'Prepositions 📄':           '📄',
   'Business Phrasal Verbs 💼': '💼',
   'Phrasal Verbs 📚':          '📚',
@@ -209,6 +213,7 @@ export default function ExerciseList({
     else if (t === 'Essential Phrasal Verbs')        exerciseComponent = <FlashcardTemplate flashcardSetId={PHRASAL_VERBS_ID} setName="phrasal-verbs" onBack={back} />
     else if (t === 'Verbs Flashcards')               exerciseComponent = <FlashcardTemplate title="Verb Flashcards" subtitle="30 essential verbs — español ↔ English" setName="bilingual_verbs" cards={VERB_CARDS} onBack={back} />
     else if (t === 'Sentence Building')              exerciseComponent = <SentenceBuilding onComplete={back} onBack={back} />
+    else if (t === 'Modal Chooser')                  exerciseComponent = <ModalChooser onComplete={back} onBack={back} />
     else if (t === 'Listening Exercises')            exerciseComponent = <ListeningExercise onBack={back} userTracks={listeningTracks} />
     else if (t === 'Dictation')                      exerciseComponent = <Dictation onBack={back} userTracks={listeningTracks} />
     else if (t === 'Borrás Flashcards')              exerciseComponent = <FlashcardTemplate title="Borrás Flashcards" subtitle="Bathroom vocabulary in context 🚿" setName="borras" cards={BORRAS_CARDS} hasRounds={true} showMemoryGame={true} onBack={back} />
@@ -223,6 +228,15 @@ export default function ExerciseList({
     else if (t === 'Tense Tagger')                   exerciseComponent = isSpanishTrack
       ? <TenseTaggerES profile={{ level: userLevel, tracks: userTracks }} initialTense={taggerTense} />
       : <TenseTagger profile={{ level: userLevel, tracks: userTracks }} initialTense={taggerTense} />
+    else if (t === 'Modal Explainer') {
+      const onPractise = () => {
+        const chooserEx = exercises.find(e => e.title === 'Modal Chooser')
+        if (!chooserEx) return
+        recordOpen('Modal Chooser')
+        setActiveExercise(chooserEx)
+      }
+      exerciseComponent = <ModalExplainer profile={{ level: userLevel, tracks: userTracks }} onPractise={onPractise} />
+    }
     else if (t === 'Tense Explainer') {
       const onPractise = (tense) => {
         const taggerEx = exercises.find(e => e.title === 'Tense Tagger')
