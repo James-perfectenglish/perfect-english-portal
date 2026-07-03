@@ -152,6 +152,7 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
   const [currentQ, setCurrentQ] = useState(0);
   const [score, setScore] = useState(0);
   const [feedback, setFeedback] = useState(null);
+  const [showSC, setShowSC] = useState(false);
 
   // Answer-builder state
   const [selectedBase, setSelectedBase] = useState(null);
@@ -274,13 +275,14 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
   const nextQuestion = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     resetBuilder();
+    setShowSC(false);
     if (currentQ + 1 >= questions.length) { setFeedback(null); setStage('finished'); }
     else { setCurrentQ(c => c + 1); setFeedback(null); }
   };
 
   const restartExercise = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-    setCurrentQ(0); setScore(0); setFeedback(null); resetBuilder();
+    setCurrentQ(0); setScore(0); setFeedback(null); setShowSC(false); resetBuilder();
     setStage('loading'); fetchQuestions(selectedLevel.dbLevels);
   };
 
@@ -408,16 +410,25 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
                     {feedback.note && <div style={{ color: '#4a5568', marginBottom: '6px', fontStyle: 'italic' }}>{feedback.note}</div>}
                     {feedback.explanation && <div style={{ color: '#4a5568', lineHeight: 1.5 }}>{feedback.explanation}</div>}
                   </div>
-                  <SentenceChallenge
-                    key={currentQ}
-                    word={feedback.answer}
-                    language="en"
-                    exercise="modal_match"
-                    headerLabel="✏️ YOUR TURN — NOW PRODUCE IT"
-                    promptText={`Now use this modal ${functionPhrase((q.tags && q.tags[0]) || '')}:`}
-                    onMarkResult={harvestModalSentence}
-                    onClose={nextQuestion}
-                  />
+                  {!showSC && (
+                    <div style={{ textAlign: 'center', marginTop: '14px' }}>
+                      <button onClick={() => setShowSC(true)} style={{ padding: '10px 32px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>
+                        ✏️ Your turn →
+                      </button>
+                    </div>
+                  )}
+                  {showSC && (
+                    <SentenceChallenge
+                      key={currentQ}
+                      word={feedback.answer}
+                      language="en"
+                      exercise="modal_match"
+                      headerLabel="✏️ YOUR TURN — NOW PRODUCE IT"
+                      promptText={<strong style={{ color: '#2d3748' }}>Now use this modal <span style={{ background: '#EDE9FE', color: '#553C9A', padding: '1px 6px', borderRadius: '4px' }}>{functionPhrase((q.tags && q.tags[0]) || '')}</span>:</strong>}
+                      onMarkResult={harvestModalSentence}
+                      onClose={nextQuestion}
+                    />
+                  )}
                 </div>
               )}
             </>

@@ -127,7 +127,7 @@ function TenseCard({ tense, ahead, onPractise }) {
         ))}
 
         <div style={{ marginTop: '1rem', background: C.warnBg, border: `1px solid ${C.warnLine}`, borderRadius: 9, padding: '0.6rem 0.8rem' }}>
-          <span style={{ fontWeight: 700, color: C.warnInk, fontSize: '0.76rem' }}>⚠️ Watch out · </span>
+          <span style={{ fontWeight: 700, color: C.warnInk, fontSize: '0.76rem' }}>👁️ Watch out · </span>
           <span style={{ color: C.warnInk, fontSize: '0.84rem', lineHeight: 1.5 }}>{tense.watchOut}</span>
         </div>
 

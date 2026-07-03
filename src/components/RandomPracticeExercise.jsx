@@ -1067,6 +1067,14 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                 {['error_correction', 'gap_fill', 'sentence_building', 'dictation', 'pronunciation'].includes(currentQuestion.type) && <AiMarkedBadge />}
               </div>
 
+              {/* Fix it!: show the previous wrong answer BEFORE the student answers */}
+              {fixupMeta && currentQuestion.type !== 'matching' && fixupMeta.last_wrong_answer && (
+                <div style={{ background: '#fffaf0', border: '1px solid #fbd38d', borderRadius: '10px', padding: '0.6rem 1rem', fontSize: '0.9rem', color: '#744210', lineHeight: 1.5 }}>
+                  🔧 {isSpanish ? 'La última vez escribiste: ' : 'Last time you wrote: '}
+                  <span style={{ textDecoration: 'line-through' }}>{fixupMeta.last_wrong_answer}</span>
+                </div>
+              )}
+
               {/* Question Text */}
               {currentQuestion.type !== 'sentence_building' && currentQuestion.type !== 'error_correction' && currentQuestion.type !== 'matching' && currentQuestion.type !== 'dictation' && currentQuestion.question && (
                 <div style={{ fontSize: 'clamp(1.15rem, 4vw, 1.4rem)', color: '#2C3E50', lineHeight: '1.6', fontWeight: '500', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
@@ -1333,14 +1341,8 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   >{isChecking ? '🤖 Checking...' : 'Check Answer'}</button>
                 )}
                 {feedback && fixupMeta && (
-                  <div style={{ background: '#f7fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.75rem 1rem', fontSize: '0.88rem', color: '#4a5568', lineHeight: 1.5 }}>
-                    {currentQuestion.type !== 'matching' && fixupMeta.last_wrong_answer && (
-                      <div>
-                        {isSpanish ? 'La última vez escribiste: ' : 'Last time you wrote: '}
-                        <span style={{ textDecoration: 'line-through', color: '#c53030' }}>{fixupMeta.last_wrong_answer}</span>
-                      </div>
-                    )}
-                    <div style={{ marginTop: '4px', fontWeight: 600, color: feedback.isCorrect ? '#276749' : '#c53030' }}>
+                  <div style={{ background: '#f7fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.75rem 1rem', fontSize: '0.88rem', lineHeight: 1.5 }}>
+                    <div style={{ fontWeight: 600, color: feedback.isCorrect ? '#276749' : '#c53030' }}>
                       {feedback.isCorrect
                         ? (fixupMeta.fixes_so_far >= 1
                             ? (isSpanish ? '🔧 ¡Arreglada! No volverás a verla.' : "🔧 Fixed! This one's out of your box for good.")
