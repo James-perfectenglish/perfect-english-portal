@@ -192,7 +192,7 @@ const aiMarkDictation = async (correctAnswer, studentAnswer, excerptType = 'phra
   } catch (e) { console.error('AI dictation marking error:', e); return null; }
 };
 
-export default function RandomPracticeExercise({ levels, levelTitle, levelSubtitle, gradient, language = 'en', userTracks = [], weakTypes = [], onBack }) {
+export default function RandomPracticeExercise({ levels, levelTitle, levelSubtitle, gradient, language = 'en', userTracks = [], weakTypes = [], fixups = [], onBack }) {
   const isSpanish = language === 'es';
 
   // Topics that are restricted to specific tracks
@@ -422,6 +422,52 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     window.scrollTo({ top: 0, behavior: 'instant' });
     setLoading(true);
     try {
+      // ── Fix it! mode: serve the student's own past mistakes, in queue order ──
+      if (fixups && fixups.length > 0) {
+        const qns = fixups.map(f => f.question_number);
+        const { data: bankRows, error: fixErr } = await supabase
+          .from('question_bank').select('*').in('question_number', qns);
+        if (fixErr) throw fixErr;
+        const byQn = Object.fromEntries((bankRows || []).map(q => [q.question_number, q]));
+        const ordered = qns.map(qn => byQn[qn]).filter(Boolean).map(q => {
+          if ((q.type === 'multiple_choice' || q.type === 'odd_one_out') && Array.isArray(q.options)) {
+            return { ...q, options: shuffleArray(q.options) };
+          }
+          return q;
+        });
+        if (ordered.length === 0) {
+          alert(isSpanish ? 'No hay nada que arreglar hoy. ¡Buen trabajo!' : 'Nothing to fix today. Nice work!');
+          setLoading(false);
+          return;
+        }
+        challengePositionsRef.current = new Set();
+        setChallengePositions(new Set());
+        setQuestions(ordered);
+        setStage('playing');
+        setCurrentQuestionIndex(0);
+        setScore(0);
+        setFeedback(null);
+        setSbFeedback(null);
+        setUserAnswer('');
+        setSelectedOption(null);
+        setOooSelected(null);
+        setEcSelectedWordIndex(null);
+        setEcCorrection('');
+        setMatchingDone(false);
+        setShowHint(false);
+        setIsChecking(false);
+        setAudioPlayed(false);
+        setIsRecording(false);
+        setIsTranscribing(false);
+        setIsMarking(false);
+        setRecordingSeconds(0);
+        setPronTranscript('');
+        setShowChallenge(false);
+        setChallengeWord('');
+        setLoading(false);
+        return;
+      }
+
       const langFilter = isSpanish ? ['es', 'both'] : ['en', 'both'];
 
       const queryForType = (type) => {
@@ -871,7 +917,9 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const retry = () => { startExercise(); };
 
   const currentQuestion = questions[currentQuestionIndex];
-  const displayTitle = levelTitle ? `${levelTitle} Practice` : 'Random Practice';
+  const isFixupMode = fixups && fixups.length > 0;
+  const fixupMeta = (isFixupMode && currentQuestion) ? fixups.find(f => f.question_number === currentQuestion.question_number) : null;
+  const displayTitle = isFixupMode ? (levelTitle || 'Fix it!') : (levelTitle ? `${levelTitle} Practice` : 'Random Practice');
   const displayGradient = gradient || 'linear-gradient(135deg, #3498DB, #667eea)';
   const scorePercent = questions.length > 0 ? (score / questions.length) * 100 : 0;
   const matchingPairs = currentQuestion?.type === 'matching'
@@ -1277,6 +1325,23 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                     disabled={isChecking || !userAnswer.trim() && currentQuestion.type !== 'multiple_choice' || currentQuestion.type === 'multiple_choice' && !selectedOption}
                     style={{ padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)', backgroundColor: '#2C3E50', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', width: '100%', fontWeight: '600', opacity: (isChecking || (!userAnswer.trim() && currentQuestion.type !== 'multiple_choice') || (currentQuestion.type === 'multiple_choice' && !selectedOption)) ? 0.5 : 1 }}
                   >{isChecking ? '🤖 Checking...' : 'Check Answer'}</button>
+                )}
+                {feedback && fixupMeta && (
+                  <div style={{ background: '#f7fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.75rem 1rem', fontSize: '0.88rem', color: '#4a5568', lineHeight: 1.5 }}>
+                    {currentQuestion.type !== 'matching' && fixupMeta.last_wrong_answer && (
+                      <div>
+                        {isSpanish ? 'La última vez escribiste: ' : 'Last time you wrote: '}
+                        <span style={{ textDecoration: 'line-through', color: '#c53030' }}>{fixupMeta.last_wrong_answer}</span>
+                      </div>
+                    )}
+                    <div style={{ marginTop: '4px', fontWeight: 600, color: feedback.isCorrect ? '#276749' : '#c53030' }}>
+                      {feedback.isCorrect
+                        ? (fixupMeta.fixes_so_far >= 1
+                            ? (isSpanish ? '🔧 ¡Arreglada! No volverás a verla.' : "🔧 Fixed! This one's out of your box for good.")
+                            : (isSpanish ? 'Una vez bien — acierta otro día y quedará arreglada.' : 'Once right — get it right on another day and it\u2019s fixed.'))
+                        : (isSpanish ? 'Vuelve a la caja — la verás otra vez.' : "Back in the box — you'll see this one again.")}
+                    </div>
+                  </div>
                 )}
                 {feedback && currentQuestion?.question_number && (
                   <FlagQuestion questionNumber={currentQuestion.question_number} language={isSpanish ? 'es' : 'en'} />

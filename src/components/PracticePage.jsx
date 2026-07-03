@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
 import RandomPracticeExercise from './RandomPracticeExercise.jsx';
 import SurvivalMode from './SurvivalMode.jsx';
 import Breadcrumb from './Breadcrumb';
@@ -59,8 +60,9 @@ function getLevelConfigForProfile(profileLevel) {
 export default function PracticePage({ profile, isTeacher = false }) {
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [survivalMode, setSurvivalMode] = useState(false);
-  const [weakSpotsMode, setWeakSpotsMode] = useState(false);
-  const [weakTypes, setWeakTypes] = useState([]);
+  const [fixitMode, setFixitMode] = useState(false);
+  const [fixupRows, setFixupRows] = useState([]);
+  const [fixupsLoading, setFixupsLoading] = useState(false);
 
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -74,17 +76,18 @@ export default function PracticePage({ profile, isTeacher = false }) {
   useEffect(() => {
     setSelectedLevel(null);
     setSurvivalMode(false);
-    setWeakSpotsMode(false);
-    setWeakTypes([]);
+    setFixitMode(false);
+    setFixupRows([]);
 
     const mode = searchParams.get('mode');
-    const weak = searchParams.get('weak');
-    if (mode === 'weakspots' && weak) {
-      const types = weak.split(',').filter(Boolean);
-      setWeakTypes(types);
-      setWeakSpotsMode(true);
-      const levelConfig = getLevelConfigForProfile(profile?.level);
-      setSelectedLevel(levelConfig);
+    if (mode === 'fixit') {
+      setFixitMode(true);
+      setFixupsLoading(true);
+      supabase.rpc('fixups_queue').then(({ data, error }) => {
+        if (error) console.error('fixups_queue error:', error);
+        setFixupRows(data || []);
+        setFixupsLoading(false);
+      });
     }
   }, [location.key]);
 
@@ -92,23 +95,39 @@ export default function PracticePage({ profile, isTeacher = false }) {
     return <SurvivalMode onBack={() => setSurvivalMode(false)} />;
   }
 
-  if (weakSpotsMode && selectedLevel) {
+  if (fixitMode) {
+    const fixitTitle = isSpanish ? '¡Arréglalo!' : 'Fix it!';
     return (
       <>
-        <Breadcrumb section="Practise" title="Weak Spots" onExit={() => { setWeakSpotsMode(false); setSelectedLevel(null); }} />
-        <RandomPracticeExercise
-          levels={selectedLevel.levels}
-          levelTitle="Weak Spots"
-          levelSubtitle={selectedLevel.subtitle}
-          gradient="linear-gradient(135deg, #e53e3e, #c53030)"
-          language={selectedLevel.language}
-          userTracks={profile?.tracks || []}
-          weakTypes={weakTypes}
-          onBack={() => {
-            setWeakSpotsMode(false);
-            setSelectedLevel(null);
-          }}
-        />
+        <Breadcrumb section="Practise" title={fixitTitle} onExit={() => setFixitMode(false)} />
+        {fixupsLoading ? (
+          <div style={{ textAlign: 'center', padding: '3rem', color: '#667eea' }}>
+            {isSpanish ? 'Buscando errores que arreglar…' : 'Finding mistakes to fix…'}
+          </div>
+        ) : fixupRows.length === 0 ? (
+          <div style={{ maxWidth: '480px', margin: '3rem auto', textAlign: 'center', background: 'white', borderRadius: '16px', padding: '2.5rem 1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🔧✨</div>
+            <h2 style={{ fontSize: '1.2rem', color: '#2C3E50', margin: '0 0 0.5rem', fontWeight: 700 }}>
+              {isSpanish ? '¡Todo arreglado!' : 'All fixed!'}
+            </h2>
+            <p style={{ fontSize: '0.9rem', color: '#718096', margin: 0, lineHeight: 1.5 }}>
+              {isSpanish
+                ? 'No hay nada que arreglar hoy. Los nuevos errores aparecerán aquí — así se aprende.'
+                : 'Nothing to fix today. New mistakes will appear here — that\u2019s how learning works.'}
+            </p>
+          </div>
+        ) : (
+          <RandomPracticeExercise
+            levels={[]}
+            levelTitle={fixitTitle}
+            levelSubtitle={null}
+            gradient="linear-gradient(135deg, #ed8936, #dd6b20)"
+            language={isSpanish ? 'es' : 'en'}
+            userTracks={profile?.tracks || []}
+            fixups={fixupRows}
+            onBack={() => setFixitMode(false)}
+          />
+        )}
       </>
     );
   }

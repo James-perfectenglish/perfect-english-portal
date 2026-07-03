@@ -31,18 +31,10 @@ function computeStreak(dates) {
   return streak
 }
 
-function getWeakTypes(typeBreakdown) {
-  return Object.entries(typeBreakdown)
-    .filter(([, d]) => d.total >= 5)
-    .sort((a, b) => (a[1].correct / a[1].total) - (b[1].correct / b[1].total))
-    .slice(0, 3)
-    .map(([t]) => t)
-}
-
 export default function StudentDashboard({ profile, session }) {
   const [streak, setStreak]               = useState(0)
   const [questionsTotal, setQTotal]       = useState(0)
-  const [typeBreakdown, setTypeBreakdown] = useState({})
+  const [fixupCount, setFixupCount]       = useState(0)
   const [starsThisWeek, setStarsThisWeek] = useState(0)
   const [loading, setLoading]             = useState(true)
 
@@ -80,30 +72,15 @@ export default function StudentDashboard({ profile, session }) {
 
     if (recentAnswers && recentAnswers.length > 0) {
       setStreak(computeStreak(recentAnswers.map(a => a.answered_at)))
-      const questionIds = [...new Set(recentAnswers.map(a => a.question_id).filter(Boolean))]
-      if (questionIds.length > 0) {
-        const { data: questions } = await supabase
-          .from('question_bank').select('question_number, type').in('question_number', questionIds)
-        if (questions) {
-          const typeMap = {}
-          questions.forEach(q => { typeMap[q.question_number] = q.type })
-          const byType = {}
-          recentAnswers.forEach(a => {
-            const type = typeMap[a.question_id]
-            if (!type) return
-            if (!byType[type]) byType[type] = { correct: 0, total: 0 }
-            byType[type].total++
-            if (a.is_correct) byType[type].correct++
-          })
-          setTypeBreakdown(byType)
-        }
-      }
     }
+
+    // Fix it! queue — how many past mistakes are ready to review today
+    const { data: fixups, error: fixErr } = await supabase.rpc('fixups_queue')
+    if (fixErr) console.error('fixups_queue error:', fixErr)
+    setFixupCount(fixups?.length || 0)
+
     setLoading(false)
   }
-
-  const weakTypes = getWeakTypes(typeBreakdown)
-  const weakParam = weakTypes.length > 0 ? `&weak=${weakTypes.join(',')}` : ''
 
   // Card component
   const QuickCard = ({ to, gradient, border, children }) => (
@@ -151,7 +128,7 @@ export default function StudentDashboard({ profile, session }) {
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
 
-          {/* Row 1: Practise + Weak Spots */}
+          {/* Row 1: Practise + Fix it! */}
           <Link to="/practise" style={{ textDecoration: 'none' }}>
             <div style={{ background: levelGradient, borderRadius: '14px', padding: '1rem', color: 'white', height: '100%', boxSizing: 'border-box', position: 'relative', overflow: 'hidden' }}>
               {profileLevel && (
@@ -167,11 +144,20 @@ export default function StudentDashboard({ profile, session }) {
             </div>
           </Link>
 
-          <Link to={`/practise?mode=weakspots${weakParam}`} style={{ textDecoration: 'none' }}>
-            <div style={{ background: 'white', border: '2px solid #e53e3e25', borderRadius: '14px', padding: '1rem', height: '100%', boxSizing: 'border-box' }}>
+          <Link to="/practise?mode=fixit" style={{ textDecoration: 'none' }}>
+            <div style={{ background: 'white', border: '2px solid #ed893640', borderRadius: '14px', padding: '1rem', height: '100%', boxSizing: 'border-box', position: 'relative', overflow: 'hidden' }}>
+              {fixupCount > 0 && (
+                <div style={{ position: 'absolute', top: '8px', right: '8px', background: '#ed8936', color: 'white', borderRadius: '20px', padding: '2px 8px', fontSize: '0.65rem', fontWeight: 700 }}>
+                  {fixupCount}
+                </div>
+              )}
               <div style={{ fontSize: '1.75rem', marginBottom: '0.4rem' }}>🔧</div>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#2C3E50', marginBottom: '0.2rem' }}>Weak Spots</div>
-              <div style={{ fontSize: '0.76rem', color: '#718096' }}>Focus on your toughest types</div>
+              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#2C3E50', marginBottom: '0.2rem' }}>{isSpanish ? '¡Arréglalo!' : 'Fix it!'}</div>
+              <div style={{ fontSize: '0.76rem', color: '#718096' }}>
+                {fixupCount > 0
+                  ? (isSpanish ? `${fixupCount} ${fixupCount === 1 ? 'error por arreglar' : 'errores por arreglar'}` : `${fixupCount} past ${fixupCount === 1 ? 'mistake' : 'mistakes'} to fix`)
+                  : (isSpanish ? 'Todo arreglado — ¡bien hecho!' : 'All fixed — nice work!')}
+              </div>
             </div>
           </Link>
 
