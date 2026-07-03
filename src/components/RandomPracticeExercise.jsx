@@ -918,7 +918,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
   const currentQuestion = questions[currentQuestionIndex];
   const isFixupMode = fixups && fixups.length > 0;
-  const fixupMeta = (isFixupMode && currentQuestion) ? fixups.find(f => f.question_number === currentQuestion.question_number) : null;
+  const fixupMeta = (isFixupMode && currentQuestion) ? fixups.find(f => Number(f.question_number) === Number(currentQuestion.question_number)) : null;
   const displayTitle = isFixupMode ? (levelTitle || 'Fix it!') : (levelTitle ? `${levelTitle} Practice` : 'Random Practice');
   const displayGradient = gradient || 'linear-gradient(135deg, #3498DB, #667eea)';
   const scorePercent = questions.length > 0 ? (score / questions.length) * 100 : 0;
@@ -1018,23 +1018,29 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
             )}
             <h1 style={{ fontSize: 'clamp(2rem, 8vw, 2.5rem)', color: '#2C3E50', marginBottom: '1.5rem', fontWeight: '700' }}>{displayTitle}</h1>
             <p style={{ fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', color: '#2C3E50', marginBottom: '1rem', lineHeight: '1.5' }}>
-              {isSpanish
-                ? '20 preguntas variadas — ¡vamos!'
-                : weakTypes.length > 0
-                  ? 'A focused session on your toughest question types. Let\'s turn those weaknesses into strengths!'
+              {isFixupMode
+                ? (isSpanish
+                    ? 'Preguntas que fallaste antes — ¡vamos a arreglarlas!'
+                    : 'Questions you got wrong before — time to fix them!')
+                : isSpanish
+                  ? '20 preguntas variadas — ¡vamos!'
                   : 'Test your English with 20 random questions!'}
             </p>
             <p style={{ fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', color: '#666', marginBottom: '2.5rem', lineHeight: '1.5' }}>
-              {isSpanish
-                ? 'Una mezcla de tipos de ejercicios. Responde todas las preguntas y mira tu puntuación al final.'
-                : 'A mix of multiple choice, gap fill, sentence building, odd one out, error correction, matching, and dictation. Answer all questions and see your score at the end.'}
+              {isFixupMode
+                ? (isSpanish
+                    ? `${fixups.length === 1 ? '1 pregunta' : `${fixups.length} preguntas`} de tus sesiones anteriores. Acierta cada una dos veces — en días distintos — y quedará arreglada para siempre.`
+                    : `${fixups.length} ${fixups.length === 1 ? 'question' : 'questions'} from your past sessions. Get each one right twice — on different days — and it's fixed for good.`)
+                : isSpanish
+                  ? 'Una mezcla de tipos de ejercicios. Responde todas las preguntas y mira tu puntuación al final.'
+                  : 'A mix of multiple choice, gap fill, sentence building, odd one out, error correction, matching, and dictation. Answer all questions and see your score at the end.'}
             </p>
             <button onClick={startExercise} disabled={loading} style={{ padding: '1.25rem', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', background: displayGradient, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', width: '100%', maxWidth: '350px', margin: '0 auto', fontWeight: '600', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-              {loading ? 'Loading...' : isSpanish ? 'Empezar' : 'Start Practice'}
+              {loading ? 'Loading...' : isFixupMode ? (isSpanish ? '¡A arreglar!' : 'Start Fixing') : isSpanish ? 'Empezar' : 'Start Practice'}
             </button>
             {onBack && (
               <button onClick={onBack} style={{ marginTop: '1.5rem', padding: '0.75rem 1.5rem', fontSize: 'clamp(0.9rem, 3vw, 1rem)', backgroundColor: 'transparent', color: '#666', border: '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}>
-                ← Choose Different Level
+                {isFixupMode ? (isSpanish ? '← Volver' : '← Back') : '← Choose Different Level'}
               </button>
             )}
           </div>
@@ -1338,7 +1344,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                       {feedback.isCorrect
                         ? (fixupMeta.fixes_so_far >= 1
                             ? (isSpanish ? '🔧 ¡Arreglada! No volverás a verla.' : "🔧 Fixed! This one's out of your box for good.")
-                            : (isSpanish ? 'Una vez bien — acierta otro día y quedará arreglada.' : 'Once right — get it right on another day and it\u2019s fixed.'))
+                            : (isSpanish ? 'Una vez bien — acierta otro día y quedará arreglada.' : 'Right once — get it right on another day and it\'s fixed.'))
                         : (isSpanish ? 'Vuelve a la caja — la verás otra vez.' : "Back in the box — you'll see this one again.")}
                     </div>
                   </div>
