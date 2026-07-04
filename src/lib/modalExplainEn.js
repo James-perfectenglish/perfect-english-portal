@@ -12,7 +12,9 @@
    `watchOut` targets Spanish-L1 traps (no "to" after core modals, must vs
    have to, mustn't vs don't have to, etc.). British spellings throughout;
    "infinitive" (never "base form"); hospitality flavour where natural.
-   Function names in `fn` must stay aligned with the Chooser's 14 pills.
+   Function names in `fn` must stay aligned with the Chooser's pills
+   (21 as of Jul 2026: the original 14 + expectation, suggestion,
+   regret & criticism, hypothetical past, refusal, past habit, concession).
    ============================================================ */
 
 /* Function-pill palette — kept identical to ModalChooser.jsx PILL_STYLES so a
@@ -35,6 +37,11 @@ export const FUNCTION_STYLES = {
   'hypothetical wish':     { bg: '#F5F3FF', fg: '#6D28D9', bd: '#DDD6FE' },
   'expectation':           { bg: '#FAF5FF', fg: '#6B21A8', bd: '#D6BCFA' },
   'suggestion':            { bg: '#FDF2F8', fg: '#9D174D', bd: '#F9A8D4' },
+  'regret & criticism':    { bg: '#FFF7ED', fg: '#C2410C', bd: '#FDBA74' },
+  'hypothetical past':     { bg: '#ECFEFF', fg: '#155E75', bd: '#67E8F9' },
+  'refusal':               { bg: '#FEF2F2', fg: '#B91C1C', bd: '#FECACA' },
+  'past habit':            { bg: '#FEFCE8', fg: '#854D0E', bd: '#FDE047' },
+  'concession':            { bg: '#FDF4FF', fg: '#86198F', bd: '#F0ABFC' },
 };
 
 /* ---------- the modal cards ----------
@@ -55,8 +62,10 @@ const DATA = [
       { fn: 'permission', form: 'can', gloss: 'saying something is allowed (everyday)', example: 'You can park here after six.' },
       { fn: 'possibility', form: 'can', gloss: 'what is generally or typically possible', example: 'It can get very busy at weekends.' },
       { fn: 'request', form: 'can', gloss: 'asking someone to do something (informal)', example: 'Can you pass me the keys?' },
+      { fn: 'offer', form: 'can', gloss: 'a casual offer of help (Can I…?)', example: 'Can I give you a hand with those bags?' },
       { fn: 'prohibition', form: "can't", gloss: 'saying something is not allowed', example: "Guests can't use the staff lift." },
       { fn: 'deduction — negative', form: "can't", gloss: 'concluding something is impossible', example: "That can't be right — he left hours ago." },
+      { fn: 'deduction — negative', form: "can't have", gloss: 'concluding something was impossible in the past', example: "The ground is bone dry — it can't have rained much." },
     ],
     contrast: '“can’t” does two very different jobs: forbidding (You can’t park here) and concluding something is impossible (That can’t be true).',
     watchOut: 'No “to” and no “-s” after can: “She can help”, not “She can to help” or “She cans help”. For future ability, use “will be able to”: “I’ll be able to help tomorrow”, not “I can help tomorrow”.',
@@ -66,6 +75,7 @@ const DATA = [
     uses: [
       { fn: 'ability', form: 'could', gloss: 'past ability — something you were able to do over a period', example: 'When I was younger, I could run for hours.' },
       { fn: 'possibility', form: 'could', gloss: 'a possible situation (a little less certain)', example: 'The parcel could be in the back office.' },
+      { fn: 'possibility', form: 'could have', gloss: 'a possible explanation of a past event', example: 'There could have been a problem with the flight.' },
       { fn: 'permission', form: 'could', gloss: 'asking permission politely', example: 'Could I use the phone for a moment?' },
       { fn: 'request', form: 'could', gloss: 'a polite request', example: 'Could you pass me the room keys?' },
       { fn: 'hypothetical wish', form: 'could', gloss: 'wishing for an ability you don’t have (if only + could)', example: 'If only you could speak a little Spanish.' },
@@ -78,8 +88,11 @@ const DATA = [
     id: 'may', modal: 'may', band: 'B1', forms: 'may · may not',
     uses: [
       { fn: 'permission', form: 'may', gloss: 'formal permission — allowing or being allowed', example: 'Guests may use the pool until ten.' },
+      { fn: 'prohibition', form: 'may not', gloss: 'formal written prohibition — the notice-board register', example: 'Passengers may not carry liquids over 100 ml.' },
       { fn: 'possibility', form: 'may', gloss: 'saying something is possible', example: 'It may rain before lunch.' },
+      { fn: 'possibility', form: 'may have', gloss: 'a past possibility', example: 'The email may have gone to spam.' },
       { fn: 'advice', form: 'may want to', gloss: 'soft, indirect advice', example: 'You may want to book early.' },
+      { fn: 'concession', form: 'may … but', gloss: 'conceding a point before countering it', example: 'The apartment may be small, but the views are spectacular.' },
     ],
     contrast: '“may” is the formal cousin of “can” for permission — notices and rules use it (Guests may…).',
     watchOut: '“may” for permission is formal; in everyday speech English speakers say “can”. Don’t overuse “may” — it sounds stiff in casual conversation.',
@@ -88,6 +101,10 @@ const DATA = [
     id: 'might', modal: 'might', band: 'B1', forms: 'might · might not',
     uses: [
       { fn: 'possibility', form: 'might', gloss: 'saying something is possible but uncertain', example: 'She might be in the garden.' },
+      { fn: 'possibility', form: 'might have', gloss: 'a possible explanation of a past event', example: 'She might have left her phone in the taxi.' },
+      { fn: 'regret & criticism', form: 'might have', gloss: 'an exasperated reproach about the past', example: 'You might have told me the lift was out of order!' },
+      { fn: 'hypothetical past', form: 'might have', gloss: 'an unreal past — less certain than “would have”', example: 'I might have taken the job if the hours were better.' },
+      { fn: 'concession', form: 'might … but', gloss: 'conceding a point before countering it', example: 'It might be cheap, but the reviews are dreadful.' },
       { fn: 'advice', form: 'might want to', gloss: 'soft, indirect advice', example: 'You might want to double-check the address.' },
     ],
     contrast: '“might” and “may” are almost interchangeable for possibility; “might” feels a touch less certain.',
@@ -100,6 +117,7 @@ const DATA = [
     uses: [
       { fn: 'obligation', form: 'must', gloss: 'a strong obligation — often the speaker’s own rule, or a written rule', example: 'All guests must show ID at check-in.' },
       { fn: 'deduction', form: 'must', gloss: 'a confident conclusion from evidence', example: 'The lights are off — they must be away.' },
+      { fn: 'deduction', form: 'must have', gloss: 'a confident conclusion about the past', example: 'The kitchen was spotless — the night shift must have stayed late.' },
       { fn: 'prohibition', form: "mustn't", gloss: 'forbidding something', example: "You mustn't smoke inside." },
     ],
     contrast: '“mustn’t” (forbidden) is NOT the opposite of “must” (obligation). The “no obligation” opposite is “don’t have to”. Compare: You mustn’t tip (forbidden) vs You don’t have to tip (optional).',
@@ -118,8 +136,9 @@ const DATA = [
     id: 'neednt', modal: 'needn’t', band: 'B1', forms: 'needn’t · need to',
     uses: [
       { fn: 'absence of obligation', form: "needn't", gloss: 'there’s no need to do something', example: "You needn't bring anything — it's all sorted." },
+      { fn: 'absence of obligation', form: "needn't have", gloss: 'you did it, and it wasn’t necessary', example: "You needn't have brought wine — but it's very kind of you." },
     ],
-    contrast: '“needn’t” = “don’t have to” (no need). Don’t confuse it with “mustn’t”, which forbids.',
+    contrast: '“needn’t” = “don’t have to” (no need). Don’t confuse it with “mustn’t”, which forbids. And “needn’t have done” = you did it, unnecessarily; “didn’t have to do” says nothing about whether you did.',
     watchOut: '“needn’t” + infinitive without “to”: “You needn’t worry.” But “need” as an ordinary verb takes “to”: “You don’t need to worry.” Both are fine — just don’t mix them (“You needn’t to worry” ✗).',
   },
 
@@ -129,7 +148,10 @@ const DATA = [
     uses: [
       { fn: 'advice', form: 'should', gloss: 'recommending — the good idea, not a rule', example: 'You should book early if you’re travelling in August.' },
       { fn: 'expectation', form: 'should', gloss: 'what you reasonably expect to be true', example: 'They left at six, so they should be here by now.' },
+      { fn: 'expectation', form: 'should have', gloss: 'what you assume has already happened', example: 'They set off at dawn, so they should have reached the coast by now.' },
       { fn: 'advice', form: "shouldn't", gloss: 'recommending against something', example: "You shouldn't leave it so late." },
+      { fn: 'regret & criticism', form: "should have / shouldn't have", gloss: 'criticising or regretting a past action', example: 'You should have told me the lift was out of order.' },
+      { fn: 'suggestion', form: 'Should we…?', gloss: 'asking whether a joint plan is a good idea', example: 'Should we invite the new colleagues along?' },
     ],
     contrast: '“should” is advice, not obligation — weaker than “must / have to”. Booking early is wise, not required.',
     watchOut: 'No “to” after should: “You should rest”, not “You should to rest”. For a firm rule, use “must / have to” instead.',
@@ -138,6 +160,8 @@ const DATA = [
     id: 'ought_to', modal: 'ought to', band: 'B1', forms: 'ought to · oughtn’t to (rare)',
     uses: [
       { fn: 'advice', form: 'ought to', gloss: 'recommending — a little more formal than “should”', example: 'You ought to check the address before you set off.' },
+      { fn: 'expectation', form: 'ought to (have)', gloss: 'a reasonable expectation — the formal twin of “should”', example: 'They ought to be at the hotel by now.' },
+      { fn: 'regret & criticism', form: 'ought to have', gloss: 'past criticism — the formal twin of “should have”', example: 'He ought to have apologised in person.' },
     ],
     contrast: '“ought to” means the same as “should” — slightly more formal, and one of the few modals that keeps “to”.',
     watchOut: 'Unlike most modals, “ought” keeps “to”: “You ought to rest”, not “You ought rest”. The negative “oughtn’t to” is rare — most speakers just say “shouldn’t”.',
@@ -158,6 +182,8 @@ const DATA = [
     uses: [
       { fn: 'offer', form: 'will', gloss: 'offering or promising to do something', example: 'I’ll carry that upstairs for you.' },
       { fn: 'deduction', form: 'will', gloss: 'a confident guess about now or the future', example: 'That’ll be the postman at the door.' },
+      { fn: 'refusal', form: "won't", gloss: 'refusing — people and machines alike', example: "The printer won't connect." },
+      { fn: 'annoying habit', form: 'will (stressed)', gloss: 'characteristic, irritating behaviour', example: 'He WILL keep parking in my space.' },
     ],
     contrast: '“Will you…?” as a request can sound abrupt or impatient — for polite requests prefer “Could / Would you…?”.',
     watchOut: 'For requests, avoid “Will you…?” — it can come across as a command. Keep “will” for offers and promises: “I’ll help you.”',
@@ -169,6 +195,9 @@ const DATA = [
       { fn: 'offer', form: 'would', gloss: 'offering (Would you like…?)', example: 'Would you like a coffee?' },
       { fn: 'annoying habit', form: "wouldn't", gloss: 'complaining about a repeated, irritating habit (wish + wouldn’t)', example: 'I wish you wouldn’t keep leaving the door unlocked.' },
       { fn: 'hypothetical wish', form: 'would', gloss: 'talking about unreal or imagined situations', example: 'I would help if I had the time.' },
+      { fn: 'hypothetical past', form: 'would have', gloss: 'an unreal or imagined past', example: 'I would have accepted the job, but the salary was terrible.' },
+      { fn: 'past habit', form: 'would', gloss: 'repeated past actions — the storytelling habit', example: 'Every August, we would drive up to the mountains.' },
+      { fn: 'refusal', form: "wouldn't", gloss: 'a past refusal', example: "We offered a refund, but he wouldn't accept it." },
     ],
     contrast: '“I wish you wouldn’t…” isn’t about the future — it’s a complaint about a habit you want stopped.',
     watchOut: 'For the annoying-habit wish, use “wouldn’t”, not “didn’t”: “I wish you wouldn’t interrupt.” “Would” never takes “-s” or “to”: “She would help”, not “She would to help”.',
@@ -178,6 +207,7 @@ const DATA = [
     uses: [
       { fn: 'offer', form: 'shall', gloss: 'offering to do something (Shall I…?)', example: 'Shall I carry that upstairs for you?' },
       { fn: 'suggestion', form: 'shall', gloss: 'suggesting doing something together (Shall we…?)', example: 'Shall we book a table?' },
+      { fn: 'obligation', form: 'shall', gloss: 'a binding obligation in contracts and legal documents', example: 'The tenant shall keep the property in good repair.' },
     ],
     contrast: '“Shall I…?” offers your help; “Shall we…?” suggests doing something together. Both are questions with I / we.',
     watchOut: '“shall” for offers and suggestions is used mainly with “I” and “we” in questions. Elsewhere it sounds old-fashioned — for the future, use “will”.',

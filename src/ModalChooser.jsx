@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { LevelBadge } from './components/BadgePill';
 import SentenceChallenge from './components/SentenceChallenge';
+import ExplainerOverlay from './components/ExplainerOverlay';
+import ModalCard from './components/ModalCard';
+import { byId as modalCardById } from './lib/modalExplainEn.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Modal Chooser
@@ -12,7 +15,8 @@ import SentenceChallenge from './components/SentenceChallenge';
 //
 // The palette is a FIXED keyboard shown every item; the other modals on the
 // board are automatically fair distractors. Level gates which TOGGLES are live
-// (n't, have), not which base tiles show.
+// (n't, have). All tiles stay visible, but at beginner/intermediate any tile
+// never used as an answer in the band greys out (per-band, never per-question).
 //
 // Entry: auto-defaults to the student's band (from profile), with an inline
 // level switcher to change band or peek at levels still being built — closest
@@ -38,7 +42,7 @@ const norm = (s) => (s || '').toLowerCase().replace(/[.,!?;:]/g, '').replace(/\s
 const LEVELS = [
   { key: 'beginner', label: 'Beginner', sublabel: 'A1 – A2', description: 'Core modals for ability, permission, obligation and requests.', colour: '#48bb78', colourLight: '#f0fff4', dbLevels: ['A1', 'A2'], icon: '🌱' },
   { key: 'intermediate', label: 'Intermediate', sublabel: 'B1 – B2', description: 'Deduction, prohibition, advice, warnings and wish forms — negatives and perfect forms unlock here.', colour: '#4299e1', colourLight: '#ebf8ff', dbLevels: ['B1', 'B2'], icon: '📘' },
-  { key: 'advanced', label: 'Advanced', sublabel: 'C1 – C2', description: 'Advanced modal nuance.', colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '🎓' },
+  { key: 'advanced', label: 'Advanced', sublabel: 'C1 – C2', description: 'Past deduction and regret, refusal, past habits and concession — perfect forms throughout.', colour: '#ed8936', colourLight: '#fffaf0', dbLevels: ['C1', 'C2'], icon: '🎓' },
 ];
 
 // Map a student's CEFR level to a band. Unknown / A-level → beginner.
@@ -59,9 +63,45 @@ const NEG = {
   must: "mustn't", shall: "shan't", should: "shouldn't", will: "won't", would: "wouldn't",
 };
 
-// Lexical tiles — kept separate from the perfect `have` toggle so we never build
-// "must have to". These stand on their own.
+// Lexical tiles — 'have to' / "don't have to" stay toggle-proof so we never
+// build "must have to"; the other three accept exactly the toggles mapped below.
 const LEXICAL = ['have to', "don't have to", "needn't", 'ought to', 'had better'];
+
+// Which lexical tiles accept which toggles, and what they produce.
+const LEX_NEG = { 'had better': 'had better not' };
+const LEX_HAVE = new Set(["needn't", 'ought to']); // needn't have · ought to have
+
+// Reverse lookup: a negative form back to its base tile (for the live-tile map).
+const REV_NEG = Object.fromEntries(Object.entries(NEG).map(([k, v]) => [v, k]));
+
+// Two balanced palette rows (roughly possibility-ish · obligation/volition-ish).
+const BASE_ROWS = [
+  ['can', 'could', 'may', 'might', 'must'],
+  ['shall', 'should', 'will', 'would'],
+];
+
+// Map any storable answer back to the tile that builds it ("should have" → should,
+// "may not" → may, "needn't have" → needn't, "had better not" → had better).
+function tileForAnswer(ans) {
+  let a = apos(String(ans || '')).trim().toLowerCase();
+  if (a.endsWith(' have')) a = a.slice(0, -5).trim();
+  if (a === 'had better not') return 'had better';
+  if (a === "'d better" || a === "'d better not") return 'had better';
+  if (LEXICAL.includes(a)) return a;
+  if (REV_NEG[a]) return REV_NEG[a];
+  if (BASE_MODALS.includes(a)) return a;
+  return null;
+}
+
+// Map an answer to its Modal Explainer card id (for the 📖 overlay).
+const CARD_ID_OVERRIDES = {
+  'have to': 'have_to', "don't have to": 'have_to',
+  "needn't": 'neednt', 'ought to': 'ought_to', 'had better': 'had_better',
+};
+function cardIdForAnswer(ans) {
+  const t = tileForAnswer(ans);
+  return t ? (CARD_ID_OVERRIDES[t] || t) : null;
+}
 
 // Follow-up Sentence Challenge prompt phrasing, keyed by function pill.
 const FUNCTION_PHRASE = {
@@ -81,6 +121,11 @@ const FUNCTION_PHRASE = {
   'hypothetical wish': 'to make a wish (If only…)',
   'expectation': 'to say what you expect',
   'suggestion': 'to make a suggestion (Shall we…?)',
+  'regret & criticism': 'to criticise or regret a past action (should have…)',
+  'hypothetical past': 'to imagine a different past (would have…)',
+  'refusal': "to talk about a refusal (won't / wouldn't)",
+  'past habit': 'to describe a past habit',
+  'concession': 'to concede a point before countering it (may… but)',
 };
 const functionPhrase = (fn) => FUNCTION_PHRASE[fn] || 'in a natural sentence';
 
@@ -100,6 +145,13 @@ const PILL_STYLES = {
   'offer':                 { bg: '#FDF2F8', fg: '#9D174D', bd: '#F9A8D4' },
   'annoying habit':        { bg: '#F1F5F9', fg: '#334155', bd: '#CBD5E1' },
   'hypothetical wish':     { bg: '#F5F3FF', fg: '#6D28D9', bd: '#DDD6FE' },
+  'expectation':           { bg: '#FAF5FF', fg: '#6B21A8', bd: '#D6BCFA' },
+  'suggestion':            { bg: '#FDF2F8', fg: '#9D174D', bd: '#F9A8D4' },
+  'regret & criticism':    { bg: '#FFF7ED', fg: '#C2410C', bd: '#FDBA74' },
+  'hypothetical past':     { bg: '#ECFEFF', fg: '#155E75', bd: '#67E8F9' },
+  'refusal':               { bg: '#FEF2F2', fg: '#B91C1C', bd: '#FECACA' },
+  'past habit':            { bg: '#FEFCE8', fg: '#854D0E', bd: '#FDE047' },
+  'concession':            { bg: '#FDF4FF', fg: '#86198F', bd: '#F0ABFC' },
 };
 const PILL_DEFAULT = { bg: '#F5F3FF', fg: '#6D28D9', bd: '#DDD6FE' };
 
@@ -118,19 +170,21 @@ function FunctionPill({ fn }) {
 }
 
 // One palette tile.
-function Tile({ label, active, disabled, onClick }) {
+function Tile({ label, active, disabled, ghost, title, onClick }) {
+  const off = disabled || ghost;
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
+      disabled={off}
+      title={title}
       style={{
         padding: '10px 16px', borderRadius: '10px', fontSize: '1rem', fontWeight: 600,
-        cursor: disabled ? 'default' : 'pointer',
+        cursor: off ? 'default' : 'pointer',
         background: active ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#fff',
-        color: active ? '#fff' : disabled ? '#a0aec0' : '#2d3748',
+        color: active ? '#fff' : off ? '#a0aec0' : '#2d3748',
         border: active ? '1px solid transparent' : '1px solid #e2e8f0',
-        opacity: disabled ? 0.5 : 1,
+        opacity: ghost ? 0.35 : disabled ? 0.5 : 1,
         boxShadow: active ? '0 4px 12px rgba(102,126,234,0.35)' : 'none',
         transition: 'transform 0.1s ease',
       }}
@@ -153,6 +207,8 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
   const [score, setScore] = useState(0);
   const [feedback, setFeedback] = useState(null);
   const [showSC, setShowSC] = useState(false);
+  const [showCard, setShowCard] = useState(false);
+  const [liveTiles, setLiveTiles] = useState(null); // Set of tile names used anywhere in this band
 
   // Answer-builder state
   const [selectedBase, setSelectedBase] = useState(null);
@@ -175,10 +231,20 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
   const togglesLive = selectedLevel && selectedLevel.key !== 'beginner';
 
   const assembled = selectedLexical
-    ? apos(selectedLexical)
+    ? (negOn && LEX_NEG[selectedLexical] ? LEX_NEG[selectedLexical] : apos(selectedLexical))
+      + (haveOn && LEX_HAVE.has(selectedLexical) ? ' have' : '')
     : selectedBase
       ? (negOn ? (NEG[selectedBase] || selectedBase) : selectedBase) + (haveOn ? ' have' : '')
       : '';
+
+  // Which toggles the current selection supports (bases: both; lexicals: per-tile).
+  const negSupported = selectedBase ? true : selectedLexical ? !!LEX_NEG[selectedLexical] : false;
+  const haveSupported = selectedBase ? true : selectedLexical ? LEX_HAVE.has(selectedLexical) : false;
+
+  // Per-band tile greying: at beginner/intermediate, tiles never used as an
+  // answer (or alternative) anywhere in the band go quiet. Advanced shows all.
+  const greyingOn = selectedLevel && selectedLevel.key !== 'advanced';
+  const tileLive = (name) => !greyingOn || !liveTiles || liveTiles.size === 0 || liveTiles.has(name);
 
   const fetchProfile = async () => {
     try {
@@ -207,6 +273,16 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
       .in('language', ['en', 'both'])
       .in('level', dbLevels);
     if (error) { console.error('Error fetching modal chooser questions:', error); setQuestions([]); setStage('playing'); return; }
+    // Live-tile map is computed from the FULL band set (pre-slice), so greying
+    // is stable per band and never telegraphs the current question's answer.
+    const live = new Set();
+    (data || []).forEach(row => {
+      [row.correct_answer, ...parseAlts(row).map(a => a.answer)].forEach(ans => {
+        const t = tileForAnswer(ans);
+        if (t) live.add(t);
+      });
+    });
+    setLiveTiles(live);
     setQuestions(shuffleArray(data || []).slice(0, 10));
     setStage('playing');
   };
@@ -216,7 +292,7 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
     const lv = LEVELS.find(l => l.key === key);
     if (!lv) return;
     window.scrollTo({ top: 0, behavior: 'instant' });
-    setSelectedLevel(lv); setCurrentQ(0); setScore(0); setFeedback(null); resetBuilder();
+    setSelectedLevel(lv); setCurrentQ(0); setScore(0); setFeedback(null); setShowCard(false); resetBuilder();
     setStage('loading'); fetchQuestions(lv.dbLevels);
   };
 
@@ -230,7 +306,10 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
 
   const pickLexical = (l) => {
     if (feedback) return;
-    setSelectedBase(null); setNegOn(false); setHaveOn(false);
+    setSelectedBase(null);
+    // Keep a toggle only if the incoming tile supports it (had better → not; needn't / ought to → have).
+    setNegOn(v => v && !!LEX_NEG[l]);
+    setHaveOn(v => v && LEX_HAVE.has(l));
     setSelectedLexical(prev => (prev === l ? null : l));
   };
 
@@ -244,18 +323,24 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
     const q = questions[currentQ];
     const ua = norm(apos(assembled));
     const primary = norm(apos(q.correct_answer || ''));
+    const alts = parseAlts(q);
+    // Every accepted form minus whatever the student built — all are equals.
+    const equally = (picked) =>
+      [q.correct_answer, ...alts.map(a => a.answer)].filter(a => norm(apos(a)) !== picked);
     if (ua === primary) {
       setScore(s => s + 1);
-      setFeedback({ result: 'correct', note: '', answer: q.correct_answer, explanation: q.explanation || '' });
+      setFeedback({ result: 'correct', note: '', answer: q.correct_answer, explanation: q.explanation || '', equally: equally(ua) });
       return;
     }
-    const match = parseAlts(q).find(a => norm(apos(a.answer)) === ua);
+    const match = alts.find(a => norm(apos(a.answer)) === ua);
     if (match) {
+      // Alternatives are fully correct — same green, same point. The note is a
+      // register nuance, never a demotion.
       setScore(s => s + 1);
-      setFeedback({ result: 'soft', note: match.feedback || '', answer: q.correct_answer, explanation: q.explanation || '' });
+      setFeedback({ result: 'correct', note: match.feedback || '', answer: match.answer, explanation: q.explanation || '', equally: equally(ua) });
       return;
     }
-    setFeedback({ result: 'wrong', note: '', answer: q.correct_answer, explanation: q.explanation || '' });
+    setFeedback({ result: 'wrong', note: '', answer: q.correct_answer, explanation: q.explanation || '', equally: alts.map(a => a.answer) });
   };
 
   const harvestModalSentence = async ({ sentence, inputMethod, result }) => {
@@ -276,17 +361,26 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
     window.scrollTo({ top: 0, behavior: 'instant' });
     resetBuilder();
     setShowSC(false);
+    setShowCard(false);
     if (currentQ + 1 >= questions.length) { setFeedback(null); setStage('finished'); }
     else { setCurrentQ(c => c + 1); setFeedback(null); }
   };
 
   const restartExercise = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-    setCurrentQ(0); setScore(0); setFeedback(null); setShowSC(false); resetBuilder();
+    setCurrentQ(0); setScore(0); setFeedback(null); setShowSC(false); setShowCard(false); resetBuilder();
     setStage('loading'); fetchQuestions(selectedLevel.dbLevels);
   };
 
   const q = questions[currentQ];
+
+  // Tiny inline renderer for the **bold** / *italic* markdown used across the
+  // bank's explanations — the feedback box shows it properly, not as asterisks.
+  const renderMd = (text) => String(text || '').split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).map((p, i) => {
+    if (/^\*\*[^*]+\*\*$/.test(p)) return <strong key={i}>{p.slice(2, -2)}</strong>;
+    if (/^\*[^*]+\*$/.test(p)) return <em key={i}>{p.slice(1, -1)}</em>;
+    return <span key={i}>{p}</span>;
+  });
 
   // ── Sentence with blank ───────────────────────────────────────────────────
   const renderSentence = (question) => {
@@ -364,26 +458,50 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
 
               {renderSentence(q)}
 
-              {/* Base modal palette */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '12px' }}>
-                {BASE_MODALS.map(m => (
-                  <Tile key={m} label={negOn && selectedBase === m ? (NEG[m] || m) : m} active={selectedBase === m} disabled={!!feedback} onClick={() => pickBase(m)} />
-                ))}
-              </div>
+              {/* Base modal palette — two fixed, balanced rows */}
+              {BASE_ROWS.map((row, ri) => (
+                <div key={ri} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: ri === BASE_ROWS.length - 1 ? '12px' : '8px' }}>
+                  {row.map(m => (
+                    <Tile
+                      key={m}
+                      label={negOn && selectedBase === m ? (NEG[m] || m) : m}
+                      active={selectedBase === m}
+                      disabled={!!feedback}
+                      ghost={!tileLive(m)}
+                      title={!tileLive(m) ? 'Not used at this level' : undefined}
+                      onClick={() => pickBase(m)}
+                    />
+                  ))}
+                </div>
+              ))}
 
-              {/* Toggles (level-gated) */}
+              {/* Toggles (level-gated; lexical tiles light only the toggles they support) */}
               {togglesLive && (
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '12px' }}>
-                  <Tile label="+ n't" active={negOn} disabled={!!feedback || !selectedBase} onClick={() => selectedBase && setNegOn(v => !v)} />
-                  <Tile label="+ have" active={haveOn} disabled={!!feedback || !selectedBase} onClick={() => selectedBase && setHaveOn(v => !v)} />
+                  <Tile label="+ n't" active={negOn} disabled={!!feedback || !negSupported} onClick={() => negSupported && setNegOn(v => !v)} />
+                  <Tile label="+ have" active={haveOn} disabled={!!feedback || !haveSupported} onClick={() => haveSupported && setHaveOn(v => !v)} />
                 </div>
               )}
 
               {/* Lexical tiles */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '16px' }}>
-                {LEXICAL.map(l => (
-                  <Tile key={l} label={l} active={selectedLexical === l} disabled={!!feedback} onClick={() => pickLexical(l)} />
-                ))}
+                {LEXICAL.map(l => {
+                  const on = selectedLexical === l;
+                  let label = l;
+                  if (on && negOn && LEX_NEG[l]) label = LEX_NEG[l];
+                  if (on && haveOn && LEX_HAVE.has(l)) label = `${label} have`;
+                  return (
+                    <Tile
+                      key={l}
+                      label={label}
+                      active={on}
+                      disabled={!!feedback}
+                      ghost={!tileLive(l)}
+                      title={!tileLive(l) ? 'Not used at this level' : undefined}
+                      onClick={() => pickLexical(l)}
+                    />
+                  );
+                })}
               </div>
 
               {!feedback && (
@@ -397,24 +515,34 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
                 <div style={{ marginTop: '4px' }}>
                   <div style={{
                     padding: '1rem 1.25rem', borderRadius: '10px',
-                    background: feedback.result === 'wrong' ? '#fff5f5' : feedback.result === 'soft' ? '#fffaf0' : '#f0fff4',
-                    border: `1px solid ${feedback.result === 'wrong' ? '#fc8181' : feedback.result === 'soft' ? '#f6ad55' : '#68d391'}`,
+                    background: feedback.result === 'wrong' ? '#fff5f5' : '#f0fff4',
+                    border: `1px solid ${feedback.result === 'wrong' ? '#fc8181' : '#68d391'}`,
                   }}>
-                    <div style={{ fontWeight: 700, color: feedback.result === 'wrong' ? '#c53030' : feedback.result === 'soft' ? '#c05621' : '#276749', marginBottom: '6px' }}>
+                    <div style={{ fontWeight: 700, color: feedback.result === 'wrong' ? '#c53030' : '#276749', marginBottom: '6px' }}>
                       {feedback.result === 'wrong'
                         ? <>❌ Not quite. A good answer here is <span style={{ textDecoration: 'underline' }}>{feedback.answer}</span>.</>
-                        : feedback.result === 'soft'
-                          ? <>✅ Correct.</>
-                          : <>✅ Correct!</>}
+                        : <>✅ Correct!</>}
                     </div>
-                    {feedback.note && <div style={{ color: '#4a5568', marginBottom: '6px', fontStyle: 'italic' }}>{feedback.note}</div>}
-                    {feedback.explanation && <div style={{ color: '#4a5568', lineHeight: 1.5 }}>{feedback.explanation}</div>}
+                    {feedback.equally && feedback.equally.length > 0 && (
+                      <div style={{ color: feedback.result === 'wrong' ? '#c53030' : '#276749', marginBottom: '6px', fontSize: '0.95rem' }}>
+                        Equally correct: {feedback.equally.map((a, i) => (
+                          <span key={i}><em>{a}</em>{i < feedback.equally.length - 1 ? ' · ' : ''}</span>
+                        ))}
+                      </div>
+                    )}
+                    {feedback.note && <div style={{ color: '#4a5568', marginBottom: '6px', fontStyle: 'italic' }}>{renderMd(feedback.note)}</div>}
+                    {feedback.explanation && <div style={{ color: '#4a5568', lineHeight: 1.5 }}>{renderMd(feedback.explanation)}</div>}
                   </div>
                   {!showSC && (
-                    <div style={{ textAlign: 'center', marginTop: '14px' }}>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '14px' }}>
                       <button onClick={() => setShowSC(true)} style={{ padding: '10px 32px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>
                         ✏️ Your turn →
                       </button>
+                      {cardIdForAnswer(feedback.answer) && (
+                        <button onClick={() => setShowCard(true)} style={{ padding: '10px 20px', background: 'white', color: '#553C9A', border: '1px solid #D6BCFA', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>
+                          📖 See the full card
+                        </button>
+                      )}
                     </div>
                   )}
                   {showSC && (
@@ -429,6 +557,15 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
                       onClose={nextQuestion}
                     />
                   )}
+                  {showCard && (() => {
+                    const cid = cardIdForAnswer(feedback.answer);
+                    const card = cid ? modalCardById[cid] : null;
+                    return card ? (
+                      <ExplainerOverlay open onClose={() => setShowCard(false)}>
+                        <ModalCard card={card} open highlightFn={(q.tags && q.tags[0]) || null} />
+                      </ExplainerOverlay>
+                    ) : null;
+                  })()}
                 </div>
               )}
             </>
