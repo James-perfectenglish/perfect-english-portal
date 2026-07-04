@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { makeES, TENSES, TIEMPO_LABEL, TIEMPO_ES, startLevel } from '../lib/tenseEngineEs.js';
+import { findByTiempo } from '../lib/tenseExplainEs.js';
+import SentenceChallenge from './SentenceChallenge';
+import ExplainerOverlay from './ExplainerOverlay';
+import TenseCardES from './TenseCardES';
 
 /* ============================================================
    Tense Tagger 🏷️ — Spanish track (native-English learners of Spanish)
@@ -10,11 +14,13 @@ import { makeES, TENSES, TIEMPO_LABEL, TIEMPO_ES, startLevel } from '../lib/tens
    Specimens are served from the tense_specimens bank (pre-generated
    and AI-filtered) via the tense_specimen_deck RPC, with the live
    conjugator as the offline fallback. Recognition attempts write to
-   tense_attempts (language='es', axis 'tiempo'); production is marked
-   by the AI (mark-free.js, type:'tense', language:'es') and harvested
-   to sc_sentences. On an AI outage, production soft-passes (Spanish
-   endings are too irregular to regex safely, so we never wrongly deny
-   a star). A2/B1 only; futuro is a fast-follow.
+   tense_attempts (language='es', axis 'tiempo'); production runs
+   through the shared SentenceChallenge sheet (type or 🎙️ voice input),
+   marked by the AI (mark-free.js, type:'tense', language:'es') and
+   harvested to sc_sentences with the real input method. On an AI
+   outage nothing is persisted and the student simply retries (SC's
+   app-wide convention). This component owns the star row (SC runs
+   noStars). A2/B1 only; futuro is a fast-follow.
 
    The conjugation engine lives in src/lib/tenseEngineEs.js, shared
    with scripts/generate_tense_specimens.mjs (the bank builder).
@@ -83,7 +89,7 @@ export default function TenseTaggerES({ profile, initialTense = null }) {
   const [graded, setGraded] = useState(false);
   const [draft, setDraft] = useState('');
   const [prod, setProd] = useState(null);
-  const [checking, setChecking] = useState(false);
+  const [showCard, setShowCard] = useState(false);
   const [stars, setStars] = useState(0);
   const [tagged, setTagged] = useState(0);
 
@@ -141,7 +147,7 @@ export default function TenseTaggerES({ profile, initialTense = null }) {
 
   function reset(toLevel = level) {
     setItem(drawES(toLevel)); setPhase('tag'); setPick(null);
-    setGraded(false); setDraft(''); setProd(null);
+    setGraded(false); setDraft(''); setProd(null); setShowCard(false);
   }
   function changeLevel(l) { deckRef.current = []; setLevel(l); reset(l); }
 
@@ -152,7 +158,7 @@ export default function TenseTaggerES({ profile, initialTense = null }) {
     setLockedTiempo(null);
     setLevel(lvl);
     setItem(makeES(lvl));
-    setPhase('tag'); setPick(null); setGraded(false); setDraft(''); setProd(null);
+    setPhase('tag'); setPick(null); setGraded(false); setDraft(''); setProd(null); setShowCard(false);
   }
 
   async function logAttempt() {
@@ -170,27 +176,27 @@ export default function TenseTaggerES({ profile, initialTense = null }) {
     } catch (e) { console.warn('TenseTaggerES: tense_attempts insert failed', e); }
   }
 
-  async function awardStar(sentence, aiFeedback) {
+  async function awardStar(sentence, aiFeedback, inputMethod = 'text') {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { error } = await supabase.from('stars').insert({
         student_id: user.id, source: 'tense_tagger', subtype: 'production',
-        context: { tense: TIEMPO_ES[item.tense], sentence, language: 'es', level, input_method: 'text', ai_feedback: aiFeedback || '' },
+        context: { tense: TIEMPO_ES[item.tense], sentence, language: 'es', level, input_method: inputMethod, ai_feedback: aiFeedback || '' },
       });
       if (error && error.code !== '23505') console.warn('TenseTaggerES: could not save star:', error);
     } catch (e) { console.warn('TenseTaggerES: could not save star:', e); }
   }
 
   // Harvest every production submission (pass AND fail), like every other record surface.
-  async function harvestSentence(sentence, isCorrect, aiFeedback) {
+  async function harvestSentence(sentence, isCorrect, aiFeedback, inputMethod = 'text') {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { error } = await supabase.from('sc_sentences').insert({
         student_id: user.id, source: 'tense_tagger', target: TIEMPO_ES[item.tense], sentence,
         is_correct: isCorrect, ai_feedback: aiFeedback || null,
-        input_method: 'text', language: 'es', level,
+        input_method: inputMethod, language: 'es', level,
       });
       if (error) console.warn('TenseTaggerES: sc_sentences insert failed', error);
     } catch (e) { console.warn('TenseTaggerES: sc_sentences insert failed', e); }
@@ -204,39 +210,27 @@ export default function TenseTaggerES({ profile, initialTense = null }) {
     if (ok) { setTagged(n => n + 1); setPhase('produce'); }
   }
 
-  // AI is the arbiter (mark-free.js, type:'tense', language:'es'); on an AI outage
-  // we soft-pass (award the star) rather than risk denying a correct Spanish answer.
-  async function checkProduction() {
-    const sentence = draft.trim();
-    if (!sentence || checking) return;
-
-    const softPass = () => {
-      setProd({ ok: true, layer: 'soft' });
-      harvestSentence(sentence, true, null);
-      awardStar(sentence, null); setStars(s => s + 1); setPhase('done');
-    };
-
-    setChecking(true); setProd(null);
-    try {
-      const res = await fetch('/api/mark-free', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'tense', sentence, tenseName: TIEMPO_ES[item.tense], level, language: 'es' }),
-      });
-      const data = res.ok ? await res.json() : null;
-      if (data && (data.valid === true || data.valid === false)) {
-        const ok = data.valid === true;
-        const feedback = data.feedback || data.reason || '';
-        setProd({ ok, layer: 'ai', feedback });
-        harvestSentence(sentence, ok, feedback);
-        if (ok) { awardStar(sentence, feedback); setStars(s => s + 1); setPhase('done'); }
-      } else {
-        softPass();
-      }
-    } catch (e) {
-      softPass();
-    } finally {
-      setChecking(false);
+  // Production now runs through the shared SentenceChallenge sheet (type or
+  // 🎙️ voice input; AI marking via mark-free.js type:'tense', language:'es').
+  // SC persists no star itself (noStars) — this component keeps ownership of
+  // the star row and the sc_sentences harvest, now with the real input method.
+  async function handleSCResult({ sentence, inputMethod, result }) {
+    const ok = result?.valid === true;
+    const feedback = result?.feedback || result?.reason || '';
+    setDraft(sentence);
+    setProd({ ok, layer: 'ai', feedback });
+    await harvestSentence(sentence, ok, feedback, inputMethod);
+    if (ok) {
+      await awardStar(sentence, feedback, inputMethod);
+      setStars(s => s + 1);
     }
+  }
+
+  // Sheet closed: a passed sentence advances to the star screen; anything else
+  // (fail-and-close, backdrop dismiss) deals a fresh specimen — old Skip semantics.
+  function handleSCClose() {
+    if (prod?.ok) setPhase('done');
+    else reset();
   }
 
   return (
@@ -318,6 +312,13 @@ export default function TenseTaggerES({ profile, initialTense = null }) {
                 <div style={{ color: C.bad, fontSize: '0.88rem', marginBottom: '0.75rem', lineHeight: 1.5 }}>
                   Not quite — the answer is in green. This one is the <b>{label}</b>.
                 </div>
+                {findByTiempo(item.tense) && (
+                  <button onClick={() => setShowCard(true)} style={{
+                    width: '100%', padding: '0.7rem', borderRadius: '10px', marginBottom: '0.5rem',
+                    background: 'white', color: C.brandDark, border: '1px solid #C4B5FD',
+                    fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
+                  }}>📖 See the full card</button>
+                )}
                 <button onClick={() => reset()} style={{
                   width: '100%', padding: '0.85rem', borderRadius: '10px', border: 'none',
                   background: C.ink, color: 'white', fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer',
@@ -332,55 +333,39 @@ export default function TenseTaggerES({ profile, initialTense = null }) {
           <div style={{
             background: C.goodBg, border: `1px solid ${C.goodLine}`, borderRadius: '12px',
             color: C.good, fontSize: '0.9rem', padding: '0.75rem 1rem', marginBottom: '1rem',
-          }}>✅ Tagged correctly — <b>{label}</b>.</div>
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', flexWrap: 'wrap',
+          }}>
+            <span>✅ Tagged correctly — <b>{label}</b>.</span>
+            {findByTiempo(item.tense) && (
+              <button onClick={() => setShowCard(true)} style={{
+                background: 'white', color: C.brandDark, border: '1px solid #C4B5FD', borderRadius: 8,
+                padding: '0.35rem 0.7rem', fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', flexShrink: 0,
+              }}>📖 See the full card</button>
+            )}
+          </div>
         )}
 
-        {/* PRODUCE phase */}
+        {/* PRODUCE phase — the shared Sentence Challenge sheet (type / 🎙️ voice) */}
         {phase === 'produce' && (
-          <div style={cardStyle}>
-            <div style={{ ...labelStyle, marginBottom: '0.6rem' }}>✏️ Your turn — earn the star</div>
-            <div style={{ fontSize: '1rem', color: C.ink, marginBottom: '0.75rem' }}>
-              Now write your own Spanish sentence in the <b>{label}</b>.
-            </div>
-            {FORMULAS_ES[item.tense] && (
-              <div style={{ background: '#f7fafc', border: `1px solid ${C.line}`, borderRadius: '10px', padding: '0.6rem 0.8rem', marginBottom: '0.75rem' }}>
-                <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, monospace', fontSize: '0.82rem', fontWeight: 600, color: C.ink }}>{FORMULAS_ES[item.tense].formula}</span>
-                <span style={{ display: 'block', marginTop: '0.3rem', fontSize: '0.8rem', color: C.muted, lineHeight: 1.4 }}>{FORMULAS_ES[item.tense].use}</span>
-              </div>
-            )}
-            <textarea value={draft} onChange={e => { setDraft(e.target.value); setProd(null); }} rows={2} autoFocus
-              placeholder="Escribe una frase…" autoCorrect="off" autoCapitalize="off" spellCheck={false} disabled={checking}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && draft.trim()) { e.preventDefault(); checkProduction(); } }}
-              style={{
-                width: '100%', padding: '0.85rem', fontSize: '1rem', boxSizing: 'border-box', resize: 'none',
-                fontFamily: 'inherit', borderRadius: '10px', backgroundColor: '#f7f7ff',
-                border: `2px solid ${prod && !prod.ok ? C.badLine : C.brand}`, color: '#2d3748', WebkitTextFillColor: '#2d3748',
-              }} />
-
-            {checking && (
-              <div style={{ marginTop: '0.6rem' }}>
-                <StatusPill tone="ai">🤖 AI is checking…</StatusPill>
-              </div>
-            )}
-            {!checking && prod && !prod.ok && (
-              <div style={{ marginTop: '0.6rem' }}>
-                <StatusPill tone="bad">🤖 Not yet</StatusPill>
-                <div style={{ color: C.bad, fontSize: '0.85rem', marginTop: '0.5rem', lineHeight: 1.5 }}>{prod.feedback}</div>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-              <button onClick={checkProduction} disabled={!draft.trim() || checking} style={{
-                flex: 1, padding: '0.85rem', borderRadius: '10px', border: 'none',
-                background: draft.trim() && !checking ? PG : '#cbd5e0', color: 'white', fontSize: '0.95rem', fontWeight: 700,
-                cursor: draft.trim() && !checking ? 'pointer' : 'not-allowed',
-              }}>{checking ? '🤖 Checking…' : '⭐️ Submit for a star'}</button>
-              <button onClick={() => reset()} disabled={checking} style={{
-                padding: '0.85rem 1rem', borderRadius: '10px', background: 'transparent', color: C.muted,
-                border: `1px solid ${C.line}`, fontSize: '0.9rem', cursor: checking ? 'not-allowed' : 'pointer',
-              }}>Skip</button>
-            </div>
-          </div>
+          <SentenceChallenge
+            word={label}
+            language="es"
+            exercise="tense_tagger"
+            apiType="tense"
+            apiExtraFields={{ tenseName: TIEMPO_ES[item.tense], level }}
+            noStars
+            headerLabel="✏️ YOUR TURN — EARN THE STAR"
+            promptText={
+              <span style={{ color: '#2d3748' }}>
+                Write your own Spanish sentence in the:
+                {FORMULAS_ES[item.tense] && (
+                  <span style={{ display: 'block', marginTop: '0.4rem', fontSize: '0.82rem', color: '#718096', fontFamily: 'ui-monospace, SFMono-Regular, monospace' }}>{FORMULAS_ES[item.tense].formula}</span>
+                )}
+              </span>
+            }
+            onMarkResult={handleSCResult}
+            onClose={handleSCClose}
+          />
         )}
 
         {/* DONE phase */}
@@ -406,6 +391,15 @@ export default function TenseTaggerES({ profile, initialTense = null }) {
             }}>↻ New sentence</button>
           </div>
         )}
+
+        {showCard && (() => {
+          const tense = findByTiempo(item.tense);
+          return tense ? (
+            <ExplainerOverlay open onClose={() => setShowCard(false)}>
+              <TenseCardES tense={{ ...tense, _studentLevel: profile?.level || 'B1' }} />
+            </ExplainerOverlay>
+          ) : null;
+        })()}
 
         <div style={{ textAlign: 'center', color: C.faint, fontSize: '0.75rem', marginTop: '0.5rem' }}>
           {tagged} tagged · {stars} star{stars === 1 ? '' : 's'} earnt

@@ -33,7 +33,7 @@ export function FunctionPill({ fn }) {
   );
 }
 
-export default function ModalCard({ card, open, onToggle, highlightFn = null }) {
+export default function ModalCard({ card, open, onToggle, highlightFn = null, onPractise = null }) {
   const interactive = typeof onToggle === 'function';
 
   const Header = (
@@ -101,6 +101,15 @@ export default function ModalCard({ card, open, onToggle, highlightFn = null }) 
             <span style={{ fontWeight: 700, color: C.warnInk, fontSize: '0.76rem' }}>👁️ Watch out · </span>
             <span style={{ color: C.warnInk, fontSize: '0.84rem', lineHeight: 1.5 }}>{card.watchOut}</span>
           </div>
+
+          {onPractise && (
+            <div style={{ marginTop: '1rem', borderTop: `1px solid ${C.line}`, paddingTop: '0.9rem' }}>
+              <button onClick={() => onPractise(card)}
+                style={{ background: PG, color: 'white', border: 'none', borderRadius: 10, padding: '0.7rem 1rem', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', width: '100%' }}>
+                ✏️ Practise in Modal Match →
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -11,6 +11,7 @@ export default function SentenceChallenge({
   headerLabel,       // optional override for the small uppercase label at top
   promptText,        // optional override for the "Write a sentence using:" subtitle
   apiContext = 'challenge', // 'challenge' | 'wotd' | 'gotd' — routes the mark-free.js prompt
+  apiType = 'sentence',     // mark-free.js marking route: 'sentence' (default) | 'tense'
   apiExtraFields = {},      // spread into the mark-free.js request body (e.g. partOfSpeech, definition)
   dedupeKey,         // optional: when set, opts in to ux_stars_dedupe anti-farming.
   noStars = false,   // teacher Class Play: run the full challenge but persist no star
@@ -97,7 +98,7 @@ export default function SentenceChallenge({
     try {
       const res = await fetch('/api/mark-free', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'sentence', context: apiContext, word, sentence, language, ...apiExtraFields }),
+        body: JSON.stringify({ type: apiType, context: apiContext, word, sentence, language, ...apiExtraFields }),
       });
       // 529 (overload) or other non-2xx → stay in input phase so the student can retry without burning today's attempt.
       // Nothing is persisted (no submission row, no star), so WOTD/GOTD don't see a fake "failed" answer.

@@ -27,7 +27,7 @@ const PG = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
 
 export default function ModalExplainer({ profile, onPractise }) {
   const groups = modalGroups();
-  const [openGroup, setOpenGroup] = useState(groups[0]?.id || null);
+  const [openGroup, setOpenGroup] = useState(null);
   const [openModal, setOpenModal] = useState(null);
 
   return (
@@ -42,12 +42,6 @@ export default function ModalExplainer({ profile, onPractise }) {
           <p style={{ color: C.slate, fontSize: '0.92rem', lineHeight: 1.55, margin: '0 0 1rem' }}>
             A quick reference: pick a modal to see its main jobs, the classic confusions, and a watch-out. The coloured labels are the same <strong>functions</strong> you’ll meet in the Modal Match.
           </p>
-
-          {onPractise && (
-            <button onClick={() => onPractise()} style={{ background: PG, color: 'white', border: 'none', borderRadius: 10, padding: '0.75rem 1rem', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', width: '100%', marginBottom: '1.25rem' }}>
-              ✏️ Practise in Modal Match →
-            </button>
-          )}
 
           {groups.map(g => {
             const gOpen = openGroup === g.id;
@@ -69,6 +63,7 @@ export default function ModalExplainer({ profile, onPractise }) {
                         card={card}
                         open={openModal === card.id}
                         onToggle={() => setOpenModal(openModal === card.id ? null : card.id)}
+                        onPractise={onPractise ? () => onPractise() : null}
                       />
                     ))}
                   </div>
