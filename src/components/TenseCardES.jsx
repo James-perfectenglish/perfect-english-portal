@@ -40,13 +40,29 @@ function withSignals(text, signals) {
   );
 }
 
-/* schematic past–now timeline, by tense (the pretérito/imperfecto contrast especially) */
+/* schematic past–now timeline, by tense (the pretérito/imperfecto contrast especially).
+   Returns null for the subjuntivo — a mood has no position on a timeline. */
 export function ESTimeline({ tiempo }) {
   const W = 260, H = 34, mid = 22, nowX = 188;
+  if (tiempo === 'subjuntivo') return null;
   let shape;
   if (tiempo === 'presente') shape = <circle cx={nowX} cy={mid} r="5" fill={C.brand} />;
   else if (tiempo === 'presente_continuo') shape = <rect x={nowX - 24} y={mid - 5} width="48" height="10" rx="5" fill={C.band} />;
   else if (tiempo === 'preterito') shape = <circle cx="78" cy={mid} r="5" fill={C.brand} />;
+  else if (tiempo === 'perfecto') shape = (
+    <g>{/* a past event whose line reaches "ahora" */}
+      <line x1="78" y1={mid} x2={nowX} y2={mid} stroke={C.band} strokeWidth="4" strokeLinecap="round" />
+      <circle cx="78" cy={mid} r="5" fill={C.brand} />
+    </g>
+  );
+  else if (tiempo === 'pluscuamperfecto') shape = (
+    <g>{/* the earlier of two past events */}
+      <circle cx="52" cy={mid} r="5" fill={C.brand} />
+      <circle cx="118" cy={mid} r="4" fill="none" stroke={C.faint} strokeWidth="1.5" />
+    </g>
+  );
+  else if (tiempo === 'futuro') shape = <circle cx={nowX + 44} cy={mid} r="5" fill={C.brand} />;
+  else if (tiempo === 'condicional') shape = <circle cx={nowX + 44} cy={mid} r="5" fill="none" stroke={C.brand} strokeWidth="2" strokeDasharray="3 2" />; // hypothetical
   else shape = <rect x="40" y={mid - 5} width="92" height="10" rx="5" fill={C.band} />; // imperfecto: ongoing in the past
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: W, display: 'block' }} aria-hidden="true">
@@ -97,7 +113,9 @@ export default function TenseCardES({ tense, onPractise }) {
       </div>
 
       <div style={{ padding: '1.1rem' }}>
-        <div style={{ marginBottom: '1rem' }}><ESTimeline tiempo={tense.tiempo} /></div>
+        {tense.tiempo !== 'subjuntivo' && (
+          <div style={{ marginBottom: '1rem' }}><ESTimeline tiempo={tense.tiempo} /></div>
+        )}
 
         <div style={{ fontSize: '0.68rem', fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>When you use it</div>
         {tense.uses.map((u, i) => (
@@ -119,6 +137,7 @@ export default function TenseCardES({ tense, onPractise }) {
           <span style={{ color: C.warnInk, fontSize: '0.84rem', lineHeight: 1.5 }}>{tense.watchOut}</span>
         </div>
 
+        {tense.practisable !== false && (
         <div style={{ marginTop: '1rem' }}>
           {current && (
             <div style={{ background: '#fff', border: `1px dashed ${C.line}`, borderRadius: 9, padding: '0.55rem 0.7rem', marginBottom: 8 }}>
@@ -136,8 +155,9 @@ export default function TenseCardES({ tense, onPractise }) {
             </button>
           )}
         </div>
+        )}
 
-        {onPractise && (
+        {onPractise && tense.practisable !== false && (
           <div style={{ marginTop: '1rem', borderTop: `1px solid ${C.line}`, paddingTop: '0.9rem' }}>
             <button onClick={() => onPractise({ tiempo: tense.tiempo, name: tense.name })}
               style={{ background: PG, color: 'white', border: 'none', borderRadius: 10, padding: '0.7rem 1rem', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', width: '100%' }}>

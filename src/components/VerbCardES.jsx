@@ -109,12 +109,12 @@ export default function VerbCardES({ tense, onOpenExplainer }) {
         </div>
 
         {/* regular / aux table */}
-        <SubHead>{tense.kind === 'compound' ? 'The auxiliary — haber' : 'Regular verbs'}</SubHead>
+        <SubHead>{tense.kind === 'compound' ? `The auxiliary — ${tense.aux.verb}` : 'Regular verbs'}</SubHead>
         <ConjTable cols={simpleCols} />
 
         {tense.kind === 'compound' && (
           <div style={{ marginTop: 10, background: C.goodBg, border: `1px solid ${C.goodLine}`, borderRadius: 9, padding: '0.55rem 0.7rem' }}>
-            <span style={{ color: C.good, fontWeight: 700, fontSize: '0.8rem' }}>+ participio&nbsp;&nbsp;</span>
+            <span style={{ color: C.good, fontWeight: 700, fontSize: '0.8rem' }}>+ {tense.complement || 'participio'}&nbsp;&nbsp;</span>
             <span style={{ color: C.ink, fontFamily: MONO, fontSize: '0.86rem' }}>{tense.participle}</span>
             {tense.participleNote && (
               <div style={{ color: C.slate, fontSize: '0.78rem', marginTop: 5 }}>{tense.participleNote}</div>
@@ -122,10 +122,10 @@ export default function VerbCardES({ tense, onOpenExplainer }) {
           </div>
         )}
 
-        {/* irregular participles (compound tenses) */}
+        {/* irregular participles / gerunds (compound tenses) */}
         {tense.irregularParticiples && (
           <>
-            <SubHead>Irregular participles</SubHead>
+            <SubHead>{tense.irregularFormsLabel || 'Irregular participles'}</SubHead>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {tense.irregularParticiples.map(([inf, part]) => (
                 <span key={inf} style={{ background: '#fff', border: `1px solid ${C.line}`, borderRadius: 8, padding: '3px 9px', fontSize: '0.78rem' }}>

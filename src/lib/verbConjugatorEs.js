@@ -22,7 +22,9 @@
    STRUCTURE
    Each entry is one tense. `kind` drives the table renderer:
      'simple'   → three model columns: hablar / comer / vivir
-     'compound' → one aux column (haber) + an invariable participle
+     'compound' → one aux column (haber or estar) + an invariable
+                  complement (participio or gerundio — `complement`
+                  labels it; `irregularFormsLabel` titles the chips)
    `anchor` is the English hook shown on the collapsed row.
    `gloss`   is the 1–2 sentence "what the hell is this" for an
              English speaker (the differentiator).
@@ -54,6 +56,24 @@ const DATA = [
     ],
     irregularNote: '**Stem-changers** (“boot” verbs): the vowel changes in every form *except* nosotros / vosotros. **o→ue** *poder → puedo*, *acostar → me acuesto*. **e→ie** *querer → quiero*, *pensar → pienso*. **e→i** *pedir → pido*.',
     watchOut: 'Resist the continuous. “I work here” = *trabajo aquí*, not *estoy trabajando* — use *estar + -ndo* only for something in progress right now.',
+  },
+  {
+    id: 'presente_continuo', name: 'Presente continuo', enName: 'Present continuous', group: 'present',
+    anchor: 'I am speaking (right now)',
+    gloss: 'English “I am —ing”, but narrower: only for something in progress at this very moment — *estoy limpiando la habitación* (I’m cleaning it now). For habits and arranged plans, Spanish sticks to the simple present.',
+    formation: 'Present of estar + the gerund (-ando / -iendo).',
+    kind: 'compound',
+    aux: { verb: 'estar', forms: ['estoy', 'estás', 'está', 'estamos', 'estáis', 'están'] },
+    complement: 'gerundio',
+    participle: 'hablando · comiendo · viviendo',
+    participleNote: 'The gerund never changes for the subject — only estar moves.',
+    irregularFormsLabel: 'Irregular gerunds',
+    irregularParticiples: [
+      ['decir', 'diciendo'], ['pedir', 'pidiendo'], ['venir', 'viniendo'], ['dormir', 'durmiendo'],
+      ['morir', 'muriendo'], ['leer', 'leyendo'], ['oír', 'oyendo'], ['traer', 'trayendo'], ['ir', 'yendo'],
+    ],
+    irregularNote: '**-yendo** when the stem ends in a vowel: *leer → leyendo*, *oír → oyendo*, *traer → trayendo*. **e→i / o→u** in -ir stem-changers: *pedir → pidiendo*, *dormir → durmiendo*.',
+    watchOut: 'Never for the future. English “I’m working tomorrow” = *trabajo mañana* or *voy a trabajar* — Spanish keeps *estar + -ndo* strictly for right now.',
   },
 
   /* ================= PAST ================= */

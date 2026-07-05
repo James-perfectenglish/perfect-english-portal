@@ -5,12 +5,14 @@ import TenseCardES from './TenseCardES';
 /* ============================================================
    Tense Explainer 📖 🇪🇸 — Learn reference (Spanish track)
    For native-English learners of Spanish. A cheat sheet, not a
-   class: the four tenses with their formula, when to use them
+   class: nine tiempos with their formula, when to use them
    (Spanish signal words + a handcrafted example), and one English-
    speaker "watch out" line. Content + structure come from the shared
    src/lib/tenseExplainEs.js. "Show another" streams a real, level-
    matched sentence from the tense_specimens bank (language='es');
    "Practise this" hands off to TenseTaggerES filtered to the tense.
+   Tiempos the engine doesn't know yet carry practisable:false in the
+   lib and show neither button — flip the flag as Tagger support lands.
    ============================================================ */
 
 const C = {

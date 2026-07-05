@@ -4,16 +4,20 @@
    For native-English learners of Spanish. Read by:
      • src/components/TenseExplainerES.jsx  (the Learn reference)
      • src/components/TenseTaggerES.jsx     (can import formulaByTiempo)
-   The four tenses match the ES Tagger / engine exactly (presente,
-   presente_continuo, preterito, imperfecto) and the bank's
-   answer.tiempo field, so {tiempo} round-trips to a bank query and a
-   Tagger filter. English scaffolding + Spanish examples, mirroring
-   the ES Tagger. All four exist at A2/B1, so there is no level ladder.
+   Nine tiempos — the full union with the Verb Conjugator. The core
+   four (presente, presente_continuo, preterito, imperfecto) match
+   the ES Tagger / engine and the bank's answer.tiempo field, so
+   {tiempo} round-trips to a bank query and a Tagger filter. The
+   other five carry `practisable: false` until the engine learns
+   them (flip per tiempo as Tagger support lands) — the flag gates
+   both the bank-example fetch and the "Practise this" button in
+   TenseCardES. English scaffolding + Spanish examples throughout.
 
    ⚠️ CONTENT NOTE FOR JAMES: the `uses` examples and `watchOut` lines
-   are first drafts for your review — your Spanish-teacher turf. The
-   formula + short `use` are lifted verbatim from the ES Tagger's
-   FORMULAS_ES. The watch-outs target the classic English→Spanish
+   are first drafts for your review — your Spanish-teacher turf. For
+   the core four, formula + short `use` are lifted verbatim from the
+   ES Tagger's FORMULAS_ES; for the five new tiempos they are also
+   first drafts. The watch-outs target the classic English→Spanish
    traps (over-using the continuous; pretérito vs imperfecto).
    ============================================================ */
 
@@ -22,9 +26,14 @@ const TIEMPO_LABEL = {
   presente_continuo: 'Presente continuo',
   preterito: 'Pretérito',
   imperfecto: 'Imperfecto',
+  perfecto: 'Pretérito perfecto',
+  pluscuamperfecto: 'Pluscuamperfecto',
+  futuro: 'Futuro',
+  condicional: 'Condicional',
+  subjuntivo: 'Presente de subjuntivo',
 };
 
-/* ---------- the 4 ES tenses, in reading order (present pair, past pair) ----------
+/* ---------- the 9 ES tiempos, in reading order (present → past → future → subjunctive) ----------
    id / tiempo   the engine + bank key (answer.tiempo)
    group         'present' | 'past'  — for the two key contrasts
    formula / use  verbatim from the ES Tagger's FORMULAS_ES
@@ -71,6 +80,53 @@ const DATA = [
     ],
     watchOut: 'Use it for the background — what used to happen or was happening — not a single finished event. “De niño jugaba al fútbol” (used to), but “ayer jugué un partido” (one match → pretérito).',
   },
+  {
+    id: 'perfecto', tiempo: 'perfecto', group: 'past', practisable: false,
+    formula: 'he / has / ha… + participio  (he hablado, ha comido)', use: 'a past action connected to now',
+    uses: [
+      { label: 'Recent past, inside “today”', signals: ['hoy', 'esta mañana', 'esta semana', 'este mes'], example: 'Esta mañana he hablado con el recepcionista.' },
+      { label: 'Life experience (ever / never)', signals: ['alguna vez', 'nunca', 'ya', 'todavía no'], example: '¿Has estado alguna vez en Menorca?' },
+    ],
+    watchOut: 'Good news — it works like English “I have done”. But Spain stretches it further: anything inside an unfinished period (hoy, esta semana) takes the perfecto, even where English would say “I did it this morning”.',
+  },
+  {
+    id: 'pluscuamperfecto', tiempo: 'pluscuamperfecto', group: 'past', practisable: false,
+    formula: 'había / habías… + participio  (había hablado)', use: 'a past action before another past action',
+    uses: [
+      { label: 'The past before the past', signals: ['ya', 'cuando', 'antes'], example: 'Cuando llegué al hotel, el cliente ya había salido.' },
+    ],
+    watchOut: 'Works exactly like English “had done” — if you would say “had” in English, you want the pluscuamperfecto. Only haber changes; the participle never does.',
+  },
+  /* ===== FUTURE & CONDITIONAL ===== */
+  {
+    id: 'futuro', tiempo: 'futuro', group: 'future', practisable: false,
+    formula: 'infinitive + -é, -ás, -á…  (hablaré, comerás)', use: 'predictions and promises about the future',
+    uses: [
+      { label: 'Predictions & promises', signals: ['mañana', 'el año que viene', 'la próxima semana'], example: 'El año que viene abrirán un hotel nuevo en el puerto.' },
+      { label: 'Guessing (“must be”)', signals: [], example: '¿Qué hora es? — Serán las tres.' },
+    ],
+    watchOut: 'For a plan you have already made, natives usually say ir a + infinitive — “voy a llamar mañana”, not “llamaré”. The futuro leans towards predictions, promises and guesses: “serán las tres” = “it must be about three”.',
+  },
+  {
+    id: 'condicional', tiempo: 'condicional', group: 'future', practisable: false,
+    formula: 'infinitive + -ía, -ías…  (hablaría, comería)', use: 'hypotheticals and polite requests (“would”)',
+    uses: [
+      { label: 'Hypotheticals (“would”)', signals: [], example: 'Con más tiempo, viajaría por toda España.' },
+      { label: 'Polite requests', signals: [], example: '¿Podría traernos la cuenta, por favor?' },
+    ],
+    watchOut: '“Would” for a past habit (“every summer we would swim”) is NOT the conditional — that is the imperfecto. The conditional is the hypothetical “would”: what you would do if things were different.',
+  },
+  /* ===== SUBJUNCTIVE ===== */
+  {
+    id: 'subjuntivo', tiempo: 'subjuntivo', group: 'subjunctive', practisable: false,
+    formula: 'yo present − o + “opposite” vowel  (hable, comas, vivan)', use: 'after triggers of wish, doubt and emotion',
+    uses: [
+      { label: 'Wishes & requests', signals: ['espero que', 'quiero que', 'ojalá'], example: 'Espero que tengas un buen turno.' },
+      { label: 'Doubt & possibility', signals: ['no creo que', 'es posible que'], example: 'No creo que el jefe llegue antes de las diez.' },
+      { label: 'Connectors pointing forward', signals: ['cuando', 'antes de que', 'para que'], example: 'Cuando termines, avísame.' },
+    ],
+    watchOut: 'Do not hunt for an English translation — there usually is not one. Anchor on the trigger: the phrase before “que” decides the mood, not the meaning of the verb itself.',
+  },
 ];
 
 /* ---------- derived structures + helpers ---------- */
@@ -82,8 +138,13 @@ export const formulaByTiempo = Object.fromEntries(
   TENSES_ES.map(t => [t.tiempo, { formula: t.formula, use: t.use }])
 );
 
-export const GROUP_ORDER = ['present', 'past'];
-export const GROUP_LABEL = { present: 'Present', past: 'Past' };
+export const GROUP_ORDER = ['present', 'past', 'future', 'subjunctive'];
+export const GROUP_LABEL = {
+  present: 'Present',
+  past: 'Past',
+  future: 'Future & conditional',
+  subjunctive: 'Subjunctive',
+};
 
 export function tensesByGroup() {
   return GROUP_ORDER

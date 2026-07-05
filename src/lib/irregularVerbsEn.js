@@ -5,14 +5,15 @@
      • src/components/IrregularVerbsEN.jsx  (the Learn reference)
    The English counterpart to verbConjugatorEs.js. English barely
    "conjugates", so the reference is the IRREGULAR VERBS: the three
-   principal parts (base / past simple / past participle), grouped
-   by pattern (easy → hard), plus a short forms-explainer on WHEN
-   each form fires — the point being that the past participle never
-   stands alone (perfect + passive), which is why "I have went" is
-   wrong.
+   principal parts (infinitive / past simple / past participle),
+   grouped by pattern (easy → hard), plus a short forms-explainer on
+   WHEN each form fires — the point being that the past participle
+   never stands alone (perfect + passive), which is why "I have went"
+   is wrong.
 
    British English throughout: got (not gotten), learnt / burnt /
-   spelt, dived not dove, etc.
+   spelt, dived not dove, etc. Term is "infinitive" everywhere, never
+   "base form" (matches the Tense Explainer and how James teaches).
 
    ⚠️ CONTENT NOTE FOR JAMES: forms double-checked and BrE-first, but
    the groupings, glosses and usage notes are yours to review, same
@@ -21,15 +22,15 @@
 
    STRUCTURE
    FORMS[]   the three principal parts + a plain "used for" gloss.
-   GROUPS[]  pattern-keyed sets. Each verb is [base, past, pp] or
-             [base, past, pp, note]. `blurb` explains the pattern;
-             optional group `note` carries a shared caveat.
+   GROUPS[]  pattern-keyed sets. Each verb is [infinitive, past, pp]
+             or [infinitive, past, pp, note]. `blurb` explains the
+             pattern; optional group `note` carries a shared caveat.
    ============================================================ */
 
 export const FORMS = [
   {
-    key: 'base', label: 'Base form', example: 'go',
-    usedFor: 'The dictionary form. Present tense (*I **go***), after *to* (*want **to go***), after modals (*will / can / should **go***), and orders (***Go!***).',
+    key: 'base', label: 'Infinitive', example: 'go',
+    usedFor: 'The dictionary form. Use it after *to* (*want **to go***), after modals (*will / can / should **go***), in the present tense (*I **go***), and in orders (***Go!***).',
   },
   {
     key: 'past', label: 'Past simple', example: 'went',
@@ -51,15 +52,25 @@ const GROUPS = [
       ['hit', 'hit', 'hit'], ['cost', 'cost', 'cost'], ['hurt', 'hurt', 'hurt'], ['shut', 'shut', 'shut'],
       ['split', 'split', 'split'], ['spread', 'spread', 'spread'], ['burst', 'burst', 'burst'],
       ['cast', 'cast', 'cast'], ['bet', 'bet', 'bet'], ['quit', 'quit', 'quit'],
-      ['read', 'read', 'read', 'Spelled the same, but the past & participle are said /red/, like “red”.'],
+      ['read', 'read', 'read', 'Spelt the same, but the past & participle are said /red/, like “red”.'],
     ],
   },
   {
     id: 'base_eq_pp',
-    title: 'Base = past participle',
-    blurb: 'Only the middle form changes — the participle comes back to the base form.',
+    title: 'Infinitive = past participle',
+    blurb: 'Only the middle form changes — the participle returns to the infinitive.',
     verbs: [
       ['come', 'came', 'come'], ['become', 'became', 'become'], ['run', 'ran', 'run'],
+    ],
+  },
+  {
+    id: 'ought_aught',
+    title: '-ought / -aught',
+    blurb: 'A set that *rhymes*: the past and the participle are identical, and all end in the same **-ought / -aught** sound. Learn the sound and the spelling follows.',
+    verbs: [
+      ['buy', 'bought', 'bought'], ['bring', 'brought', 'brought'], ['think', 'thought', 'thought'],
+      ['fight', 'fought', 'fought'], ['seek', 'sought', 'sought'],
+      ['catch', 'caught', 'caught'], ['teach', 'taught', 'taught'],
     ],
   },
   {
@@ -67,8 +78,6 @@ const GROUPS = [
     title: 'Past = past participle',
     blurb: 'The biggest group: the past simple and the past participle are identical, so there are really only **two** forms to learn.',
     verbs: [
-      ['buy', 'bought', 'bought'], ['bring', 'brought', 'brought'], ['think', 'thought', 'thought'],
-      ['catch', 'caught', 'caught'], ['teach', 'taught', 'taught'], ['fight', 'fought', 'fought'], ['seek', 'sought', 'sought'],
       ['sell', 'sold', 'sold'], ['tell', 'told', 'told'],
       ['feel', 'felt', 'felt'], ['keep', 'kept', 'kept'], ['sleep', 'slept', 'slept'], ['leave', 'left', 'left'],
       ['mean', 'meant', 'meant'], ['lose', 'lost', 'lost'], ['spend', 'spent', 'spent'], ['send', 'sent', 'sent'],
@@ -103,6 +112,15 @@ const GROUPS = [
     ],
   },
   {
+    id: 'ew_own',
+    title: '-ew → -own',
+    blurb: 'A tidy sub-pattern: the past ends in **-ew** and the participle in **-wn** — *know → knew → known*, *fly → flew → flown*.',
+    verbs: [
+      ['know', 'knew', 'known'], ['grow', 'grew', 'grown'], ['fly', 'flew', 'flown'],
+      ['throw', 'threw', 'thrown'], ['blow', 'blew', 'blown'], ['draw', 'drew', 'drawn'],
+    ],
+  },
+  {
     id: 'three_diff',
     title: 'All three different',
     blurb: 'All three forms differ — the ones to learn properly, because the participle is where most mistakes happen (*I have **gone***, not *I have **went***).',
@@ -112,13 +130,11 @@ const GROUPS = [
       ['drive', 'drove', 'driven'], ['ride', 'rode', 'ridden'], ['rise', 'rose', 'risen'],
       ['break', 'broke', 'broken'], ['speak', 'spoke', 'spoken'], ['steal', 'stole', 'stolen'],
       ['choose', 'chose', 'chosen'], ['freeze', 'froze', 'frozen'], ['wake', 'woke', 'woken'],
-      ['wear', 'wore', 'worn'], ['tear', 'tore', 'torn'], ['fly', 'flew', 'flown'],
-      ['grow', 'grew', 'grown'], ['know', 'knew', 'known'], ['throw', 'threw', 'thrown'],
-      ['draw', 'drew', 'drawn'], ['blow', 'blew', 'blown'],
+      ['wear', 'wore', 'worn'], ['tear', 'tore', 'torn'],
       ['show', 'showed', 'shown', 'The past is regular (*showed*); only the participle is irregular (*shown*).'],
       ['fall', 'fell', 'fallen'], ['forget', 'forgot', 'forgotten'], ['hide', 'hid', 'hidden'],
       ['bite', 'bit', 'bitten'], ['shake', 'shook', 'shaken'],
-      ['beat', 'beat', 'beaten', 'The past is the same as the base (*beat*); the participle is *beaten*.'],
+      ['beat', 'beat', 'beaten', 'The past is the same as the infinitive (*beat*); the participle is *beaten*.'],
       ['be', 'was / were', 'been', 'Special: present *am / is / are*, past *was / were*, participle *been*.'],
       ['lie', 'lay', 'lain', 'To recline. Don’t confuse it with *lay / laid / laid* (to put something down) or *lie / lied / lied* (to tell an untruth).'],
     ],

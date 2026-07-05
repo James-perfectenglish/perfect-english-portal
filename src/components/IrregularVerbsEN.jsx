@@ -42,7 +42,7 @@ function VerbTable({ verbs }) {
     <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.9rem' }}>
       <thead>
         <tr>
-          {['base', 'past simple', 'past participle'].map(h => (
+          {['infinitive', 'past simple', 'past participle'].map(h => (
             <th key={h} style={{ textAlign: 'left', padding: '2px 10px 8px 0', fontSize: '0.62rem', fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{h}</th>
           ))}
         </tr>
