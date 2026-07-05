@@ -22,6 +22,7 @@ import TenseExplainer from './components/TenseExplainer'
 import ModalExplainer from './components/ModalExplainer'
 import TenseExplainerES from './components/TenseExplainerES'
 import VerbConjugatorES from './components/VerbConjugatorES'
+import IrregularVerbsEN from './components/IrregularVerbsEN'
 import { BORRAS_CARDS } from './data/BorrasCards'
 import { HOTEL_CARDS } from './data/HotelCards'
 import { VERB_CARDS } from './data/VerbCards'
@@ -42,6 +43,7 @@ const ACTIVE_EXERCISES = new Set([
   'Travel 🧳', 'Sport ⚽️', 'Wordle', 'Connections', 'Spelling Bee', 'Wordsearch', 'Crossword',
   'Tense Tagger', 'Tense Explainer', 'Modal Explainer',
   'Verb Conjugator 🇪🇸',
+  'Irregular Verbs Past ⏳',
 ])
 
 const EXERCISE_ICONS = {
@@ -83,6 +85,7 @@ const EXERCISE_ICONS = {
   'Tense Tagger':              '🏷️',
   'Tense Explainer':           '📖',
   'Verb Conjugator 🇪🇸':       '🔤',
+  'Irregular Verbs Past ⏳':    '⏳',
 }
 
 // Play removed from tabs — students use bottom nav, teachers use sidebar
@@ -260,6 +263,15 @@ export default function ExerciseList({
         setActiveExercise(explainerEx)
       }
       exerciseComponent = <VerbConjugatorES onOpenExplainer={onOpenExplainer} />
+    }
+    else if (t === 'Irregular Verbs Past ⏳') {
+      const onOpenExplainer = () => {
+        const explainerEx = exercises.find(e => e.title === 'Tense Explainer')
+        if (!explainerEx) return
+        recordOpen('Tense Explainer')
+        setActiveExercise(explainerEx)
+      }
+      exerciseComponent = <IrregularVerbsEN onOpenExplainer={onOpenExplainer} />
     }
 
     if (exerciseComponent) {
