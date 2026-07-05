@@ -21,6 +21,7 @@ import TenseTaggerES from './components/TenseTaggerES'
 import TenseExplainer from './components/TenseExplainer'
 import ModalExplainer from './components/ModalExplainer'
 import TenseExplainerES from './components/TenseExplainerES'
+import VerbConjugatorES from './components/VerbConjugatorES'
 import { BORRAS_CARDS } from './data/BorrasCards'
 import { HOTEL_CARDS } from './data/HotelCards'
 import { VERB_CARDS } from './data/VerbCards'
@@ -40,6 +41,7 @@ const ACTIVE_EXERCISES = new Set([
   'Matching', 'Sentence Auction', 'Lyrics Mixer', 'Blurt!', 'Word Snake', 'Real Talk',
   'Travel 🧳', 'Sport ⚽️', 'Wordle', 'Connections', 'Spelling Bee', 'Wordsearch', 'Crossword',
   'Tense Tagger', 'Tense Explainer', 'Modal Explainer',
+  'Verb Conjugator 🇪🇸',
 ])
 
 const EXERCISE_ICONS = {
@@ -80,6 +82,7 @@ const EXERCISE_ICONS = {
   'Crossword':                 '✜',
   'Tense Tagger':              '🏷️',
   'Tense Explainer':           '📖',
+  'Verb Conjugator 🇪🇸':       '🔤',
 }
 
 // Play removed from tabs — students use bottom nav, teachers use sidebar
@@ -248,6 +251,15 @@ export default function ExerciseList({
       exerciseComponent = isSpanishTrack
         ? <TenseExplainerES profile={{ level: userLevel, tracks: userTracks }} onPractise={onPractise} />
         : <TenseExplainer profile={{ level: userLevel, tracks: userTracks }} onPractise={onPractise} />
+    }
+    else if (t === 'Verb Conjugator 🇪🇸') {
+      const onOpenExplainer = () => {
+        const explainerEx = exercises.find(e => e.title === 'Tense Explainer')
+        if (!explainerEx) return
+        recordOpen('Tense Explainer')
+        setActiveExercise(explainerEx)
+      }
+      exerciseComponent = <VerbConjugatorES onOpenExplainer={onOpenExplainer} />
     }
 
     if (exerciseComponent) {
