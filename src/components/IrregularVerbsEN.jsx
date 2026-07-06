@@ -77,7 +77,7 @@ export default function IrregularVerbsEN({ onOpenExplainer }) {
       <div style={{ maxWidth: 600, margin: '0 auto' }}>
 
         <div style={{ marginBottom: '1rem' }}>
-          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: C.ink }}>⏳ Irregular Verbs Past</div>
+          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: C.ink }}>⏳ Irregular Verbs: Past Forms</div>
           <div style={{ color: C.muted, fontSize: '0.85rem', marginTop: 2 }}>The {VERB_COUNT} essential irregular verbs, grouped by pattern — and what each of the three forms is for.</div>
         </div>
 

@@ -43,7 +43,7 @@ const ACTIVE_EXERCISES = new Set([
   'Travel 🧳', 'Sport ⚽️', 'Wordle', 'Connections', 'Spelling Bee', 'Wordsearch', 'Crossword',
   'Tense Tagger', 'Tense Explainer', 'Modal Explainer',
   'Verb Conjugator 🇪🇸',
-  'Irregular Verbs Past ⏳',
+  'Irregular Verbs: Past Forms ⏳',
 ])
 
 const EXERCISE_ICONS = {
@@ -85,7 +85,7 @@ const EXERCISE_ICONS = {
   'Tense Tagger':              '🏷️',
   'Tense Explainer':           '📖',
   'Verb Conjugator 🇪🇸':       '🔤',
-  'Irregular Verbs Past ⏳':    '⏳',
+  'Irregular Verbs: Past Forms ⏳':    '⏳',
 }
 
 // Play removed from tabs — students use bottom nav, teachers use sidebar
@@ -264,7 +264,7 @@ export default function ExerciseList({
       }
       exerciseComponent = <VerbConjugatorES onOpenExplainer={onOpenExplainer} />
     }
-    else if (t === 'Irregular Verbs Past ⏳') {
+    else if (t === 'Irregular Verbs: Past Forms ⏳') {
       const onOpenExplainer = () => {
         const explainerEx = exercises.find(e => e.title === 'Tense Explainer')
         if (!explainerEx) return
