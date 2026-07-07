@@ -1,6 +1,6 @@
 // api/mark-free.js
-// Consolidated: sentence (WOTD/Wordle) | word_order | correction
-// Pass { type: 'sentence' | 'word_order' | 'correction', ...fields } in body
+// Consolidated: sentence (WOTD/Wordle) | word_order | correction | tense | conditional
+// Pass { type: 'sentence' | 'word_order' | 'correction' | 'tense' | 'conditional', ...fields } in body
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -8,6 +8,7 @@ export default async function handler(req, res) {
   if (type === 'word_order') return handleWordOrder(req, res);
   if (type === 'correction') return handleCorrection(req, res);
   if (type === 'tense') return handleTense(req, res);
+  if (type === 'conditional') return handleConditional(req, res);
   return handleSentence(req, res);
 }
 
@@ -505,6 +506,65 @@ or
 {"valid": false, "feedback": "kind, specific reason and a small nudge"}`;
 
   return callAI(prompt, 200, res, 'mark-free.tense');
+}
+
+// ── CONDITIONAL (Conditionals Chooser produce loop) ─────────────────────────
+async function handleConditional(req, res) {
+  const { sentence, conditionalName, structure, level = 'B1', language = 'en' } = req.body;
+  if (!sentence || !conditionalName) return res.status(400).json({ error: 'Missing required fields' });
+
+  // Spanish track: native-English learners of Spanish. Feedback in English;
+  // -ra/-se equal; hubiera accepted in the tipo-3 result half; si + condicional
+  // and si + futuro always fail; tildes and other cosmetics never fail.
+  if (language === 'es') {
+    const promptEs = `You are marking a "Conditionals Chooser" production task. The learner is a native English speaker learning SPANISH (level ${level}). They have just answered a question on the ${conditionalName} and must now WRITE their own SPANISH sentence using that structure.
+
+Student's sentence: "${sentence}"
+Target structure: ${conditionalName}${structure ? ` — ${structure}` : ''}
+
+ASSESSMENT RULES — apply in order:
+1. STRUCTURE: the sentence must contain both a condition and a result, with the verb forms matching the target. Clause order is free. Negatives in either half are fully valid uses.
+   - The -ra and -se imperfecto de subjuntivo forms are EQUAL: tuviera = tuviese, hubiera = hubiese.
+   - In a tipo 3 result half, "hubiera + participio" is accepted alongside "habría + participio" — both are correct Spanish.
+   - "si + condicional" (si tendría) and "si + futuro" (si lloverá) are ALWAYS wrong → valid=false, with a gentle note that si takes the present indicative or a past subjunctive, never the conditional or the future.
+   - For "A menos que & friends": a menos que / a no ser que / siempre que / con tal de que (+ subjuntivo), or por si (+ indicativo), may replace si — that is the point of the card.
+   - For "De + infinitivo": the sentence should use de + infinitivo (or "yo que tú") rather than a plain si-clause; a plain si-sentence is not a pass here — note kindly that the card is about dropping "si".
+   - A correct conditional of the WRONG type → valid=false, and say which type they actually wrote.
+2. Is it natural, grammatical Spanish? Right structure but broken or unnatural → valid=false with a gentle fix.
+3. Cosmetic only — a missing or wrong accent/tilde, capitalisation, punctuation, an opening ¿ or ¡ — is NEVER grounds for rejection → valid=true; you may note it in one short clause.
+
+Give the feedback in ENGLISH (the learner's first language). Be warm and encouraging; 1–2 short sentences.
+
+Reply ONLY with JSON:
+{"valid": true, "feedback": "warm brief praise in English, optionally a tiny note"}
+or
+{"valid": false, "feedback": "kind, specific reason in English and a small nudge"}`;
+    return callAI(promptEs, 200, res, 'mark-free.conditional.es');
+  }
+
+  const prompt = `You are marking a "Conditionals Chooser" production task for an adult English learner at level ${level}. They have just answered a question on the ${conditionalName} and must now WRITE their own sentence using that structure.
+
+Student's sentence: "${sentence}"
+Target structure: ${conditionalName}${structure ? ` — ${structure}` : ''}
+
+ASSESSMENT RULES — apply in order:
+1. EXPAND CONTRACTIONS FIRST: "'ll"=will, "won't"=will not, "wouldn't"=would not, "hadn't"=had not, "would've"=would have, "'d"=would OR had — decide from what follows ('d + past participle = had; 'd + infinitive = would). A contraction conceals the auxiliary verb, it does not remove it.
+2. STRUCTURE: the sentence must contain BOTH halves — a condition and a result — and the verb forms must match the ${conditionalName}. Clause order is free ("I would travel more if I had time" is as good as "If I had time…"). Negatives in either half are fully valid uses.
+   - For "Unless, as long as & in case": unless / as long as / provided that / in case may replace if — that is the point of the card.
+   - For "Formal inversion": the sentence must actually invert (Had I…, Should you…, Were I to…) — a plain if-sentence is not a pass here; note kindly that the card is about dropping "if".
+   - For "Mixed conditionals": the two halves must genuinely sit in different times.
+   - A correct conditional of the WRONG type → valid=false, and name the type they actually wrote.
+3. NATURALNESS: right shape but unnatural English — a wrong collocation, broken phrasing — is NOT a pass → valid=false with a gentle fix.
+4. Cosmetic only — punctuation, capitalisation, a missing comma after the if-clause, a typo on a non-target word — is NEVER grounds for rejection → valid=true; you may note it in one short clause.
+
+Be warm and encouraging — this is practice, not an exam. Keep feedback to 1–2 short sentences, with no grammar-jargon codes.
+
+Reply ONLY with JSON:
+{"valid": true, "feedback": "warm brief praise, optionally a tiny note"}
+or
+{"valid": false, "feedback": "kind, specific reason and a small nudge"}`;
+
+  return callAI(prompt, 200, res, 'mark-free.conditional');
 }
 
 // ── SHARED AI CALLER ─────────────────────────────────────────────────────────

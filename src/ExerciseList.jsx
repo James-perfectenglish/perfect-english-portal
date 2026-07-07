@@ -23,6 +23,9 @@ import ModalExplainer from './components/ModalExplainer'
 import TenseExplainerES from './components/TenseExplainerES'
 import VerbConjugatorES from './components/VerbConjugatorES'
 import IrregularVerbsEN from './components/IrregularVerbsEN'
+import ConditionalExplainer from './components/ConditionalExplainer'
+import ConditionalExplainerES from './components/ConditionalExplainerES'
+import ConditionalChooser from './ConditionalChooser'
 import { BORRAS_CARDS } from './data/BorrasCards'
 import { HOTEL_CARDS } from './data/HotelCards'
 import { VERB_CARDS } from './data/VerbCards'
@@ -44,6 +47,7 @@ const ACTIVE_EXERCISES = new Set([
   'Tense Tagger', 'Tense Explainer', 'Modal Explainer',
   'Verb Conjugator 🇪🇸',
   'Irregular Verbs: Past Forms ⏳',
+  'Conditionals Explainer', 'Conditionals Chooser',
 ])
 
 const EXERCISE_ICONS = {
@@ -86,6 +90,8 @@ const EXERCISE_ICONS = {
   'Tense Explainer':           '📖',
   'Verb Conjugator 🇪🇸':       '🔤',
   'Irregular Verbs: Past Forms ⏳':    '⏳',
+  'Conditionals Explainer':    '📘',
+  'Conditionals Chooser':      '🎯',
 }
 
 // Play removed from tabs — students use bottom nav, teachers use sidebar
@@ -273,6 +279,18 @@ export default function ExerciseList({
       }
       exerciseComponent = <IrregularVerbsEN onOpenExplainer={onOpenExplainer} />
     }
+    else if (t === 'Conditionals Explainer') {
+      const onPractise = () => {
+        const chooserEx = exercises.find(e => e.title === 'Conditionals Chooser')
+        if (!chooserEx) return
+        recordOpen('Conditionals Chooser')
+        setActiveExercise(chooserEx)
+      }
+      exerciseComponent = isSpanishTrack
+        ? <ConditionalExplainerES profile={{ level: userLevel, tracks: userTracks }} onPractise={onPractise} />
+        : <ConditionalExplainer profile={{ level: userLevel, tracks: userTracks }} onPractise={onPractise} />
+    }
+    else if (t === 'Conditionals Chooser') exerciseComponent = <ConditionalChooser language={isSpanishTrack ? 'es' : 'en'} onComplete={back} onBack={back} />
 
     if (exerciseComponent) {
       return (
