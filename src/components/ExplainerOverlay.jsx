@@ -36,6 +36,7 @@ export default function ExplainerOverlay({ open, onClose, children }) {
             width: 32, height: 32, borderRadius: '50%', border: 'none',
             background: 'rgba(255,255,255,0.25)', color: 'white',
             fontSize: '1.05rem', fontWeight: 700, cursor: 'pointer', lineHeight: 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
           }}
         >
           ✕

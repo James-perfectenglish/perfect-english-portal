@@ -16,13 +16,14 @@ export default async function handler(req, res) {
 async function handleSentence(req, res) {
   const { word, partOfSpeech, definition, studentSentence, sentence, language, context,
           grammarPoint, structure, example, usage,
-          phrasalVerb, meaning, separable } = req.body
+          phrasalVerb, meaning, separable, targetFunction } = req.body
 
   // Challenge mode: called with { word, sentence, context: 'challenge', language }
   // Wordle mode:    called with { word, sentence, language } — no definition, no context
   // WOTD mode:      called with { word, sentence | studentSentence, partOfSpeech, definition, language, context?: 'wotd' }
   // GOTD mode:      called with { word: grammarPoint, sentence, grammarPoint, structure, example, usage, context: 'gotd', language }
   const isChallenge = context === 'challenge'
+  const isModal     = context === 'modal'
   const isGotd      = context === 'gotd'
   const isPvotd     = context === 'pvotd'
   const isWotd      = !isGotd && !isPvotd && (context === 'wotd' || (!!definition && !isChallenge))
@@ -164,6 +165,29 @@ Reply ONLY with JSON:
 or
 {"valid": false, "feedback": "kind correction — what was wrong and how to fix it"}`
     return callAI(prompt, 150, res, 'mark-free.challenge')
+  }
+
+  if (isModal) {
+    prompt = `You are marking the "Your turn" step of the Modal Match exercise. The student has just met the modal "${word}" and must now write their OWN sentence that uses it FOR A SPECIFIC FUNCTION.
+
+Modal to use: "${word}"
+Target function: ${targetFunction || 'use the modal naturally'}
+
+Student's sentence: "${thesentence}"
+
+ASSESSMENT RULES — apply in order:
+1. Is "${word}" actually used, in a grammatical, natural English sentence? If the modal is missing, misused, or the English is broken/unnatural → valid=false with a short, kind fix.
+2. FUNCTION — this is the heart of the task. The sentence must genuinely PERFORM the target function (${targetFunction || 'the one shown'}), not merely use the modal in some other role. A grammatically fine sentence that uses "${word}" for a DIFFERENT function does NOT pass → valid=false; warmly name what they did instead and give a tiny model of the target function.
+   Example: target "to make a wish (If only…)", student writes "You could go to the shop" (a suggestion) → valid=false: "That's a suggestion! For a wish, try 'If only I could…' — e.g. 'If only I could speak French.'"
+3. Cosmetic only — punctuation, a missing capital, a typo on a non-target word — is NEVER grounds for rejection → valid=true; you may note it in one short clause.
+
+Be warm and encouraging — this is practice, not an exam. Keep feedback to 1–2 short sentences, no grammar-jargon codes.
+
+Reply ONLY with JSON:
+{"valid": true, "feedback": "warm brief praise that the function landed, optionally a tiny note"}
+or
+{"valid": false, "feedback": "kind, specific reason — what function they did instead — and a small model of the target"}`
+    return callAI(prompt, 200, res, 'mark-free.modal')
   }
 
   if (isWordle) {

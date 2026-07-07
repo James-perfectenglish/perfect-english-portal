@@ -551,6 +551,8 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
                       word={feedback.answer}
                       language="en"
                       exercise="modal_match"
+                      apiContext="modal"
+                      apiExtraFields={{ targetFunction: functionPhrase((q.tags && q.tags[0]) || '') }}
                       headerLabel="✏️ YOUR TURN — NOW PRODUCE IT"
                       promptText={<strong style={{ color: '#2d3748' }}>Now use this modal <span style={{ background: '#EDE9FE', color: '#553C9A', padding: '1px 6px', borderRadius: '4px' }}>{functionPhrase((q.tags && q.tags[0]) || '')}</span>:</strong>}
                       onMarkResult={harvestModalSentence}

@@ -225,6 +225,8 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const [bestScore, setBestScore] = useState(null);
   const [averageScore, setAverageScore] = useState(null);
   const allScoresRef = useRef([]);
+  const clearedForGoodRef = useRef(new Set());
+  const [clearedForGood, setClearedForGood] = useState(0);
   const [oooSelected, setOooSelected] = useState(null);
   const [ecSelectedWordIndex, setEcSelectedWordIndex] = useState(null);
   const [ecCorrection, setEcCorrection] = useState('');
@@ -284,6 +286,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     const scores = allScoresRef.current;
     setBestScore(Math.max(...scores));
     setAverageScore(Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10);
+    setClearedForGood(clearedForGoodRef.current.size);
     setStage('finished');
     saveAttemptToDB(currentScore);
   };
@@ -300,6 +303,12 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   };
 
   const saveAnswer = async (question, studentAnswer, isCorrect) => {
+    // Fix It: a correct answer on a question already fixed once (fixes_so_far ≥ 1)
+    // clears it from the box for good — tally those to celebrate at the finish.
+    if (isCorrect && fixups && fixups.length > 0 && question?.question_number != null) {
+      const meta = fixups.find(f => Number(f.question_number) === Number(question.question_number));
+      if (meta && (meta.fixes_so_far || 0) >= 1) clearedForGoodRef.current.add(question.question_number);
+    }
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -420,6 +429,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
 
   const startExercise = async () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
+    clearedForGoodRef.current = new Set();
     setLoading(true);
     try {
       // ── Fix it! mode: serve the student's own past mistakes, in queue order ──
@@ -1368,6 +1378,48 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         {stage === 'finished' && (
           <div style={{ width: '100%', maxWidth: '600px', margin: '2rem auto 0' }}>
             <div style={{ backgroundColor: 'white', padding: 'clamp(2rem, 6vw, 3rem)', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+              {isFixupMode ? (
+              <>
+                <div style={{ fontSize: '2.75rem', marginBottom: '0.5rem' }}>🔧✨</div>
+                <h1 style={{ fontSize: 'clamp(1.8rem, 6vw, 2.2rem)', color: '#2C3E50', marginBottom: '0.5rem', fontWeight: '700' }}>
+                  {isSpanish ? '¡Reparaciones hechas!' : 'Repairs done!'}
+                </h1>
+                <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', marginBottom: '1.5rem', color: '#666' }}>
+                  {score === questions.length
+                    ? (isSpanish ? '¡Arreglaste todas hoy!' : 'You fixed every one today!')
+                    : (isSpanish ? '¡Buen trabajo de reparación!' : 'Nice repair work!')}
+                </div>
+                <div style={{ background: displayGradient, borderRadius: '16px', padding: '1.5rem 1rem', color: 'white', marginBottom: '1rem' }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: '600', opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.4rem' }}>
+                    {isSpanish ? 'Arregladas hoy' : 'Fixed today'}
+                  </div>
+                  <div style={{ fontSize: 'clamp(2rem, 8vw, 2.8rem)', fontWeight: '700', lineHeight: 1.1 }}>{score} / {questions.length}</div>
+                </div>
+                {clearedForGood > 0 && (
+                  <div style={{ background: '#f0fff4', border: '2px solid #48bb78', borderRadius: '12px', padding: '0.9rem 1rem', marginBottom: '1rem', color: '#276749', fontWeight: '600', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: 1.5 }}>
+                    🎉 {clearedForGood === 1
+                      ? (isSpanish ? '¡1 sale de tu caja para siempre!' : '1 cleared out of your box for good!')
+                      : (isSpanish ? `¡${clearedForGood} salen de tu caja para siempre!` : `${clearedForGood} cleared out of your box for good!`)}
+                  </div>
+                )}
+                <div style={{ fontSize: 'clamp(0.85rem, 2.8vw, 0.95rem)', color: '#718096', marginBottom: '2rem', lineHeight: 1.5 }}>
+                  {isSpanish
+                    ? 'Acierta cada una otra vez, en otro día, y quedará arreglada para siempre.'
+                    : 'Get each one right again — on another day — and it’s fixed for good.'}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {onBack && (
+                    <button onClick={onBack} style={{ padding: '1.2rem', fontSize: 'clamp(1.1rem, 4vw, 1.25rem)', background: displayGradient, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '600' }}>
+                      {isSpanish ? 'Hecho' : 'Done'}
+                    </button>
+                  )}
+                  <button onClick={retry} style={{ padding: '1rem', fontSize: 'clamp(1rem, 3.5vw, 1.1rem)', backgroundColor: 'transparent', color: '#666', border: '1px solid #ddd', borderRadius: '10px', cursor: 'pointer', fontWeight: '500' }}>
+                    {isSpanish ? 'Repasar otra vez' : 'Try these again'}
+                  </button>
+                </div>
+              </>
+              ) : (
+              <>
               <h1 style={{ fontSize: 'clamp(1.8rem, 6vw, 2.2rem)', color: '#2C3E50', marginBottom: '0.5rem', fontWeight: '700' }}>
                 {isSpanish ? '¡Práctica completada!' : 'Practice Complete!'}
               </h1>
@@ -1409,6 +1461,8 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   </button>
                 )}
               </div>
+              </>
+              )}
             </div>
           </div>
         )}
