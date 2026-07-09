@@ -155,7 +155,7 @@ function tenseBand({ aspect, voice }) {
 }
 
 /* ---------- component ---------- */
-export default function TenseTagger({ profile, initialTense = null }) {
+export default function TenseTagger({ profile, initialTense = null, classMode = false }) {
   const [lockedTense, setLockedTense] = useState(() => initialTense || null);
   const [level, setLevel] = useState(() => initialTense ? tenseBand(initialTense) : startLevel(profile));
   const [item, setItem] = useState(() => initialTense
@@ -257,6 +257,7 @@ export default function TenseTagger({ profile, initialTense = null }) {
   const recognitionCorrect = graded && liveAxes.every(ax => picks[ax] === item.answer[ax]);
 
   async function logAttempt(functionAnswer, functionPicked) {
+    if (classMode) return; // Class Play: teacher preview writes nothing
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -273,6 +274,7 @@ export default function TenseTagger({ profile, initialTense = null }) {
   }
 
   async function awardStar(sentence, aiFeedback, inputMethod = 'text') {
+    if (classMode) return; // Class Play: teacher preview writes nothing
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -288,6 +290,7 @@ export default function TenseTagger({ profile, initialTense = null }) {
   // tagging classifier sees Tense Tagger like every other "record" surface.
   // target = the tense name; is_correct = the final verdict; ai_feedback when the AI ran.
   async function harvestSentence(sentence, isCorrect, aiFeedback, inputMethod = 'text') {
+    if (classMode) return; // Class Play: teacher preview writes nothing
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;

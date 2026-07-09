@@ -46,6 +46,8 @@ const TYPE = {
   matching:          { backgroundColor: '#D1FAE5', color: '#065F46', border: '1px solid #6EE7B7',  label: '🔗 Matching' },
   dictation:         { backgroundColor: '#EDE9FE', color: '#553C9A', border: '1px solid #C4B5FD',  label: '⌨️ Dictation' },
   sentence_building: { backgroundColor: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A',  label: '🔨 Sentence Building' },
+  modal_chooser:      { backgroundColor: '#EDE9FE', color: '#553C9A', border: '1px solid #C4B5FD',  label: '🎛️ Modal Match' },
+  conditional_chooser:{ backgroundColor: '#E6FFFA', color: '#2C7A7B', border: '1px solid #4FD1C5',  label: '🔀 Conditionals' },
 };
 
 // sentence_building renders no badge (it shows the UI inline instead)

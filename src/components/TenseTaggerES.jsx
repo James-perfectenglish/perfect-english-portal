@@ -79,7 +79,7 @@ function StatusPill({ tone, children }) {
 }
 
 /* ---------- component ---------- */
-export default function TenseTaggerES({ profile, initialTense = null }) {
+export default function TenseTaggerES({ profile, initialTense = null, classMode = false }) {
   const lockedInit = initialTense?.tiempo || null;
   const [lockedTiempo, setLockedTiempo] = useState(() => lockedInit);
   const [level, setLevel] = useState(() => startLevel(profile));
@@ -162,6 +162,7 @@ export default function TenseTaggerES({ profile, initialTense = null }) {
   }
 
   async function logAttempt() {
+    if (classMode) return; // Class Play: teacher preview writes nothing
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -177,6 +178,7 @@ export default function TenseTaggerES({ profile, initialTense = null }) {
   }
 
   async function awardStar(sentence, aiFeedback, inputMethod = 'text') {
+    if (classMode) return; // Class Play: teacher preview writes nothing
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -190,6 +192,7 @@ export default function TenseTaggerES({ profile, initialTense = null }) {
 
   // Harvest every production submission (pass AND fail), like every other record surface.
   async function harvestSentence(sentence, isCorrect, aiFeedback, inputMethod = 'text') {
+    if (classMode) return; // Class Play: teacher preview writes nothing
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;

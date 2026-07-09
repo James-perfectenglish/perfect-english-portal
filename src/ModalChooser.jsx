@@ -194,7 +194,7 @@ function Tile({ label, active, disabled, ghost, title, onClick }) {
   );
 }
 
-export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
+export default function ModalChooser({ onBack, onComplete, userTracks = [], classMode = false }) {
   const [stage, setStage] = useState('loading');
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [questionCounts, setQuestionCounts] = useState({});
@@ -318,6 +318,25 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
     try { return JSON.parse(q.acceptable_alternatives || '[]'); } catch { return []; }
   };
 
+  // Record the choose-step attempt so Modal Match counts on the Teacher Dashboard.
+  // Mirrors RandomPracticeExercise's student_answers shape; question_bank rows carry
+  // a question_number, so this flows into student_activity as normal exercise activity.
+  // Fire-and-forget — never blocks the UI, never throws into checkAnswer.
+  const recordChooserAnswer = async (question, studentAnswer, isCorrect) => {
+    if (classMode) return; // Class Play: teacher preview writes nothing
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from('student_answers').insert({
+        student_id: user.id,
+        question_id: question.question_number,
+        student_answer: studentAnswer,
+        correct_answer: question.correct_answer || '',
+        is_correct: isCorrect,
+      });
+    } catch (e) { console.warn('ModalMatch: student_answers insert failed', e); }
+  };
+
   const checkAnswer = () => {
     if (feedback || !assembled) return;
     const q = questions[currentQ];
@@ -327,23 +346,26 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
     // Every accepted form minus whatever the student built — all are equals.
     const equally = (picked) =>
       [q.correct_answer, ...alts.map(a => a.answer)].filter(a => norm(apos(a)) !== picked);
+    const altMatch = alts.find(a => norm(apos(a.answer)) === ua);
+    const isCorrect = ua === primary || !!altMatch;
+    recordChooserAnswer(q, assembled, isCorrect);
     if (ua === primary) {
       setScore(s => s + 1);
       setFeedback({ result: 'correct', note: '', answer: q.correct_answer, explanation: q.explanation || '', equally: equally(ua) });
       return;
     }
-    const match = alts.find(a => norm(apos(a.answer)) === ua);
-    if (match) {
+    if (altMatch) {
       // Alternatives are fully correct — same green, same point. The note is a
       // register nuance, never a demotion.
       setScore(s => s + 1);
-      setFeedback({ result: 'correct', note: match.feedback || '', answer: match.answer, explanation: q.explanation || '', equally: equally(ua) });
+      setFeedback({ result: 'correct', note: altMatch.feedback || '', answer: altMatch.answer, explanation: q.explanation || '', equally: equally(ua) });
       return;
     }
     setFeedback({ result: 'wrong', note: '', answer: q.correct_answer, explanation: q.explanation || '', equally: alts.map(a => a.answer) });
   };
 
   const harvestModalSentence = async ({ sentence, inputMethod, result }) => {
+    if (classMode) return; // Class Play: teacher preview writes nothing
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -551,6 +573,7 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [] }) {
                       word={feedback.answer}
                       language="en"
                       exercise="modal_match"
+                      noStars={classMode}
                       apiContext="modal"
                       apiExtraFields={{ targetFunction: functionPhrase((q.tags && q.tags[0]) || '') }}
                       headerLabel="✏️ YOUR TURN — NOW PRODUCE IT"

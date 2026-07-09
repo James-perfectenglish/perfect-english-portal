@@ -9,6 +9,15 @@ import WordleGame from './WordleGame';
 import ConnectionsGame from './ConnectionsGame';
 import GrammarOfTheDay from './GrammarOfTheDay';
 import PhrasalVerbOfTheDay from './PhrasalVerbOfTheDay';
+import ModalChooser from './ModalChooser';
+import ConditionalChooser from './ConditionalChooser';
+import TenseTagger from './components/TenseTagger';
+import TenseTaggerES from './components/TenseTaggerES';
+import TenseExplainer from './components/TenseExplainer';
+import TenseExplainerES from './components/TenseExplainerES';
+import ModalExplainer from './components/ModalExplainer';
+import ConditionalExplainer from './components/ConditionalExplainer';
+import ConditionalExplainerES from './components/ConditionalExplainerES';
 
 const TYPE_INFO = {
   gap_fill:          { emoji: '✏️',  label: 'Gap Fill' },
@@ -18,6 +27,8 @@ const TYPE_INFO = {
   error_correction:  { emoji: '🔴',  label: 'Error Correction' },
   matching:          { emoji: '🔗',  label: 'Matching' },
   sentence_auction:  { emoji: '🔨',  label: 'Sentence Auction' },
+  modal_chooser:     { emoji: '🎛️',  label: 'Modal Match' },
+  conditional_chooser:{ emoji: '🔀',  label: 'Conditionals' },
 };
 
 const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
@@ -570,6 +581,65 @@ function InteractiveQuestion({ item: q }) {
           </div>
         )}
 
+        {(q.type === 'modal_chooser' || q.type === 'conditional_chooser') && (() => {
+          // Modal Match / Conditionals Chooser preview. conditional_chooser rows
+          // carry four tiles in options → interactive pick. modal_chooser rows have
+          // no options (the live app uses a fixed modal palette) → reveal the answer.
+          const tiles = Array.isArray(q.options) ? q.options : [];
+          const norm = (s) => (s || '').toLowerCase().replace(/[.,!?;:]/g, '').replace(/\s+/g, ' ').trim();
+          let alts = [];
+          try { alts = Array.isArray(q.acceptable_alternatives) ? q.acceptable_alternatives : JSON.parse(q.acceptable_alternatives || '[]'); } catch { alts = []; }
+          const correctSet = new Set([q.correct_answer, ...alts.map(a => a && a.answer)].filter(Boolean).map(norm));
+          const choose = (choice) => { if (feedback) return; setFeedback({ type: 'chooser', isCorrect: correctSet.has(norm(choice)), studentAnswer: choice }); };
+          return (
+            <div>
+              {tiles.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '1rem' }}>
+                  {tiles.map((opt, i) => {
+                    const chosen = feedback && feedback.studentAnswer === opt;
+                    const isRight = feedback && correctSet.has(norm(opt));
+                    let bg = 'white', border = '#e2e8f0', color = '#2d3748';
+                    if (feedback) {
+                      if (isRight)      { bg = '#f0fff4'; border = '#48bb78'; color = '#276749'; }
+                      else if (chosen)  { bg = '#fff5f5'; border = '#f56565'; color = '#c53030'; }
+                      else              { color = '#a0aec0'; }
+                    }
+                    return (
+                      <button key={i} onClick={() => choose(opt)} disabled={!!feedback}
+                        style={{ padding: '10px 18px', borderRadius: '10px', fontSize: '1rem', fontWeight: 600, cursor: feedback ? 'default' : 'pointer', background: bg, border: `2px solid ${border}`, color }}>
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (!feedback && (
+                <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                  <button onClick={() => setFeedback({ type: 'chooser', isCorrect: true, studentAnswer: null })}
+                    style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>
+                    Show answer
+                  </button>
+                </div>
+              ))}
+              {feedback && (
+                <div style={{ borderRadius: '10px', border: `2px solid ${feedback.isCorrect ? '#48bb78' : '#f56565'}`, background: feedback.isCorrect ? '#f0fff4' : '#fff5f5', padding: '1rem' }}>
+                  <div style={{ fontWeight: 700, color: feedback.isCorrect ? '#276749' : '#c53030', marginBottom: '6px' }}>
+                    {feedback.studentAnswer === null ? 'Answer' : feedback.isCorrect ? '✅ Correct!' : '❌ Not quite'}
+                  </div>
+                  <div style={{ color: '#2d3748', marginBottom: (alts.length || q.explanation) ? '6px' : 0 }}>
+                    Answer: <strong>{q.correct_answer}</strong>
+                  </div>
+                  {alts.length > 0 && (
+                    <div style={{ color: '#4a5568', fontSize: '0.9rem', marginBottom: q.explanation ? '6px' : 0 }}>
+                      Also accepted: {alts.map(a => a.answer).filter(Boolean).join(' · ')}
+                    </div>
+                  )}
+                  {q.explanation && <div style={{ color: '#4a5568', lineHeight: 1.5, fontSize: '0.92rem' }}>{q.explanation}</div>}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {q.type === 'sentence_building' && (
           <SentenceBuildingInput key={q.id} {..._getSbProps(q)} disabled={!!feedback} onResult={handleSentenceBuildingResult} feedback={sbFeedback} showCheckButton={true} onAnswerReady={() => {}} />
         )}
@@ -730,7 +800,7 @@ function InteractiveQuestion({ item: q }) {
           </div>
         )}
 
-        {feedback && !['error_correction', 'sentence_building', 'gap_fill', 'multiple_choice', 'dictation', 'sentence_auction'].includes(q.type) && (
+        {feedback && !['error_correction', 'sentence_building', 'gap_fill', 'multiple_choice', 'dictation', 'sentence_auction', 'modal_chooser', 'conditional_chooser'].includes(q.type) && (
           <div style={{ backgroundColor: feedback.isCorrect ? '#d4edda' : '#f8d7da', color: feedback.isCorrect ? '#155724' : '#721c24', padding: '1.2rem', borderRadius: '10px', marginTop: '1rem', fontSize: 'clamp(1rem, 3vw, 1.1rem)', lineHeight: '1.6', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
             {feedback.message}
           </div>
@@ -738,7 +808,7 @@ function InteractiveQuestion({ item: q }) {
       </div>
 
       <div style={{ marginTop: '1.5rem' }}>
-        {!feedback && !['sentence_building', 'odd_one_out', 'error_correction', 'matching', 'sentence_auction'].includes(q.type) && (
+        {!feedback && !['sentence_building', 'odd_one_out', 'error_correction', 'matching', 'sentence_auction', 'modal_chooser', 'conditional_chooser'].includes(q.type) && (
           <button
             onClick={q.type === 'dictation' ? checkDictationAnswer : checkAnswer}
             disabled={isChecking || (!userAnswer.trim() && q.type !== 'multiple_choice') || (q.type === 'multiple_choice' && !selectedOption)}
@@ -791,7 +861,7 @@ function FocusMode({ items, index, onChangeIndex, previewMode, setPreviewMode, o
 }
 
 // ─── Main TeacherBrowse Component ─────────────────────────────────────────────
-const CONTENT_SOURCES = ['wordle', 'connections', 'crossword', 'wordsearch', 'wotd', 'gotd', 'pvotd'];
+const CONTENT_SOURCES = ['wordle', 'connections', 'crossword', 'wordsearch', 'wotd', 'gotd', 'pvotd', 'grammar'];
 const EXERCISE_SOURCES = ['all', 'question_bank', 'listening', 'dictation'];
 
 export default function TeacherBrowse({ user, globalLang = 'en' }) {
@@ -827,6 +897,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
   const [wordsearchFocus,    setWordsearchFocus]    = useState(null); // full wordsearch_puzzles row → Class Play
   const [gotdFocus,          setGotdFocus]          = useState(null); // full grammar_of_the_day row → Class Play
   const [pvotdFocus,         setPvotdFocus]         = useState(null); // full phrasal_verb_of_the_day row → Class Play
+  const [grammarFocus,       setGrammarFocus]       = useState(null); // { tool } → grammar-tool Class Play overlay
   const [wotdExpanded,       setWotdExpanded]       = useState(new Set());
 
   const isContentSource = CONTENT_SOURCES.includes(filters.source);
@@ -981,6 +1052,29 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       setResults(items); setLoading(false); return;
     }
 
+    // ── Grammar tools ───────────────────────────────────────────
+    // Static launcher list (no DB) — opens the real Learn/practice component in a
+    // no-write Class Play overlay. Respects the Language filter (en / es / both).
+    if (f.source === 'grammar') {
+      const en = [
+        { tool: 'tense_tagger',           title: 'Tense Tagger',          kind: 'Practice',  desc: 'Recognise then produce every tense' },
+        { tool: 'modal_match',            title: 'Modal Match',           kind: 'Practice',  desc: 'Pick the right modal for each function' },
+        { tool: 'conditionals_chooser',   title: 'Conditionals Chooser',  kind: 'Practice',  desc: 'Choose the form that completes each conditional' },
+        { tool: 'tense_explainer',        title: 'Tense Explainer',       kind: 'Reference', desc: 'Every tense: formula, uses, watch-outs' },
+        { tool: 'modal_explainer',        title: 'Modal Explainer',       kind: 'Reference', desc: 'Modal cards, grouped by function' },
+        { tool: 'conditionals_explainer', title: 'Conditionals Explainer',kind: 'Reference', desc: 'Conditional cards: formula + examples' },
+      ];
+      const es = [
+        { tool: 'tense_tagger_es',           title: 'Tense Tagger 🇪🇸',          kind: 'Practice',  desc: 'Reconocer y producir los tiempos' },
+        { tool: 'conditionals_chooser_es',   title: 'Conditionals Chooser 🇪🇸',  kind: 'Practice',  desc: 'Elegir la forma del condicional' },
+        { tool: 'tense_explainer_es',        title: 'Tense Explainer 🇪🇸',       kind: 'Reference', desc: 'Los tiempos: fórmula y usos' },
+        { tool: 'conditionals_explainer_es', title: 'Conditionals Explainer 🇪🇸',kind: 'Reference', desc: 'Fichas de condicionales' },
+      ];
+      const pool = f.lang === 'es' ? es : f.lang === 'both' ? [...en, ...es] : en;
+      setResults(pool.map(t => ({ ...t, _source: 'grammar', _rowKey: `gt_${t.tool}` })));
+      setLoading(false); return;
+    }
+
     // ── Exercises (existing logic) ────────────────────────────────────────────
     const newThreshold = maxQNumber != null ? maxQNumber - NEW_COUNT + 1 : null;
     const all = [];
@@ -1058,6 +1152,8 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       setGotdFocus(item);
     } else if (item._source === 'pvotd') {
       setPvotdFocus(item);
+    } else if (item._source === 'grammar') {
+      setGrammarFocus(item);
     } else if (item._source === 'wotd') {
       setWotdExpanded(prev => {
         const next = new Set(prev);
@@ -1124,7 +1220,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
 
       {/* Content group */}
       <div style={{ fontSize: 9, fontWeight: 700, color: '#a0aec0', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>Content</div>
-      {[['wordle', '🟩 Wordle'], ['connections', '🟨 Connections'], ['crossword', '✜ Crossword'], ['wordsearch', '🔎 Wordsearch'], ['wotd', '📖 Word of the Day'], ['gotd', '📝 Grammar of the Day'], ['pvotd', '📚 Phrasal Verb of the Day']].map(([val, lbl]) => (
+      {[['wordle', '🟩 Wordle'], ['connections', '🟨 Connections'], ['crossword', '✜ Crossword'], ['wordsearch', '🔎 Wordsearch'], ['wotd', '📖 Word of the Day'], ['gotd', '📝 Grammar of the Day'], ['pvotd', '📚 Phrasal Verb of the Day'], ['grammar', '🧠 Grammar tools']].map(([val, lbl]) => (
         <button key={val} onClick={() => setFilter('source', val)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '5px 8px', borderRadius: 6, border: 'none', background: filters.source === val ? '#667eea' : 'transparent', color: filters.source === val ? 'white' : '#4a5568', cursor: 'pointer', marginBottom: 1, fontSize: 13 }}>{lbl}</button>
       ))}
 
@@ -1140,7 +1236,7 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
       </FilterSection>
 
       {/* Content sources: date range */}
-      {isContentSource && (
+      {isContentSource && filters.source !== 'grammar' && (
         <FilterSection label="Date range">
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
             {[['This month', 0], ['Next month', 1], ['Last month', -1]].map(([lbl, offset]) => (
@@ -1494,6 +1590,22 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
           );
         }
 
+        // ── Grammar tool item ─────────────────────────────────────
+        if (item._source === 'grammar') {
+          return (
+            <div
+              key={item._rowKey}
+              onClick={() => handleItemClick(item, -1)}
+              style={{ padding: '10px 14px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, marginBottom: 5, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}
+            >
+              <span style={{ background: item.kind === 'Reference' ? '#E6FFFA' : '#EDE9FE', color: item.kind === 'Reference' ? '#2C7A7B' : '#553C9A', borderRadius: 5, padding: '2px 7px', fontSize: 12, fontWeight: 700 }}>🧠 {item.kind}</span>
+              <span style={{ fontSize: 14, color: '#2d3748', fontWeight: 700 }}>{item.title}</span>
+              <span style={{ fontSize: 13, color: '#718096' }}>{item.desc}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 13, color: '#667eea', fontWeight: 700 }}>▶ Open</span>
+            </div>
+          );
+        }
+
         // ── Exercise item (existing) ─────────────────────────────────────────
         exerciseIdx++;
         const thisExerciseIdx = exerciseIdx;
@@ -1601,6 +1713,28 @@ export default function TeacherBrowse({ user, globalLang = 'en' }) {
           <div style={{ maxWidth: 560, margin: '0 auto', padding: '3.5rem 1rem 2rem' }}>
             <PhrasalVerbOfTheDay classItem={pvotdFocus} collapsible={false} />
           </div>
+        </div>
+      )}
+      {/* Grammar tools Class Play overlay — the real components in no-write class mode */}
+      {grammarFocus && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#f8f9fa', overflowY: 'auto' }}>
+          <button onClick={() => setGrammarFocus(null)} style={{ position: 'fixed', top: 12, right: 12, zIndex: 3001, padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: 13, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>✕ Close</button>
+          {(() => {
+            const t = grammarFocus.tool;
+            const close = () => setGrammarFocus(null);
+            if (t === 'tense_tagger')            return <TenseTagger profile={null} classMode />;
+            if (t === 'tense_tagger_es')         return <TenseTaggerES profile={null} classMode />;
+            if (t === 'modal_match')             return <ModalChooser classMode onBack={close} />;
+            if (t === 'conditionals_chooser')    return <ConditionalChooser language="en" classMode onBack={close} />;
+            if (t === 'conditionals_chooser_es') return <ConditionalChooser language="es" classMode onBack={close} />;
+            const refWrap = (node) => <div style={{ maxWidth: 720, margin: '0 auto', padding: '3.5rem 1rem 2rem' }}>{node}</div>;
+            if (t === 'tense_explainer')            return refWrap(<TenseExplainer profile={null} onPractise={() => {}} />);
+            if (t === 'tense_explainer_es')         return refWrap(<TenseExplainerES profile={null} onPractise={() => {}} />);
+            if (t === 'modal_explainer')            return refWrap(<ModalExplainer profile={null} onPractise={() => {}} />);
+            if (t === 'conditionals_explainer')     return refWrap(<ConditionalExplainer profile={null} onPractise={() => {}} />);
+            if (t === 'conditionals_explainer_es')  return refWrap(<ConditionalExplainerES profile={null} onPractise={() => {}} />);
+            return null;
+          })()}
         </div>
       )}
       <div style={{ maxWidth: 1300, margin: '0 auto', padding: '12px 1rem 2rem', display: 'flex', gap: 10, alignItems: 'flex-start' }}>

@@ -12,6 +12,8 @@ const TYPE_INFO = {
   matching:        { label: 'Matching',         emoji: '🔗' },
   sentence_auction:{ label: 'Sentence Auction', emoji: '🔨' },
   dictation:       { label: 'Dictation',        emoji: '🎧' },
+  modal_chooser:   { label: 'Modal Match',      emoji: '🎛️' },
+  conditional_chooser:{ label: 'Conditionals',  emoji: '🔀' },
 }
 
 function initials(name) {
