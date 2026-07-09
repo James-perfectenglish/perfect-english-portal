@@ -74,7 +74,7 @@ James strongly prefers:
 - Sentence building tiles: lowercase at insertion time, except "I" and proper nouns. Strip `¿` and `¡` from Spanish `correct_answer` fields (tile assembly never produces those characters).
 - Phrasal verb gap fills: complete verb+particle in the blank — never split around an object.
 - **Always check `SELECT MAX(question_number)` and the target range before insert.** Never assume a range is free.
-- Last used question number: **2048**. Next batch starts from **2049**.
+- Last used question number: **2641**. Next batch starts from **2642**. (2507–2641 = EN Conditionals Chooser + Modal Match freshness top-up.)
 
 ### `stars` (unified)
 - Columns: `id`, `student_id`, `source`, `subtype`, `context` (JSONB), `awarded_at`
