@@ -118,6 +118,21 @@ function isForYouFn(exercise, userTracks) {
   return exTracks.some(t => SPECIFIC_TRACKS.includes(t) && userTracks.includes(t))
 }
 
+// Teacher-only list visibility. The teacher's normal lists stay clear of
+// vocational track content until a track button is switched on:
+//  - no track filter  -> general only (plus Spanish-specific when previewing in ES)
+//  - track filter(s)   -> ONLY the exercises belonging to the active track(s)
+// Students are unaffected (they still use shouldShowExercise / isForYouFn).
+function teacherListVisible(exercise, vocationalFilters, isEs) {
+  const exTracks = exercise.tracks || ['general']
+  if (vocationalFilters.length > 0) {
+    return exTracks.some(t => vocationalFilters.includes(t))
+  }
+  if (exTracks.includes('general')) return true
+  if (isEs && exTracks.includes('spanish')) return true
+  return false
+}
+
 function getSectionLabel(category) {
   if (category === 'speak')     return 'Speak'
   if (category === 'real_talk') return 'Activities'
@@ -144,7 +159,14 @@ export default function ExerciseList({
   const location = useLocation()
   const navigate = useNavigate()
 
-  useEffect(() => { setActiveExercise(null); setTaggerTense(null) }, [location.key])
+  // Reset per-navigation state AND re-sync the tab to the route's defaultTab.
+  // Without the setActiveTab, navigating between /learn, /play and /listen reused
+  // the same component instance and kept the stale tab (Learn/Play "not working").
+  useEffect(() => {
+    setActiveExercise(null)
+    setTaggerTense(null)
+    setActiveTab(defaultTab || 'learn')
+  }, [location.key, defaultTab])
   useEffect(() => { fetchAll() }, [userTracks])
 
   const fetchAll = async () => {
@@ -306,13 +328,26 @@ export default function ExerciseList({
     return <PronunciationExercise profile={{ level: userLevel, tracks: userTracks }} />
   }
 
+  // Teacher preview identity: 'spanish' in userTracks flags the ES view; the rest
+  // are the active vocational track filters (bathroom/hotels/business).
+  const isEs = (userTracks || []).includes('spanish')
+  const vocationalFilters = (userTracks || []).filter(t => t !== 'spanish' && t !== 'general')
+
   const tabExercises = exercises
-    .filter(e => shouldShowExercise(e, userTracks))
+    .filter(e => isTeacher ? teacherListVisible(e, vocationalFilters, isEs) : shouldShowExercise(e, userTracks))
     .filter(e => (e.category || 'practice') === activeTab)
 
-  const forYouList  = tabExercises.filter(e => isForYouFn(e, userTracks))
-  const generalList = tabExercises.filter(e => !isForYouFn(e, userTracks))
+  // Teachers get a single flat list (the For You / All split is a student device).
+  const forYouList  = isTeacher ? [] : tabExercises.filter(e => isForYouFn(e, userTracks))
+  const generalList = isTeacher ? tabExercises : tabExercises.filter(e => !isForYouFn(e, userTracks))
   const hasBoth     = forYouList.length > 0 && generalList.length > 0
+
+  const TRACK_LABELS = { bathroom: 'Bathroom', hotels: 'Hotels', business: 'Business' }
+  const teacherSubtitle = vocationalFilters.length > 0
+    ? `Showing ${vocationalFilters.map(t => TRACK_LABELS[t] || t).join(' + ')} track${vocationalFilters.length > 1 ? 's' : ''} only`
+    : isEs
+      ? 'General Spanish content'
+      : 'General content — track buttons add specialised sets'
 
   const LevelBadge = ({ level }) => {
     const key = level?.[0] || 'B'
@@ -336,7 +371,7 @@ export default function ExerciseList({
   )
 
   const GridCard = ({ exercise }) => {
-    const fy      = isForYouFn(exercise, userTracks)
+    const fy      = !isTeacher && isForYouFn(exercise, userTracks)
     const newFlag = isNew(exercise)
     const active  = ACTIVE_EXERCISES.has(exercise.title)
     const icon    = EXERCISE_ICONS[exercise.title] || '📝'
@@ -382,7 +417,7 @@ export default function ExerciseList({
   }
 
   const ListCard = ({ exercise }) => {
-    const fy      = isForYouFn(exercise, userTracks)
+    const fy      = !isTeacher && isForYouFn(exercise, userTracks)
     const newFlag = isNew(exercise)
     const active  = ACTIVE_EXERCISES.has(exercise.title)
     const icon    = EXERCISE_ICONS[exercise.title] || '📝'
@@ -411,7 +446,7 @@ export default function ExerciseList({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '1rem 1rem 0.5rem' }}>
         <div>
           <div style={{ fontSize: 'clamp(1.1rem, 4vw, 1.4rem)', fontWeight: 700, color: '#2d3748' }}>Exercises</div>
-          <div style={{ fontSize: '0.78rem', color: '#718096', marginTop: '2px' }}>⭐️ For You exercises appear first</div>
+          <div style={{ fontSize: '0.78rem', color: '#718096', marginTop: '2px' }}>{isTeacher ? teacherSubtitle : '⭐️ For You exercises appear first'}</div>
         </div>
         <button onClick={() => setIsListView(v => !v)}
           style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#f0f0f5', borderRadius: '8px', padding: '5px 9px', cursor: 'pointer', border: 'none', fontSize: '0.72rem', fontWeight: 600, color: '#4a5568', whiteSpace: 'nowrap', marginTop: '2px' }}>

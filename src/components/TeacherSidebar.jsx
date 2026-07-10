@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { TRACK_EMOJI, TRACK_LABEL } from './TeacherToolbar'
+import { LEVEL_BUTTONS, VOCATIONAL_TRACKS, bandOf } from './teacherControls'
 
 const NAV_LINKS = [
   { icon: '🏠', label: 'Home',     path: '/'         },
@@ -9,12 +9,13 @@ const NAV_LINKS = [
   { icon: '📊', label: 'Progress', path: '/progress' },
 ]
 
-function SbBtn({ icon, title, onClick, active, style: extraStyle = {} }) {
+function SbBtn({ icon, title, onClick, active, badge, style: extraStyle = {} }) {
   return (
     <button
       onClick={onClick}
       title={title}
       style={{
+        position: 'relative',
         width: '36px',
         height: '36px',
         borderRadius: '8px',
@@ -31,6 +32,20 @@ function SbBtn({ icon, title, onClick, active, style: extraStyle = {} }) {
       }}
     >
       {icon}
+      {badge && (
+        <span style={{
+          position: 'absolute',
+          bottom: '-1px',
+          right: '-2px',
+          fontSize: '0.5rem',
+          fontWeight: 800,
+          lineHeight: 1,
+          padding: '1px 3px',
+          borderRadius: '6px',
+          background: '#667eea',
+          color: 'white',
+        }}>{badge}</span>
+      )}
     </button>
   )
 }
@@ -47,8 +62,20 @@ function Divider() {
   )
 }
 
-export default function TeacherSidebar({ teacherTrack, onCycleTrack, onBrowseClick, onTeacherClick, onPresentMode }) {
+export default function TeacherSidebar({
+  teachLang,
+  teachLevel,
+  teachTracks = [],
+  onToggleLang,
+  onSetBand,
+  onToggleTrack,
+  onBrowseClick,
+  onTeacherClick,
+  onPresentMode,
+}) {
   const navigate = useNavigate()
+  const isEs = teachLang === 'es'
+  const activeBand = bandOf(teachLevel)
 
   return (
     <>
@@ -79,6 +106,7 @@ export default function TeacherSidebar({ teacherTrack, onCycleTrack, onBrowseCli
           flexDirection: 'column',
           alignItems: 'center',
           padding: '12px 0',
+          overflowY: 'auto',
         }}
       >
         {/* Nav links */}
@@ -93,20 +121,52 @@ export default function TeacherSidebar({ teacherTrack, onCycleTrack, onBrowseCli
 
         <Divider />
 
-        {/* Teacher tools */}
+        {/* Language toggle */}
         <SbBtn
-          icon={TRACK_EMOJI[teacherTrack] || '🇬🇧'}
-          title={`Track: ${TRACK_LABEL[teacherTrack] || 'English'} — click to cycle`}
-          onClick={onCycleTrack}
-          active={teacherTrack && teacherTrack !== 'en'}
+          icon={isEs ? '🇪🇸' : '🇬🇧'}
+          title={`Language: ${isEs ? 'Spanish' : 'English'} — click to switch`}
+          onClick={onToggleLang}
+          active={isEs}
         />
-        <SbBtn icon="🔍" title="Browse questions"    onClick={onBrowseClick}  />
-        <SbBtn icon="👨‍🏫" title="Teacher dashboard" onClick={onTeacherClick} />
 
         <Divider />
 
+        {/* Level band — tap to cycle sub-level */}
+        {LEVEL_BUTTONS.map(b => {
+          const isActive = activeBand === b.band
+          return (
+            <SbBtn
+              key={b.band}
+              icon={b.emoji}
+              title={`${b.label}${isActive ? ` — ${teachLevel} (click to cycle)` : ' — click to preview'}`}
+              onClick={() => onSetBand(b.band)}
+              active={isActive}
+              badge={isActive ? teachLevel : null}
+              style={{ fontSize: '0.95rem' }}
+            />
+          )
+        })}
+
+        <Divider />
+
+        {/* Track filters — multi-select, kept off the normal lists until active */}
+        {VOCATIONAL_TRACKS.map(t => (
+          <SbBtn
+            key={t.key}
+            icon={t.emoji}
+            title={`${t.label} track — ${teachTracks.includes(t.key) ? 'showing (click to hide)' : 'click to show its content'}`}
+            onClick={() => onToggleTrack(t.key)}
+            active={teachTracks.includes(t.key)}
+          />
+        ))}
+
+        <Divider />
+
+        <SbBtn icon="🔍" title="Browse questions"    onClick={onBrowseClick}  />
+        <SbBtn icon="👨‍🏫" title="Teacher dashboard" onClick={onTeacherClick} />
+
         {/* Spacer pushes Present Mode to bottom */}
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: 1, minHeight: '8px' }} />
 
         {/* Present Mode */}
         <SbBtn

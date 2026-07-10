@@ -23,7 +23,7 @@ import NavBar from './components/NavBar'
 import TeacherSidebar from './components/TeacherSidebar'
 import TeacherStarBanner from './components/TeacherStarBanner'
 import PronunciationExercise from './PronunciationExercise'
-import { TRACK_CYCLE } from './components/TeacherToolbar'
+import { nextLevelForBand } from './components/teacherControls'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -55,10 +55,25 @@ function App() {
   )
 }
 
-function buildEffectiveProfile(profile, teacherTrack) {
-  if (!profile || !teacherTrack || teacherTrack === 'en') return profile
-  if (teacherTrack === 'spanish') return { ...profile, level: 'Spanish', tracks: ['spanish'] }
-  return { ...profile, tracks: [teacherTrack] }
+// Compose the teacher's "preview identity" from the three sidebar controls.
+// - level: the chosen CEFR level (independent of language and track).
+// - tracks: the active vocational filters, plus 'spanish' when previewing in Spanish.
+// An empty tracks array in EN means "general only" (the teacher's normal lists);
+// ExerciseList reads isTeacher to apply general-only vs track-only filtering.
+function buildEffectiveProfile(profile, { teachLang, teachLevel, teachTracks }) {
+  if (!profile) return profile
+  const tracks = [
+    ...(teachTracks || []),
+    ...(teachLang === 'es' ? ['spanish'] : []),
+  ]
+  return { ...profile, level: teachLevel || profile.level, tracks }
+}
+
+// Is the teacher previewing anything other than their own default view?
+function overrideActive(profile, { teachLang, teachLevel, teachTracks }) {
+  return teachLang === 'es'
+    || (teachTracks && teachTracks.length > 0)
+    || (teachLevel && teachLevel !== profile?.level)
 }
 
 function PresentModeBar({ onExit }) {
@@ -100,12 +115,16 @@ function Dashboard({ session }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [presentMode, setPresentMode] = useState(false)
-  const [globalLang, setGlobalLang] = useState(
+  const [teachLang, setTeachLang] = useState(
     () => localStorage.getItem('pep_teach_lang') || 'en'
   )
-  const [teacherTrack, setTeacherTrack] = useState(
-    () => localStorage.getItem('pep_teacher_track') || 'en'
+  const [teachLevel, setTeachLevel] = useState(
+    () => localStorage.getItem('pep_teach_level') || null
   )
+  const [teachTracks, setTeachTracks] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pep_teach_tracks')) || [] }
+    catch { return [] }
+  })
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -119,13 +138,28 @@ function Dashboard({ session }) {
 
   const handleLogout = async () => { await supabase.auth.signOut() }
 
-  const cycleTrack = () => {
-    const idx = TRACK_CYCLE.indexOf(teacherTrack)
-    const next = TRACK_CYCLE[(idx + 1) % TRACK_CYCLE.length]
-    setTeacherTrack(next)
-    localStorage.setItem('pep_teacher_track', next)
-    const lang = next === 'spanish' ? 'es' : 'en'
-    localStorage.setItem('pep_teach_lang', lang)
+  const toggleLang = () => {
+    setTeachLang(prev => {
+      const next = prev === 'es' ? 'en' : 'es'
+      localStorage.setItem('pep_teach_lang', next)
+      return next
+    })
+  }
+
+  const setBand = (band) => {
+    setTeachLevel(prev => {
+      const next = nextLevelForBand(prev || profile?.level, band)
+      localStorage.setItem('pep_teach_level', next)
+      return next
+    })
+  }
+
+  const toggleTrack = (key) => {
+    setTeachTracks(prev => {
+      const next = prev.includes(key) ? prev.filter(t => t !== key) : [...prev, key]
+      localStorage.setItem('pep_teach_tracks', JSON.stringify(next))
+      return next
+    })
   }
 
   if (loading) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading...</div>
@@ -144,7 +178,10 @@ function Dashboard({ session }) {
   }
 
   const isTeacher = profile?.is_teacher || false
-  const effectiveProfile = isTeacher ? buildEffectiveProfile(profile, teacherTrack) : profile
+  const resolvedLevel = teachLevel || profile?.level
+  const controls = { teachLang, teachLevel: resolvedLevel, teachTracks }
+  const effectiveProfile = isTeacher ? buildEffectiveProfile(profile, controls) : profile
+  const hasOverride = isTeacher && overrideActive(profile, controls)
 
   // ── Teacher layout ────────────────────────────────────────────────────────
   if (isTeacher) {
@@ -170,8 +207,12 @@ function Dashboard({ session }) {
     return (
       <div>
         <TeacherSidebar
-          teacherTrack={teacherTrack}
-          onCycleTrack={cycleTrack}
+          teachLang={teachLang}
+          teachLevel={resolvedLevel}
+          teachTracks={teachTracks}
+          onToggleLang={toggleLang}
+          onSetBand={setBand}
+          onToggleTrack={toggleTrack}
           onBrowseClick={() => navigate('/teacher/browse')}
           onTeacherClick={() => navigate('/teacher')}
           onPresentMode={() => setPresentMode(true)}
@@ -198,9 +239,8 @@ function Dashboard({ session }) {
             session={session}
             profile={profile}
             effectiveProfile={effectiveProfile}
-            teacherTrack={teacherTrack}
-            globalLang={localStorage.getItem('pep_teach_lang') || 'en'}
-            cycleTrack={cycleTrack}
+            hasOverride={hasOverride}
+            globalLang={teachLang}
             handleLogout={handleLogout}
             navigate={navigate}
           />
@@ -255,7 +295,7 @@ function StudentRoutes({ session, profile, handleLogout }) {
 }
 
 // ── Teacher routes ────────────────────────────────────────────────────────────
-function TeacherRoutes({ session, profile, effectiveProfile, teacherTrack, globalLang, cycleTrack, handleLogout, navigate }) {
+function TeacherRoutes({ session, profile, effectiveProfile, hasOverride, globalLang, handleLogout, navigate }) {
   const nav = useNavigate()
   return (
     <Routes>
@@ -269,8 +309,8 @@ function TeacherRoutes({ session, profile, effectiveProfile, teacherTrack, globa
       <Route path="/exercises" element={<Navigate to="/learn" replace />} />
       <Route path="/progress"  element={<Progress session={session} profile={profile} handleLogout={handleLogout} />} />
       <Route path="/lyrics"    element={<LyricsExercise user={session.user} />} />
-      <Route path="/blurt"     element={<Blurt user={session.user} profileOverride={teacherTrack !== 'en' ? effectiveProfile : null} />} />
-      <Route path="/wordsnake" element={<WordSnake user={session.user} profileOverride={teacherTrack !== 'en' ? effectiveProfile : null} />} />
+      <Route path="/blurt"     element={<Blurt user={session.user} profileOverride={hasOverride ? effectiveProfile : null} />} />
+      <Route path="/wordsnake" element={<WordSnake user={session.user} profileOverride={hasOverride ? effectiveProfile : null} />} />
       <Route path="/wordle"       element={<WordleGame onBack={() => nav(-1)} />} />
       <Route path="/connections"  element={<ConnectionsGame onBack={() => nav(-1)} userProfile={effectiveProfile} />} />
       <Route path="/spelling-bee" element={<SpellingBeeGame onBack={() => nav(-1)} userProfile={effectiveProfile} />} />
