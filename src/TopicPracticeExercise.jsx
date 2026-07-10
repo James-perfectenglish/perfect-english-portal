@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { supabase } from './supabaseClient'
+import { fetchSeenMap, pickFresh } from './lib/questionFreshness'
 import { LevelBadge, TypeBadge, AiMarkedBadge, TagBadges } from './components/BadgePill'
 import SentenceChallenge from './components/SentenceChallenge'
 import FlagQuestion from './components/FlagQuestion'
@@ -254,26 +255,28 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     setUserAnswer(''); setSelectedOption(null); setSessionSaved(false)
     setHintLevel(0); setHintRandomIdx(null); setAutoHintShown(false)
 
-    const { data, error } = await supabase
-      .from('question_bank')
-      .select('*')
-      .eq('topic', 'spanish')
-      .eq('language', 'es')
-      .in('type', ['multiple_choice', 'gap_fill'])
-      .is('sequence_group', null)
+    // Seen-history read runs in parallel with the pool fetch (no added latency)
+    const [{ data, error }, seenMap] = await Promise.all([
+      supabase
+        .from('question_bank')
+        .select('*')
+        .eq('topic', 'spanish')
+        .eq('language', 'es')
+        .in('type', ['multiple_choice', 'gap_fill'])
+        .is('sequence_group', null),
+      fetchSeenMap(supabase),
+    ])
 
     if (error || !data || data.length === 0) { setStage('playing'); setQuestions([]); return }
 
-    const mc = shuffleArray(data.filter(q => q.type === 'multiple_choice'))
-    const gf = shuffleArray(data.filter(q => q.type === 'gap_fill'))
-    // Aim for 5+5; if either type is short, fill from the other
-    let mcSlice = mc.slice(0, 5)
-    let gfSlice = gf.slice(0, 5)
+    // Least-recently-seen first within each type. Aim for 5+5; if either type
+    // is short, fill from the other
+    let mcSlice = pickFresh(data.filter(q => q.type === 'multiple_choice'), seenMap, 5)
+    let gfSlice = pickFresh(data.filter(q => q.type === 'gap_fill'), seenMap, 5)
     if (mcSlice.length + gfSlice.length < totalTarget) {
       const used = new Set([...mcSlice, ...gfSlice])
-      const spare = shuffleArray(data.filter(q => !used.has(q)))
       const needed = totalTarget - mcSlice.length - gfSlice.length
-      gfSlice = [...gfSlice, ...spare.slice(0, needed)]
+      gfSlice = [...gfSlice, ...pickFresh(data.filter(q => !used.has(q)), seenMap, needed)]
     }
     const selected = shuffleArray([...mcSlice, ...gfSlice])
     const prepared = selected.map(q => q.type === 'multiple_choice' ? { ...q, shuffledOptions: shuffleArray(parseJsonb(q.options)) } : q)
@@ -300,27 +303,25 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
 
     let query = supabase.from('question_bank').select('*').eq('topic', exercise.topic).in('level', level.dbLevels).is('sequence_group', null)
     query = query.in('language', ['en', 'both'])
-    const { data, error } = await query
+    // Seen-history read runs in parallel with the pool fetch (no added latency)
+    const [{ data, error }, seenMap] = await Promise.all([query, fetchSeenMap(supabase)])
 
     if (error || !data || data.length === 0) { setStage('playing'); setQuestions([]); return }
 
     const g = level.group
     let selected = []
     if (g === 'A') {
-      const mc = shuffleArray(data.filter(q => q.type === 'multiple_choice'))
-      selected = mc.slice(0, totalTarget)
-      if (selected.length < totalTarget) selected = [...selected, ...shuffleArray(data.filter(q => !selected.includes(q)))].slice(0, totalTarget)
+      selected = pickFresh(data.filter(q => q.type === 'multiple_choice'), seenMap, totalTarget)
+      if (selected.length < totalTarget) selected = [...selected, ...pickFresh(data.filter(q => !selected.includes(q)), seenMap, totalTarget - selected.length)]
     } else if (g === 'C') {
-      const gf = shuffleArray(data.filter(q => q.type === 'gap_fill'))
-      selected = gf.slice(0, totalTarget)
-      if (selected.length < totalTarget) selected = [...selected, ...shuffleArray(data.filter(q => !selected.includes(q)))].slice(0, totalTarget)
+      selected = pickFresh(data.filter(q => q.type === 'gap_fill'), seenMap, totalTarget)
+      if (selected.length < totalTarget) selected = [...selected, ...pickFresh(data.filter(q => !selected.includes(q)), seenMap, totalTarget - selected.length)]
     } else {
-      const mc = shuffleArray(data.filter(q => q.type === 'multiple_choice'))
-      const gf = shuffleArray(data.filter(q => q.type === 'gap_fill'))
-      let mcSlice = mc.slice(0, 5), gfSlice = gf.slice(0, 5)
+      let mcSlice = pickFresh(data.filter(q => q.type === 'multiple_choice'), seenMap, 5)
+      let gfSlice = pickFresh(data.filter(q => q.type === 'gap_fill'), seenMap, 5)
       if (mcSlice.length + gfSlice.length < totalTarget) {
         const used = new Set([...mcSlice, ...gfSlice])
-        mcSlice = [...mcSlice, ...shuffleArray(data.filter(q => !used.has(q))).slice(0, totalTarget - mcSlice.length - gfSlice.length)]
+        mcSlice = [...mcSlice, ...pickFresh(data.filter(q => !used.has(q)), seenMap, totalTarget - mcSlice.length - gfSlice.length)]
       }
       selected = shuffleArray([...mcSlice, ...gfSlice])
     }
@@ -364,6 +365,23 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     else { if (!userAnswer.trim()) return; await checkGapFill(q, userAnswer.trim()) }
   }
 
+  // Log each answered question to student_answers so it feeds the Teacher
+  // Dashboard (via student_activity → "Question bank") and the recently-seen
+  // freshness read. Mirrors RandomPracticeExercise's shape; fire-and-forget.
+  const recordAnswer = async (question, studentAnswer, isCorrect) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || question?.question_number == null) return
+      await supabase.from('student_answers').insert({
+        student_id: user.id,
+        question_id: question.question_number,
+        student_answer: studentAnswer,
+        correct_answer: question.correct_answer || '',
+        is_correct: isCorrect,
+      })
+    } catch (e) { console.warn('TopicPractice: student_answers insert failed', e) }
+  }
+
   const checkMC = (q, sel) => {
     const norm = normalise(sel)
     const alts = parseJsonb(q.acceptable_alternatives)
@@ -373,6 +391,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     const pointAwarded = isCorrect && hintLevel < 3
     // Auto-reveal hint after wrong answer (only if not already revealed)
     if (!isCorrect && hintLevel === 0 && q.hint) setAutoHintShown(true)
+    recordAnswer(q, sel, isCorrect)
     setFeedback({ isCorrect, correct: q.correct_answer, type: 'mc', usedHint, pointAwarded })
     setResults(prev => [...prev, { question: q, isCorrect: pointAwarded }])
     if (pointAwarded) setScore(s => s + 1)
@@ -387,6 +406,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     const altFeedback = (norm) => { const match = alts.find(a => normalise(typeof a === 'object' ? a.answer : a) === norm); return match?.feedback || null }
     const usedHint = hintLevel > 0
     const finish = (isCorrect, fb) => {
+      recordAnswer(q, answer, isCorrect)
       const pointAwarded = isCorrect && hintLevel < 3
       // Auto-reveal hint after wrong answer (only if not already revealed)
       if (!isCorrect && hintLevel === 0 && q.hint) setAutoHintShown(true)

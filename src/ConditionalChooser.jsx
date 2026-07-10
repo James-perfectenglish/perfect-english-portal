@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
+import { fetchSeenMap, pickFresh } from './lib/questionFreshness';
 import { LevelBadge } from './components/BadgePill';
 import SentenceChallenge from './components/SentenceChallenge';
 import ExplainerOverlay from './components/ExplainerOverlay';
@@ -184,13 +185,19 @@ export default function ConditionalChooser({ language = 'en', onBack, onComplete
   };
 
   const fetchQuestions = async (dbLevels) => {
-    const { data, error } = await supabase.from('question_bank').select('*')
-      .eq('type', 'conditional_chooser')
-      .in('language', [language, 'both'])
-      .in('level', dbLevels);
+    // Seen-history read runs in parallel with the pool fetch (no added latency).
+    // classMode skips it — teacher previews shouldn't be freshness-shaped.
+    const [{ data, error }, seenMap] = await Promise.all([
+      supabase.from('question_bank').select('*')
+        .eq('type', 'conditional_chooser')
+        .in('language', [language, 'both'])
+        .in('level', dbLevels),
+      classMode ? Promise.resolve(new Map()) : fetchSeenMap(supabase),
+    ]);
     if (error) { console.error('Error fetching conditional chooser questions:', error); setQuestions([]); setStage('playing'); return; }
-    // Shuffle each question's tiles ONCE here, so re-renders never reshuffle.
-    const prepared = shuffleArray(data || []).slice(0, 10)
+    // Least-recently-seen first, then shuffle each question's tiles ONCE here,
+    // so re-renders never reshuffle.
+    const prepared = pickFresh(data || [], seenMap, 10)
       .map(q => ({ ...q, _tiles: shuffleArray(parseOptions(q)) }));
     setQuestions(prepared);
     setStage('playing');

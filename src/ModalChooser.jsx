@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
+import { fetchSeenMap, pickFresh } from './lib/questionFreshness';
 import { LevelBadge } from './components/BadgePill';
 import SentenceChallenge from './components/SentenceChallenge';
 import ExplainerOverlay from './components/ExplainerOverlay';
@@ -26,15 +27,6 @@ import { byId as modalCardById } from './lib/modalExplainEn.js';
 // correct_answer, then against acceptable_alternatives[].answer (each carries an
 // optional register-note `feedback`). No AI / server marking.
 // ─────────────────────────────────────────────────────────────────────────────
-
-function shuffleArray(arr) {
-  const shuffled = [...arr];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
 
 // Compare tolerantly: case-insensitive, punctuation-stripped, whitespace-collapsed.
 const norm = (s) => (s || '').toLowerCase().replace(/[.,!?;:]/g, '').replace(/\s+/g, ' ').trim();
@@ -268,10 +260,15 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [], clas
   };
 
   const fetchQuestions = async (dbLevels) => {
-    const { data, error } = await supabase.from('question_bank').select('*')
-      .eq('type', 'modal_chooser')
-      .in('language', ['en', 'both'])
-      .in('level', dbLevels);
+    // Seen-history read runs in parallel with the pool fetch (no added latency).
+    // classMode skips it — teacher previews shouldn't be freshness-shaped.
+    const [{ data, error }, seenMap] = await Promise.all([
+      supabase.from('question_bank').select('*')
+        .eq('type', 'modal_chooser')
+        .in('language', ['en', 'both'])
+        .in('level', dbLevels),
+      classMode ? Promise.resolve(new Map()) : fetchSeenMap(supabase),
+    ]);
     if (error) { console.error('Error fetching modal chooser questions:', error); setQuestions([]); setStage('playing'); return; }
     // Live-tile map is computed from the FULL band set (pre-slice), so greying
     // is stable per band and never telegraphs the current question's answer.
@@ -283,7 +280,7 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [], clas
       });
     });
     setLiveTiles(live);
-    setQuestions(shuffleArray(data || []).slice(0, 10));
+    setQuestions(pickFresh(data || [], seenMap, 10));
     setStage('playing');
   };
 

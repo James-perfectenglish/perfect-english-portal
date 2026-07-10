@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
+import { fetchSeenMap, pickFresh } from '../lib/questionFreshness';
 import SentenceBuildingInput from './SentenceBuildingInput';
 import MatchingPairs from './MatchingPairs';
 import SentenceChallenge from './SentenceChallenge';
@@ -495,7 +496,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         return q;
       };
 
-      const [gfRes, mcRes, sbRes, oooRes, ecRes, matchRes, dictRes] = await Promise.all([
+      const [gfRes, mcRes, sbRes, oooRes, ecRes, matchRes, dictRes, seenMap] = await Promise.all([
         queryForType('gap_fill'),
         queryForType('multiple_choice'),
         queryForType('sentence_building'),
@@ -508,6 +509,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
           return q;
         })(),
         fetchDictation(),
+        fetchSeenMap(supabase), // seen-history for least-recently-seen ordering
       ]);
 
       if (gfRes.error || mcRes.error || sbRes.error || oooRes.error || ecRes.error || matchRes.error) {
@@ -517,7 +519,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       const activeMix = buildWeakMix(weakTypes);
       const TARGET_TOTAL = Object.values(activeMix).reduce((a, b) => a + b, 0);
 
-      const pick = (data, type) => shuffleArray((data || []).filter(q => isAllowedByTrack(q.topic))).slice(0, activeMix[type] || 0).map(q => {
+      const pick = (data, type) => pickFresh((data || []).filter(q => isAllowedByTrack(q.topic)), seenMap, activeMix[type] || 0).map(q => {
         if ((type === 'multiple_choice' || type === 'odd_one_out') && Array.isArray(q.options)) {
           return { ...q, options: shuffleArray(q.options) };
         }
@@ -569,7 +571,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
       if (baseQuestions.length < TARGET_TOTAL) {
         const shortfall = TARGET_TOTAL - baseQuestions.length;
         const mcUsedIds = new Set(pickedMC.map(q => q.id));
-        const extraMC = shuffleArray((mcRes.data || []).filter(q => !mcUsedIds.has(q.id))).slice(0, shortfall);
+        const extraMC = pickFresh((mcRes.data || []).filter(q => !mcUsedIds.has(q.id)), seenMap, shortfall);
         baseQuestions = [...baseQuestions, ...extraMC];
       }
 
