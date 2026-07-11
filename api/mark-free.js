@@ -176,10 +176,15 @@ Target function: ${targetFunction || 'use the modal naturally'}
 Student's sentence: "${thesentence}"
 
 ASSESSMENT RULES — apply in order:
-1. Is "${word}" actually used, in a grammatical, natural English sentence? If the modal is missing, misused, or the English is broken/unnatural → valid=false with a short, kind fix.
+1. Is "${word}" actually used, in a grammatical English sentence? If the modal is missing, or its structure is wrong ("must to go", "can played") → valid=false with a short, kind fix.
 2. FUNCTION — this is the heart of the task. The sentence must genuinely PERFORM the target function (${targetFunction || 'the one shown'}), not merely use the modal in some other role. A grammatically fine sentence that uses "${word}" for a DIFFERENT function does NOT pass → valid=false; warmly name what they did instead and give a tiny model of the target function.
    Example: target "to make a wish (If only…)", student writes "You could go to the shop" (a suggestion) → valid=false: "That's a suggestion! For a wish, try 'If only I could…' — e.g. 'If only I could speak French.'"
-3. Cosmetic only — punctuation, a missing capital, a typo on a non-target word — is NEVER grounds for rejection → valid=true; you may note it in one short clause.
+3. CONTENT IS THE STUDENT'S TO CHOOSE. Never judge whether the scenario is factually plausible, whether the reasoning is one you would have reached, or how the imagined situation "should" work. If the modal performs the target function in a grammatical sentence, that is a PASS — even if the premise is odd or you would have phrased it differently. NEVER concede that the function landed and then fail the sentence anyway.
+4. STYLE IS NOT AN ERROR. Never reject for word order, register, politeness markers or length. British English norms apply: "Please may I borrow your car?" asks permission perfectly well.
+5. Cosmetic slips — punctuation, a missing capital, a typo on a non-target word — are NEVER grounds for rejection → valid=true; you may note them in one short clause.
+6. A genuine grammar error elsewhere in the sentence (agreement, tense, a wrong preposition) belongs in the feedback, but only fails the sentence if it obscures the meaning.
+
+When in doubt about style, content, register or a small slip, PASS — a false "not quite" on a correct sentence costs more than a lenient tick. But never be lenient about rule 2: the function is the one hard gate, and a sentence that does not perform it fails however natural it sounds.
 
 Be warm and encouraging — this is practice, not an exam. Keep feedback to 1–2 short sentences, no grammar-jargon codes.
 
