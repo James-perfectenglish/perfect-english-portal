@@ -144,7 +144,7 @@ export default function MatchingPairs({ pairs, disabled, onResult }) {
           <img
             src={item.content}
             alt={item.label || ''}
-            style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px', display: 'block' }}
+            style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '8px', display: 'block' }}
           />
           {item.label && (
             <span style={{ fontSize: '0.78rem', color: '#4a5568', textAlign: 'center', lineHeight: 1.2 }}>
