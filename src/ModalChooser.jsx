@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { fetchSeenMap, pickFresh } from './lib/questionFreshness';
 import { LevelBadge } from './components/BadgePill';
@@ -201,6 +201,10 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [], clas
   const [showSC, setShowSC] = useState(false);
   const [showCard, setShowCard] = useState(false);
   const [liveTiles, setLiveTiles] = useState(null); // Set of tile names used anywhere in this band
+  // One Sentence Challenge per FORM per visit: once a modal's Explainer card id
+  // has had its produce step, later questions on the same form skip straight to
+  // Next. Survives Try Again and band switches; resets on leaving the exercise.
+  const seenFormsRef = useRef(new Set());
 
   // Answer-builder state
   const [selectedBase, setSelectedBase] = useState(null);
@@ -346,19 +350,25 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [], clas
     const altMatch = alts.find(a => norm(apos(a.answer)) === ua);
     const isCorrect = ua === primary || !!altMatch;
     recordChooserAnswer(q, assembled, isCorrect);
+    // The Sentence Challenge fires only the first time this form is shown.
+    // Key on the card of the answer the SC will practise (feedback.answer).
+    const fbAnswer = ua === primary ? q.correct_answer : (altMatch ? altMatch.answer : q.correct_answer);
+    const formKey = cardIdForAnswer(fbAnswer) || norm(apos(fbAnswer || ''));
+    const scDue = !seenFormsRef.current.has(formKey);
+    seenFormsRef.current.add(formKey);
     if (ua === primary) {
       setScore(s => s + 1);
-      setFeedback({ result: 'correct', note: '', answer: q.correct_answer, explanation: q.explanation || '', equally: equally(ua) });
+      setFeedback({ result: 'correct', note: '', answer: q.correct_answer, explanation: q.explanation || '', equally: equally(ua), scDue });
       return;
     }
     if (altMatch) {
       // Alternatives are fully correct — same green, same point. The note is a
       // register nuance, never a demotion.
       setScore(s => s + 1);
-      setFeedback({ result: 'correct', note: altMatch.feedback || '', answer: altMatch.answer, explanation: q.explanation || '', equally: equally(ua) });
+      setFeedback({ result: 'correct', note: altMatch.feedback || '', answer: altMatch.answer, explanation: q.explanation || '', equally: equally(ua), scDue });
       return;
     }
-    setFeedback({ result: 'wrong', note: '', answer: q.correct_answer, explanation: q.explanation || '', equally: alts.map(a => a.answer) });
+    setFeedback({ result: 'wrong', note: '', answer: q.correct_answer, explanation: q.explanation || '', equally: alts.map(a => a.answer), scDue });
   };
 
   const harvestModalSentence = async ({ sentence, inputMethod, result }) => {
@@ -554,9 +564,15 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [], clas
                   </div>
                   {!showSC && (
                     <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '14px' }}>
-                      <button onClick={() => setShowSC(true)} style={{ padding: '10px 32px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>
-                        ✏️ Your turn →
-                      </button>
+                      {feedback.scDue ? (
+                        <button onClick={() => setShowSC(true)} style={{ padding: '10px 32px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>
+                          ✏️ Your turn →
+                        </button>
+                      ) : (
+                        <button onClick={nextQuestion} style={{ padding: '10px 32px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>
+                          Next →
+                        </button>
+                      )}
                       {cardIdForAnswer(feedback.answer) && (
                         <button onClick={() => setShowCard(true)} style={{ padding: '10px 20px', background: 'white', color: '#553C9A', border: '1px solid #D6BCFA', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>
                           📖 See the full card

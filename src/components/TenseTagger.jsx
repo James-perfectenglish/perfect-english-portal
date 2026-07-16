@@ -161,7 +161,7 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
   const [item, setItem] = useState(() => initialTense
     ? (makeGenerated(tenseBand(initialTense), initialTense) || nextItem(startLevel(profile)))
     : nextItem(startLevel(profile)));
-  const [phase, setPhase] = useState('tag'); // tag | function | produce | done
+  const [phase, setPhase] = useState('tag'); // tag | function | produce | done | finished
   const [picks, setPicks] = useState({});
   const [graded, setGraded] = useState(false);
   const [fnPick, setFnPick] = useState(null);
@@ -170,6 +170,13 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
   const [showCard, setShowCard] = useState(false);
   const [stars, setStars] = useState(0);
   const [tagged, setTagged] = useState(0);
+  // Set-of-10 state — consistent with Modal Match / Conditionals Chooser.
+  const [qNum, setQNum] = useState(1);   // 1-based specimen counter
+  const [score, setScore] = useState(0); // correct recognitions this set
+  // One production (Sentence Challenge) per TENSE per visit: tenses already
+  // produced this visit skip the produce step. Survives Try Again and level
+  // switches; resets on leaving the exercise.
+  const seenTensesRef = useRef(new Set());
 
   // Specimen bank: a shuffled deck of pre-generated, AI-filtered rows for the
   // current level, refilled in the background. Falls back to the live engine
@@ -235,7 +242,31 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
     setItem(nextFromBank(toLevel)); setPhase('tag'); setPicks({});
     setGraded(false); setFnPick(null); setDraft(''); setProd(null); setShowCard(false);
   }
-  function changeLevel(l) { deckRef.current = []; setLevel(l); reset(l); }
+  // Advance the set: next specimen, or the completion screen after 10.
+  function advance() {
+    if (qNum >= 10) {
+      setPhase('finished');
+      setGraded(false); setPicks({}); setFnPick(null); setProd(null); setShowCard(false);
+      return;
+    }
+    setQNum(n => n + 1);
+    reset();
+  }
+  // Recognition done (tags, plus the C1 function step when it runs): produce
+  // only the first time this tense is met this visit — otherwise straight on.
+  function proceedAfterRecognition() {
+    if (!seenTensesRef.current.has(name)) {
+      seenTensesRef.current.add(name);
+      setPhase('produce');
+    } else {
+      advance();
+    }
+  }
+  function restartSet() {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    setQNum(1); setScore(0); reset();
+  }
+  function changeLevel(l) { deckRef.current = []; setLevel(l); setQNum(1); setScore(0); reset(l); }
 
   function clearLock() {
     const lvl = startLevel(profile);
@@ -243,6 +274,7 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
     deckRef.current = [];
     setLockedTense(null);
     setLevel(lvl);
+    setQNum(1); setScore(0);
     setItem(makeGenerated(lvl) || makeCurated());
     setPhase('tag'); setPicks({}); setGraded(false); setFnPick(null); setDraft(''); setProd(null); setShowCard(false);
   }
@@ -308,8 +340,9 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
     const ok = liveAxes.every(ax => picks[ax] === item.answer[ax]);
     if (ok) {
       setTagged(n => n + 1);
+      setScore(s => s + 1);
       if (gate.secondQ) { setPhase('function'); }   // attempt logged after the function answer
-      else { logAttempt(); setPhase('produce'); }
+      else { logAttempt(); proceedAfterRecognition(); }
     } else {
       logAttempt();   // log the mistake — this is the teaching signal
     }
@@ -338,10 +371,11 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
   }
 
   // Sheet closed: a passed sentence advances to the star screen; anything else
-  // (fail-and-close, backdrop dismiss) deals a fresh specimen — old Skip semantics.
+  // (fail-and-close, backdrop dismiss) advances the set — the item was already
+  // scored at the tag step.
   function handleSCClose() {
     if (prod?.ok) setPhase('done');
-    else reset();
+    else advance();
   }
 
   const accepts = functionAccepts(item);
@@ -382,7 +416,16 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
           </div>
         )}
 
+        {/* set progress — consistent with Modal Match / Conditionals Chooser */}
+        {phase !== 'finished' && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', background: C.card, border: `1px solid ${C.line}`, padding: '10px 16px', borderRadius: '12px', marginBottom: '1rem', fontSize: '0.85rem', color: C.slate, fontWeight: 600 }}>
+            <span>Progress: {qNum}/10</span>
+            <span>Score: {score}/10</span>
+          </div>
+        )}
+
         {/* specimen */}
+        {phase !== 'finished' && (
         <div style={{ ...cardStyle, padding: '1.5rem' }}>
           <div style={{ ...labelStyle, marginBottom: '0.75rem' }}>Sentence</div>
           <p style={{ fontSize: '1.4rem', lineHeight: 1.45, color: C.ink, margin: 0, fontWeight: 400 }}>
@@ -391,6 +434,7 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
             {item.post}
           </p>
         </div>
+        )}
 
         {/* TAG phase */}
         {(phase === 'tag' || (graded && !recognitionCorrect)) && (
@@ -438,10 +482,10 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
                     fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
                   }}>📖 See the full card</button>
                 )}
-                <button onClick={() => reset()} style={{
+                <button onClick={advance} style={{
                   width: '100%', padding: '0.85rem', borderRadius: '10px', border: 'none',
                   background: C.ink, color: 'white', fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer',
-                }}>↻ New sentence</button>
+                }}>Next →</button>
               </div>
             )}
           </div>
@@ -503,7 +547,7 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
                       : 'Right — here the form and the meaning line up.'}
                   </div>
                 )}
-                <button onClick={() => setPhase('produce')} style={{
+                <button onClick={proceedAfterRecognition} style={{
                   width: '100%', padding: '0.85rem', borderRadius: '10px', border: 'none',
                   background: PG, color: 'white', fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer',
                 }}>Continue →</button>
@@ -570,10 +614,23 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
                 <StatusPill tone="warn">⚠️ AI unavailable — structure verified</StatusPill>
               </div>
             )}
-            <button onClick={() => reset()} style={{
+            <button onClick={advance} style={{
               width: '100%', padding: '0.85rem', borderRadius: '10px', border: 'none', marginTop: '0.5rem',
               background: C.ink, color: 'white', fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer',
-            }}>↻ New sentence</button>
+            }}>Next →</button>
+          </div>
+        )}
+
+        {/* FINISHED — set complete (mirrors Modal Match / Conditionals Chooser) */}
+        {phase === 'finished' && (
+          <div style={{ background: '#f7fafc', border: '2px solid #e2e8f0', borderRadius: '8px', padding: '2rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>{score >= 9 ? '🏆' : score >= 7 ? '⭐' : score >= 5 ? '👍' : '💪'}</div>
+            <h2 style={{ color: '#2d3748', margin: '0 0 12px' }}>Exercise Complete!</h2>
+            <div style={{ fontSize: '3rem', fontWeight: 700, color: score >= 7 ? '#48bb78' : score >= 5 ? '#ed8936' : '#f56565', margin: '12px 0' }}>{score}/10</div>
+            <p style={{ color: '#4a5568' }}>{score >= 9 ? 'Outstanding — you can spot any tense on sight!' : score >= 7 ? 'Great work — your tense recognition is strong.' : score >= 5 ? 'Good effort. Keep practising to improve.' : 'Keep going — practice makes perfect!'}</p>
+            <div style={{ marginTop: '20px', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button onClick={restartSet} style={{ padding: '10px 24px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Try Again</button>
+            </div>
           </div>
         )}
 
