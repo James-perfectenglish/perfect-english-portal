@@ -212,19 +212,17 @@ export default function Progress({ session, profile, handleLogout }) {
       setTopicProgress(topicList)
     }
 
-    // Stars (unified across all sources)
-    const { data: allStars } = await supabase
-      .from('stars').select('source, awarded_at').eq('student_id', userId)
-    if (allStars && allStars.length > 0) {
-      const monday = new Date(getMondayISO())
+    // Stars (unified across all sources) — counted server-side via get_star_summary RPC.
+    // A plain select caps at Supabase's 1,000-row limit, which froze totals at 1,000.
+    const { data: starSummary } = await supabase
+      .rpc('get_star_summary', { p_student_id: userId, p_week_start: getMondayISO() })
+    if (starSummary && starSummary.total > 0) {
       const bySource = {}
-      let thisWeek = 0
-      allStars.forEach(s => {
-        const bucket = ['wordle','spelling_bee','connections','wotd','gotd','teacher_awarded'].includes(s.source) ? s.source : 'other'
-        bySource[bucket] = (bySource[bucket] || 0) + 1
-        if (new Date(s.awarded_at) >= monday) thisWeek++
+      Object.entries(starSummary.by_source || {}).forEach(([source, n]) => {
+        const bucket = ['wordle','spelling_bee','connections','wotd','gotd','teacher_awarded'].includes(source) ? source : 'other'
+        bySource[bucket] = (bySource[bucket] || 0) + n
       })
-      setStars({ total: allStars.length, thisWeek, bySource })
+      setStars({ total: starSummary.total, thisWeek: starSummary.this_week, bySource })
     }
 
     setLoading(false)

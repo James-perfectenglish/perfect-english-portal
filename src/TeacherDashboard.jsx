@@ -301,10 +301,9 @@ export default function TeacherDashboard({ profile, handleLogout }) {
 
   async function fetchStarsLeaderboard() {
     const monday = getMondayISO()
+    // Grouped server-side via RPC — a plain row select caps at 1,000 rows/week.
     const { data: rows } = await supabase
-      .from('stars')
-      .select('student_id, source, subtype')
-      .gte('awarded_at', monday)
+      .rpc('get_weekly_star_counts', { p_week_start: monday })
 
     if (!rows || rows.length === 0) return
 
@@ -319,8 +318,8 @@ export default function TeacherDashboard({ profile, handleLogout }) {
     rows.forEach(r => {
       if (!totals[r.student_id]) totals[r.student_id] = { wordle: 0, spelling_bee: 0, connections: 0, wotd: 0, gotd: 0, wordsearch: 0, crossword: 0, teacher_awarded: 0, other: 0, total: 0 }
       const bucket = ['wordle','spelling_bee','connections','wotd','gotd','wordsearch','crossword','teacher_awarded'].includes(r.source) ? r.source : 'other'
-      totals[r.student_id][bucket]++
-      totals[r.student_id].total++
+      totals[r.student_id][bucket] += r.n
+      totals[r.student_id].total    += r.n
     })
 
     const leaderboard = Object.entries(totals)
