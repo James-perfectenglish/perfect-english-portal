@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import SentenceChallenge from './components/SentenceChallenge'
+import HelpSheet from './components/HelpSheet'
 
 const WORD_LENGTH  = 5
 const MAX_GUESSES  = 6
@@ -112,7 +113,6 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
   // five letters rather than lock a student out on a bad connection.
   const [dictionary, setDictionary] = useState(null)
 
-  const [showHelp, setShowHelp] = useState(false)
   const today    = new Date().toISOString().slice(0, 10)
   const stateRef = useRef({ word: '', guesses: [], current: '', gameState: 'loading' })
   const inputRef = useRef(null)
@@ -354,17 +354,18 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
 
       {/* Header */}
       <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem', position: 'relative' }}>
-        <button
-          onClick={() => setShowHelp(true)}
-          aria-label={isSpanish ? 'Cómo jugar' : 'How to play'}
-          style={{
-            position: 'absolute', top: '10px', right: '12px',
-            width: '28px', height: '28px', borderRadius: '50%',
-            background: 'rgba(255,255,255,0.2)', color: 'white',
-            border: '1px solid rgba(255,255,255,0.45)',
-            fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
-          }}>?</button>
+        <HelpSheet
+          title="How to play"
+          points={[
+            'Guess the 5-letter word in 6 tries.',
+            'Green: right letter, right place. Amber: right letter, wrong place. Grey: not in the word.',
+            "Every guess must be a real word. Names, places and abbreviations don't count.",
+            ...(isSpanish
+              ? [<>Accents aren't needed — type <strong>facil</strong> and it counts as <strong>fácil</strong>.</>]
+              : []),
+            'Stars: solved in 6 = 1⭐, 5 = 2⭐, 4 = 3⭐… 1 guess = 6⭐. Plus one more for a good sentence.',
+          ]}
+        />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
           <h1 style={{ margin: 0, fontSize: '1.7rem', letterSpacing: '6px', fontWeight: 800 }}>WORDLE</h1>
           {isSpanish && <span style={{ fontSize: '1.2rem' }}>🇪🇸</span>}
@@ -532,53 +533,6 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
       )}
 
     </div>
-    {showHelp && (
-      <div
-        onClick={() => setShowHelp(false)}
-        style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '1rem', zIndex: 1000,
-        }}>
-        <div
-          onClick={e => e.stopPropagation()}
-          style={{
-            background: 'white', borderRadius: '12px', padding: '1.5rem',
-            maxWidth: '380px', width: '100%', maxHeight: '80vh', overflowY: 'auto',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-          }}>
-          <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.15rem', color: '#2d3748' }}>
-            {isSpanish ? 'Cómo jugar' : 'How to play'}
-          </h2>
-          <ul style={{ margin: 0, paddingLeft: '1.1rem', color: '#4a5568', fontSize: '0.88rem', lineHeight: 1.6 }}>
-            <li>{isSpanish
-              ? 'Adivina la palabra de 5 letras en 6 intentos.'
-              : 'Guess the 5-letter word in 6 tries.'}</li>
-            <li>{isSpanish
-              ? 'Verde: letra correcta en el sitio correcto. Ámbar: letra correcta en otro sitio. Gris: no está en la palabra.'
-              : 'Green: right letter, right place. Amber: right letter, wrong place. Grey: not in the word.'}</li>
-            <li>{isSpanish
-              ? 'Cada intento tiene que ser una palabra real. Los nombres propios y las abreviaturas no valen.'
-              : 'Every guess must be a real word. Names, places and abbreviations don\'t count.'}</li>
-            {isSpanish && (
-              <li>No hace falta poner tildes — escribe <strong>facil</strong> y vale por <strong>fácil</strong>.</li>
-            )}
-            <li>{isSpanish
-              ? 'Estrellas: 6 intentos = 1⭐, 5 = 2⭐, 4 = 3⭐… 1 intento = 6⭐. Y una más por una buena frase.'
-              : 'Stars: solved in 6 = 1⭐, 5 = 2⭐, 4 = 3⭐… 1 guess = 6⭐. Plus one more for a good sentence.'}</li>
-          </ul>
-          <button
-            onClick={() => setShowHelp(false)}
-            style={{
-              marginTop: '1.25rem', width: '100%', padding: '0.7rem',
-              background: GRADIENT, color: 'white', border: 'none',
-              borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem',
-            }}>
-            {isSpanish ? 'Entendido' : 'Got it'}
-          </button>
-        </div>
-      </div>
-    )}
     {showChallenge && word && (
       <SentenceChallenge
         word={(displayWord || word).toLowerCase()}

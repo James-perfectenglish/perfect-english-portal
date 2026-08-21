@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import SentenceChallenge from './components/SentenceChallenge'
+import HelpSheet from './components/HelpSheet'
 
 const GRADIENT    = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 const BEE_YELLOW  = '#f9df6d'
@@ -563,7 +564,21 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
       <div style={{ maxWidth: '500px', margin: '0 auto', padding: '1rem 1rem 3rem' }}>
 
         {/* Header */}
-        <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem' }}>
+        <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem', position: 'relative' }}>
+          <HelpSheet
+            title="How to play"
+            points={[
+              'Make as many words as you can from the seven letters.',
+              <>Every word must use the centre letter <strong>{centre?.toUpperCase()}</strong>, and must be at least four letters long.</>,
+              'Letters can be used as many times as you like.',
+              'A word using all seven letters is a pangram — worth a big bonus.',
+              'Four-letter words score 1 point. Longer words score one point per letter.',
+              'Genius is 50 words. Queen Bee is 100.',
+              ...(isSpanish
+                ? [<>Accents aren't needed — type <strong>facil</strong> and it counts as <strong>fácil</strong>.</>]
+                : []),
+            ]}
+          />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
             <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>🐝</span>
             <h1 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, letterSpacing: '3px' }}>SPELLING BEE</h1>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import SentenceChallenge from './components/SentenceChallenge'
+import HelpSheet from './components/HelpSheet'
 
 const GRADIENT     = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 const MAX_MISTAKES = 4
@@ -279,7 +280,18 @@ export default function ConnectionsGame({ onBack, userProfile, classPuzzle = nul
     <div style={{ maxWidth: '500px', margin: '0 auto', padding: '1rem 1rem 3rem' }}>
 
       {/* Header */}
-      <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem' }}>
+      <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem', position: 'relative' }}>
+        <HelpSheet
+          title="How to play"
+          points={[
+            'Find the four groups of four words that belong together.',
+            'Select four words, then hit Submit.',
+            'You get four mistakes. A fifth ends the puzzle.',
+            <><strong>One away</strong> means three of your four are right.</>,
+            "Words are put in more than one plausible group on purpose — that's the puzzle.",
+            'Groups run easiest to hardest: yellow, green, blue, purple.',
+          ]}
+        />
         <h1 style={{ margin: 0, fontSize: '1.7rem', fontWeight: 800, letterSpacing: '2px' }}>CONNECTIONS</h1>
         <p style={{ margin: '4px 0 0', opacity: 0.85, fontSize: '0.82rem' }}>
           {puzzleTitle

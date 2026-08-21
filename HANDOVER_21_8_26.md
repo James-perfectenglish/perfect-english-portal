@@ -145,3 +145,85 @@ James reports not having touched it. **Cause unknown.** Practical impact nil —
 2. **ES Connections 15 Sept** — off-brief ("En la peluquería"); swap or leave.
 3. **ES `part_of_speech` cleanup** — legacy A1/A2 WOTD rows still mixed between Spanish labels (`sustantivo`) and English (`noun`). Carried since 23 July.
 4. **October content** — all six streams cliff together on 30 September.
+
+---
+---
+
+# Session 2 — 21 August 2026 (evening)
+
+**Wordle guess validation. §4 of the morning session's brief, plus the `word_lists` repair that was blocking it.** Everything below is applied and verified. Nothing is committed — push is James's.
+
+## 1. What shipped
+
+### Dictionary (DB)
+
+| | before | after |
+|---|---|---|
+| EN entries | 112,850 | 115,398 |
+| EN five-letter | 6,772 | 6,786 |
+| ES entries | 84,859 | 640,136 |
+| ES five-letter | 4,751 | 11,114 |
+| Unmatchable Wordle answers (EN / ES) | 1 / 16 | **0 / 0** |
+
+**`word_lists.word_key`** — generated stored column, `translate(lower(word), 'áéíóúüÁÉÍÓÚÜ', 'aeiouuaeiouu')`, with indexes on `(word_key, language)` and `(language, length(word))`. `translate` not `unaccent`: unaccent isn't installed and isn't `IMMUTABLE`, so it can't back an index. Ñ deliberately untouched — it's a distinct letter (año ≠ ano). 2,006 ES words carry it.
+
+**English Britishised**, +2,548 rows: `-ize→-ise` 2,233 (rule, guarded against size/prize/seize/maize/capsize), `-yze→-yse` ~15, `-or→-our` 142 (stem-anchored), `-eled→-elled` 30 (hand-curated), `-re`/`-ence`/misc ~107 (explicit list).
+
+**Spanish replaced, not patched.** The old ES list was lemma-only: no plurals, no conjugated forms (`tengo`, `quiero`, `puedo`, `dijo`, `fuimos` all absent), and `min(length)` 4, so `mar`/`pez` weren't there and `mares`/`peces` couldn't be derived. Generating plurals would not have made validation shippable. Source: **`words/an-array-of-spanish-words`** (MIT, Letterpress-derived, 636,598 forms), already accent-stripped with ñ preserved — which matches how `wordle_words` stores ES. 555,235 rows merged; 14,498 skipped because an accented lemma already held that key, so `fácil` and `árbol` survive as the display form. Plus 42 hand-added loanwords, because the source contains **no k and no w** (`kilos`, `kiwis`, `koala`, `kayak`, `whisky`, `wifi`, `sándwich`).
+
+**`wordle_words.display_word`** (nullable) — correct accented spelling where it differs from `word`, which stays accent-stripped for tile matching. Six ES rows populated: jabón, lápiz, árbol, avión, cajón, buzón.
+
+**`wordle_sessions.solve_stars`** smallint, backfilled from `solve_star`, which is kept as a boolean mirror for any older reader.
+
+### Components
+
+**`WordleGame.jsx`**
+- Guess validation in `submitGuess` after the length check. A rejected guess does not consume a turn; the answer always passes even if somehow off-list.
+- **Duplicate-letter scoring fixed.** `getTileResult` marked every occurrence of a letter amber regardless of how many were actually in the answer — students were being taught inferences that don't hold. Replaced with row-level `evaluateGuess`, standard two-pass. Verified: SPEED/ABIDE, GEESE/THESE, ARRAY/RADAR, EERIE/CRANE, LLAMA/MEDAL, GATOS/GATOS.
+- **Stars 1–6** by guess count, emitted as subtypes `solve_6`…`solve_1`, one per tier crossed, sharing the daily dedupe key. Mirrors how Spelling Bee awards milestones; `ux_stars_dedupe` is unique on subtype so they coexist. First-guess solve pays 6⭐, no cap — James's call.
+- Accents stripped on input from both keyboards; `display_word` used for the reveal and the Sentence Challenge prompt.
+- Class Play reads `classPuzzle.validateGuesses !== false` — on by default, waivable per puzzle.
+
+**`SpellingBeeGame.jsx`** — lookup moved to `word_key`. `facil` is accepted and returns as `fácil`. Where a key maps to several forms (`hablo`/`habló`) it keeps what was typed rather than guessing at an accent, so it never shows a *wrong* accent, only sometimes omits one. "Already found" and the cross-device merge both compare on the key, so pre-existing unaccented saves still dedupe.
+
+**`src/components/HelpSheet.jsx`** (new) — "?" button plus rules modal, `points` accepts JSX. Two variants: default absolute in a gradient header (needs `position: 'relative'`), and `inline` for a small grey button in normal flow. Wired into Wordle, Spelling Bee and Connections.
+
+### Scripts (new, both `$SUPABASE_DB` + psycopg2, `--commit` pattern)
+
+- **`scripts/import_es_wordlist.py`** — one-shot, kept for provenance. Staged via `COPY` into `word_list_import_es`; that table has since been dropped.
+- **`scripts/export_wordle_words.py`** — writes `src/data/wordleWords.{en,es}.js` from `word_lists`. **Re-run after ANY change to `word_lists`** or the shipped dictionary drifts from the DB.
+
+The guess dictionaries are dynamic-imported by `WordleGame`, so each is its own hashed chunk: precached by the existing `**/*.js` workbox glob, loaded only when the game opens, works offline. 6,779 EN / 11,086 ES keys. Guess list ≠ answer list, so nothing is leaked by shipping it. **The build fails without those two files** — run the exporter before any fresh clone builds.
+
+## 2. Evidence behind the decisions
+
+From 401 sessions before validation: 83% solved, **66.3% earned the old ≤5 star**, 16.7% solved on the 6th, 17% failed. That's the baseline to compare against in a fortnight.
+
+37.8% of English guesses ever made would be rejected by the new dictionary. Sorted: letter probing (`aeiou` 14 times, `aselr`, `arsgy`), misspellings (`wierd`, `apeal`, `amgry`, `acces`, `aroun`), proper nouns (`james` 9 times, `paine`, `maine`), and valid Spanish the old list lacked (`puedo`, `artes`). Only the probing is a real loss; the misspellings now stop costing a turn and start returning spelling feedback, which is the pedagogical case for the whole feature.
+
+ES Spelling Bee was rejecting **15.2% of otherwise-valid September answers** on accents alone — 875 of 5,770, ~29 a day. Belinda plays daily.
+
+## 3. Gotchas learned this session
+
+- **Rule-based British spelling over-generates, in both directions.** Blanket `-eled→-elled` produced `princelling`, `athelling` and `unparallelled` (British is *unparalleled*, single l) — 30 of 48 candidates were curated by hand instead. The `-our` rule tried `succory→succoury`; succory is chicory, unrelated. And *laborious, honorary, humorous, vigorous, vaporise* correctly keep `-or`/`-ise` in British English, so suffix allow-lists matter more than stem lists.
+- **The repo's `import-word-lists.mjs` does not reflect what's in the DB.** It points at SOWPODS and this very Spanish package, but the live lists matched neither. Treat it as stale.
+- **Help text should be English even on the Spanish side.** Those students are English speakers learning Spanish; rules in Spanish are one more thing to decode. The first Wordle help sheet had this backwards and was rewritten.
+- **Large `INSERT..SELECT` needs chunking** through the MCP — 555k rows split by word length across five statements. A single nested-loop anti-join without an index hit the statement timeout.
+- **Filesystem MCP still can't create files.** `HelpSheet.jsx` and both scripts were delivered as downloads for James to save. Worth remembering that the *first* run of a new script always fails with ENOENT until it's moved out of `~/Downloads`.
+
+## 4. Next session
+
+1. **Re-measure the star rate** a fortnight after this goes live and compare to 66.3%. If the ≤5-equivalent rate collapses, the scale is the lever.
+2. **`HelpSheet` on the marking-based exercises** — Sentence Building, Dictation, RPE, Sentence Challenge. Not "how do I play" but **"how am I marked?"**: near-misses come back amber, alternative phrasings are accepted, Fix It! gives another go, spelling counts. Students who don't know this conclude the marker is broken. Use the `inline` variant.
+3. **`HelpSheet` on the dashboard star banner** — nobody knows how stars are earned across the app, and Wordle now pays 1–6.
+4. **Class Play validation toggle** — the prop is plumbed and defaults on; the UI switch is unbuilt. `classPuzzle` is not constructed in `TeacherDashboard.jsx`; the call site still needs finding.
+5. **Five September EN Spelling Bee days have fewer than 50 valid words, so Genius is unreachable**, and 16 of 30 can't reach Queen Bee at 100. Pre-existing, not caused by this work — the generator doesn't check answer counts when picking letter sets. ES now averages 635 valid words a day against EN's 117, on identical thresholds; James has accepted that asymmetry for now.
+
+## 5. Standing open decisions (carried, updated)
+
+1. ~~**`word_lists` repair**~~ — **done this session.**
+2. **ES Connections 15 Sept** — off-brief ("En la peluquería"); swap or leave.
+3. **ES `part_of_speech` cleanup** — legacy A1/A2 WOTD rows mixed between `sustantivo` and `noun`. Carried since 23 July.
+4. **October content** — all six streams cliff together on 30 September.
+5. **ES dictionary carries vulgarities.** Left in deliberately: adult audience, and filtering Spanish reliably means casualties among legitimate words. The bee will score them. Reversible with a blocklist if it ever matters.
+6. **Accent display is partial by design.** Works for the 15,278 pre-existing accented lemmas; imported inflections (`arboles`) display bare. Never wrong, sometimes incomplete. Improvable later from a second source without a schema change, since `word_key` is the join.
