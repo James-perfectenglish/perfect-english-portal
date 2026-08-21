@@ -30,26 +30,56 @@ const WIN_MESSAGES = [
   'Splendid! 👏', 'Great! 🎉', 'Phew! 😅',
 ]
 
-function getTileResult(guess, word, col) {
-  const letter = guess[col]
-  if (letter === word[col]) return 'correct'
-  if (word.includes(letter)) return 'present'
-  return 'absent'
+// Two-pass scoring so repeated letters behave like real Wordle: greens are
+// claimed first, then ambers only while unmatched instances of that letter
+// remain. The old single-pass version marked every occurrence amber, which
+// taught students inferences that don't hold.
+function evaluateGuess(guess, word) {
+  const result = Array(WORD_LENGTH).fill('absent')
+  const pool   = {}
+
+  for (let i = 0; i < WORD_LENGTH; i++) {
+    if (guess[i] === word[i]) result[i] = 'correct'
+    else pool[word[i]] = (pool[word[i]] || 0) + 1
+  }
+  for (let i = 0; i < WORD_LENGTH; i++) {
+    if (result[i] === 'correct') continue
+    const letter = guess[i]
+    if (pool[letter] > 0) { result[i] = 'present'; pool[letter]-- }
+  }
+  return result
 }
 
 function computeLetterStates(guesses, word) {
   const priority = { correct: 3, present: 2, absent: 1 }
   const states = {}
   guesses.forEach(guess => {
+    const results = evaluateGuess(guess, word)
     for (let i = 0; i < WORD_LENGTH; i++) {
       const letter = guess[i]
-      const result = getTileResult(guess, word, i)
+      const result = results[i]
       if (!states[letter] || priority[result] > priority[states[letter]]) {
         states[letter] = result
       }
     }
   })
   return states
+}
+
+// Stars scale with how few guesses it took: 6 guesses = 1⭐, 1 guess = 6⭐.
+// Emitted as one star per tier crossed, mirroring Spelling Bee's milestones —
+// ux_stars_dedupe is unique on subtype, so they coexist under one daily key.
+function starTiers(guessCount) {
+  const tiers = []
+  for (let n = MAX_GUESSES; n >= guessCount; n--) tiers.push(`solve_${n}`)
+  return tiers
+}
+
+// Students type plain letters; ES answers are stored accent-stripped.
+const ACCENTED = 'ÁÉÍÓÚÜ'
+const PLAIN    = 'AEIOUU'
+function stripAccents(w) {
+  return w.replace(/[ÁÉÍÓÚÜ]/g, c => PLAIN[ACCENTED.indexOf(c)])
 }
 
 export default function WordleGame({ onBack, classPuzzle = null }) {
@@ -59,6 +89,10 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
   const language = isSpanish ? 'es' : 'en'
 
   const [word, setWord]           = useState('')
+  // Tiles always show the accent-stripped form (the keyboard has no accent
+  // keys); displayWord carries the correct spelling for the reveal and the
+  // sentence challenge, so BUZON is revealed as BUZÓN.
+  const [displayWord, setDisplayWord] = useState('')
   const [guesses, setGuesses]     = useState([])
   const [current, setCurrent]     = useState('')
   const [gameState, setGameState] = useState('loading')
@@ -70,21 +104,46 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
   const [sentenceFeedback, setSentenceFeedback] = useState(null)
   const [showChallenge, setShowChallenge]       = useState(false)
 
-  const [solveStar, setSolveStar]     = useState(false)
+  const [solveStars, setSolveStars]   = useState(0)
   const [sentenceStar, setSentenceStar] = useState(false)
+
+  // Guess dictionary: the 5-letter subset, loaded as its own chunk when the
+  // game opens. null = not loaded yet or failed, in which case we accept any
+  // five letters rather than lock a student out on a bad connection.
+  const [dictionary, setDictionary] = useState(null)
 
   const [showHelp, setShowHelp] = useState(false)
   const today    = new Date().toISOString().slice(0, 10)
   const stateRef = useRef({ word: '', guesses: [], current: '', gameState: 'loading' })
   const inputRef = useRef(null)
 
-  useEffect(() => { stateRef.current = { word, guesses, current, gameState } })
+  useEffect(() => { stateRef.current = { word, displayWord, guesses, current, gameState } })
 
   useEffect(() => {
     initDaily()
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Class Play can waive validation per puzzle; a teacher word is always
+  // accepted even when it sits outside the dictionary.
+  const validationOn = teacherMode ? classPuzzle.validateGuesses !== false : true
+
+  useEffect(() => {
+    if (!validationOn) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const mod = isSpanish
+          ? await import('./data/wordleWords.es.js')
+          : await import('./data/wordleWords.en.js')
+        if (!cancelled) setDictionary(new Set(mod.WORDS))
+      } catch (e) {
+        console.warn('Wordle dictionary failed to load, validation off:', e)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [isSpanish, validationOn])
 
   useEffect(() => {
     if ((gameState === 'won' || gameState === 'lost') && !sentenceDone) {
@@ -96,6 +155,7 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
     // Class Play: a specific word is supplied; play it fresh, no session/stars.
     if (teacherMode) {
       setWord((classPuzzle.word || '').toUpperCase())
+      setDisplayWord((classPuzzle.display_word || classPuzzle.word || '').toUpperCase())
       setGameState('playing')
       return
     }
@@ -111,12 +171,14 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
     }
 
     const { data: wordRow } = await supabase
-      .from('wordle_words').select('word')
+      .from('wordle_words').select('word, display_word')
       .eq('play_date', today).eq('language', lang).single()
 
     if (!wordRow) { setGameState('noword'); return }
     const w = wordRow.word.toUpperCase()
+    const shown = (wordRow.display_word || wordRow.word).toUpperCase()
     setWord(w)
+    setDisplayWord(shown)
 
     if (user) {
       const { data: session } = await supabase
@@ -127,14 +189,14 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
         const g = session.guesses || []
         setGuesses(g)
         setSentenceDone(session.sentence_done || false)
-        setSolveStar(session.solve_star || false)
+        setSolveStars(session.solve_stars ?? (session.solve_star ? 1 : 0))
         setSentenceStar(session.sentence_star || false)
         if (session.solved) {
           setGameState('won')
           setMessage(WIN_MESSAGES[g.length - 1] || 'Well done!')
         } else if (g.length >= MAX_GUESSES) {
           setGameState('lost')
-          setMessage(isSpanish ? `La palabra era ${w}` : `The word was ${w}`)
+          setMessage(isSpanish ? `La palabra era ${shown}` : `The word was ${shown}`)
         } else {
           setGameState('playing')
         }
@@ -150,23 +212,32 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
     const key = e.key.toUpperCase()
     if (key === 'ENTER')           submitGuess()
     else if (key === 'BACKSPACE')  setCurrent(c => c.slice(0, -1))
-    else if (/^[A-ZÑÁÉÍÓÚ]$/.test(key) || key === 'Ñ') setCurrent(c => c.length < WORD_LENGTH ? c + key : c)
+    else if (/^[A-ZÑÁÉÍÓÚ]$/.test(key) || key === 'Ñ') setCurrent(c => c.length < WORD_LENGTH ? c + stripAccents(key) : c)
   }
 
   function handleVirtualKey(key) {
     if (stateRef.current.gameState !== 'playing') return
     if (key === 'ENTER')  submitGuess()
     else if (key === '⌫') setCurrent(c => c.slice(0, -1))
-    else if (/^[A-ZÑÁÉÍÓÚ]$/.test(key) || key === 'Ñ') setCurrent(c => c.length < WORD_LENGTH ? c + key : c)
+    else if (/^[A-ZÑÁÉÍÓÚ]$/.test(key) || key === 'Ñ') setCurrent(c => c.length < WORD_LENGTH ? c + stripAccents(key) : c)
   }
 
   async function submitGuess() {
-    const { current, word, guesses, gameState } = stateRef.current
+    const { current, word, displayWord, guesses, gameState } = stateRef.current
     if (gameState !== 'playing' || locked) return
 
     if (current.length < WORD_LENGTH) {
       setShaking(true)
       setMessage(isSpanish ? 'Faltan letras' : 'Not enough letters')
+      setTimeout(() => { setShaking(false); setMessage('') }, 800)
+      return
+    }
+
+    // Real words only. The guess is not consumed on a rejection, and the answer
+    // itself always passes even if it somehow isn't in the guess list.
+    if (dictionary && current !== word && !dictionary.has(current.toLowerCase())) {
+      setShaking(true)
+      setMessage(isSpanish ? 'No está en la lista' : 'Not in word list')
       setTimeout(() => { setShaking(false); setMessage('') }, 800)
       return
     }
@@ -180,30 +251,50 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
     setCurrent('')
 
     if (won) {
-      const earnedSolve = newGuesses.length <= 5
+      const tiers = starTiers(newGuesses.length)
       setMessage(WIN_MESSAGES[newGuesses.length - 1] || 'Well done!')
       setGameState('won')
-      if (earnedSolve) setSolveStar(true)
-      await saveSession(newGuesses, true, false, false, earnedSolve, false)
-      if (earnedSolve) await insertStar('solve', word)
+      setSolveStars(tiers.length)
+      await saveSession(newGuesses, true, false, false, tiers.length, false)
+      await insertSolveStars(tiers, word)
     } else if (lost) {
-      setMessage(isSpanish ? `La palabra era ${word}` : `The word was ${word}`)
+      setMessage(isSpanish
+        ? `La palabra era ${displayWord || word}`
+        : `The word was ${displayWord || word}`)
       setGameState('lost')
-      await saveSession(newGuesses, false, false, false, false, false)
+      await saveSession(newGuesses, false, false, false, 0, false)
     }
     setLocked(false)
   }
 
-  async function saveSession(g, solved, sentDone, sentStar, solStar) {
+  async function saveSession(g, solved, sentDone, sentStar, solStars) {
     if (teacherMode) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     await supabase.from('wordle_sessions').upsert({
       student_id: user.id, play_date: today,
       guesses: g, solved,
-      sentence_done: sentDone, solve_star: solStar, sentence_star: sentStar,
+      sentence_done: sentDone, solve_star: solStars > 0, solve_stars: solStars,
+      sentence_star: sentStar,
       completed_at: new Date().toISOString(),
     }, { onConflict: 'student_id,play_date' })
+  }
+
+  // One row per tier crossed. supabase-js can't target the expression-based
+  // partial index, so insert plainly and swallow 23505.
+  async function insertSolveStars(tiers, w) {
+    if (teacherMode) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const dedupe_key = `daily:${today}:${language}`
+    const rows = tiers.map(subtype => ({
+      student_id: user.id,
+      source:     'wordle',
+      subtype,
+      context:    { word: w.toLowerCase(), language, play_date: today, dedupe_key },
+    }))
+    const { error } = await supabase.from('stars').insert(rows)
+    if (error && error.code !== '23505') console.warn('Wordle star insert failed:', error)
   }
 
   async function insertStar(type, w) {
@@ -232,13 +323,13 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
       setSentenceStar(true)
       await insertStar('sentence', word)
     }
-    await saveSession(guesses, gameState === 'won', true, data.valid, solveStar)
+    await saveSession(guesses, gameState === 'won', true, data.valid, solveStars)
     setSentenceDone(true)
   }
 
   const letterStates = computeLetterStates(guesses, word)
   const gameOver     = gameState === 'won' || gameState === 'lost'
-  const totalStars   = (solveStar ? 1 : 0) + (sentenceStar ? 1 : 0)
+  const totalStars   = solveStars + (sentenceStar ? 1 : 0)
 
   if (gameState === 'loading') return (
     <div style={{ textAlign: 'center', padding: '4rem', color: '#718096' }}>
@@ -263,6 +354,17 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
 
       {/* Header */}
       <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.25rem 2rem', textAlign: 'center', color: 'white', marginBottom: '1rem', position: 'relative' }}>
+        <button
+          onClick={() => setShowHelp(true)}
+          aria-label={isSpanish ? 'Cómo jugar' : 'How to play'}
+          style={{
+            position: 'absolute', top: '10px', right: '12px',
+            width: '28px', height: '28px', borderRadius: '50%',
+            background: 'rgba(255,255,255,0.2)', color: 'white',
+            border: '1px solid rgba(255,255,255,0.45)',
+            fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+          }}>?</button>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
           <h1 style={{ margin: 0, fontSize: '1.7rem', letterSpacing: '6px', fontWeight: 800 }}>WORDLE</h1>
           {isSpanish && <span style={{ fontSize: '1.2rem' }}>🇪🇸</span>}
@@ -292,13 +394,14 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
           const isActive   = rowIdx === guesses.length && gameState === 'playing'
           const guess      = guesses[rowIdx] || ''
           const letters    = isActive ? current : guess
+          const rowResults = isRevealed ? evaluateGuess(guess, word) : null
           return (
             <div key={rowIdx} style={{ display: 'flex', gap: '5px', animation: isActive && shaking ? 'shake 0.5s ease' : 'none' }}>
               {Array.from({ length: WORD_LENGTH }).map((_, colIdx) => {
                 const letter = letters[colIdx] || ''
                 let bg = 'white', border = '#d3d6da', color = '#2d3748'
                 if (isRevealed && letter) {
-                  const result = getTileResult(guess, word, colIdx)
+                  const result = rowResults[colIdx]
                   bg = COLOURS[result]; border = COLOURS[result]; color = 'white'
                 } else if (isActive && letter) { border = '#878a8c' }
                 return (
@@ -364,8 +467,8 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
           </div>
           <div style={{ fontSize: '0.82rem', color: '#718096', marginBottom: '12px' }}>
             {isSpanish
-              ? `Usa la palabra "${word.toLowerCase()}" en una frase. Si no sabes lo que significa, ¡inténtalo igualmente!`
-              : `Use the word "${word.toLowerCase()}" in a sentence. Not sure what it means? Have a go anyway!`}
+              ? `Usa la palabra "${(displayWord || word).toLowerCase()}" en una frase. Si no sabes lo que significa, ¡inténtalo igualmente!`
+              : `Use the word "${(displayWord || word).toLowerCase()}" in a sentence. Not sure what it means? Have a go anyway!`}
           </div>
           <button
             onClick={() => setShowChallenge(true)}
@@ -401,10 +504,14 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
             <div style={{ textAlign: 'center', marginBottom: '1rem', padding: '0.75rem', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
               <div style={{ fontSize: '2rem', marginBottom: '2px' }}>{Array(totalStars).fill('⭐️').join(' ')}</div>
               <div style={{ fontSize: '0.78rem', color: '#92400e', fontWeight: 600 }}>
-                {solveStar && sentenceStar
-                  ? (isSpanish ? '¡Palabra encontrada + frase correcta!' : 'Word found + great sentence!')
-                  : solveStar
-                  ? (isSpanish ? '¡Palabra encontrada en ≤5 intentos!' : 'Word found in 5 or fewer guesses!')
+                {solveStars > 0 && sentenceStar
+                  ? (isSpanish
+                      ? `¡Resuelto en ${guesses.length} + frase correcta!`
+                      : `Solved in ${guesses.length} + great sentence!`)
+                  : solveStars > 0
+                  ? (isSpanish
+                      ? `¡Resuelto en ${guesses.length} ${guesses.length === 1 ? 'intento' : 'intentos'}!`
+                      : `Solved in ${guesses.length} ${guesses.length === 1 ? 'guess' : 'guesses'}!`)
                   : (isSpanish ? '¡Frase correcta!' : 'Great sentence!')}
               </div>
             </div>
@@ -425,9 +532,56 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
       )}
 
     </div>
+    {showHelp && (
+      <div
+        onClick={() => setShowHelp(false)}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '1rem', zIndex: 1000,
+        }}>
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            background: 'white', borderRadius: '12px', padding: '1.5rem',
+            maxWidth: '380px', width: '100%', maxHeight: '80vh', overflowY: 'auto',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+          }}>
+          <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.15rem', color: '#2d3748' }}>
+            {isSpanish ? 'Cómo jugar' : 'How to play'}
+          </h2>
+          <ul style={{ margin: 0, paddingLeft: '1.1rem', color: '#4a5568', fontSize: '0.88rem', lineHeight: 1.6 }}>
+            <li>{isSpanish
+              ? 'Adivina la palabra de 5 letras en 6 intentos.'
+              : 'Guess the 5-letter word in 6 tries.'}</li>
+            <li>{isSpanish
+              ? 'Verde: letra correcta en el sitio correcto. Ámbar: letra correcta en otro sitio. Gris: no está en la palabra.'
+              : 'Green: right letter, right place. Amber: right letter, wrong place. Grey: not in the word.'}</li>
+            <li>{isSpanish
+              ? 'Cada intento tiene que ser una palabra real. Los nombres propios y las abreviaturas no valen.'
+              : 'Every guess must be a real word. Names, places and abbreviations don\'t count.'}</li>
+            {isSpanish && (
+              <li>No hace falta poner tildes — escribe <strong>facil</strong> y vale por <strong>fácil</strong>.</li>
+            )}
+            <li>{isSpanish
+              ? 'Estrellas: 6 intentos = 1⭐, 5 = 2⭐, 4 = 3⭐… 1 intento = 6⭐. Y una más por una buena frase.'
+              : 'Stars: solved in 6 = 1⭐, 5 = 2⭐, 4 = 3⭐… 1 guess = 6⭐. Plus one more for a good sentence.'}</li>
+          </ul>
+          <button
+            onClick={() => setShowHelp(false)}
+            style={{
+              marginTop: '1.25rem', width: '100%', padding: '0.7rem',
+              background: GRADIENT, color: 'white', border: 'none',
+              borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem',
+            }}>
+            {isSpanish ? 'Entendido' : 'Got it'}
+          </button>
+        </div>
+      </div>
+    )}
     {showChallenge && word && (
       <SentenceChallenge
-        word={word.toLowerCase()}
+        word={(displayWord || word).toLowerCase()}
         language={language}
         exercise="wordle"
         apiContext="challenge"

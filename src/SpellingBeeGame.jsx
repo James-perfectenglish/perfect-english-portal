@@ -34,6 +34,15 @@ const QUEEN_BEE = 100
 const TARGET    = 50
 const MIN_LEN   = 4
 
+// Accents are matched but never required. Students type plain letters; the
+// dictionary keeps the correct spelling and we show it back to them.
+// ñ is a distinct letter and is deliberately left alone.
+const ACCENTED = 'áéíóúü'
+const PLAIN    = 'aeiouu'
+function stripAccents(w) {
+  return w.replace(/[áéíóúü]/g, c => PLAIN[ACCENTED.indexOf(c)])
+}
+
 function scoreWord(word, isPangram) {
   let base
   if (word.length === 4)      base = 1
@@ -44,7 +53,7 @@ function scoreWord(word, isPangram) {
 
 function isPangramWord(word, allowedSet) {
   // word uses every letter in allowedSet (size 7)
-  const used = new Set(word)
+  const used = new Set(stripAccents(word))
   if (used.size !== allowedSet.size) return false
   for (const c of allowedSet) if (!used.has(c)) return false
   return true
@@ -287,7 +296,7 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
       )
       return
     }
-    if (foundWords.includes(word)) {
+    if (foundWords.some(w => stripAccents(w) === word)) {
       showMsg(isSpanish ? 'Ya encontrada' : 'Already found', 'warning')
       return
     }
@@ -300,23 +309,26 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
       }
     }
 
-    // Lookup in word_lists
-    const { data: dictHit } = await supabase
+    // Lookup in word_lists on the accent-normalised key.
+    const { data: dictHits } = await supabase
       .from('word_lists')
       .select('word')
-      .eq('word', word)
+      .eq('word_key', word)
       .eq('language', language)
-      .maybeSingle()
 
-    if (!dictHit) {
+    if (!dictHits || dictHits.length === 0) {
       showMsg(isSpanish ? 'No es una palabra' : 'Not a word', 'error')
       return
     }
 
+    // Show the accented spelling only when it's unambiguous. Where one key maps
+    // to several forms (hablo / habló) keep what they typed rather than guess.
+    const display = dictHits.length === 1 ? dictHits[0].word : word
+
     const isPangram = isPangramWord(word, allowed)
     const pts       = scoreWord(word, isPangram)
-    const newWords  = [...foundWords, word]
-    const newPangs  = isPangram ? [...pangramsFound, word] : pangramsFound
+    const newWords  = [...foundWords, display]
+    const newPangs  = isPangram ? [...pangramsFound, display] : pangramsFound
     const newScore  = score + pts
 
     setFoundWords(newWords)
@@ -422,9 +434,9 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
       if (existing) {
         serverSCP = existing.sentence_challenge_passed
         if (existing.found_words?.length) {
-          const seen = new Set(words)
+          const seen = new Set(words.map(stripAccents))
           mergedWords = [...words]
-          for (const w of existing.found_words) if (!seen.has(w)) mergedWords.push(w)
+          for (const w of existing.found_words) if (!seen.has(stripAccents(w))) mergedWords.push(w)
         }
       }
     } catch (e) {
