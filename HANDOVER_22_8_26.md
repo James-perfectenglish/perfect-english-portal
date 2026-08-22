@@ -1,8 +1,7 @@
 # Handover — 22 August 2026
 
 **Session type:** strategic review, then a Spanish levelling fix and the GOTD / PVOTD build that
-came out of it. Mixed DB and code. **James pushed mid-session**; the last three files are still
-awaiting a push (see §7).
+came out of it. Mixed DB and code. **Everything is pushed, deployed and verified in-app** (§7).
 
 ---
 
@@ -129,6 +128,20 @@ Spotted from a screenshot: **WORD OF THE DAY** in English sitting directly above
 DÍA** in Spanish. WOTD switched only its Sentence Challenge header; the card itself was hard-coded
 at lines 176 and 206. Now switches like GOTD does.
 
+### 3f. The dashboard gate — the one that actually blocked it
+
+`StudentDashboard.jsx` line 122 read `{!isSpanish && <PhrasalVerbOfTheDay ... />}`. The card was
+never mounted for Spanish students at all. That gate was **correct** while the component was
+English-only, and became the sole blocker the moment it stopped being so.
+
+Found only after James reported the card still missing post-deploy and reasonably assumed caching.
+**Claude had verified `App.jsx` carried `spanish_level` through, then declared the feature done
+without checking the call site that decides whether the component renders at all.** Same class of
+error as the Queen Bee one in §5: verifying the part being worked on and asserting the rest.
+
+Removing the gate is safe — the component sets `noItem` and returns `null` on an empty pool, so it
+self-hides. `isSpanish` is still used eight times in that file, so nothing is left dangling.
+
 ---
 
 ## 4. Content added
@@ -242,26 +255,30 @@ Queen Bees in six months is the rarest event in the app and should be a self-cle
 
 ## 7. Deploy state
 
-**Pushed and live** (James, mid-session): `src/WordOfTheDay.jsx` and `src/GrammarOfTheDay.jsx` — the
-`spanish_level` fetch fixes. Verified working in-app: María at B1/B2 correctly served *conseguir*
-(not the A1/A2 or C1/C2 word) and *Pronombres dobles* from the new ES B1/B2 pool.
+**Pushed and live** (James, during the session): `src/WordOfTheDay.jsx`, `src/GrammarOfTheDay.jsx`,
+`src/PhrasalVerbOfTheDay.jsx`, `src/StudentDashboard.jsx`, `api/mark-free.js`. All esbuild-clean,
+all diffs dry-run and byte-confirmed after applying.
 
-**Awaiting push:**
+**Verified in-app on the demo account:**
 
-```
-git add src/WordOfTheDay.jsx src/PhrasalVerbOfTheDay.jsx api/mark-free.js
-git commit -m "Expresión del día: bilingual PVOTD, ES marker branch, WOTD header consistency"
-git push
-```
+- WOTD served *conseguir* at B1/B2 — not the A1/A2 or C1/C2 word available for the same date.
+- GOTD served *Pronombres dobles* from the ES B1/B2 pool that did not exist that morning.
+- *Expresión del día* rendered with the ES badge, the `es-ES` date chip, and the Spanish Sentence
+  Challenge header and prompt.
+- **The ES marker branch fired correctly on its first real use.** Submitted
+  *"...consiste **de** entrenar todos los días..."*; it rejected on the governed preposition, named
+  the correct form, replied in English, and did **not** penalise the conjugated `consiste` against
+  the infinitive headword — rules 1, 2 and 4 all behaving.
 
-All three esbuild-clean, all diffs dry-run and byte-confirmed after applying.
+**Still worth one canary:** an English PVOTD submission. That prompt is byte-identical to before, so
+any change in its behaviour is a regression.
 
-**Untested and worth a canary either side:** submitting a Spanish sentence sends it down
-`mark-free.pvotd.es` for the first time. *Quedamos en vernos el lunes* should pass;
-*Quedamos **de** vernos el lunes* should fail on the preposition and say so. Run an English PVOTD
-sentence too — that prompt is byte-identical, so any change there is a regression.
+**Watch, do not fix yet:** the ES marker's model answer silently corrected more than the error it
+rejected on — it supplied a missing subject and dropped a stray `y` alongside the preposition fix.
+Defensible as a model sentence, but it means the student sees a suggestion differing in three ways
+from what they wrote. If it recurs, add a line telling it to change only what it rejected.
 
-**All content is DB-only and live now.**
+**All content is DB-only and live.**
 
 ---
 
@@ -301,6 +318,11 @@ WHERE id = '1cee5fbd-41ce-4a00-aaf0-9c27eda448d0';
    Carried since 23 July.
 7. **ES Connections 15 Sept** — off-brief ("En la peluquería"); swap or leave.
 8. **Queen Bee alert as a banner** rather than a clickable row.
+9. **Audit for sibling `!isSpanish` gates.** §3f was one of a class: guards written while a component
+   was English-only, now obsolete and silently suppressing Spanish features. `ExerciseList.jsx` is
+   the likeliest place to look next, since its EN/ES routing was extended rather than designed
+   bilingual. Cheap to check, and the failure mode is invisible — nothing errors, the feature simply
+   never appears.
 
 ---
 
