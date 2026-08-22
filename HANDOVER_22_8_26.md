@@ -142,6 +142,34 @@ error as the Queen Bee one in §5: verifying the part being worked on and assert
 Removing the gate is safe — the component sets `noItem` and returns `null` on an empty pool, so it
 self-hides. `isSpanish` is still used eight times in that file, so nothing is left dangling.
 
+### 3g. Wordle — a reported bug that wasn't, and a real one underneath it
+
+**Reported:** Wordle accepted `NEMOB` for Belinda, with the `?` help button visible, so apparently
+the new validating build.
+
+**Not a validation failure.** Her `stars` row for the day has `subtype = 'solve'` — the pre-update
+flat award. Carmen and Jon the same day have the tiered `solve_4/5/6` and `solve_2..6`. `LEMON` was
+Belinda's final guess, and the star written at that moment carries the old subtype, so the entire
+game finished on the cached old bundle. She then quit and relaunched as instructed. The board is
+redrawn from `wordle_sessions.guesses` on open, so the new shell was displaying old-code guesses —
+validation never had the chance to see them. James separately confirmed validation rejects non-words
+when tested as María. `JAMES` had also been accepted, which is the same story.
+
+**The lag is ongoing, not historical.** Beatriz played at 11:50 on 22 August with five non-words
+(`QEING`, `MENUD`, `NEMSO`, `FEMOT`, `REMOR`), still on the old bundle.
+
+**The real bug, found while diagnosing:** `WordleGame.jsx` line 192 read
+`session.solve_stars ?? (session.solve_star ? 1 : 0)`. `solve_stars` is `smallint NOT NULL DEFAULT 0`,
+so a session written by the pre-tiered build holds **0, not null** — `??` keeps the 0 and the
+`solve_star` fallback never runs. The restored 0 is then written straight back by the sentence-submit
+path (line 326), flipping `solve_star` from true to false. **A student who straddles a deploy loses
+their solve record by reloading.** Belinda's row now reads `solve_star false, solve_stars 0` for a
+solved 4-guess game. Fixed with `||`, plus a comment naming the trap.
+
+**Note the fix does not backfill.** With `||` she would have kept her single old-style star, not
+gained three — the shortfall against Carmen's three comes from playing on old code, and no code
+change reaches backwards. James is topping her up via the Teacher Dashboard.
+
 ---
 
 ## 4. Content added
@@ -280,6 +308,9 @@ from what they wrote. If it recurs, add a line telling it to change only what it
 
 **All content is DB-only and live.**
 
+**Awaiting push:** `src/WordleGame.jsx` — the `??` → `||` star-restore fix (§3g). esbuild-clean, diff
+dry-run and byte-confirmed.
+
 ---
 
 ## 8. ⚠️ María Rodríguez is currently a Spanish-track account
@@ -323,6 +354,12 @@ WHERE id = '1cee5fbd-41ce-4a00-aaf0-9c27eda448d0';
    the likeliest place to look next, since its EN/ES routing was extended rather than designed
    bilingual. Cheap to check, and the failure mode is invisible — nothing errors, the feature simply
    never appears.
+10. **PWA update lag — the one worth scoping properly.** Students keep running the cached bundle
+    until they force-quit, so every deploy opens a window where some are on old code. Currently
+    handled by messaging students individually, which does not scale and did not land in time for
+    either Belinda or Beatriz. Their results then look like bugs (§3g) and cost real diagnosis time.
+    Fix: `skipWaiting` plus a "new version — tap to reload" banner. This will recur on every
+    behaviour-changing deploy until it is addressed.
 
 ---
 

@@ -189,7 +189,10 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
         const g = session.guesses || []
         setGuesses(g)
         setSentenceDone(session.sentence_done || false)
-        setSolveStars(session.solve_stars ?? (session.solve_star ? 1 : 0))
+        // `||` not `??`: solve_stars is NOT NULL DEFAULT 0, so a session written by the
+        // pre-tiered-stars build has 0 here rather than null. `??` would keep that 0 and
+        // the solve_star fallback would never run — zeroing a solved game's stars on reload.
+        setSolveStars(session.solve_stars || (session.solve_star ? 1 : 0))
         setSentenceStar(session.sentence_star || false)
         if (session.solved) {
           setGameState('won')
