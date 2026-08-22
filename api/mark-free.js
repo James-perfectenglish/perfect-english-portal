@@ -92,6 +92,35 @@ or
     return callAI(prompt, 200, res, 'mark-free.gotd')
   }
 
+  if (isPvotd && isSpanish) {
+    prompt = `You are marking a Spanish learner's "Expresión del día" exercise.
+
+Expression: "${word}"
+Family: ${partOfSpeech || 'expresión'}
+Meaning (in English): ${meaning}
+Example of correct use: "${example}"
+
+Student's sentence: "${thesentence}"
+
+The student is an ENGLISH speaker learning Spanish. They must write a SPANISH sentence that uses "${word}" correctly, with the meaning given above.
+
+ASSESSMENT RULES — apply in this order:
+1. Is the expression "${word}" actually used, with the meaning given above? Spanish expressions inflect, so the verb may legitimately be conjugated (acabo de / acabábamos de / acaba de) and a reflexive or object pronoun may attach or move. Accept any correct inflected form. A literal or different-meaning use of the same words does NOT count → valid=false, kind brief explanation.
+2. Is the construction that the expression requires respected? Typically: the preposition it governs (soñar CON, contar CON, acordarse DE), the infinitive after a perífrasis (volver a HACER, dejar de FUMAR), or the fixed wording of an idiom (echar de menos). If the student changes the preposition or breaks the fixed form → valid=false, name the correct form briefly.
+3. If the expression is used with the right meaning and the right construction → valid=true. Warm, brief praise.
+4. Errors elsewhere in the sentence (gender agreement, an accent, a wrong article, a spelling slip, subjunctive where indicative would do) are NEVER grounds for rejection — still valid=true. You may note one of them very briefly if it is worth knowing.
+
+There is NO separable/inseparable distinction in Spanish. Do not apply English phrasal-verb rules.
+
+Give the feedback in ENGLISH — the learner's first language — so the explanation is clear. Quote the Spanish where you need to. Be generous, warm and encouraging. This is a learning exercise, not a test. Keep it to 1–2 sentences.
+
+Reply ONLY with JSON:
+{"valid": true, "feedback": "warm brief praise, optionally a small note"}
+or
+{"valid": false, "feedback": "kind explanation of the problem with a small nudge"}`
+    return callAI(prompt, 200, res, 'mark-free.pvotd.es')
+  }
+
   if (isPvotd) {
     prompt = `You are marking a student's "Phrasal Verb of the Day" exercise.
 

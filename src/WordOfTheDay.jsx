@@ -173,7 +173,7 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
       }}>
         <div>
           <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.75)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '4px' }}>
-            📖 Word of the Day
+            📖 {isSpanish ? 'Palabra del día' : 'Word of the Day'}
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
             <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'white' }}>{word.word}</span>
@@ -203,7 +203,7 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <span style={{ fontSize: '1.2rem' }}>📖</span>
-          <span style={{ color: 'white', fontWeight: '700', fontSize: '0.95rem' }}>Word of the Day</span>
+          <span style={{ color: 'white', fontWeight: '700', fontSize: '0.95rem' }}>{isSpanish ? 'Palabra del día' : 'Word of the Day'}</span>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <span style={{ background: levelColour, color: 'white', padding: '2px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700' }}>{levelLabel}</span>

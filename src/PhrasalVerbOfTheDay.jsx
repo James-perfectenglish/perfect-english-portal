@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import SentenceChallenge from './components/SentenceChallenge'
 
-// Phrasal Verb of the Day — English only. Mirrors GrammarOfTheDay's pool/rotation
-// shape (one item per UTC day, picked by day-index from the student's level band).
-// Three distinct level bands: A1/A2, B1/B2, C1/C2 — each student only ever sees
+// Phrasal Verb of the Day (EN) / Expresión del día (ES). Mirrors GrammarOfTheDay's
+// pool/rotation shape (one item per UTC day, picked by day-index from the student's
+// level band). Three level bands: A1/A2, B1/B2, C1/C2 — each student only ever sees
 // their own band, so an A-level PV like "sit down" never shows for a C student.
+// Spanish has no phrasal verbs, so the ES side carries three related families
+// (perífrasis verbal, verbo con preposición, expresión idiomática), named per day in
+// `category`. `separable` is meaningless there, so the badge shows the family instead.
 
 const levelBucket = (profileLevel) => {
   if (!profileLevel) return 'B1/B2'
@@ -36,8 +39,12 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
   const [expanded, setExpanded]           = useState(!collapsible)
   const [showChallenge, setShowChallenge] = useState(false)
 
-  const bucket = teacherMode ? classItem.level : levelBucket(profile?.level)
-  const level  = bucket
+  const isSpanish = teacherMode
+    ? classItem.language === 'es'
+    : ((Array.isArray(profile?.tracks) && profile.tracks.includes('spanish')) || profile?.level === 'Spanish')
+  const bucket    = teacherMode ? classItem.level : levelBucket(profile?.level)
+  const language  = isSpanish ? 'es' : 'en'
+  const level     = isSpanish ? (profile?.spanish_level || 'A1/A2') : bucket
 
   useEffect(() => { fetchItem() }, [profile])
 
@@ -51,11 +58,11 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
       return
     }
 
-    // Count active rows at this level (English only), then pick by day index.
+    // Count active rows at this level + language, then pick by day index.
     const { data: pool, error } = await supabase
       .from('phrasal_verb_of_the_day')
       .select('*')
-      .eq('language', 'en')
+      .eq('language', language)
       .eq('level', level)
       .eq('active', true)
       .order('id', { ascending: true })
@@ -117,7 +124,7 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
 
   if (loading) return (
     <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '1rem', textAlign: 'center', color: '#718096', fontSize: '0.9rem' }}>
-      Loading today's phrasal verb...
+      {isSpanish ? 'Cargando la expresión del día...' : "Loading today's phrasal verb..."}
     </div>
   )
 
@@ -125,10 +132,11 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
 
   const alreadySubmitted = !!submission
   const feedbackToShow   = alreadySubmitted ? { valid: submission.is_correct, message: submission.ai_feedback } : null
-  const levelColour      = levelColourMap[bucket] || '#718096'
-  const levelLabel       = bucket
-  const sepLabel         = item.separable ? 'separable' : 'inseparable'
-  const sepColour        = item.separable ? '#dd6b20' : '#3182ce'
+  const levelColour      = isSpanish ? '#e53e3e' : (levelColourMap[bucket] || '#718096')
+  const levelLabel       = isSpanish ? 'ES' : bucket
+  // ES has no separable/inseparable split — the badge carries the expression family instead.
+  const sepLabel         = isSpanish ? (item.category || 'expresión') : (item.separable ? 'separable' : 'inseparable')
+  const sepColour        = isSpanish ? '#805ad5' : (item.separable ? '#dd6b20' : '#3182ce')
 
   // ── COLLAPSED ────────────────────────────────────────────────────────────
   if (collapsible && !expanded) {
@@ -140,20 +148,20 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
       }}>
         <div>
           <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.75)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '4px' }}>
-            📚 Phrasal Verb of the Day
+            📚 {isSpanish ? 'Expresión del día' : 'Phrasal Verb of the Day'}
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
             <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'white' }}>{item.phrasal_verb}</span>
           </div>
           {alreadySubmitted && (
             <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.8)', marginTop: '3px' }}>
-              {submission.is_correct ? '✅ Submitted today' : '↩ Try again'}
+              {submission.is_correct ? (isSpanish ? '✅ Enviado hoy' : '✅ Submitted today') : (isSpanish ? '↩ Inténtalo de nuevo' : '↩ Try again')}
             </div>
           )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
           <span style={{ background: levelColour, color: 'white', padding: '2px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 700 }}>{levelLabel}</span>
-          <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)' }}>tap to expand ↓</span>
+          <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)' }}>{isSpanish ? 'toca para abrir ↓' : 'tap to expand ↓'}</span>
         </div>
       </div>
     )
@@ -170,13 +178,13 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <span style={{ fontSize: '1.2rem' }}>📚</span>
           <span style={{ color: 'white', fontWeight: '700', fontSize: '0.95rem' }}>
-            Phrasal Verb of the Day
+            {isSpanish ? 'Expresión del día' : 'Phrasal Verb of the Day'}
           </span>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <span style={{ background: levelColour, color: 'white', padding: '2px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700' }}>{levelLabel}</span>
           <span style={{ background: 'rgba(255,255,255,0.2)', color: 'white', padding: '2px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600' }}>
-            {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+            {new Date().toLocaleDateString(isSpanish ? 'es-ES' : 'en-GB', { day: 'numeric', month: 'short' })}
           </span>
           {collapsible && <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.75rem' }}>↑</span>}
         </div>
@@ -195,14 +203,14 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: '1rem' }}>
           <div>
             <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-              Meaning
+              {isSpanish ? 'Significado' : 'Meaning'}
             </span>
             <p style={{ margin: '0.15rem 0 0', fontSize: '0.92rem', color: '#2d3748', lineHeight: '1.5' }}>{item.meaning}</p>
           </div>
 
           <div style={{ background: '#f7fafc', borderLeft: `3px solid ${levelColour}`, borderRadius: '0 8px 8px 0', padding: '0.55rem 0.85rem' }}>
             <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-              Example
+              {isSpanish ? 'Ejemplo' : 'Example'}
             </span>
             <p style={{ margin: '0.1rem 0 0', fontSize: '0.9rem', color: '#2d3748', fontStyle: 'italic', lineHeight: '1.5' }}>"{item.example}"</p>
           </div>
@@ -210,7 +218,7 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
           {item.note && (
             <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.55rem 0.85rem' }}>
               <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                💡 Tip
+                💡 {isSpanish ? 'Consejo' : 'Tip'}
               </span>
               <p style={{ margin: '0.15rem 0 0', fontSize: '0.85rem', color: '#78350f', lineHeight: '1.5' }}>{item.note}</p>
             </div>
@@ -220,7 +228,7 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
         {alreadySubmitted && (
           <div>
             <div style={{ fontSize: '0.78rem', fontWeight: '600', color: '#718096', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '0.4rem' }}>
-              Your sentence
+              {isSpanish ? 'Tu frase' : 'Your sentence'}
             </div>
             <div style={{ background: '#f7fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem 1rem', fontSize: '0.92rem', color: '#2d3748', marginBottom: '0.75rem', fontStyle: 'italic' }}>
               "{submission.sentence}"
@@ -231,7 +239,7 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
               </div>
             )}
             <p style={{ fontSize: '0.78rem', color: '#a0aec0', margin: '0.75rem 0 0', textAlign: 'center' }}>
-              Come back tomorrow for a new phrasal verb 👋
+              {isSpanish ? 'Vuelve mañana para una nueva expresión 👋' : 'Come back tomorrow for a new phrasal verb 👋'}
             </p>
           </div>
         )}
@@ -245,10 +253,10 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
                 border: 'none', borderRadius: '10px', cursor: 'pointer',
                 fontWeight: '700', fontSize: '0.95rem', letterSpacing: '0.2px'
               }}>
-              ⭐ Use it in a sentence →
+              ⭐ {isSpanish ? 'Úsala en una frase →' : 'Use it in a sentence →'}
             </button>
             <p style={{ fontSize: '0.78rem', color: '#a0aec0', margin: '0.6rem 0 0', textAlign: 'center' }}>
-              Write or speak a sentence using "{item.phrasal_verb}"
+              {isSpanish ? 'Escribe o graba una frase con' : 'Write or speak a sentence using'} "{item.phrasal_verb}"
             </p>
           </div>
         )}
@@ -257,19 +265,20 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
     {showChallenge && item && (
       <SentenceChallenge
         word={item.phrasal_verb}
-        language="en"
+        language={isSpanish ? 'es' : 'en'}
         exercise="pvotd"
         apiContext="pvotd"
         apiExtraFields={{
-          phrasalVerb: item.phrasal_verb,
-          meaning:     item.meaning,
-          example:     item.example,
-          separable:   item.separable,
+          phrasalVerb:  item.phrasal_verb,
+          meaning:      item.meaning,
+          example:      item.example,
+          separable:    item.separable,
+          partOfSpeech: item.category || null,
         }}
         dedupeKey={`pvotd:${item.id}:${new Date().toISOString().slice(0, 10)}`}
         noStars={teacherMode}
-        headerLabel="📚 Phrasal Verb of the Day"
-        promptText="Use it in a sentence:"
+        headerLabel={isSpanish ? '📚 Expresión del día' : '📚 Phrasal Verb of the Day'}
+        promptText={isSpanish ? 'Úsala en una frase:' : 'Use it in a sentence:'}
         onMarkResult={onMarked}
         onClose={() => setShowChallenge(false)}
       />
