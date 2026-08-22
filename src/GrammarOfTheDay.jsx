@@ -41,7 +41,7 @@ export default function GrammarOfTheDay({ profile, collapsible = true, classItem
     : ((Array.isArray(profile?.tracks) && profile.tracks.includes('spanish')) || profile?.level === 'Spanish')
   const bucket    = teacherMode ? classItem.level : levelBucket(profile?.level)
   const language  = isSpanish ? 'es' : 'en'
-  const level     = isSpanish ? 'A1/A2' : bucket
+  const level     = isSpanish ? (profile?.spanish_level || 'A1/A2') : bucket
 
   useEffect(() => { fetchItem() }, [profile])
 

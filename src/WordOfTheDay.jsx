@@ -48,6 +48,7 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
 
   const isSpanish = (Array.isArray(profile?.tracks) && profile.tracks.includes('spanish')) || profile?.level === 'Spanish'
   const bucket    = levelBucket(profile?.level)
+  const spanishLevel = profile?.spanish_level || 'A1/A2'
   const today     = new Date().toISOString().split('T')[0]
 
   useEffect(() => { fetchWord() }, [profile])
@@ -57,9 +58,17 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
     let wordData = null
 
     if (isSpanish) {
-      const { data } = await supabase
-        .from('word_of_the_day').select('*').eq('date', today).eq('language', 'es').limit(1).single()
-      wordData = data
+      const { data: s1 } = await supabase
+        .from('word_of_the_day').select('*').eq('date', today).eq('language', 'es')
+        .eq('level', spanishLevel).limit(1).single()
+      wordData = s1
+      // ES B1/B2 and C1/C2 are not populated for every date; fall back to the A1/A2 row.
+      if (!wordData && spanishLevel !== 'A1/A2') {
+        const { data: s2 } = await supabase
+          .from('word_of_the_day').select('*').eq('date', today).eq('language', 'es')
+          .eq('level', 'A1/A2').limit(1).single()
+        wordData = s2
+      }
     } else {
       const { data: d1 } = await supabase
         .from('word_of_the_day').select('*').eq('date', today).eq('level', bucket).eq('language', 'en').single()
