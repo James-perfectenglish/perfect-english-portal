@@ -118,8 +118,8 @@ export default function StudentDashboard({ profile, session }) {
       {/* GRAMMAR OF THE DAY */}
       <GrammarOfTheDay profile={profile} collapsible={true} />
 
-      {/* PHRASAL VERB OF THE DAY — English learners only (not Spanish track) */}
-      {!isSpanish && <PhrasalVerbOfTheDay profile={profile} collapsible={true} />}
+      {/* PHRASAL VERB OF THE DAY (EN) / EXPRESIÓN DEL DÍA (ES) */}
+      <PhrasalVerbOfTheDay profile={profile} collapsible={true} />
 
       {/* QUICK START */}
       <div style={{ marginTop: '0.5rem' }}>
