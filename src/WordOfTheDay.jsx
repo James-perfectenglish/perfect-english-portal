@@ -60,27 +60,27 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
     if (isSpanish) {
       const { data: s1 } = await supabase
         .from('word_of_the_day').select('*').eq('date', today).eq('language', 'es')
-        .eq('level', spanishLevel).limit(1).single()
+        .eq('level', spanishLevel).limit(1).maybeSingle()
       wordData = s1
       // ES B1/B2 and C1/C2 are not populated for every date; fall back to the A1/A2 row.
       if (!wordData && spanishLevel !== 'A1/A2') {
         const { data: s2 } = await supabase
           .from('word_of_the_day').select('*').eq('date', today).eq('language', 'es')
-          .eq('level', 'A1/A2').limit(1).single()
+          .eq('level', 'A1/A2').limit(1).maybeSingle()
         wordData = s2
       }
     } else {
       const { data: d1 } = await supabase
-        .from('word_of_the_day').select('*').eq('date', today).eq('level', bucket).eq('language', 'en').single()
+        .from('word_of_the_day').select('*').eq('date', today).eq('level', bucket).eq('language', 'en').maybeSingle()
       wordData = d1
       if (!wordData) {
         const { data: d2 } = await supabase
-          .from('word_of_the_day').select('*').eq('date', today).eq('language', 'en').limit(1).single()
+          .from('word_of_the_day').select('*').eq('date', today).eq('language', 'en').limit(1).maybeSingle()
         wordData = d2
       }
       if (!wordData) {
         const { data: d3 } = await supabase
-          .from('word_of_the_day').select('*').eq('date', today).limit(1).single()
+          .from('word_of_the_day').select('*').eq('date', today).limit(1).maybeSingle()
         wordData = d3
       }
     }
@@ -108,7 +108,7 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
       if (user) {
         const { data: existing } = await supabase
           .from('word_of_the_day_submissions').select('*')
-          .eq('student_id', user.id).eq('word_id', wordData.id).single()
+          .eq('student_id', user.id).eq('word_id', wordData.id).maybeSingle()
         if (existing) { setSubmission(existing); fetchCommunity(wordData.id) }
       }
     }

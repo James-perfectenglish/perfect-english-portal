@@ -180,7 +180,7 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
 
     const { data: wordRow } = await supabase
       .from('wordle_words').select('word, display_word')
-      .eq('play_date', today).eq('language', lang).single()
+      .eq('play_date', today).eq('language', lang).maybeSingle()
 
     if (!wordRow) { setGameState('noword'); return }
     const w = wordRow.word.toUpperCase()
@@ -191,7 +191,7 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
     if (user) {
       const { data: session } = await supabase
         .from('wordle_sessions').select('*')
-        .eq('student_id', user.id).eq('play_date', today).single()
+        .eq('student_id', user.id).eq('play_date', today).maybeSingle()
 
       if (session) {
         const g = session.guesses || []

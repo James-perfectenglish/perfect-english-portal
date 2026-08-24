@@ -184,7 +184,7 @@ export default function SpellingBeeGame({ onBack, userProfile }) {
       .select('*')
       .eq('play_date', today)
       .eq('language', language)
-      .single()
+      .maybeSingle()
 
     if (!p) { setGameState('noword'); return }
 

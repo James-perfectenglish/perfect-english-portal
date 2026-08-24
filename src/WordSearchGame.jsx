@@ -157,7 +157,7 @@ export default function WordSearchGame({ onBack, userProfile, classPuzzle = null
       .select('*')
       .eq('play_date', today)
       .eq('language', language)
-      .single()
+      .maybeSingle()
 
     if (!p) { setGameState('noword'); return }
     setPuzzle(p)

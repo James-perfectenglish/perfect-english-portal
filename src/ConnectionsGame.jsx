@@ -87,7 +87,7 @@ export default function ConnectionsGame({ onBack, userProfile, classPuzzle = nul
       .select('id, title')
       .eq('play_date', today)
       .eq('language', lang)
-      .single()
+      .maybeSingle()
 
     if (!puzzle) { setGameState('noword'); return }
 
@@ -107,7 +107,7 @@ export default function ConnectionsGame({ onBack, userProfile, classPuzzle = nul
     if (user) {
       const { data: session } = await supabase
         .from('connections_sessions').select('*')
-        .eq('student_id', user.id).eq('play_date', today).single()
+        .eq('student_id', user.id).eq('play_date', today).maybeSingle()
 
       if (session) {
         const solved = new Set(session.solved_groups || [])
