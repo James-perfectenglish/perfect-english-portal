@@ -120,7 +120,11 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
   const stateRef = useRef({ word: '', guesses: [], current: '', gameState: 'loading' })
   const inputRef = useRef(null)
 
-  useEffect(() => { stateRef.current = { word, displayWord, guesses, current, gameState } })
+  // `dictionary` is mirrored here too: the keydown listener is bound once on
+  // mount, so anything it reads from the closure is frozen at first render
+  // (when the dictionary is still null) and validation would never run for
+  // people typing on a physical keyboard.
+  useEffect(() => { stateRef.current = { word, displayWord, guesses, current, gameState, dictionary } })
 
   useEffect(() => {
     initDaily()
@@ -230,7 +234,7 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
   }
 
   async function submitGuess() {
-    const { current, word, displayWord, guesses, gameState } = stateRef.current
+    const { current, word, displayWord, guesses, gameState, dictionary } = stateRef.current
     if (gameState !== 'playing' || locked) return
 
     if (current.length < WORD_LENGTH) {
