@@ -112,6 +112,9 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
   // game opens. null = not loaded yet or failed, in which case we accept any
   // five letters rather than lock a student out on a bad connection.
   const [dictionary, setDictionary] = useState(null)
+  // Set when the dictionary chunk can't be fetched, so the game can say so
+  // rather than silently accepting anything.
+  const [dictionaryFailed, setDictionaryFailed] = useState(false)
 
   const today    = new Date().toISOString().slice(0, 10)
   const stateRef = useRef({ word: '', guesses: [], current: '', gameState: 'loading' })
@@ -137,9 +140,10 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
         const mod = isSpanish
           ? await import('./data/wordleWords.es.js')
           : await import('./data/wordleWords.en.js')
-        if (!cancelled) setDictionary(new Set(mod.WORDS))
+        if (!cancelled) { setDictionary(new Set(mod.WORDS)); setDictionaryFailed(false) }
       } catch (e) {
         console.warn('Wordle dictionary failed to load, validation off:', e)
+        if (!cancelled) setDictionaryFailed(true)
       }
     })()
     return () => { cancelled = true }
@@ -427,6 +431,17 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
       {/* Keyboard */}
       {gameState === 'playing' && (
         <>
+          {dictionaryFailed && (
+            <div style={{
+              maxWidth: '340px', margin: '0 auto 0.6rem', padding: '8px 12px',
+              background: '#fffaf0', border: '1px solid #fbd38d', borderRadius: '10px',
+              fontSize: '0.72rem', color: '#92400e', textAlign: 'center', lineHeight: 1.4,
+            }}>
+              {isSpanish
+                ? 'No se pudo cargar la lista de palabras, así que hoy no se comprueban las palabras. Recarga la página para intentarlo de nuevo.'
+                : "Couldn't load the word list, so guesses aren't being checked. Reload the page to try again."}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
             {[['#538d4e','Correct'], ['#b59f3b','Wrong position'], ['#787c7e','Not in word']].map(([c, l]) => (
               <span key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: '#718096' }}>
