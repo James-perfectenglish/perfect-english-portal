@@ -3,13 +3,18 @@ import { useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import SentenceChallenge from './components/SentenceChallenge'
 import Breadcrumb from './components/Breadcrumb'
+import HelpSheet from './components/HelpSheet'
 
 // ── Wordsearch v1 (8 May 2026) ──────────────────────────────────────────────
 // Daily puzzle, 10 themed words to find in a grid (varying sizes, see DB).
 // Bonus words: any 4+ letter word in word_lists (besides the 10 theme words)
 // counts toward score for vocabulary discovery. No gameplay gating.
 // Hint mechanic: reveals the first letter of an unfound theme word at random
-// (Star word held back until last). Unlimited but tracked in hints_used.
+// (Star word held back until last). Capped at 3, tracked in hints_used.
+// Reveal-remaining (28 Aug 2026): once all 3 hints are spent, a button lists
+// the theme words still to find — names only, never positions. Each one must
+// still be traced, so score and stars are untouched. Not persisted: the button
+// stays available (hints_used >= 3 is saved), so re-opening costs one tap.
 // Star events: solve (10/10), star_word (when found), sentence (SC pass).
 // Stars use dedupe_key='daily:<date>:<lang>:<subtype>'.
 // Grid display: full discovery — no theme word list shown to player.
@@ -121,6 +126,7 @@ export default function WordSearchGame({ onBack, userProfile, classPuzzle = null
   const [revealedHintCells, setRevealedHintCells] = useState({})  // 'r,c' -> themeWord
   const [score, setScore]                   = useState(0)
   const [starWordAwarded, setStarWordAwarded] = useState(false)
+  const [wordsRevealed, setWordsRevealed]     = useState(false)
 
   const [dragging, setDragging]   = useState(false)
   const [dragStart, setDragStart] = useState(null)  // [r, c]
@@ -142,7 +148,7 @@ export default function WordSearchGame({ onBack, userProfile, classPuzzle = null
     stateRef.current = {
       gameState, puzzle, themeWordsFound, bonusWordsFound, bonusWordPaths,
       dragging, dragStart, dragPath, hintsUsed, score, revealedHintCells,
-      starWordAwarded,
+      starWordAwarded, wordsRevealed,
     }
   })
 
@@ -466,6 +472,9 @@ export default function WordSearchGame({ onBack, userProfile, classPuzzle = null
 
   const themeCount = themeWordsFound.length
   const allFound   = themeCount >= 10
+  const remainingWords = puzzle
+    ? (puzzle.theme_words || []).filter(w => !themeWordsFound.includes(w)).sort()
+    : []
   const baseStars  = (allFound ? 1 : 0) + (starWordAwarded ? 1 : 0)
   const totalStars = baseStars + (sentenceStar ? 1 : 0)
 
@@ -522,7 +531,18 @@ export default function WordSearchGame({ onBack, userProfile, classPuzzle = null
       <div style={{ maxWidth: '500px', margin: '0 auto', padding: '1rem 1rem 3rem' }}>
 
         {/* Header */}
-        <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.1rem 1.5rem', textAlign: 'center', color: 'white', marginBottom: '1rem' }}>
+        <div style={{ background: GRADIENT, borderRadius: '12px', padding: '1.1rem 1.5rem', textAlign: 'center', color: 'white', marginBottom: '1rem', position: 'relative' }}>
+          <HelpSheet
+            title="How to play"
+            points={[
+              'Drag across the letters to trace a word. Words run in any direction — forwards, backwards, up, down and diagonally.',
+              "There are 10 theme words, but you don't get a list. Working out what they are is half the game.",
+              'Any other real word of 4+ letters you spot earns bonus points — the longer the word, the more it is worth.',
+              "A short word hidden inside one of the 10 doesn't count on its own. It flashes amber to tell you so.",
+              "🔎 gives you the first letter of a word you haven't found. Three per puzzle — after that you can ask to see the words you still have to find.",
+              'Stars: one for finding all 10, one for the star word, one for a good sentence.',
+            ]}
+          />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
             <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>🔎</span>
             <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, letterSpacing: '2px' }}>
@@ -709,6 +729,53 @@ export default function WordSearchGame({ onBack, userProfile, classPuzzle = null
             )}
           </div>
         </div>
+
+        {/* Stuck? — lists the theme words still to find, once all three hints
+            are spent. Names only, never positions: each word must still be
+            traced on the grid, so score and stars are unaffected. */}
+        {gameState === 'playing' && hintsUsed >= 3 && !allFound && (
+          <div style={{ background: 'white', borderRadius: '12px', marginBottom: '0.75rem', overflow: 'hidden' }}>
+            {!wordsRevealed ? (
+              <button
+                onClick={() => setWordsRevealed(true)}
+                style={{
+                  width: '100%', padding: '0.75rem 1rem', background: 'transparent',
+                  border: 'none', cursor: 'pointer', fontWeight: 700,
+                  fontSize: '0.85rem', color: '#92400e', textAlign: 'center',
+                }}
+              >
+                🙈 {isSpanish
+                  ? '¿Atascado? Ver las palabras que faltan'
+                  : "Stuck? Show the words you haven't found"}
+              </button>
+            ) : (
+              <div style={{ padding: '0.75rem 1rem 0.85rem' }}>
+                <div style={{
+                  fontSize: '0.7rem', color: '#a0aec0', fontWeight: 600,
+                  textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px',
+                }}>
+                  {isSpanish ? 'Te faltan' : 'Still to find'} · {remainingWords.length}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  {remainingWords.map(w => (
+                    <span key={w} style={{
+                      padding: '3px 9px', borderRadius: '999px', fontSize: '0.78rem',
+                      fontWeight: 600, background: '#fffbeb', color: '#92400e',
+                      border: '1px solid #fde68a',
+                    }}>
+                      {w}
+                    </span>
+                  ))}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#a0aec0', marginTop: '8px' }}>
+                  {isSpanish
+                    ? 'Siguen contando — encuéntralas en la cuadrícula.'
+                    : 'They still count — find them in the grid.'}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Bonus words */}
         {gameState === 'playing' && (
