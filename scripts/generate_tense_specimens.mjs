@@ -1,9 +1,9 @@
 /* ============================================================
    generate_tense_specimens.mjs
    Builds the Tense Tagger specimen bank: generates sentences with the
-   SHARED engines, runs each through an AI "does this scan?" naturalness
-   filter (same Haiku model the app marks with), and inserts the
-   survivors into the tense_specimens table.
+   SHARED engines, runs each through an AI editor that judges BOTH
+   plausibility and fitness-as-a-specimen, and inserts the survivors
+   into the tense_specimens table.
 
    The engine is imported, not duplicated — so the bank can never drift
    from what the live component would generate.
@@ -21,16 +21,35 @@
      node scripts/generate_tense_specimens.mjs --lang=es  # one language
      node scripts/generate_tense_specimens.mjs --level=B1 # one level
      node scripts/generate_tense_specimens.mjs --target=500
+     node scripts/generate_tense_specimens.mjs --model=claude-haiku-4-5-20251001
+
+   ── The filter ──────────────────────────────────────────────
+   The filter is told WHICH TENSE each sentence is a specimen for, and
+   asks two questions rather than one:
+     1. Plausibility — could this happen, would anyone say it? This is
+        where grammatically flawless nonsense gets caught ("Cuando abrió
+        el restaurante, el cliente ya había dormido").
+     2. Fitness — is it a CLEAR example of the stated tense? If a fluent
+        speaker would reach for a different tense, the answer key is
+        wrong and the learner gets marked down for agreeing with the
+        native speaker. That is worse than an ugly sentence.
+   Rejections come back with a short reason, which --dry prints. Tune the
+   prompt from those reasons, not from guesswork.
    ============================================================ */
 
 import pg from 'pg';
-import { makeGenerated } from '../src/lib/tenseEngineEn.js';
-import { makeES } from '../src/lib/tenseEngineEs.js';
+import { makeGenerated, tenseName } from '../src/lib/tenseEngineEn.js';
+import { makeES, TIEMPO_ES } from '../src/lib/tenseEngineEs.js';
 
 const { Client } = pg;
 
 // ── config ──────────────────────────────────────────────────
-const MODEL = 'claude-haiku-4-5-20251001';
+// Opus by default. The filter's job is a plausibility judgement, and that is
+// exactly where a cheaper model waves through grammatical-but-absurd sentences.
+// At ~450 input / ~200 output tokens per 20-sentence call, a full six-bucket
+// rebuild costs a few dollars — the model is not the place to economise here.
+// Override with --model= to A/B a cheaper one against a --dry sample.
+const DEFAULT_MODEL = 'claude-opus-5';
 const BATCH = 20;            // sentences per AI filter call
 const DEFAULT_TARGET = 1500; // survivors wanted per (language, level)
 const INSERT_CHUNK = 500;    // rows per INSERT statement
@@ -61,6 +80,7 @@ const arg = k => { const a = args.find(x => x.startsWith(`--${k}=`)); return a ?
 const onlyLang = arg('lang');
 const onlyLevel = arg('level');
 const TARGET = arg('target') ? parseInt(arg('target'), 10) : DEFAULT_TARGET;
+const MODEL = arg('model') || DEFAULT_MODEL;
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const DB_URL = process.env.SUPABASE_DB;
@@ -71,29 +91,57 @@ let client = null;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ── one specimen from the right engine ─────────────────────
+// `target` is the human-readable tense name, passed to the filter so it can
+// judge fitness-as-a-specimen, not just whether the sentence scans.
 function makeOne(language, level) {
   if (language === 'es') {
     const it = makeES(level);
-    return { pre: it.pre, vp: it.vp, post: it.post, sentence: it.sentence, answer: { tiempo: it.tense } };
+    return {
+      pre: it.pre, vp: it.vp, post: it.post, sentence: it.sentence,
+      answer: { tiempo: it.tense }, target: TIEMPO_ES[it.tense] || it.tense,
+    };
   }
   const it = makeGenerated(level);
   if (!it) return null;
-  return { pre: it.pre, vp: it.vp, post: it.post, sentence: it.pre + it.vp + it.post, answer: it.answer };
+  return {
+    pre: it.pre, vp: it.vp, post: it.post, sentence: it.pre + it.vp + it.post,
+    answer: it.answer, target: tenseName(it),
+  };
 }
 
-// ── AI naturalness filter (batched) ────────────────────────
-async function filterBatch(sentences, language) {
+// ── AI editor: plausibility + fitness-as-a-specimen (batched) ────
+async function filterBatch(items, language) {
   const lang = language === 'es' ? 'Spanish' : 'English';
-  const example = language === 'es'
-    ? 'e.g. reject "Yo traje el menú el año que viene" — a fluent speaker would not say that'
-    : 'e.g. reject "We will have brought the menu by next year" — a fluent speaker would not say that';
-  const list = sentences.map((s, i) => `${i + 1}. ${s}`).join('\n');
-  const prompt = `You are a strict but fair language-teaching editor. For each numbered ${lang} sentence, decide whether it is NATURAL, idiomatic ${lang} that a teacher would be happy to show a learner. Reject ONLY sentences that are grammatically fine but read oddly — implausible scenarios, awkward collocations, or things a fluent speaker would never say (${example}). Accept anything that sounds normal, even if a little plain.
+  const bad = language === 'es'
+    ? ['"Cuando abrió el restaurante, el cliente ya había dormido." — grammatically perfect; nobody has this thought',
+       '"Ellos vivieron en Palma el lunes pasado." — a long-running state pinned to a single past moment',
+       '"El cocinero ha esperado a los clientes este año." — the time frame makes the action pointless']
+    : ['"We will have brought the menu by next year." — the timescale is absurd for the action',
+       '"The chef had slept when the restaurant opened." — grammatical, but not a thought anyone has',
+       '"They have been owning the hotel since Monday." — a state verb forced into a continuous'];
+  const list = items.map((it, i) => `${i + 1}. ${it.sentence}   [${it.target}]`).join('\n');
 
-Return ONLY a JSON array of booleans, one per sentence in order (true = keep, false = reject). No other text.
+  const prompt = `You are a language-teaching editor deciding which sentences are fit to show a learner.
+
+Each ${lang} sentence below is a specimen for one specific tense, named in brackets after it. Judge each on TWO questions.
+
+1. PLAUSIBILITY — could this actually happen, and would a real person ever say it? Reject sentences that are grammatically flawless but describe an absurd, pointless or incoherent scenario. This is the most common failure and the main thing you are here to catch:
+   • ${bad[0]}
+   • ${bad[1]}
+   • ${bad[2]}
+
+2. FITNESS AS A SPECIMEN — is this a clear, unambiguous example of the tense in brackets? Reject if a fluent speaker would naturally use a DIFFERENT tense to say this. The bracketed tense is the answer key, so a learner who agrees with the native speaker would be marked wrong — worse than an ugly sentence.
+
+ACCEPT anything plausible and clearly in its stated tense, even if plain or unexciting. Do NOT reject for being dull, short, or for lacking an object. Do NOT reject for regional variation, or for a missing accent or punctuation mark.
+
+Return ONLY a JSON array, one entry per sentence, in order:
+[{"keep":true},{"keep":false,"why":"six words maximum"}]
+No other text.
 
 Sentences:
 ${list}`;
+
+  const keepAll = () => items.map(() => ({ keep: true, why: null }));
 
   for (let attempt = 0; attempt < 3; attempt++) {
     let res;
@@ -101,26 +149,32 @@ ${list}`;
       res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: MODEL, max_tokens: 1024, messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ model: MODEL, max_tokens: 2048, messages: [{ role: 'user', content: prompt }] }),
       });
     } catch (e) {
       console.warn(`  filter network error (${e.message}) — retrying`); await sleep(1000); continue;
     }
     if (res.status === 529 || res.status === 429) { await sleep(1500 + attempt * 1500); continue; }  // transient — back off and retry
-    if (!res.ok) {  // hard error (bad key / no credits / bad request): abort rather than silently bank unfiltered rows
+    if (!res.ok) {  // hard error (bad key / no credits / bad model id): abort rather than silently bank unfiltered rows
       const body = await res.text().catch(() => '');
       throw new Error(`Anthropic filter returned HTTP ${res.status}. ${body.slice(0, 200)}`);
     }
     const data = await res.json();
     const text = (data.content || []).map(b => b.text || '').join('');
     const m = text.match(/\[[\s\S]*\]/);
-    const verdicts = m ? JSON.parse(m[0]) : null;
-    if (Array.isArray(verdicts) && verdicts.length === sentences.length) return verdicts.map(Boolean);
+    let parsed = null;
+    try { parsed = m ? JSON.parse(m[0]) : null; } catch { parsed = null; }
+    if (Array.isArray(parsed) && parsed.length === items.length) {
+      // tolerate a bare-boolean array too, in case a model ignores the object shape
+      return parsed.map(v => (typeof v === 'boolean'
+        ? { keep: v, why: null }
+        : { keep: v?.keep !== false, why: v?.why || null }));
+    }
     console.warn('  filter parse mismatch — keeping this batch');  // rare; safe to keep one batch
-    return sentences.map(() => true);
+    return keepAll();
   }
   console.warn('  filter unavailable after retries — keeping this batch');
-  return sentences.map(() => true);
+  return keepAll();
 }
 
 // ── insert a chunk of survivors (ON CONFLICT DO NOTHING against the dedup index) ──
@@ -144,7 +198,11 @@ async function buildBucket(language, level) {
   const seen = new Set();
   const survivors = [];
   let generated = 0, rejected = 0;
-  const maxAttempts = TARGET * 6;
+  // Headroom: the two-question filter rejects harder than the old naturalness
+  // check, so a bucket needs more attempts to fill. Raise this, not the bar,
+  // if a bucket comes up short.
+  const maxAttempts = TARGET * 12;
+  const keptBy = {}, rejBy = {}, samples = [];
 
   while (survivors.length < TARGET && generated < maxAttempts) {
     const batch = [];
@@ -157,15 +215,40 @@ async function buildBucket(language, level) {
     }
     if (!batch.length) break;
 
-    const verdicts = await filterBatch(batch.map(c => c.sentence), language);
-    batch.forEach((c, i) => { if (verdicts[i]) survivors.push(c); else rejected++; });
+    const verdicts = await filterBatch(batch, language);
+    batch.forEach((c, i) => {
+      if (verdicts[i].keep) {
+        survivors.push(c);
+        keptBy[c.target] = (keptBy[c.target] || 0) + 1;
+      } else {
+        rejected++;
+        rejBy[c.target] = (rejBy[c.target] || 0) + 1;
+        if (samples.length < 25) samples.push({ s: c.sentence, t: c.target, why: verdicts[i].why });
+      }
+    });
     process.stdout.write(`\r  ${language} ${level}: kept ${survivors.length}/${TARGET}  (rejected ${rejected})   `);
   }
   process.stdout.write('\n');
 
+  // Per-tense keep rate. A tense rejecting far harder than its neighbours means
+  // the ENGINE is generating bad specimens for it (wrong adverbials, or a frame
+  // that suits few verbs) — fix that rather than paying the filter to bin them.
+  const targets = [...new Set([...Object.keys(keptBy), ...Object.keys(rejBy)])].sort();
+  console.log('  keep rate by tense:');
+  for (const t of targets) {
+    const k = keptBy[t] || 0, r = rejBy[t] || 0;
+    const pct = (k + r) ? Math.round(k / (k + r) * 100) : 0;
+    const flag = (k + r >= 20 && pct < 45) ? '   <-- check the engine for this one' : '';
+    console.log(`    ${t.padEnd(28)} ${String(pct).padStart(3)}%   (kept ${k}, rejected ${r})${flag}`);
+  }
+
   if (DRY) {
-    console.log('  [dry] sample of kept:');
-    survivors.slice(0, 8).forEach(c => console.log(`    ${c.sentence}`));
+    console.log('  [dry] sample of KEPT:');
+    survivors.slice(0, 8).forEach(c => console.log(`    ${c.sentence}   [${c.target}]`));
+    if (samples.length) {
+      console.log('  [dry] sample of REJECTED, with reasons:');
+      samples.slice(0, 15).forEach(x => console.log(`    ${x.s}   [${x.t}]\n        -> ${x.why || '(no reason given)'}`));
+    }
     return survivors.length;
   }
 
