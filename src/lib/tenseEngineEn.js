@@ -5,6 +5,8 @@
    Pure JS, no React: importable by Vite and by Node scripts.
    ============================================================ */
 
+import { axisAllows } from './tenseFocus.js';
+
 /* ---------- lexicon ---------- */
 // base, s, past, pp, ing, transitive, stative, objects, min
 const VERBS = [
@@ -168,6 +170,41 @@ function allowedSpecs(level) {
   return GRID.filter(s => g.aspect.includes(s.aspect) && g.voice.includes(s.voice));
 }
 
+/* Specs surviving a focus rule (see src/lib/tenseFocus.js). The component
+   derives its CHIPS from the same rule via axisState(), so the pool and the
+   answer options can never drift apart — which is exactly what leaked the
+   answer in the old locked "Practise this" mode. Falls back to the unfocused
+   set if a focus would empty the pool. */
+function allowedSpecsFocused(level, focus = null) {
+  const all = allowedSpecs(level);
+  if (!focus) return all;
+  const kept = all.filter(s =>
+    axisAllows(s.answer.time, focus.time) &&
+    axisAllows(s.answer.aspect, focus.aspect) &&
+    axisAllows(s.answer.voice, focus.voice));
+  return kept.length ? kept : all;
+}
+
+/* The options actually REACHABLE on each axis — the chip source.
+   For each axis we drop that axis's own rule and keep the rest, so the chips
+   are exactly the values that can still turn up as an answer given everything
+   else the focus has fixed. Without this, "Future only" would offer a
+   "perfect continuous" chip that the grid never generates for the future — a
+   dead option a student can learn to rule out for free.
+   NOTE for a future Custom-matrix UI: build its controls from THIS, so an
+   unsatisfiable combination can never be assembled in the first place. */
+function axisOptionsEn(level, focus = null) {
+  const g = LEVEL_GATES[level];
+  const AX = { time: ['past', 'present', 'future'], aspect: g.aspect, voice: g.voice };
+  const out = {};
+  for (const ax of ['time', 'aspect', 'voice']) {
+    const others = focus ? { ...focus, [ax]: null } : null;
+    const specs = allowedSpecsFocused(level, others);
+    out[ax] = AX[ax].filter(v => specs.some(s => s.answer[ax] === v));
+  }
+  return out;
+}
+
 /* ---------- helpers ---------- */
 const rand = a => a[Math.floor(Math.random() * a.length)];
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
@@ -181,9 +218,9 @@ function tenseName(item) {
   return n;
 }
 
-function makeGenerated(level, only = null) {
-  let specs = allowedSpecs(level);
-  // locked-tense mode (Tense Tagger "Practise this"): generate only that tense
+function makeGenerated(level, only = null, focus = null) {
+  let specs = allowedSpecsFocused(level, focus);
+  // legacy single-tense lock — kept for callers that still pin one exact tense
   if (only) specs = specs.filter(s => s.time === only.time && s.aspect === only.aspect && s.voice === only.voice);
   if (!specs.length) return null;
   for (let tries = 0; tries < 50; tries++) {
@@ -276,6 +313,7 @@ function startLevel(profile) {
 }
 
 export {
-  VERBS, LEVEL_GATES, allowedSpecs, buildVP, tenseName, ASPECT_NAME,
-  makeGenerated, productionResult, functionAccepts, FUNCTION_OPTIONS, startLevel,
+  VERBS, LEVEL_GATES, allowedSpecs, allowedSpecsFocused, axisOptionsEn, buildVP,
+  tenseName, ASPECT_NAME, makeGenerated, productionResult, functionAccepts,
+  FUNCTION_OPTIONS, startLevel,
 };

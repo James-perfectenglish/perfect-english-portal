@@ -8,10 +8,14 @@
    four (presente, presente_continuo, preterito, imperfecto) match
    the ES Tagger / engine and the bank's answer.tiempo field, so
    {tiempo} round-trips to a bank query and a Tagger filter. The
-   other five carry `practisable: false` until the engine learns
-   them (flip per tiempo as Tagger support lands) — the flag gates
-   both the bank-example fetch and the "Practise this" button in
-   TenseCardES. English scaffolding + Spanish examples throughout.
+   other five carried `practisable: false` until the engine learned
+   them. Four have now landed (perfecto, pluscuamperfecto, futuro,
+   condicional). Only the SUBJUNTIVO still carries the flag: it is a
+   mood, not a tense, and needs a trigger clause ("Espero que…") so
+   the highlighted verb sits in a subordinate clause — a different
+   generator shape, and a separate job. The flag gates both the
+   bank-example fetch and the "Practise this" button in TenseCardES.
+   English scaffolding + Spanish examples throughout.
 
    ⚠️ CONTENT NOTE FOR JAMES: the `uses` examples and `watchOut` lines
    are first drafts for your review — your Spanish-teacher turf. For
@@ -81,7 +85,7 @@ const DATA = [
     watchOut: 'Use it for the background — what used to happen or was happening — not a single finished event. “De niño jugaba al fútbol” (used to), but “ayer jugué un partido” (one match → pretérito).',
   },
   {
-    id: 'perfecto', tiempo: 'perfecto', group: 'past', practisable: false,
+    id: 'perfecto', tiempo: 'perfecto', group: 'past',
     formula: 'he / has / ha… + participio  (he hablado, ha comido)', use: 'a past action connected to now',
     uses: [
       { label: 'Recent past, inside “today”', signals: ['hoy', 'esta mañana', 'esta semana', 'este mes'], example: 'Esta mañana he hablado con el recepcionista.' },
@@ -90,7 +94,7 @@ const DATA = [
     watchOut: 'Good news — it works like English “I have done”. But Spain stretches it further: anything inside an unfinished period (hoy, esta semana) takes the perfecto, even where English would say “I did it this morning”.',
   },
   {
-    id: 'pluscuamperfecto', tiempo: 'pluscuamperfecto', group: 'past', practisable: false,
+    id: 'pluscuamperfecto', tiempo: 'pluscuamperfecto', group: 'past',
     formula: 'había / habías… + participio  (había hablado)', use: 'a past action before another past action',
     uses: [
       { label: 'The past before the past', signals: ['ya', 'cuando', 'antes'], example: 'Cuando llegué al hotel, el cliente ya había salido.' },
@@ -99,7 +103,7 @@ const DATA = [
   },
   /* ===== FUTURE & CONDITIONAL ===== */
   {
-    id: 'futuro', tiempo: 'futuro', group: 'future', practisable: false,
+    id: 'futuro', tiempo: 'futuro', group: 'future',
     formula: 'infinitive + -é, -ás, -á…  (hablaré, comerás)', use: 'predictions and promises about the future',
     uses: [
       { label: 'Predictions & promises', signals: ['mañana', 'el año que viene', 'la próxima semana'], example: 'El año que viene abrirán un hotel nuevo en el puerto.' },
@@ -108,7 +112,7 @@ const DATA = [
     watchOut: 'For a plan you have already made, natives usually say ir a + infinitive — “voy a llamar mañana”, not “llamaré”. The futuro leans towards predictions, promises and guesses: “serán las tres” = “it must be about three”.',
   },
   {
-    id: 'condicional', tiempo: 'condicional', group: 'future', practisable: false,
+    id: 'condicional', tiempo: 'condicional', group: 'future',
     formula: 'infinitive + -ía, -ías…  (hablaría, comería)', use: 'hypotheticals and polite requests (“would”)',
     uses: [
       { label: 'Hypotheticals (“would”)', signals: [], example: 'Con más tiempo, viajaría por toda España.' },

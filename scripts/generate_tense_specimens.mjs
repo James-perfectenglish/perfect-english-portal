@@ -41,6 +41,19 @@ const BUCKETS = [
   { language: 'es', level: 'A2' }, { language: 'es', level: 'B1' },
 ];
 
+/* ⚠️ SPANISH REBUILD — the ES engine now covers EIGHT tiempos (perfecto,
+   pluscuamperfecto, futuro and condicional were added). The existing ES rows
+   only cover the original four, so a rebuild is needed:
+
+     node scripts/generate_tense_specimens.mjs --lang=es --dry     # eyeball first
+     node scripts/generate_tense_specimens.mjs --lang=es
+
+   ORDER MATTERS: deploy the app FIRST, then run this. New-tiempo rows would
+   break a previously deployed TenseTaggerES, which only knows four tiempos and
+   would render a chip row with no correct answer in it. The inserts are
+   ON CONFLICT DO NOTHING against (language, level, sentence), so re-running is
+   safe and additive — old rows are kept, not replaced. */
+
 // ── args ────────────────────────────────────────────────────
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry');

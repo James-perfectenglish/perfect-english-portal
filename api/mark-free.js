@@ -521,7 +521,10 @@ Target tense: ${tenseName} (Spanish)
 
 ASSESSMENT RULES — apply in order:
 1. Is the sentence in Spanish, with the main verb in the ${tenseName}? Identify the conjugated verb and its tense.
-   Reference: presente (hablo / come), presente continuo (estoy hablando), pretérito (hablé / comió — a completed past action), imperfecto (hablaba / comía — an ongoing or habitual past). Pretérito vs imperfecto is the key contrast: both are past, but only the ${tenseName} is accepted here. A correct verb in the WRONG past tense → valid=false, and say which tense they actually used.
+   Reference: presente (hablo / come), presente continuo (estoy hablando), pretérito (hablé / comió — a completed past action), imperfecto (hablaba / comía — an ongoing or habitual past), pretérito perfecto (he hablado / ha comido — a past action connected to now), pluscuamperfecto (había hablado — a past action before another past action), futuro (hablaré / comerás), condicional (hablaría / comería).
+   The FOUR PAST tenses are the hard contrast: pretérito, imperfecto, pretérito perfecto and pluscuamperfecto are all past, but only the ${tenseName} is accepted here. A correct verb in the WRONG past tense → valid=false, and say which tense they actually used.
+   Two more traps worth naming kindly rather than failing silently: "ir a + infinitivo" (voy a hablar) is NOT the futuro; and "would" as a past habit is the imperfecto, not the condicional.
+   Peninsular usage is the standard here (tú and vosotros). Latin-American forms are not errors — accept them and say nothing.
 2. Is it natural, grammatical Spanish? Right tense but broken or unnatural → valid=false with a gentle fix.
 3. Cosmetic only — a missing or wrong accent/tilde, capitalisation, punctuation, an opening ¿ or ¡ — is NEVER grounds for rejection → valid=true; you may note it in one short clause.
 

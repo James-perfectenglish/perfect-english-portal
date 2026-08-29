@@ -2,8 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import {
   makeGenerated, tenseName, functionAccepts,
-  FUNCTION_OPTIONS, startLevel, LEVEL_GATES,
+  FUNCTION_OPTIONS, startLevel, LEVEL_GATES, axisOptionsEn,
 } from '../lib/tenseEngineEn.js';
+import {
+  presetsForLevelEn, focusForTenseEn, axisState, liveAxesFor,
+  focusToJson, normaliseFocus, pinnedSummary, EN_AXIS_LABEL,
+} from '../lib/tenseFocus.js';
 import { findTense } from '../lib/tenseExplainEn.js';
 import SentenceChallenge from './SentenceChallenge';
 import ExplainerOverlay from './ExplainerOverlay';
@@ -156,11 +160,23 @@ function tenseBand({ aspect, voice }) {
 
 /* ---------- component ---------- */
 export default function TenseTagger({ profile, initialTense = null, classMode = false }) {
-  const [lockedTense, setLockedTense] = useState(() => initialTense || null);
-  const [level, setLevel] = useState(() => initialTense ? tenseBand(initialTense) : startLevel(profile));
+  const startLvl = initialTense ? tenseBand(initialTense) : startLevel(profile);
+  // "Practise this" from the Explainer used to pin all three axes, which left
+  // nothing to decide. It now pins time + voice and puts the chosen aspect up
+  // against its nearest contrast — two chips, one real decision, still centred
+  // on the tense they clicked.
+  const [level, setLevel] = useState(startLvl);
+  const [focus, setFocus] = useState(() => initialTense
+    ? focusForTenseEn(initialTense,
+        axisOptionsEn(startLvl, { time: initialTense.time, voice: initialTense.voice }).aspect)
+    : null);
+  const [showPresets, setShowPresets] = useState(false);
   const [item, setItem] = useState(() => initialTense
-    ? (makeGenerated(tenseBand(initialTense), initialTense) || nextItem(startLevel(profile)))
-    : nextItem(startLevel(profile)));
+    ? (makeGenerated(startLvl, null,
+        focusForTenseEn(initialTense,
+          axisOptionsEn(startLvl, { time: initialTense.time, voice: initialTense.voice }).aspect))
+       || nextItem(startLvl))
+    : nextItem(startLvl));
   const [phase, setPhase] = useState('tag'); // tag | function | produce | done | finished
   const [picks, setPicks] = useState({});
   const [graded, setGraded] = useState(false);
@@ -184,58 +200,68 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
   const deckRef = useRef([]);
   const levelRef = useRef(level);
   levelRef.current = level;
-  const lockedRef = useRef(lockedTense);
-  lockedRef.current = lockedTense;
+  const focusRef = useRef(focus);
+  focusRef.current = focus;
 
   const bankRowToItem = (row) => ({
     kind: 'generated', pre: row.pre, vp: row.vp, post: row.post,
     answer: row.answer, functionTime: row.answer.time, note: null, isMismatch: false,
   });
 
-  async function loadDeck(lvl) {
+  async function loadDeck(lvl, fcs) {
     try {
-      const lock = lockedRef.current;
       let rows;
-      if (lock) {
-        // locked "Practise this" mode — a tense-filtered deck straight from the bank
-        const { data, error } = await supabase
-          .from('tense_specimens')
+      if (fcs) {
+        // focused deck: a pinned axis is an eq, a restricted axis an in
+        let q = supabase.from('tense_specimens')
           .select('pre,vp,post,answer')
-          .eq('language', 'en').eq('level', lvl)
-          .eq('answer->>time', lock.time)
-          .eq('answer->>aspect', lock.aspect)
-          .eq('answer->>voice', lock.voice)
-          .limit(40);
-        if (error || !Array.isArray(data) || lvl !== levelRef.current || lock !== lockedRef.current) return;
+          .eq('language', 'en').eq('level', lvl);
+        for (const ax of ['time', 'aspect', 'voice']) {
+          const rule = fcs[ax];
+          if (rule == null) continue;
+          q = Array.isArray(rule) ? q.in(`answer->>${ax}`, rule) : q.eq(`answer->>${ax}`, rule);
+        }
+        const { data, error } = await q.limit(60);
+        if (error || !Array.isArray(data) || lvl !== levelRef.current || fcs !== focusRef.current) return;
         rows = data.slice().sort(() => Math.random() - 0.5);
       } else {
         const { data, error } = await supabase.rpc('tense_specimen_deck',
           { p_language: 'en', p_level: lvl, p_limit: 40 });
-        if (error || !Array.isArray(data) || lvl !== levelRef.current || lockedRef.current) return;
+        if (error || !Array.isArray(data) || lvl !== levelRef.current || focusRef.current) return;
         rows = data;
       }
       deckRef.current = deckRef.current.concat(rows.map(bankRowToItem));
     } catch { /* offline — the live engine fallback covers it */ }
   }
 
-  useEffect(() => { deckRef.current = []; loadDeck(level); }, [level, lockedTense]);
+  useEffect(() => { deckRef.current = []; loadDeck(level, focus); }, [level, focus]);
 
   function drawGenerated(lvl) {
     if (deckRef.current.length) {
       const it = deckRef.current.shift();
-      if (deckRef.current.length < 8) loadDeck(lvl);   // refill in the background
+      if (deckRef.current.length < 8) loadDeck(lvl, focusRef.current);   // refill in the background
       return it;
     }
-    return makeGenerated(lvl, lockedTense) || makeCurated();  // bank empty/offline → live engine (on-tense when locked)
+    return makeGenerated(lvl, null, focusRef.current) || makeCurated();  // bank empty/offline → live engine
   }
 
   function nextFromBank(lvl) {
-    if (!lockedTense && lvl === 'C1' && Math.random() < 0.45) return makeCurated();
+    // curated items are hand-picked form≠function specials and carry fixed tags,
+    // so they can't honour a focus rule — they only run in unfocused C1 sets
+    if (!focusRef.current && lvl === 'C1' && Math.random() < 0.45) return makeCurated();
     return drawGenerated(lvl);
   }
 
   const gate = LEVEL_GATES[level];
-  const liveAxes = gate.axes;
+  // options reachable on each axis given everything the focus has fixed, and
+  // the axes still being ASKED. Both the chips and the scoring read these, so
+  // a pinned axis is removed from the question rather than merely biased.
+  const axisOpts = axisOptionsEn(level, focus);
+  const liveAxes = liveAxesFor(focus, gate.axes, axisOpts);
+  const pins = pinnedSummary(focus, gate.axes, axisOpts, EN_AXIS_LABEL);
+  const presets = presetsForLevelEn(level);
+  const activePreset = presets.find(p =>
+    JSON.stringify(normaliseFocus(p.focus)) === JSON.stringify(normaliseFocus(focus)));
   const name = tenseName(item);
 
   function reset(toLevel = level) {
@@ -266,23 +292,25 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
     window.scrollTo({ top: 0, behavior: 'instant' });
     setQNum(1); setScore(0); reset();
   }
-  function changeLevel(l) { deckRef.current = []; setLevel(l); setQNum(1); setScore(0); reset(l); }
+  function changeLevel(l) {
+    deckRef.current = []; levelRef.current = l;
+    setLevel(l); setQNum(1); setScore(0); reset(l);
+  }
 
-  function clearLock() {
-    const lvl = startLevel(profile);
-    lockedRef.current = null;
-    deckRef.current = [];
-    setLockedTense(null);
-    setLevel(lvl);
+  function applyFocus(f) {
+    const nf = normaliseFocus(f);
+    deckRef.current = []; focusRef.current = nf;
+    setFocus(nf); setShowPresets(false);
     setQNum(1); setScore(0);
-    setItem(makeGenerated(lvl) || makeCurated());
+    setItem(nextFromBank(level));
     setPhase('tag'); setPicks({}); setGraded(false); setFnPick(null); setDraft(''); setProd(null); setShowCard(false);
   }
 
+  // chips per axis come from the focus rule applied to the reachable options
   const axisDef = {
-    time: { label: 'Time', opts: ['past', 'present', 'future'] },
-    aspect: { label: 'Type', opts: gate.aspect },
-    voice: { label: 'Voice', opts: gate.voice },
+    time: { label: EN_AXIS_LABEL.time, opts: axisState(focus, 'time', axisOpts.time).opts },
+    aspect: { label: EN_AXIS_LABEL.aspect, opts: axisState(focus, 'aspect', axisOpts.aspect).opts },
+    voice: { label: EN_AXIS_LABEL.voice, opts: axisState(focus, 'voice', axisOpts.voice).opts },
   };
 
   const allPicked = liveAxes.every(ax => picks[ax]);
@@ -301,6 +329,7 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
         sentence: (item.pre + item.vp + item.post), verb_phrase: item.vp,
         answer: ansLog, picks: picksLog, is_correct: ok, is_mismatch: item.isMismatch,
         function_answer: functionAnswer ?? null, function_picked: functionPicked ?? null,
+        focus: focusToJson(focus),   // NULL when unfocused — keeps old rows comparable
       });
     } catch (e) { console.warn('TenseTagger: tense_attempts insert failed', e); }
   }
@@ -392,29 +421,64 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
           <div style={{ color: C.brandDark, fontWeight: 700, fontSize: '0.95rem' }}>⭐️ {stars}</div>
         </div>
 
-        {/* level pills (normal) OR locked-tense strip ("Practise this") */}
-        {lockedTense ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '1rem', background: '#EDE9FE', border: '1px solid #C4B5FD', borderRadius: '999px', padding: '0.3rem 0.4rem 0.3rem 0.9rem' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: C.brandDark }}>
-              Practising: {lockedTense.name || tenseName(item)}
+        {/* level pills */}
+        <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.6rem' }}>
+          {['A2', 'B1', 'B2', 'C1'].map(l => (
+            <button key={l} onClick={() => changeLevel(l)} style={{
+              padding: '0.35rem 0.9rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 600,
+              letterSpacing: '0.04em', cursor: 'pointer', transition: 'all 0.12s',
+              background: level === l ? C.ink : 'transparent', color: level === l ? 'white' : C.muted,
+              border: `1px solid ${level === l ? C.ink : C.line}`,
+            }}>{l}</button>
+          ))}
+        </div>
+
+        {/* focus strip — what this set is asking about */}
+        <div style={{ marginBottom: '1rem' }}>
+          <button onClick={() => setShowPresets(v => !v)} style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem',
+            background: focus ? '#EDE9FE' : C.card, border: `1px solid ${focus ? '#C4B5FD' : C.line}`,
+            borderRadius: '12px', padding: '0.55rem 0.9rem', cursor: 'pointer', textAlign: 'left',
+          }}>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ ...labelStyle, color: C.faint, display: 'block' }}>Focus</span>
+              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: focus ? C.brandDark : C.ink }}>
+                {activePreset ? activePreset.label
+                  : focus ? liveAxes.map(ax => axisDef[ax].label).join(' + ') + ' only'
+                  : 'All tenses'}
+              </span>
             </span>
-            <button onClick={clearLock} style={{
-              padding: '0.3rem 0.8rem', borderRadius: '999px', fontSize: '0.78rem', fontWeight: 600,
-              cursor: 'pointer', background: 'white', color: C.brandDark, border: '1px solid #C4B5FD',
-            }}>← all tenses</button>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem' }}>
-            {['A2', 'B1', 'B2', 'C1'].map(l => (
-              <button key={l} onClick={() => changeLevel(l)} style={{
-                padding: '0.35rem 0.9rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 600,
-                letterSpacing: '0.04em', cursor: 'pointer', transition: 'all 0.12s',
-                background: level === l ? C.ink : 'transparent', color: level === l ? 'white' : C.muted,
-                border: `1px solid ${level === l ? C.ink : C.line}`,
-              }}>{l}</button>
-            ))}
-          </div>
-        )}
+            <span style={{ color: C.faint, fontSize: '0.8rem', flexShrink: 0 }}>{showPresets ? 'Close ⌃' : 'Change ⌄'}</span>
+          </button>
+
+          {showPresets && (
+            <div style={{ ...cardStyle, marginTop: '0.5rem', marginBottom: 0, padding: '0.9rem' }}>
+              <div style={{ color: C.muted, fontSize: '0.78rem', lineHeight: 1.5, marginBottom: '0.75rem' }}>
+                Narrow what you're being asked. Anything fixed still appears in the sentences — you just aren't being marked on it.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {presets.map(p => {
+                  const on = (activePreset?.id === p.id);
+                  return (
+                    <button key={p.id} onClick={() => applyFocus(p.focus)} style={{
+                      display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap',
+                      padding: '0.6rem 0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'left',
+                      background: on ? C.brand : 'white', color: on ? 'white' : C.ink,
+                      border: `1.5px solid ${on ? C.brand : C.line}`, fontSize: '0.85rem', fontWeight: 600,
+                    }}>
+                      <span>{p.label}</span>
+                      {p.hint && (
+                        <span style={{ fontSize: '0.72rem', fontWeight: 500, color: on ? 'rgba(255,255,255,0.85)' : C.faint }}>
+                          {p.hint}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* set progress — consistent with Modal Match / Conditionals Chooser */}
         {phase !== 'finished' && (
@@ -427,7 +491,15 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
         {/* specimen */}
         {phase !== 'finished' && (
         <div style={{ ...cardStyle, padding: '1.5rem' }}>
-          <div style={{ ...labelStyle, marginBottom: '0.75rem' }}>Sentence</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+            <div style={labelStyle}>Sentence</div>
+            {/* pinned axes are NOT being asked, so they are shown rather than guessed */}
+            {pins.length > 0 && (
+              <div style={{ fontSize: '0.72rem', color: C.brandDark, background: '#EDE9FE', border: '1px solid #C4B5FD', borderRadius: 6, padding: '2px 8px', fontWeight: 600 }}>
+                {pins.join(' · ')}
+              </div>
+            )}
+          </div>
           <p style={{ fontSize: '1.4rem', lineHeight: 1.45, color: C.ink, margin: 0, fontWeight: 400 }}>
             {item.pre}
             <span style={{ background: C.mark, padding: '1px 5px', borderRadius: '5px', fontWeight: 700 }}>{item.vp}</span>
