@@ -37,7 +37,7 @@
    its active forms.
    ============================================================ */
 
-import { axisAllows } from './tenseFocus.js';
+import { axisAllows, comboAllows, comboKeys } from './tenseFocus.js';
 
 /* ---------- lexicon ----------
    base, s, past, pp, ing, transitive, stative, objects, min
@@ -410,10 +410,13 @@ function allowedSpecs(level) {
 function allowedSpecsFocused(level, focus = null) {
   const all = allowedSpecs(level);
   if (!focus) return all;
+  // an axis named inside `combos` is governed by the combos alone — its own
+  // per-axis rule is ignored rather than intersected, so a preset can pin a
+  // leftover axis (voice) without fighting the diagonal.
+  const covered = comboKeys(focus);
   const kept = all.filter(s =>
-    axisAllows(s.answer.time, focus.time) &&
-    axisAllows(s.answer.aspect, focus.aspect) &&
-    axisAllows(s.answer.voice, focus.voice));
+    comboAllows(s.answer, focus.combos) &&
+    ['time', 'aspect', 'voice'].every(ax => covered.includes(ax) || axisAllows(s.answer[ax], focus[ax])));
   return kept.length ? kept : all;
 }
 

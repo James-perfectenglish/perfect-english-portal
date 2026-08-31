@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import {
-  makeGenerated, tenseName, functionAccepts,
+  makeGenerated, tenseName, functionAccepts, allowedSpecsFocused,
   FUNCTION_OPTIONS, startLevel, LEVEL_GATES, axisOptionsEn,
 } from '../lib/tenseEngineEn.js';
 import {
   presetsForLevelEn, focusForTenseEn, axisState, liveAxesFor,
   focusToJson, normaliseFocus, pinnedSummary, EN_AXIS_LABEL,
+  COMBO_AXIS, comboOptions, comboKeys, comboAllows, answerComboKey,
 } from '../lib/tenseFocus.js';
 import { findTense } from '../lib/tenseExplainEn.js';
 import SentenceChallenge from './SentenceChallenge';
@@ -216,14 +217,24 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
         let q = supabase.from('tense_specimens')
           .select('pre,vp,post,answer')
           .eq('language', 'en').eq('level', lvl);
+        // A combo focus is a DIAGONAL, which no combination of per-axis filters
+        // can express. Narrow to the surrounding rectangle in SQL, then sieve
+        // the diagonal out client-side — and over-fetch to cover what the sieve
+        // drops. An axis is only narrowed if EVERY combo names it.
+        const covered = comboKeys(fcs);
         for (const ax of ['time', 'aspect', 'voice']) {
+          if (covered.includes(ax)) {
+            const vals = fcs.combos.every(c => c[ax]) ? [...new Set(fcs.combos.map(c => c[ax]))] : null;
+            if (vals) q = q.in(`answer->>${ax}`, vals);
+            continue;
+          }
           const rule = fcs[ax];
           if (rule == null) continue;
           q = Array.isArray(rule) ? q.in(`answer->>${ax}`, rule) : q.eq(`answer->>${ax}`, rule);
         }
-        const { data, error } = await q.limit(60);
+        const { data, error } = await q.limit(covered.length ? 120 : 60);
         if (error || !Array.isArray(data) || lvl !== levelRef.current || fcs !== focusRef.current) return;
-        rows = data.slice().sort(() => Math.random() - 0.5);
+        rows = data.filter(r => comboAllows(r.answer, fcs.combos)).sort(() => Math.random() - 0.5);
       } else {
         const { data, error } = await supabase.rpc('tense_specimen_deck',
           { p_language: 'en', p_level: lvl, p_limit: 40 });
@@ -311,10 +322,18 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
     time: { label: EN_AXIS_LABEL.time, opts: axisState(focus, 'time', axisOpts.time).opts },
     aspect: { label: EN_AXIS_LABEL.aspect, opts: axisState(focus, 'aspect', axisOpts.aspect).opts },
     voice: { label: EN_AXIS_LABEL.voice, opts: axisState(focus, 'voice', axisOpts.voice).opts },
+    // whole tenses on one row — see the combos note in tenseFocus.js. Asking
+    // a diagonal as two axes would let one answer give away the other.
+    [COMBO_AXIS]: { label: 'Tense', opts: comboOptions(focus, allowedSpecsFocused(level, focus)).map(c => c.key) },
   };
 
+  // the correct chip for an axis — for the combo row that is whichever whole
+  // tense the answer satisfies, not a single axis value
+  const axisAnswer = ax => (ax === COMBO_AXIS ? answerComboKey(item.answer, focus?.combos) : item.answer[ax]);
+  const tagsCorrect = () => liveAxes.every(ax => picks[ax] === axisAnswer(ax));
+
   const allPicked = liveAxes.every(ax => picks[ax]);
-  const recognitionCorrect = graded && liveAxes.every(ax => picks[ax] === item.answer[ax]);
+  const recognitionCorrect = graded && tagsCorrect();
 
   async function logAttempt(functionAnswer, functionPicked) {
     if (classMode) return; // Class Play: teacher preview writes nothing
@@ -322,8 +341,8 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const picksLog = {}, ansLog = {};
-      liveAxes.forEach(ax => { picksLog[ax] = picks[ax]; ansLog[ax] = item.answer[ax]; });
-      const ok = liveAxes.every(ax => picks[ax] === item.answer[ax]);
+      liveAxes.forEach(ax => { picksLog[ax] = picks[ax]; ansLog[ax] = axisAnswer(ax); });
+      const ok = tagsCorrect();
       await supabase.from('tense_attempts').insert({
         student_id: user.id, language: 'en', level,
         sentence: (item.pre + item.vp + item.post), verb_phrase: item.vp,
@@ -366,7 +385,7 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
 
   function checkTags() {
     setGraded(true);
-    const ok = liveAxes.every(ax => picks[ax] === item.answer[ax]);
+    const ok = tagsCorrect();
     if (ok) {
       setTagged(n => n + 1);
       setScore(s => s + 1);
@@ -520,13 +539,13 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
                     const picked = picks[ax] === opt;
                     let state = picked ? 'selected' : 'idle';
                     if (graded) {
-                      if (opt === item.answer[ax]) state = picked ? 'correct' : 'answer';
+                      if (opt === axisAnswer(ax)) state = picked ? 'correct' : 'answer';
                       else if (picked) state = 'wrong';
                     }
                     return (
                       <button key={opt} disabled={graded} onClick={() => setPicks(p => ({ ...p, [ax]: opt }))}
                         style={chipStyle(state)}>
-                        {opt.replace(/_/g, ' ')}{state === 'correct' ? ' ✓' : state === 'wrong' ? ' ✕' : ''}
+                        {opt.replace(/[_|]/g, ' ')}{state === 'correct' ? ' ✓' : state === 'wrong' ? ' ✕' : ''}
                       </button>
                     );
                   })}

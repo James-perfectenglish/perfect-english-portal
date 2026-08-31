@@ -11,6 +11,19 @@
    Narrowing what the exercise asks about, so a student practising one
    contrast is not also being marked on two axes nobody mentioned.
 
+   ⚠️ RECTANGLES vs DIAGONALS. Per-axis rules can only describe a RECTANGLE:
+   "Past: simple vs perfect" pins Time and offers two Types. Some real teaching
+   contrasts are DIAGONAL — present perfect vs past simple pairs present with
+   perfect and past with simple, and the nearest rectangle is four tenses, not
+   two. Worse, restricting the pool to the diagonal without changing the UI
+   would correlate Time and Type, so a student who spots that present always
+   means perfect gets the second axis free — the very score inflation this
+   file exists to prevent.
+   Hence `combos`: a list of whole tense descriptions, asked as ONE decision on
+   a single chip row rather than as separate axes. Axes named inside the combos
+   stop being questions in their own right and their per-axis rules are ignored.
+   Spanish never needs this — it has one axis, so every pair is expressible.
+
    Every axis is in one of three states:
      mix        — value is null/absent. All the level's options are live
                   and the axis IS asked.
@@ -39,6 +52,39 @@ export function axisAllows(value, rule) {
   return value === rule;
 }
 
+/* ---------- combos: the diagonal case ---------- */
+export const COMBO_AXIS = 'tense';
+
+// stable identity for a combo, used as the chip value and in tense_attempts
+export const comboKey = c => ['time', 'aspect', 'voice'].filter(k => c[k]).map(k => c[k]).join('|');
+
+// which axes the combos have taken over — these stop being separate questions
+export function comboKeys(focus) {
+  if (!focus?.combos?.length) return [];
+  const keys = new Set();
+  for (const c of focus.combos) for (const k of Object.keys(c)) keys.add(k);
+  return [...keys];
+}
+
+const matches = (answer, combo) => Object.entries(combo).every(([k, v]) => answer[k] === v);
+export const comboAllows = (answer, combos) => !combos?.length || combos.some(c => matches(answer, c));
+
+// the combo a concrete answer satisfies — the "correct chip" for scoring
+export const answerComboKey = (answer, combos) => {
+  const c = (combos || []).find(x => matches(answer, x));
+  return c ? comboKey(c) : null;
+};
+
+/* Combos still reachable at this level, with a label. A preset written for B1
+   may name a tense the level does not carry, and an unreachable chip is a free
+   elimination, so it is dropped rather than shown. */
+export function comboOptions(focus, specs) {
+  if (!focus?.combos?.length) return [];
+  return focus.combos
+    .filter(c => specs.some(sp => matches(sp.answer, c)))
+    .map(c => ({ combo: c, key: comboKey(c) }));
+}
+
 // a length-1 array is a pin, not a restriction — normalise so callers
 // never have to check both shapes
 export function normaliseFocus(focus) {
@@ -47,6 +93,10 @@ export function normaliseFocus(focus) {
   let any = false;
   for (const [k, v] of Object.entries(focus)) {
     if (v == null) continue;
+    if (k === 'combos') {                       // list of objects, never collapsed
+      if (Array.isArray(v) && v.length) { out.combos = v.map(c => ({ ...c })); any = true; }
+      continue;
+    }
     const val = Array.isArray(v) ? (v.length === 1 ? v[0] : v.slice()) : v;
     if (Array.isArray(val) && !val.length) continue;
     out[k] = val; any = true;
@@ -74,8 +124,13 @@ export function axisState(focus, axis, allOpts) {
    the last axis is released, because an exercise with no question is not an
    exercise. */
 export function liveAxesFor(focus, gateAxes, optsByAxis) {
-  const live = gateAxes.filter(ax => axisState(focus, ax, optsByAxis[ax]).state !== 'pinned');
-  return live.length ? live : [gateAxes[gateAxes.length - 1]];
+  const covered = comboKeys(focus);
+  const rest = gateAxes
+    .filter(ax => !covered.includes(ax))
+    .filter(ax => axisState(focus, ax, optsByAxis[ax]).state !== 'pinned');
+  // the combo row IS the question for the axes it covers, so it counts as live
+  if (covered.length) return [COMBO_AXIS, ...rest];
+  return rest.length ? rest : [gateAxes[gateAxes.length - 1]];
 }
 
 /* ---------- what gets written to tense_attempts.focus ---------- */
@@ -106,6 +161,10 @@ export const EN_PRESETS = [
   { id: 'past',        min: 'A2', label: 'Past only',             hint: 'active voice',                   focus: { time: 'past', voice: 'active' } },
   { id: 'future',      min: 'A2', label: 'Future only',           hint: 'active voice',                   focus: { time: 'future', voice: 'active' } },
   { id: 'past_perf',   min: 'B1', label: 'Past: simple vs perfect', hint: 'the classic mix-up',           focus: { time: 'past', voice: 'active', aspect: ['simple', 'perfect'] } },
+  // DIAGONAL — see the combos note at the top. Present pairs with perfect and
+  // past with simple, which no per-axis rule can express.
+  { id: 'pp_vs_past',  min: 'B1', label: 'Present perfect vs past simple', hint: 'have done / did — the classic',
+    focus: { voice: 'active', combos: [{ time: 'present', aspect: 'perfect' }, { time: 'past', aspect: 'simple' }] } },
   { id: 'voice_only',  min: 'B1', label: 'Active vs passive',     hint: 'past simple only — voice alone', focus: { time: 'past', aspect: 'simple' } },
   { id: 'perf_cont',   min: 'B2', label: 'Perfect vs perfect continuous', hint: 'present, active',        focus: { time: 'present', voice: 'active', aspect: ['perfect', 'perfect_continuous'] } },
 ];
@@ -169,7 +228,9 @@ export function focusForTiempoEs(tiempo, available, groupOf) {
 // taken out of the question and therefore need showing as context.
 export function pinnedSummary(focus, axes, optsByAxis, labels) {
   if (!focus) return [];
+  const covered = comboKeys(focus);   // asked on the combo row, so not context
   return axes
+    .filter(ax => !covered.includes(ax))
     .map(ax => ({ ax, st: axisState(focus, ax, optsByAxis[ax]) }))
     .filter(x => x.st.state === 'pinned')
     .map(x => `${labels[x.ax]}: ${String(x.st.pin).replace(/_/g, ' ')}`);
