@@ -71,8 +71,22 @@ const CURATED = [
 
 const rand = a => a[Math.floor(Math.random() * a.length)];
 
-function makeCurated() {
-  const it = rand(CURATED);
+/* Curated items carry full answer tags, so they CAN honour a focus after all:
+   an item is servable when its tags match a spec the level and focus allow.
+   This reuses the generated path's own predicate, so the two cannot drift.
+   Before this, ANY focus switched curated items off wholesale, and the C1
+   form≠function specials — the most interesting content in the exercise —
+   vanished the moment a student picked a preset, with nothing said. */
+function curatedPool(level, focus = null) {
+  const specs = allowedSpecsFocused(level, focus);
+  return CURATED.filter(it => specs.some(s =>
+    s.answer.time === it.answer.time &&
+    s.answer.aspect === it.answer.aspect &&
+    s.answer.voice === it.answer.voice));
+}
+
+function makeCurated(pool = CURATED) {
+  const it = rand(pool.length ? pool : CURATED);
   const idx = it.sentence.toLowerCase().indexOf(it.vp.toLowerCase());
   return {
     kind: 'curated',
@@ -86,9 +100,10 @@ function makeCurated() {
 
 // Initial specimen only (synchronous at mount, before the bank deck has loaded).
 // Subsequent specimens come from the bank via the component's nextFromBank().
-function nextItem(level) {
-  if (level === 'C1' && Math.random() < 0.45) return makeCurated();
-  return makeGenerated(level) || makeCurated();
+function nextItem(level, focus = null) {
+  const pool = curatedPool(level, focus);
+  if (pool.length && level === 'C1' && Math.random() < 0.45) return makeCurated(pool);
+  return makeGenerated(level, null, focus) || makeCurated(pool);
 }
 
 /* ---------- small UI bits ---------- */
@@ -167,17 +182,13 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
   // against its nearest contrast — two chips, one real decision, still centred
   // on the tense they clicked.
   const [level, setLevel] = useState(startLvl);
-  const [focus, setFocus] = useState(() => initialTense
+  const initialFocus = initialTense
     ? focusForTenseEn(initialTense,
         axisOptionsEn(startLvl, { time: initialTense.time, voice: initialTense.voice }).aspect)
-    : null);
+    : null;
+  const [focus, setFocus] = useState(initialFocus);
   const [showPresets, setShowPresets] = useState(false);
-  const [item, setItem] = useState(() => initialTense
-    ? (makeGenerated(startLvl, null,
-        focusForTenseEn(initialTense,
-          axisOptionsEn(startLvl, { time: initialTense.time, voice: initialTense.voice }).aspect))
-       || nextItem(startLvl))
-    : nextItem(startLvl));
+  const [item, setItem] = useState(() => nextItem(startLvl, initialFocus));
   const [phase, setPhase] = useState('tag'); // tag | function | produce | done | finished
   const [picks, setPicks] = useState({});
   const [graded, setGraded] = useState(false);
@@ -253,13 +264,18 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
       if (deckRef.current.length < 8) loadDeck(lvl, focusRef.current);   // refill in the background
       return it;
     }
-    return makeGenerated(lvl, null, focusRef.current) || makeCurated();  // bank empty/offline → live engine
+    // the curated fallback honours the focus too — otherwise an off-topic
+    // sentence slips into a focused set whenever the bank is empty or offline
+    return makeGenerated(lvl, null, focusRef.current)
+      || makeCurated(curatedPool(lvl, focusRef.current));
   }
 
   function nextFromBank(lvl) {
-    // curated items are hand-picked form≠function specials and carry fixed tags,
-    // so they can't honour a focus rule — they only run in unfocused C1 sets
-    if (!focusRef.current && lvl === 'C1' && Math.random() < 0.45) return makeCurated();
+    // curated items are hand-picked form≠function specials; they now honour the
+    // focus instead of being switched off by it, and simply don't appear when
+    // the focus leaves none of them standing
+    const pool = curatedPool(lvl, focusRef.current);
+    if (pool.length && lvl === 'C1' && Math.random() < 0.45) return makeCurated(pool);
     return drawGenerated(lvl);
   }
 
