@@ -215,6 +215,14 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
   const focusRef = useRef(focus);
   focusRef.current = focus;
 
+  /* Curated items are drawn WITHOUT replacement within a set. The 45% roll was
+     tuned for the unfocused pool of seven; under a focus the pool is often two,
+     and re-rolling it every question serves the same sentence four times in ten.
+     Marking on serve keeps the unfocused behaviour identical (the roll, not the
+     pool, is the limiter there) while making a small focused pool show each of
+     its items once, early. Cleared at every set boundary. */
+  const usedCuratedRef = useRef(new Set());
+
   const bankRowToItem = (row) => ({
     kind: 'generated', pre: row.pre, vp: row.vp, post: row.post,
     answer: row.answer, functionTime: row.answer.time, note: null, isMismatch: false,
@@ -258,6 +266,10 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
 
   useEffect(() => { deckRef.current = []; loadDeck(level, focus); }, [level, focus]);
 
+  useEffect(() => {
+    if (item?.kind === 'curated') usedCuratedRef.current.add(item.pre + item.vp + item.post);
+  }, [item]);
+
   function drawGenerated(lvl) {
     if (deckRef.current.length) {
       const it = deckRef.current.shift();
@@ -274,7 +286,8 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
     // curated items are hand-picked form≠function specials; they now honour the
     // focus instead of being switched off by it, and simply don't appear when
     // the focus leaves none of them standing
-    const pool = curatedPool(lvl, focusRef.current);
+    const pool = curatedPool(lvl, focusRef.current)
+      .filter(c => !usedCuratedRef.current.has(c.sentence));
     if (pool.length && lvl === 'C1' && Math.random() < 0.45) return makeCurated(pool);
     return drawGenerated(lvl);
   }
@@ -317,16 +330,19 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
   }
   function restartSet() {
     window.scrollTo({ top: 0, behavior: 'instant' });
+    usedCuratedRef.current = new Set();
     setQNum(1); setScore(0); reset();
   }
   function changeLevel(l) {
     deckRef.current = []; levelRef.current = l;
+    usedCuratedRef.current = new Set();
     setLevel(l); setQNum(1); setScore(0); reset(l);
   }
 
   function applyFocus(f) {
     const nf = normaliseFocus(f);
     deckRef.current = []; focusRef.current = nf;
+    usedCuratedRef.current = new Set();
     setFocus(nf); setShowPresets(false);
     setQNum(1); setScore(0);
     setItem(nextFromBank(level));
