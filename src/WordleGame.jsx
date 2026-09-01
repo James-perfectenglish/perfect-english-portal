@@ -120,6 +120,13 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
   const stateRef = useRef({ word: '', guesses: [], current: '', gameState: 'loading' })
   const inputRef = useRef(null)
 
+  // Mid-game session writes are fired without awaiting, so a slow connection
+  // never leaves the Enter key dead. They are chained through this ref so they
+  // land in order: every write carries the WHOLE guesses array, so a stale
+  // write landing last would shrink it and hand back a free guess — the exact
+  // hole this persistence is closing.
+  const saveChain = useRef(Promise.resolve())
+
   // `dictionary` is mirrored here too: the keydown listener is bound once on
   // mount, so anything it reads from the closure is frozen at first render
   // (when the dictionary is still null) and validation would never run for
@@ -266,29 +273,55 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
       setMessage(WIN_MESSAGES[newGuesses.length - 1] || 'Well done!')
       setGameState('won')
       setSolveStars(tiers.length)
-      await saveSession(newGuesses, true, false, false, tiers.length, false)
+      await saveSession(newGuesses, true, false, false, tiers.length)
       await insertSolveStars(tiers, word)
     } else if (lost) {
       setMessage(isSpanish
         ? `La palabra era ${displayWord || word}`
         : `The word was ${displayWord || word}`)
       setGameState('lost')
-      await saveSession(newGuesses, false, false, false, 0, false)
+      await saveSession(newGuesses, false, false, false, 0)
+    } else {
+      // Mid-game. Without this the row was only ever written on a win or a
+      // loss, so leaving and coming back reset the board to six fresh guesses.
+      // Not awaited: the keyboard stays live while the write is in flight.
+      // The last three are literals rather than state, because submitGuess is
+      // reached from the mount-bound keydown listener and would read them
+      // frozen at first render. Mid-game they are false/false/0 regardless —
+      // the sentence challenge only opens after the game ends, and solve stars
+      // only exist on a win.
+      saveSession(newGuesses, false, false, false, 0)
     }
     setLocked(false)
   }
 
-  async function saveSession(g, solved, sentDone, sentStar, solStars) {
-    if (teacherMode) return
+  // Queues a write behind any still in flight and returns the chained promise,
+  // so the terminal paths can await it while the per-guess path doesn't. The
+  // catch keeps a failed write from poisoning the chain for the rest of the game.
+  function saveSession(g, solved, sentDone, sentStar, solStars) {
+    if (teacherMode) return Promise.resolve()
+    saveChain.current = saveChain.current
+      .then(() => writeSession(g, solved, sentDone, sentStar, solStars))
+      .catch(e => console.warn('Wordle session save failed:', e))
+    return saveChain.current
+  }
+
+  async function writeSession(g, solved, sentDone, sentStar, solStars) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    await supabase.from('wordle_sessions').upsert({
+    // completed_at is stamped on mid-game writes too. Despite the name, the
+    // only two readers (Progress → streak, TeacherDashboard → lastActive)
+    // treat it as "last active", so this is truthful for them. Leaving it null
+    // until the game ends would sort NULLS FIRST in their DESC queries and eat
+    // the row limit — the bug connections_sessions has latent today.
+    const { error } = await supabase.from('wordle_sessions').upsert({
       student_id: user.id, play_date: today,
       guesses: g, solved,
       sentence_done: sentDone, solve_star: solStars > 0, solve_stars: solStars,
       sentence_star: sentStar,
       completed_at: new Date().toISOString(),
     }, { onConflict: 'student_id,play_date' })
+    if (error) console.warn('Wordle session save failed:', error)
   }
 
   // One row per tier crossed. supabase-js can't target the expression-based
