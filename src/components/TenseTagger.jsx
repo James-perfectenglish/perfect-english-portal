@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import {
-  makeGenerated, tenseName, functionAccepts, allowedSpecsFocused,
+  makeGenerated, tenseName, functionAccepts, allowedSpecs, allowedSpecsFocused,
   FUNCTION_OPTIONS, startLevel, LEVEL_GATES, axisOptionsEn,
 } from '../lib/tenseEngineEn.js';
 import {
   presetsForLevelEn, focusForTenseEn, axisState, liveAxesFor,
   focusToJson, normaliseFocus, pinnedSummary, EN_AXIS_LABEL,
-  COMBO_AXIS, comboOptions, comboKeys, comboAllows, answerComboKey,
+  COMBO_AXIS, comboOptions, comboKeys, comboAllows, answerComboKey, axisAllows,
 } from '../lib/tenseFocus.js';
 import { findTense } from '../lib/tenseExplainEn.js';
 import SentenceChallenge from './SentenceChallenge';
@@ -67,6 +67,60 @@ const CURATED = [
   { sentence: 'Hotels usually charge a deposit.', vp: 'charge',
     answer: { time: 'present', aspect: 'simple', voice: 'active', modality: 'none' },
     functionTime: 'general', note: 'Present simple for a general truth.' },
+
+  // --- perfect: a present-perfect form pointing at the future, in a time clause
+  { sentence: 'We will start once the guests have arrived.', vp: 'have arrived',
+    answer: { time: 'present', aspect: 'perfect', voice: 'active', modality: 'none' },
+    functionTime: 'future', note: 'Present perfect in a time clause for a future event \u2014 never \u201Cwill have arrived\u201D here.' },
+  { sentence: 'I will send the invoice as soon as the manager has approved it.', vp: 'has approved',
+    answer: { time: 'present', aspect: 'perfect', voice: 'active', modality: 'none' },
+    functionTime: 'future', note: 'After \u201Cas soon as\u201D the present perfect carries future meaning.' },
+
+  // --- perfect continuous. A present perfect continuous whose meaning is still
+  // present is NOT a form\u2260function item, so the mismatch has to come from an
+  // activity that has just STOPPED, or from the extra-polite past form.
+  { sentence: 'The floor is wet because someone has been cleaning.', vp: 'has been cleaning',
+    answer: { time: 'present', aspect: 'perfect_continuous', voice: 'active', modality: 'none' },
+    functionTime: 'past', note: 'The cleaning has stopped \u2014 the perfect continuous points at a finished activity with a visible result.' },
+  { sentence: 'I had been hoping you could help me.', vp: 'had been hoping',
+    answer: { time: 'past', aspect: 'perfect_continuous', voice: 'active', modality: 'none' },
+    functionTime: 'present', note: 'Past perfect continuous makes a request about right now especially polite.' },
+  { sentence: 'I have been to Madrid twice.', vp: 'have been',
+    answer: { time: 'present', aspect: 'perfect', voice: 'active', modality: 'none' },
+    functionTime: 'past', note: 'Present perfect form, but the visits themselves are finished and past.' },
+
+  // --- future form, no future meaning
+  { sentence: 'Oil will float on water.', vp: 'will float',
+    answer: { time: 'future', aspect: 'simple', voice: 'active', modality: 'none' },
+    functionTime: 'general', note: '\u201CWill\u201D for a general truth, not a future event.' },
+  { sentence: 'That will be the taxi outside.', vp: 'will be',
+    answer: { time: 'future', aspect: 'simple', voice: 'active', modality: 'none' },
+    functionTime: 'present', note: '\u201CWill\u201D for a deduction about right now.' },
+
+  // --- passive
+  { sentence: 'Breakfast is served from seven every morning.', vp: 'is served',
+    answer: { time: 'present', aspect: 'simple', voice: 'passive', modality: 'none' },
+    functionTime: 'general', note: 'Present simple passive for a standing arrangement.' },
+  { sentence: 'The bill is paid at the end of the stay.', vp: 'is paid',
+    answer: { time: 'present', aspect: 'simple', voice: 'passive', modality: 'none' },
+    functionTime: 'general', note: 'Present simple passive for how things are always done.' },
+  { sentence: 'The new wing is being opened next spring.', vp: 'is being opened',
+    answer: { time: 'present', aspect: 'continuous', voice: 'passive', modality: 'none' },
+    functionTime: 'future', note: 'Continuous passive for a fixed future arrangement.' },
+
+  // --- past form, present or future meaning
+  { sentence: 'It is time we left.', vp: 'left',
+    answer: { time: 'past', aspect: 'simple', voice: 'active', modality: 'none' },
+    functionTime: 'present', note: 'Past form after \u201Cit is time\u201D for a present situation.' },
+  { sentence: 'We would rather you paid in cash.', vp: 'paid',
+    answer: { time: 'past', aspect: 'simple', voice: 'active', modality: 'none' },
+    functionTime: 'present', note: 'Past form after \u201Cwould rather\u201D for a present preference.' },
+  { sentence: 'Suppose we booked the flights tomorrow.', vp: 'booked',
+    answer: { time: 'past', aspect: 'simple', voice: 'active', modality: 'none' },
+    functionTime: 'future', note: 'Past form for a hypothetical future.' },
+  { sentence: 'I was wondering if you could help me.', vp: 'was wondering',
+    answer: { time: 'past', aspect: 'continuous', voice: 'active', modality: 'none' },
+    functionTime: 'present', note: 'Past continuous to make a present request more polite.' },
 ];
 
 const rand = a => a[Math.floor(Math.random() * a.length)];
@@ -121,6 +175,31 @@ function chipStyle(state) {
     cursor: 'pointer', transition: 'all 0.12s',
   };
 }
+/* ---------- custom matrix ↔ focus ----------
+   The focus model already stores exactly what a multi-select needs: nothing on
+   an axis means every value is asked, one value pins it as context, and a list
+   restricts it and keeps it asked. So the panel writes a focus object directly
+   and everything downstream — chips, scoring, the deck query — already works.
+   A diagonal (combos) cannot be drawn as a rectangle, so opening the matrix on
+   one starts from the full grid rather than silently widening the diagonal. */
+const matrixFromFocus = (focus, axes, base) => {
+  const m = {};
+  for (const ax of axes) {
+    const rule = focus?.combos ? null : focus?.[ax];
+    m[ax] = rule == null ? base[ax].slice() : (Array.isArray(rule) ? rule.slice() : [rule]);
+  }
+  return m;
+};
+const focusFromMatrix = (m, axes, base) => {
+  const f = {};
+  for (const ax of axes) {
+    const sel = m?.[ax] || [];
+    if (!sel.length || sel.length === base[ax].length) continue;  // all of them = no rule
+    f[ax] = sel.length === 1 ? sel[0] : sel.slice();              // one = pinned, several = asked
+  }
+  return Object.keys(f).length ? f : null;
+};
+
 const cardStyle = { background: C.card, border: `1px solid ${C.line}`, borderRadius: '16px', padding: '1.25rem', marginBottom: '1rem' };
 const labelStyle = { fontSize: '0.7rem', fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.5px' };
 
@@ -188,6 +267,7 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
     : null;
   const [focus, setFocus] = useState(initialFocus);
   const [showPresets, setShowPresets] = useState(false);
+  const [matrix, setMatrix] = useState(null);
   const [item, setItem] = useState(() => nextItem(startLvl, initialFocus));
   const [phase, setPhase] = useState('tag'); // tag | function | produce | done | finished
   const [picks, setPicks] = useState({});
@@ -299,6 +379,23 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
   const axisOpts = axisOptionsEn(level, focus);
   const liveAxes = liveAxesFor(focus, gate.axes, axisOpts);
   const pins = pinnedSummary(focus, gate.axes, axisOpts, EN_AXIS_LABEL);
+  const matrixBase = axisOptionsEn(level, null);
+  useEffect(() => {
+    setMatrix(matrixFromFocus(focus, LEVEL_GATES[level].axes, axisOptionsEn(level, null)));
+  }, [level, focus]);
+  /* The RAW intersection, deliberately not allowedSpecsFocused: that helper
+     falls back to the whole grid when a focus would empty it, which is right
+     for generation but would report 19 here instead of 0 and leave every
+     impossible combination enabled. */
+  const matrixCountFor = m => {
+    const f = normaliseFocus(focusFromMatrix(m, gate.axes, matrixBase));
+    const all = allowedSpecs(level);
+    const specs = f ? all.filter(sp => gate.axes.every(ax => axisAllows(sp.answer[ax], f[ax]))) : all;
+    return { specs: specs.length, focus: f };
+  };
+  const mDraft = matrix ? matrixCountFor(matrix) : null;
+  const mLive = mDraft ? liveAxesFor(mDraft.focus, gate.axes, axisOptionsEn(level, mDraft.focus)) : [];
+
   const presets = presetsForLevelEn(level);
   const activePreset = presets.find(p =>
     JSON.stringify(normaliseFocus(p.focus)) === JSON.stringify(normaliseFocus(focus)));
@@ -527,6 +624,57 @@ export default function TenseTagger({ profile, initialTense = null, classMode = 
                   );
                 })}
               </div>
+
+              {matrix && (
+                <div style={{ borderTop: `1px solid ${C.line}`, marginTop: '0.9rem', paddingTop: '0.9rem' }}>
+                  <div style={{ ...labelStyle, marginBottom: '0.15rem' }}>Or build your own</div>
+                  <div style={{ color: C.muted, fontSize: '0.75rem', lineHeight: 1.5, marginBottom: '0.7rem' }}>
+                    Pick one on a row to fix it, or several to be asked about it.
+                  </div>
+                  {gate.axes.map(ax => (
+                    <div key={ax} style={{ marginBottom: '0.55rem' }}>
+                      <div style={{ fontSize: '0.72rem', color: C.faint, fontWeight: 600, marginBottom: '0.3rem' }}>
+                        {EN_AXIS_LABEL[ax]}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        {matrixBase[ax].map(opt => {
+                          const on = matrix[ax].includes(opt);
+                          const next = on ? matrix[ax].filter(o => o !== opt)
+                                          : matrixBase[ax].filter(o => matrix[ax].includes(o) || o === opt);
+                          // an empty row, or a combination the grid never generates,
+                          // would fall back to the whole set without saying so
+                          const dead = !next.length || matrixCountFor({ ...matrix, [ax]: next }).specs === 0;
+                          return (
+                            <button key={opt} disabled={dead}
+                              onClick={() => setMatrix({ ...matrix, [ax]: next })}
+                              style={{
+                                padding: '0.35rem 0.7rem', borderRadius: '999px', fontSize: '0.78rem', fontWeight: 600,
+                                cursor: dead ? 'not-allowed' : 'pointer', opacity: dead ? 0.35 : 1,
+                                background: on ? C.brand : 'white', color: on ? 'white' : C.slate,
+                                border: `1.5px solid ${on ? C.brand : C.line}`,
+                              }}>
+                              {opt.replace(/_/g, ' ')}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.76rem', color: C.muted }}>
+                      {mDraft.specs} {mDraft.specs === 1 ? 'tense' : 'tenses'}
+                      {mLive.length ? ` · asking ${mLive.map(a => (a === COMBO_AXIS ? 'tense' : EN_AXIS_LABEL[a].toLowerCase())).join(' + ')}` : ''}
+                    </span>
+                    <button onClick={() => applyFocus(focusFromMatrix(matrix, gate.axes, matrixBase))}
+                      style={{
+                        padding: '0.45rem 1.1rem', borderRadius: '10px', cursor: 'pointer', fontSize: '0.82rem',
+                        fontWeight: 700, background: C.brand, color: 'white', border: 'none',
+                      }}>
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
