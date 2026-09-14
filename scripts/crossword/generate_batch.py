@@ -18,13 +18,20 @@ from crossword_engine import generate_puzzle, LEVEL_CONFIGS
 LANG_LEVELS = [("en", "A"), ("en", "B"), ("en", "C"), ("es", "A")]
 POOL_MULT = 3.0
 
+# Clue style per level. Gap-fill sentences carry the grammar and collocation, so
+# the learner recognises the word instead of reverse-engineering a definition.
+# Words with no clue of the preferred type fall back to whatever they have.
+PREFERRED_CLUE_TYPE = {("en", "B"): "gapfill"}
+
 def load_bank(conn):
     with conn.cursor() as cur:
         cur.execute("""SELECT id, word, language, level, clue_text,
-                              used_count, last_used_date FROM crossword_clue_bank""")
+                              used_count, last_used_date, clue_type
+                         FROM crossword_clue_bank""")
         return [{"id": r[0], "word": r[1], "language": r[2], "level": r[3],
                  "clue_text": r[4], "used_count": r[5],
-                 "last_used_date": r[6].isoformat() if r[6] else None}
+                 "last_used_date": r[6].isoformat() if r[6] else None,
+                 "clue_type": r[7]}
                 for r in cur.fetchall()]
 
 def variants_by_word(rows):
@@ -38,7 +45,10 @@ def freshness_key(word_rows, extra_use):
     last = max((r["last_used_date"] or "0000-00-00") for r in word_rows)
     return (base + extra_use * 5, last)   # in-batch use weighted x5 -> keeps week varied
 
-def pick_pool(words_map, cfg, used_in_batch, rng, day_index):
+def pick_pool(words_map, cfg, used_in_batch, rng, day_index, prefer_type=None):
+    if prefer_type:
+        words_map = {w: [r for r in rows if r.get("clue_type") == prefer_type] or rows
+                     for w, rows in words_map.items()}
     words = sorted(words_map, key=lambda w: freshness_key(words_map[w], used_in_batch[w]))
     fresh = words[:min(len(words), int(cfg.target_words * POOL_MULT))]
     rng.shuffle(fresh)
@@ -59,7 +69,8 @@ def build_batch(rows, start, days, seed):
         play_date = (start + timedelta(days=d)).isoformat()
         for (lang, level) in LANG_LEVELS:
             cfg = LEVEL_CONFIGS[(lang, level)]
-            pool = pick_pool(vbw[(lang, level)], cfg, used_in_batch[(lang, level)], rng, d)
+            pool = pick_pool(vbw[(lang, level)], cfg, used_in_batch[(lang, level)], rng, d,
+                             PREFERRED_CLUE_TYPE.get((lang, level)))
             puz = generate_puzzle(pool, lang, level, rng=rng)
             if puz is None:
                 out.append({"play_date": play_date, "language": lang, "level": level,

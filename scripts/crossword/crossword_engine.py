@@ -28,7 +28,7 @@ class LevelConfig:
 
 LEVEL_CONFIGS = {
     ("en", "A"): LevelConfig(9,  6,  10, "en-A"),
-    ("en", "B"): LevelConfig(19, 14, 15, "en-B"),
+    ("en", "B"): LevelConfig(12, 9,  13, "en-B"),
     ("en", "C"): LevelConfig(18, 13, 15, "en-C"),
     ("es", "A"): LevelConfig(11, 7,  11, "es-A"),
 }

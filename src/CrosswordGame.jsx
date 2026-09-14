@@ -1003,7 +1003,10 @@ function ClueList({ title, clues, activeClue, cellLetters, grid, onTap }) {
               }}
             >
               <span style={{ fontWeight: 800, minWidth: '20px' }}>{cl.num}</span>
-              <span style={{ fontWeight: 500, flex: 1 }}>{cl.clue_text}</span>
+              <span style={{ fontWeight: 500, flex: 1 }}>
+                {cl.clue_text}
+                <span style={{ color: '#a0aec0', fontWeight: 600, marginLeft: '5px' }}>({cl.length})</span>
+              </span>
               {correct && <span style={{ fontSize: '0.78rem' }}>✓</span>}
             </button>
           )
