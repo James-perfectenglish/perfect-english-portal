@@ -112,6 +112,12 @@ export default function CrosswordGame({ onBack, userProfile, classPuzzle = null 
 
   const [message, setMessage] = useState({ text: '', type: '' })
 
+  // Clue display: 'gapfill' (sentence with a blank) or 'definition'. B puzzles carry
+  // both on every clue; other levels only have clue_text, so the toggle stays hidden.
+  const [clueStyle, setClueStyle] = useState('gapfill')
+  const clueTextFor = cl =>
+    (clueStyle === 'definition' && cl?.clue_definition) ? cl.clue_definition : cl?.clue_text
+
   const stateRef     = useRef({})
   const saveTimerRef = useRef(null)
   const today        = new Date().toISOString().slice(0, 10)
@@ -707,7 +713,7 @@ export default function CrosswordGame({ onBack, userProfile, classPuzzle = null 
             <span style={{ fontWeight: 800, whiteSpace: 'nowrap' }}>
               {activeClue.num}{activeClue.dir === 'across' ? (isSpanish ? 'H' : 'A') : (isSpanish ? 'V' : 'D')}
             </span>
-            <span style={{ fontWeight: 500 }}>{activeClue.clue_text}</span>
+            <span style={{ fontWeight: 500 }}>{clueTextFor(activeClue)}</span>
           </div>
         )}
 
@@ -839,6 +845,28 @@ export default function CrosswordGame({ onBack, userProfile, classPuzzle = null 
         {/* Clues list (collapsible per direction) */}
         {gameState === 'playing' && (
           <div style={{ background: 'white', borderRadius: '12px', padding: '0.85rem 1rem', marginBottom: '0.75rem' }}>
+            {puzzle?.clues?.some(c => c.clue_definition) && (
+              <div style={{ display: 'flex', gap: '4px', marginBottom: '0.7rem' }}>
+                {[
+                  { key: 'gapfill',    label: isSpanish ? 'Frase'      : 'Sentence' },
+                  { key: 'definition', label: isSpanish ? 'Definición' : 'Definition' },
+                ].map(opt => (
+                  <button
+                    key={opt.key}
+                    onClick={() => setClueStyle(opt.key)}
+                    style={{
+                      flex: 1, padding: '6px 0', borderRadius: '6px', cursor: 'pointer',
+                      fontSize: '0.78rem', fontWeight: 700,
+                      background: clueStyle === opt.key ? '#eff6ff' : 'transparent',
+                      border: '1px solid ' + (clueStyle === opt.key ? '#bfdbfe' : '#e2e8f0'),
+                      color:  clueStyle === opt.key ? '#1e40af' : '#718096',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
             <ClueList
               title={isSpanish ? 'Horizontales' : 'Across'}
               clues={acrossClues}
@@ -846,6 +874,7 @@ export default function CrosswordGame({ onBack, userProfile, classPuzzle = null 
               cellLetters={cellLetters}
               grid={grid}
               onTap={handleClueTap}
+              clueText={clueTextFor}
             />
             <div style={{ height: '0.75rem' }} />
             <ClueList
@@ -855,6 +884,7 @@ export default function CrosswordGame({ onBack, userProfile, classPuzzle = null 
               cellLetters={cellLetters}
               grid={grid}
               onTap={handleClueTap}
+              clueText={clueTextFor}
             />
           </div>
         )}
@@ -974,7 +1004,7 @@ export default function CrosswordGame({ onBack, userProfile, classPuzzle = null 
 
 // ── Subcomponent: clue list ────────────────────────────────────────────────
 
-function ClueList({ title, clues, activeClue, cellLetters, grid, onTap }) {
+function ClueList({ title, clues, activeClue, cellLetters, grid, onTap, clueText }) {
   return (
     <div>
       <div style={{ fontSize: '0.78rem', color: '#a0aec0', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
@@ -1004,7 +1034,7 @@ function ClueList({ title, clues, activeClue, cellLetters, grid, onTap }) {
             >
               <span style={{ fontWeight: 800, minWidth: '20px' }}>{cl.num}</span>
               <span style={{ fontWeight: 500, flex: 1 }}>
-                {cl.clue_text}
+                {clueText ? clueText(cl) : cl.clue_text}
                 <span style={{ color: '#a0aec0', fontWeight: 600, marginLeft: '5px' }}>({cl.length})</span>
               </span>
               {correct && <span style={{ fontSize: '0.78rem' }}>✓</span>}
