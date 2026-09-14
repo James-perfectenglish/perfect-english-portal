@@ -112,11 +112,20 @@ export default function CrosswordGame({ onBack, userProfile, classPuzzle = null 
 
   const [message, setMessage] = useState({ text: '', type: '' })
 
-  // Clue display: 'gapfill' (sentence with a blank) or 'definition'. B puzzles carry
-  // both on every clue; other levels only have clue_text, so the toggle stays hidden.
-  const [clueStyle, setClueStyle] = useState('gapfill')
-  const clueTextFor = cl =>
-    (clueStyle === 'definition' && cl?.clue_definition) ? cl.clue_definition : cl?.clue_text
+  // Clue display. A clue may carry both clue_gapfill (a sentence with a blank) and
+  // clue_definition. clue_text always holds whichever is that level's default:
+  // gap-fill at B, definition at A and C. null below means "use that default".
+  const [clueStyle, setClueStyle] = useState(null)
+  const firstClue = puzzle?.clues?.[0]
+  const defaultClueStyle =
+    firstClue && firstClue.clue_text === firstClue.clue_gapfill ? 'gapfill' : 'definition'
+  const activeClueStyle = clueStyle || defaultClueStyle
+  const bothClueStyles  = !!puzzle?.clues?.some(c => c.clue_gapfill && c.clue_definition)
+  const clueTextFor = cl => {
+    if (!cl) return ''
+    const picked = activeClueStyle === 'gapfill' ? cl.clue_gapfill : cl.clue_definition
+    return picked || cl.clue_text
+  }
 
   const stateRef     = useRef({})
   const saveTimerRef = useRef(null)
@@ -845,7 +854,7 @@ export default function CrosswordGame({ onBack, userProfile, classPuzzle = null 
         {/* Clues list (collapsible per direction) */}
         {gameState === 'playing' && (
           <div style={{ background: 'white', borderRadius: '12px', padding: '0.85rem 1rem', marginBottom: '0.75rem' }}>
-            {puzzle?.clues?.some(c => c.clue_definition) && (
+            {bothClueStyles && (
               <div style={{ display: 'flex', gap: '4px', marginBottom: '0.7rem' }}>
                 {[
                   { key: 'gapfill',    label: isSpanish ? 'Frase'      : 'Sentence' },
@@ -857,9 +866,9 @@ export default function CrosswordGame({ onBack, userProfile, classPuzzle = null 
                     style={{
                       flex: 1, padding: '6px 0', borderRadius: '6px', cursor: 'pointer',
                       fontSize: '0.78rem', fontWeight: 700,
-                      background: clueStyle === opt.key ? '#eff6ff' : 'transparent',
-                      border: '1px solid ' + (clueStyle === opt.key ? '#bfdbfe' : '#e2e8f0'),
-                      color:  clueStyle === opt.key ? '#1e40af' : '#718096',
+                      background: activeClueStyle === opt.key ? '#eff6ff' : 'transparent',
+                      border: '1px solid ' + (activeClueStyle === opt.key ? '#bfdbfe' : '#e2e8f0'),
+                      color:  activeClueStyle === opt.key ? '#1e40af' : '#718096',
                     }}
                   >
                     {opt.label}
