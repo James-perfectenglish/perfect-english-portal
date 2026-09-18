@@ -7,7 +7,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // Prompt mode: a new worker installs and WAITS until the student taps the
+      // update banner (src/components/UpdateBanner.jsx). autoUpdate would
+      // force-reload the page the moment a new worker activated, mid-exercise.
+      registerType: 'prompt',
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'Perfect English Portal',
@@ -39,9 +42,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Take over immediately — don't wait for old SW to close
-        skipWaiting: true,
-        clientsClaim: true,
+        // Do NOT add skipWaiting / clientsClaim here: either would make a new
+        // worker take over the moment it installs and the banner would be
+        // pointless. With them off, workbox emits the SKIP_WAITING message
+        // listener that the banner's tap relies on.
         // Cache the app shell (JS, CSS, HTML)
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // Offline fallback only — navigation itself is NetworkFirst below.

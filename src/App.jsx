@@ -22,6 +22,7 @@ import CrosswordGame from './CrosswordGame'
 import NavBar from './components/NavBar'
 import TeacherSidebar from './components/TeacherSidebar'
 import TeacherStarBanner from './components/TeacherStarBanner'
+import UpdateBanner from './components/UpdateBanner'
 import PronunciationExercise from './PronunciationExercise'
 import { nextLevelForBand } from './components/teacherControls'
 
@@ -43,6 +44,9 @@ function App() {
   if (loading) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading...</div>
 
   return (
+    <>
+    {/* Outside the router so every page, login included, can pick up a deploy. */}
+    <UpdateBanner />
     <BrowserRouter>
       <Routes>
         <Route path="/login"   element={<Login />} />
@@ -52,6 +56,7 @@ function App() {
         <Route path="/*"      element={session ? <Dashboard session={session} /> : <Navigate to="/login" />} />
       </Routes>
     </BrowserRouter>
+    </>
   )
 }
 

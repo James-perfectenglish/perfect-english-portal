@@ -99,7 +99,6 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
   const [gameState, setGameState] = useState('loading')
   const [message, setMessage]     = useState('')
   const [shaking, setShaking]     = useState(false)
-  const [locked, setLocked]       = useState(false)
 
   const [sentenceDone, setSentenceDone]         = useState(false)
   const [sentenceFeedback, setSentenceFeedback] = useState(null)
@@ -119,6 +118,13 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
   const today    = new Date().toISOString().slice(0, 10)
   const stateRef = useRef({ word: '', guesses: [], current: '', gameState: 'loading' })
   const inputRef = useRef(null)
+
+  // Re-entrancy guard for submitGuess. A ref rather than state: submitGuess is
+  // reached from the mount-bound keydown listener, so state read from its
+  // closure is frozen at first render and a physical-keyboard double-Enter
+  // slipped straight past the old `locked` flag. A ref is written synchronously
+  // and read fresh every call, whichever keyboard the Enter came from.
+  const lockedRef = useRef(false)
 
   // Mid-game session writes are fired without awaiting, so a slow connection
   // never leaves the Enter key dead. They are chained through this ref so they
@@ -242,7 +248,7 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
 
   async function submitGuess() {
     const { current, word, displayWord, guesses, gameState, dictionary } = stateRef.current
-    if (gameState !== 'playing' || locked) return
+    if (gameState !== 'playing' || lockedRef.current) return
 
     if (current.length < WORD_LENGTH) {
       setShaking(true)
@@ -260,13 +266,18 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
       return
     }
 
-    setLocked(true)
+    lockedRef.current = true
     const newGuesses = [...guesses, current]
     const won  = current === word
     const lost = !won && newGuesses.length >= MAX_GUESSES
 
     setGuesses(newGuesses)
     setCurrent('')
+    // Mirror into the ref now rather than waiting for the sync effect, which
+    // only runs after the next render. A second Enter can land before that and
+    // would otherwise read the old `current` and `guesses` and resubmit the
+    // same word.
+    stateRef.current = { ...stateRef.current, guesses: newGuesses, current: '' }
 
     if (won) {
       const tiers = starTiers(newGuesses.length)
@@ -292,7 +303,7 @@ export default function WordleGame({ onBack, classPuzzle = null }) {
       // only exist on a win.
       saveSession(newGuesses, false, false, false, 0)
     }
-    setLocked(false)
+    lockedRef.current = false
   }
 
   // Queues a write behind any still in flight and returns the chained promise,
