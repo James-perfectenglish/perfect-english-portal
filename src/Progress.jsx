@@ -218,8 +218,13 @@ export default function Progress({ session, profile, handleLogout }) {
       .rpc('get_star_summary', { p_student_id: userId, p_week_start: getMondayISO() })
     if (starSummary && starSummary.total > 0) {
       const bySource = {}
+      // Named buckets for the sources worth a tile of their own; every practice
+      // surface rolls into 'practice'. 'other' still catches anything new so a
+      // source added later is visible rather than silently dropped.
+      const NAMED    = ['teacher_awarded','practice','wordle','crossword','spelling_bee','wordsearch','connections','wotd','gotd','pvotd','tense_tagger']
+      const PRACTICE = ['rpe','topic_practice','modal_match','conditional_chooser','error_correction','odd_one_out','survival','auction','dictation','listening','matching']
       Object.entries(starSummary.by_source || {}).forEach(([source, n]) => {
-        const bucket = ['wordle','spelling_bee','connections','wotd','gotd','teacher_awarded'].includes(source) ? source : 'other'
+        const bucket = NAMED.includes(source) ? source : PRACTICE.includes(source) ? 'practice' : 'other'
         bySource[bucket] = (bySource[bucket] || 0) + n
       })
       setStars({ total: starSummary.total, thisWeek: starSummary.this_week, bySource })
@@ -314,12 +319,17 @@ export default function Progress({ session, profile, handleLogout }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))', gap: '0.6rem' }}>
             {[
               { key: 'teacher_awarded', emoji: '👨‍🏫', label: isSpanish ? 'Profesor'   : 'Teacher'   },
+              { key: 'practice',        emoji: '✏️', label: isSpanish ? 'Práctica'   : 'Practice'  },
               { key: 'wordle',          emoji: '🟩', label: 'Wordle' },
-              { key: 'spelling_bee',    emoji: '🐝', label: isSpanish ? 'Spelling Bee' : 'Spelling Bee' },
+              { key: 'crossword',       emoji: '✜',  label: isSpanish ? 'Crucigrama' : 'Crossword' },
+              { key: 'spelling_bee',    emoji: '🐝', label: 'Spelling Bee' },
+              { key: 'wordsearch',      emoji: '🔎', label: isSpanish ? 'Sopa de letras' : 'Wordsearch' },
               { key: 'connections',     emoji: '🔗', label: 'Connections' },
               { key: 'wotd',            emoji: '📖', label: isSpanish ? 'Palabra'    : 'Word'      },
               { key: 'gotd',            emoji: '📝', label: isSpanish ? 'Gramática' : 'Grammar'   },
-              { key: 'other',           emoji: '✍️', label: isSpanish ? 'Frases'     : 'Sentences' },
+              { key: 'pvotd',           emoji: '🧩', label: 'Phrasal verb' },
+              { key: 'tense_tagger',    emoji: '🏷️', label: isSpanish ? 'Tiempos'    : 'Tenses'    },
+              { key: 'other',           emoji: '✨', label: isSpanish ? 'Otras'      : 'Other'     },
             ].filter(({ key }) => (stars.bySource[key] || 0) > 0).map(({ key, emoji, label }) => (
               <div key={key} style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '0.65rem 0.5rem', textAlign: 'center' }}>
                 <div style={{ fontSize: '1.3rem', lineHeight: 1 }}>{emoji}</div>
@@ -330,8 +340,8 @@ export default function Progress({ session, profile, handleLogout }) {
           </div>
           <p style={{ fontSize: '0.78rem', color: '#718096', margin: '0.85rem 0 0' }}>
             {isSpanish
-              ? 'Gana ⭐ jugando Wordle, Spelling Bee, Connections, la Palabra y la Gramática del día, escribiendo buenas frases, o cuando tu profesor te dé una.'
-              : 'Earn ⭐ by playing Wordle, Spelling Bee, Connections, Word and Grammar of the Day, by writing good sentences, or when your teacher awards you one.'}
+              ? 'Gana ⭐ terminando y aprobando series de práctica, con los juegos diarios, la Palabra y la Gramática del día, escribiendo buenas frases, o cuando tu profesor te dé una.'
+              : 'Earn ⭐ by finishing and passing practice sets, playing the daily games, Word and Grammar of the Day, writing good sentences, or when your teacher awards you one.'}
           </p>
         </Section>
       )}

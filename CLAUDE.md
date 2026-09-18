@@ -78,10 +78,12 @@ James strongly prefers:
 
 ### `stars` (unified)
 - Columns: `id`, `student_id`, `source`, `subtype`, `context` (JSONB), `awarded_at`
-- Sources: `wordle`, `spelling_bee`, `connections`, `wotd`, `gotd`, `topic_practice`, `rpe`, `listening`, `dictation`, `pronunciation`, `matching`, `wordsearch`, `teacher_awarded`
+- Sources: `wordle`, `spelling_bee`, `connections`, `crossword`, `wordsearch`, `wotd`, `gotd`, `pvotd`, `topic_practice`, `rpe`, `tense_tagger`, `modal_match`, `conditional_chooser`, `listening`, `dictation`, `pronunciation`, `matching`, `teacher_awarded`
 - Anti-farming via `ux_stars_dedupe` partial unique index on `(student_id, source, subtype, (context->>'dedupe_key'))` where `context ? 'dedupe_key'`.
-- Writers opt in by including `dedupe_key` in `context`. RPE / `topic_practice` intentionally omit it.
+- Writers opt in by including `dedupe_key` in `context`. Sentence-challenge stars (`subtype: 'sentence'`) from RPE / `topic_practice` intentionally omit it.
+- **Practice stars (added 18 Sep 2026):** `rpe` and `topic_practice` award `set_complete` (finished a set) and `set_pass` (RPE: 70%+; topic: the exercise's `passing_score`), each once per day — dedupe keys `practise:<levelKey>:<date>`, `fixit:fixit:<date>`, `topic:<topic>:<date>`. Inserted one row at a time, never batched, so a repeat `set_complete` can't block a first `set_pass`.
 - **`supabase-js` `.onConflict()` cannot target expression-based partial indexes.** Pattern: plain `.insert()` and catch `error.code === '23505'` silently.
+- Progress page buckets every practice source into one ✏️ Practice tile (`PRACTICE` list in `Progress.jsx`); a new source must be added to `NAMED` or `PRACTICE` there or it lands in “Other”.
 
 ### `exercises`
 - `title` is the join key across `ExerciseList.jsx`'s three registration points. Drift causes simultaneous "Soon" badge + icon fallback.

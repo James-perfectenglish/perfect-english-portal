@@ -193,6 +193,21 @@ const aiMarkDictation = async (correctAnswer, studentAnswer, excerptType = 'phra
   } catch (e) { console.error('AI dictation marking error:', e); return null; }
 };
 
+// What the set just finished banked. Rendered on both results screens.
+function SetStarsLine({ earned, isSpanish }) {
+  if (earned === null || earned === undefined) return null;
+  const text = earned === 2
+    ? (isSpanish ? '⭐⭐ Serie terminada y aprobada' : '⭐⭐ Set finished and passed')
+    : earned === 1
+      ? (isSpanish ? '⭐ Serie terminada — llega al 70% para una segunda estrella' : '⭐ Set finished — score 70%+ for a second star')
+      : (isSpanish ? '⭐ Las estrellas de hoy para este nivel ya están en tu cuenta' : '⭐ Today’s stars for this level are already banked');
+  return (
+    <div style={{ background: '#fffbeb', border: '2px solid #fde68a', borderRadius: '12px', padding: '0.75rem 1rem', marginBottom: '1rem', color: '#92400e', fontWeight: 600, fontSize: 'clamp(0.9rem, 3vw, 1rem)', lineHeight: 1.4 }}>
+      {text}
+    </div>
+  );
+}
+
 export default function RandomPracticeExercise({ levels, levelTitle, levelSubtitle, gradient, language = 'en', userTracks = [], weakTypes = [], fixups = [], onBack }) {
   const isSpanish = language === 'es';
 
@@ -228,6 +243,9 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const allScoresRef = useRef([]);
   const clearedForGoodRef = useRef(new Set());
   const [clearedForGood, setClearedForGood] = useState(0);
+  // Stars banked by the set just finished: null = not yet checked, 0 = today's
+  // stars for this level were already banked, 1 = finished, 2 = finished + passed.
+  const [earnedStars, setEarnedStars] = useState(null);
   const [oooSelected, setOooSelected] = useState(null);
   const [ecSelectedWordIndex, setEcSelectedWordIndex] = useState(null);
   const [ecCorrection, setEcCorrection] = useState('');
@@ -290,6 +308,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
     setClearedForGood(clearedForGoodRef.current.size);
     setStage('finished');
     saveAttemptToDB(currentScore);
+    awardSetStars(currentScore);
   };
 
   const saveAttemptToDB = async (currentScore) => {
@@ -301,6 +320,38 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         answers: { practice_type: 'random_practice', levels: getLevelKey(), total_questions: questions.length },
       });
     } catch (error) { console.error('Error saving attempt:', error); }
+  };
+
+  // Practice stars (18 Sep 2026): one for finishing a set, one more for passing
+  // it (70%+), each once per level per day. Anti-farming is the ux_stars_dedupe
+  // partial unique index, same as the daily games — a repeat comes back 23505
+  // and is simply not counted. Fix it! is its own daily bucket.
+  const awardSetStars = async (currentScore) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const total = questions.length;
+      if (!total) return;
+      const mode     = fixups && fixups.length > 0 ? 'fixit' : 'practise';
+      const levelKey = mode === 'fixit' ? 'fixit' : getLevelKey();
+      const today    = new Date().toISOString().slice(0, 10);
+      const dedupe_key = `${mode}:${levelKey}:${today}`;
+      const base = {
+        student_id: user.id, source: 'rpe',
+        context: { dedupe_key, mode, level: levelKey, language, play_date: today, score: currentScore, total },
+      };
+      const rows = [{ ...base, subtype: 'set_complete' }];
+      if (currentScore / total >= 0.7) rows.push({ ...base, subtype: 'set_pass' });
+      // One insert per row, not a batch: a multi-row insert is all-or-nothing,
+      // so a repeat set_complete would block a first set_pass later the same day.
+      let earned = 0;
+      for (const row of rows) {
+        const { error } = await supabase.from('stars').insert(row);
+        if (!error) earned++;
+        else if (error.code !== '23505') console.warn('Practice star insert failed:', error);
+      }
+      setEarnedStars(earned);
+    } catch (e) { console.warn('Practice star award failed:', e); }
   };
 
   const saveAnswer = async (question, studentAnswer, isCorrect) => {
@@ -434,6 +485,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
   const startExercise = async () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     clearedForGoodRef.current = new Set();
+    setEarnedStars(null);
     setLoading(true);
     try {
       // ── Fix it! mode: serve the student's own past mistakes, in queue order ──
@@ -1400,6 +1452,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
                   </div>
                   <div style={{ fontSize: 'clamp(2rem, 8vw, 2.8rem)', fontWeight: '700', lineHeight: 1.1 }}>{score} / {questions.length}</div>
                 </div>
+                <SetStarsLine earned={earnedStars} isSpanish={isSpanish} />
                 {clearedForGood > 0 && (
                   <div style={{ background: '#f0fff4', border: '2px solid #48bb78', borderRadius: '12px', padding: '0.9rem 1rem', marginBottom: '1rem', color: '#276749', fontWeight: '600', fontSize: 'clamp(0.95rem, 3vw, 1.05rem)', lineHeight: 1.5 }}>
                     🎉 {clearedForGood === 1
@@ -1431,6 +1484,7 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
               <div style={{ fontSize: 'clamp(1rem, 3.5vw, 1.15rem)', marginBottom: '1.5rem', color: '#666' }}>
                 {scorePercent >= 90 ? '🌟 Outstanding work!' : scorePercent >= 75 ? '👍 Great job!' : scorePercent >= 50 ? '👌 Good effort!' : '💪 Keep practicing!'}
               </div>
+              <SetStarsLine earned={earnedStars} isSpanish={isSpanish} />
               <div style={{ display: 'grid', gridTemplateColumns: bestScore !== null ? 'repeat(3, minmax(0, 1fr))' : '1fr', gap: '0.5rem', marginBottom: '2rem' }}>
                 <div style={{ background: displayGradient, borderRadius: '12px', padding: '1rem 0.4rem', color: 'white' }}>
                   <div style={{ fontSize: '0.8rem', fontWeight: '600', opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.4rem' }}>This attempt</div>

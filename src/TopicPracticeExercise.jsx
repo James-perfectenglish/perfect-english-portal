@@ -206,6 +206,8 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
   const [isChecking, setIsChecking]     = useState(false)
   const [results, setResults]           = useState([])
   const [sessionSaved, setSessionSaved] = useState(false)
+  // Stars banked by this attempt: null = not checked, 0 = already banked today, 1 = finished, 2 = finished + passed.
+  const [earnedStars, setEarnedStars] = useState(null)
   const inputRef = useRef(null)
 
   // ── Hint state ──
@@ -252,7 +254,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
 
   async function fetchQuestionsSpanish() {
     setCurrentQ(0); setScore(0); setResults([]); setFeedback(null)
-    setUserAnswer(''); setSelectedOption(null); setSessionSaved(false)
+    setUserAnswer(''); setSelectedOption(null); setSessionSaved(false); setEarnedStars(null)
     setHintLevel(0); setHintRandomIdx(null); setAutoHintShown(false)
 
     // Seen-history read runs in parallel with the pool fetch (no added latency)
@@ -298,7 +300,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
 
   async function fetchQuestions(level) {
     setCurrentQ(0); setScore(0); setResults([]); setFeedback(null)
-    setUserAnswer(''); setSelectedOption(null); setSessionSaved(false)
+    setUserAnswer(''); setSelectedOption(null); setSessionSaved(false); setEarnedStars(null)
     setHintLevel(0); setHintRandomIdx(null); setAutoHintShown(false)
 
     let query = supabase.from('question_bank').select('*').eq('topic', exercise.topic).in('level', level.dbLevels).is('sequence_group', null)
@@ -438,6 +440,31 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
     }
   }
 
+  // Practice stars (18 Sep 2026): one for finishing, one more for passing the
+  // exercise's own pass mark, each once per topic per day. Dedupe is the
+  // ux_stars_dedupe index — a repeat comes back 23505 and isn't counted.
+  const awardSetStars = async (userId, sc) => {
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const dedupe_key = `topic:${exercise.topic}:${today}`
+      const base = {
+        student_id: userId, source: 'topic_practice',
+        context: { dedupe_key, topic: exercise.topic, language: isSpanishTP ? 'es' : 'en', play_date: today, score: sc, total: questions.length },
+      }
+      const rows = [{ ...base, subtype: 'set_complete' }]
+      if (sc >= passMark) rows.push({ ...base, subtype: 'set_pass' })
+      // One insert per row: a batch is all-or-nothing, and a repeat
+      // set_complete would block a first set_pass later the same day.
+      let earned = 0
+      for (const row of rows) {
+        const { error } = await supabase.from('stars').insert(row)
+        if (!error) earned++
+        else if (error.code !== '23505') console.warn('Topic practice star insert failed:', error)
+      }
+      setEarnedStars(earned)
+    } catch (e) { console.warn('Topic practice star award failed:', e) }
+  }
+
   const doAdvance = async () => {
     window.scrollTo({ top: 0, behavior: 'instant' })
     if (currentQ + 1 >= questions.length) {
@@ -447,6 +474,7 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
         if (user) {
           const sc = results.filter(r => r.isCorrect).length
           await supabase.from('topic_sessions').insert({ student_id: user.id, topic: exercise.topic, score: sc, total: questions.length, passed: sc >= passMark })
+          awardSetStars(user.id, sc)
         }
       }
       setStage('finished'); return
@@ -845,6 +873,13 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
               <h2 style={{ color: '#2d3748', margin: '0 0 12px' }}>Exercise Complete!</h2>
               <div style={{ fontSize: '3rem', fontWeight: 700, margin: '12px 0', color: finalPass ? '#48bb78' : finalScore >= 5 ? '#ed8936' : '#f56565' }}>{finalScore}/{questions.length}</div>
               <p style={{ color: '#4a5568' }}>{finalScore >= 9 ? 'Outstanding! Excellent work.' : finalPass ? 'Great work! You passed.' : finalScore >= 5 ? 'Good effort. Keep practising to improve.' : 'Keep going — practice makes perfect!'}</p>
+              {earnedStars !== null && (
+                <div style={{ background: '#fffbeb', border: '2px solid #fde68a', borderRadius: '10px', padding: '0.7rem 1rem', margin: '0 auto 0.5rem', maxWidth: '420px', color: '#92400e', fontWeight: 600, lineHeight: 1.4 }}>
+                  {earnedStars === 2 ? '⭐⭐ Finished and passed'
+                    : earnedStars === 1 ? `⭐ Finished — reach ${passMark}/${questions.length} for a second star`
+                    : '⭐ Today’s stars for this topic are already banked'}
+                </div>
+              )}
               <div style={{ marginTop: '20px', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button onClick={restartExercise} style={{ padding: '10px 24px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Try Again</button>
                 <button onClick={backToLevelSelect} style={{ padding: '10px 24px', background: '#4a5568', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>Change Level</button>
