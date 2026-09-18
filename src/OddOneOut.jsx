@@ -108,7 +108,8 @@ export default function OddOneOut({ onBack, onComplete, topicFilter, userTracks 
         question_id: question.question_number,
         student_answer: studentAnswer,
         correct_answer: question.correct_answer || '',
-        is_correct: isCorrect
+        is_correct: isCorrect,
+        context: 'odd_one_out',
       });
     } catch (error) { console.error('Error saving answer:', error); }
   };

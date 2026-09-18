@@ -38,7 +38,8 @@ export default function SurvivalMode({ onBack }) {
           question_id: question.question_number,
           student_answer: studentAnswer,
           correct_answer: question.correct_answer || '',
-          is_correct: isCorrect
+          is_correct: isCorrect,
+          context: 'survival',
         });
     } catch (error) {
       console.error('Error saving answer:', error);

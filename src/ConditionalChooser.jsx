@@ -236,6 +236,7 @@ export default function ConditionalChooser({ language = 'en', onBack, onComplete
         student_answer: studentAnswer,
         correct_answer: question.correct_answer || '',
         is_correct: isCorrect,
+        context: 'conditionals',
       });
     } catch (e) { console.warn('ConditionalChooser: student_answers insert failed', e); }
   };

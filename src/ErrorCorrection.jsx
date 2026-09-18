@@ -140,7 +140,8 @@ export default function ErrorCorrection({ onBack, onComplete, topicFilter, userT
       await supabase.from('student_answers').insert({
         student_id: user.id, question_id: question.question_number,
         student_answer: studentAnswer, correct_answer: question.correct_answer || '',
-        is_correct: isCorrect, is_soft_pass: isSoftPass
+        is_correct: isCorrect, is_soft_pass: isSoftPass,
+        context: 'error_correction',
       });
     } catch (error) { console.error('Error saving answer:', error); }
   };

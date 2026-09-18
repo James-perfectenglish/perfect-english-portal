@@ -334,6 +334,7 @@ export default function ModalChooser({ onBack, onComplete, userTracks = [], clas
         student_answer: studentAnswer,
         correct_answer: question.correct_answer || '',
         is_correct: isCorrect,
+        context: 'modal_match',
       });
     } catch (e) { console.warn('ModalMatch: student_answers insert failed', e); }
   };

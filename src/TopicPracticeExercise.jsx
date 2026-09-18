@@ -378,6 +378,10 @@ export default function TopicPracticeExercise({ exercise, userLevel, onBack, onC
         student_answer: studentAnswer,
         correct_answer: question.correct_answer || '',
         is_correct: isCorrect,
+        context: 'topic',
+        // The one surface with a real exercises row to point at. Omitted (not
+        // null) when absent so the column default still applies.
+        ...(exercise?.id ? { exercise_id: exercise.id } : {}),
       })
     } catch (e) { console.warn('TopicPractice: student_answers insert failed', e) }
   }

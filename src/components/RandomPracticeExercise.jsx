@@ -319,6 +319,9 @@ export default function RandomPracticeExercise({ levels, levelTitle, levelSubtit
         student_answer: studentAnswer,
         correct_answer: question.correct_answer || '',
         is_correct: isCorrect,
+        // Which surface logged this — nothing else on the row says. Fix it!
+        // reuses this component with a fixups queue; plain Practise has none.
+        context: fixups && fixups.length > 0 ? 'fixit' : 'practise',
       });
     } catch (error) { console.error('Error saving answer:', error); }
   };

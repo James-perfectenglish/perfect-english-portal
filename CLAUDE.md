@@ -14,9 +14,9 @@ Secondary Spanish track for native-English learners.
 
 ## Stack
 
-- **Frontend**: React + Vite, PWA via vite-plugin-pwa
+- **Frontend**: React + Vite, PWA via vite-plugin-pwa (prompt mode: new builds wait for a tap on `UpdateBanner`; never re-add `skipWaiting`/`clientsClaim` to the workbox config)
 - **Backend**: Supabase (Postgres + Storage + Realtime + Auth)
-- **Hosting**: Vercel hobby plan (~12 serverless function limit — currently at the cap, consolidation is a parked priority)
+- **Hosting**: Vercel hobby plan (12 serverless function limit — 8 in `api/` as of Sep 2026)
 - **AI marking**: Anthropic API via Vercel serverless functions (`mark-gap.js`, `mark-free.js`, `mark-correction.js`, `mark-sentence.js`, etc.)
 - **Audio**: ElevenLabs for dictation/pronunciation recording; files in Supabase Storage at `audio/dictation/` with convention `quick-[level]-[number].mp3`
 - **Local path**: `/Users/james/perfect-english-portal/`
@@ -100,6 +100,7 @@ James strongly prefers:
 - Level values individual (`'B1'`, not `'B1/B2'`).
 - Apostrophes in SQL → `''`.
 - `student_answers.question_id` is `int4` (question_number).
+- `student_answers.context` (added 18 Sep 2026) says which surface logged the row: `practise`, `fixit`, `topic`, `modal_match`, `conditionals`, `error_correction`, `odd_one_out`, `auction`, `survival`. Null = before that date. `exercise_id` defaults to `gen_random_uuid()` and only Topic practice sets it to a real `exercises` row — never join it to `exercises` for anything else. Any new surface that logs answers must set `context`.
 - `word_of_the_day.id` is auto-increment — omit from INSERT.
 - `spelling_bee_puzzles` has unique constraint on `(play_date, language)` — blocks CASE-statement date swaps.
 - Connections inserts via DO block with `RETURNING id INTO p_id`. Always run dup-word check after.

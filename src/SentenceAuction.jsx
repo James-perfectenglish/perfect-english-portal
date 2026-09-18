@@ -159,7 +159,8 @@ export default function SentenceAuction({ onBack, onComplete, userTracks = [] })
       const auction = auctions[currentIdx];
       await supabase.from('student_answers').insert({
         student_id: user.id, question_id: auction.question_number,
-        student_answer: `gained:${gained} lost:${lost}`, correct_answer: 'auction', is_correct: gained > lost
+        student_answer: `gained:${gained} lost:${lost}`, correct_answer: 'auction', is_correct: gained > lost,
+        context: 'auction',
       });
     } catch (e) { console.error(e); }
   };
