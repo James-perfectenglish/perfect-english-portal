@@ -19,6 +19,7 @@ import ConnectionsGame from './ConnectionsGame'
 import SpellingBeeGame from './SpellingBeeGame'
 import WordSearchGame from './WordSearchGame'
 import CrosswordGame from './CrosswordGame'
+import BluffGame from './BluffGame'
 import NavBar from './components/NavBar'
 import TeacherSidebar from './components/TeacherSidebar'
 import TeacherStarBanner from './components/TeacherStarBanner'
@@ -292,6 +293,7 @@ function StudentRoutes({ session, profile, handleLogout }) {
       <Route path="/spelling-bee" element={<SpellingBeeGame onBack={() => navigate(-1)} userProfile={profile} />} />
       <Route path="/wordsearch"   element={<WordSearchGame onBack={() => navigate(-1)} userProfile={profile} />} />
       <Route path="/crossword"    element={<CrosswordGame onBack={() => navigate(-1)} userProfile={profile} />} />
+      <Route path="/bluff"        element={<BluffGame onBack={() => navigate(-1)} userProfile={profile} />} />
       <Route path="/exercises" element={<Navigate to="/learn" replace />} />
       <Route path="*"          element={<Navigate to="/" replace />} />
     </Routes>
@@ -321,6 +323,7 @@ function TeacherRoutes({ session, profile, effectiveProfile, hasOverride, global
       <Route path="/spelling-bee" element={<SpellingBeeGame onBack={() => nav(-1)} userProfile={effectiveProfile} />} />
       <Route path="/wordsearch"   element={<WordSearchGame onBack={() => nav(-1)} userProfile={effectiveProfile} />} />
       <Route path="/crossword"    element={<CrosswordGame onBack={() => nav(-1)} userProfile={effectiveProfile} />} />
+      <Route path="/bluff"        element={<BluffGame onBack={() => nav(-1)} userProfile={effectiveProfile} />} />
       <Route path="/teacher"   element={<TeacherDashboard profile={profile} handleLogout={handleLogout} />} />
       <Route path="/teacher/browse" element={<TeacherBrowse user={session.user} globalLang={globalLang} />} />
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -221,7 +221,7 @@ export default function Progress({ session, profile, handleLogout }) {
       // Named buckets for the sources worth a tile of their own; every practice
       // surface rolls into 'practice'. 'other' still catches anything new so a
       // source added later is visible rather than silently dropped.
-      const NAMED    = ['teacher_awarded','practice','wordle','crossword','spelling_bee','wordsearch','connections','wotd','gotd','pvotd','tense_tagger']
+      const NAMED    = ['teacher_awarded','practice','wordle','crossword','spelling_bee','wordsearch','connections','bluff','wotd','gotd','pvotd','tense_tagger']
       const PRACTICE = ['rpe','topic_practice','modal_match','conditional_chooser','error_correction','odd_one_out','survival','auction','dictation','listening','matching']
       Object.entries(starSummary.by_source || {}).forEach(([source, n]) => {
         const bucket = NAMED.includes(source) ? source : PRACTICE.includes(source) ? 'practice' : 'other'
@@ -325,6 +325,7 @@ export default function Progress({ session, profile, handleLogout }) {
               { key: 'spelling_bee',    emoji: '🐝', label: 'Spelling Bee' },
               { key: 'wordsearch',      emoji: '🔎', label: isSpanish ? 'Sopa de letras' : 'Wordsearch' },
               { key: 'connections',     emoji: '🔗', label: 'Connections' },
+              { key: 'bluff',           emoji: '🃏', label: 'Word Bluff' },
               { key: 'wotd',            emoji: '📖', label: isSpanish ? 'Palabra'    : 'Word'      },
               { key: 'gotd',            emoji: '📝', label: isSpanish ? 'Gramática' : 'Grammar'   },
               { key: 'pvotd',           emoji: '🧩', label: 'Phrasal verb' },

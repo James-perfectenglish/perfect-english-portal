@@ -44,11 +44,26 @@ const ACTIVE_EXERCISES = new Set([
   'Odd One Out', 'Error Correction',
   'Matching', 'Sentence Auction', 'Lyrics Mixer', 'Blurt!', 'Word Snake', 'Real Talk',
   'Travel 🧳', 'Sport ⚽️', 'Wordle', 'Connections', 'Spelling Bee', 'Wordsearch', 'Crossword',
+  'Word Bluff',
   'Tense Tagger', 'Tense Explainer', 'Modal Explainer',
   'Verb Conjugator 🇪🇸',
   'Irregular Verbs: Past Forms ⏳',
   'Conditionals Explainer', 'Conditionals Chooser',
 ])
+
+// Students see these as "Soon" until the date (UTC, as the daily games use);
+// teachers can open them straight away to preview. No deploy needed on the day.
+const LAUNCH_DATES = {
+  'Word Bluff': '2026-11-01',
+}
+
+// Hidden from Spanish-track learners: there is no Spanish version.
+const ENGLISH_ONLY = new Set(['Word Bluff'])
+
+function isLaunched(title, isTeacher) {
+  const launch = LAUNCH_DATES[title]
+  return isTeacher || !launch || new Date().toISOString().slice(0, 10) >= launch
+}
 
 const EXERCISE_ICONS = {
   'Modal Explainer':           '📗',
@@ -86,6 +101,7 @@ const EXERCISE_ICONS = {
   'Spelling Bee':              '🐝',
   'Wordsearch':                '🔎',
   'Crossword':                 '✜',
+  'Word Bluff':                '🃏',
   'Tense Tagger':              '🏷️',
   'Tense Explainer':           '📖',
   'Verb Conjugator 🇪🇸':       '🔤',
@@ -212,8 +228,10 @@ export default function ExerciseList({
     setOpenedTitles(prev => new Set([...prev, title]))
   }
 
+  const isActive = (exercise) => ACTIVE_EXERCISES.has(exercise.title) && isLaunched(exercise.title, isTeacher)
+
   const startExercise = (exercise) => {
-    if (!ACTIVE_EXERCISES.has(exercise.title)) return
+    if (!isActive(exercise)) return
     setTaggerTense(null)
     recordOpen(exercise.title)
     if (exercise.title === 'Lyrics Mixer') { navigate('/lyrics');    return }
@@ -224,6 +242,7 @@ export default function ExerciseList({
     if (exercise.title === 'Spelling Bee') { navigate('/spelling-bee', { state: { isSpanish: userTracks.includes('spanish') } }); return }
     if (exercise.title === 'Wordsearch')   { navigate('/wordsearch',   { state: { isSpanish: userTracks.includes('spanish') } }); return }
     if (exercise.title === 'Crossword')    { navigate('/crossword',    { state: { isSpanish: userTracks.includes('spanish') } }); return }
+    if (exercise.title === 'Word Bluff')   { navigate('/bluff'); return }
     setActiveExercise(exercise)
   }
 
@@ -333,8 +352,10 @@ export default function ExerciseList({
   const isEs = (userTracks || []).includes('spanish')
   const vocationalFilters = (userTracks || []).filter(t => t !== 'spanish' && t !== 'general')
 
+  const spanishView = isEs || userLevel === 'Spanish'
   const tabExercises = exercises
     .filter(e => isTeacher ? teacherListVisible(e, vocationalFilters, isEs) : shouldShowExercise(e, userTracks))
+    .filter(e => !(spanishView && ENGLISH_ONLY.has(e.title)))
     .filter(e => (e.category || 'practice') === activeTab)
 
   // Teachers get a single flat list (the For You / All split is a student device).
@@ -373,7 +394,7 @@ export default function ExerciseList({
   const GridCard = ({ exercise }) => {
     const fy      = !isTeacher && isForYouFn(exercise, userTracks)
     const newFlag = isNew(exercise)
-    const active  = ACTIVE_EXERCISES.has(exercise.title)
+    const active  = isActive(exercise)
     const icon    = EXERCISE_ICONS[exercise.title] || '📝'
     const isWide  = exercise.category === 'listen'
     const cardStyle = {
@@ -419,7 +440,7 @@ export default function ExerciseList({
   const ListCard = ({ exercise }) => {
     const fy      = !isTeacher && isForYouFn(exercise, userTracks)
     const newFlag = isNew(exercise)
-    const active  = ACTIVE_EXERCISES.has(exercise.title)
+    const active  = isActive(exercise)
     const icon    = EXERCISE_ICONS[exercise.title] || '📝'
     return (
       <div style={{ border: `1.5px solid ${fy ? '#667eea' : '#e8e8f0'}`, borderRadius: '12px', padding: '12px 14px', background: fy ? 'linear-gradient(160deg, #f7f8ff 0%, #fdf5ff 100%)' : 'white', cursor: active ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}

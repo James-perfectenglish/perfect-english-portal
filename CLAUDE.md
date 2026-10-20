@@ -78,12 +78,22 @@ James strongly prefers:
 
 ### `stars` (unified)
 - Columns: `id`, `student_id`, `source`, `subtype`, `context` (JSONB), `awarded_at`
-- Sources: `wordle`, `spelling_bee`, `connections`, `crossword`, `wordsearch`, `wotd`, `gotd`, `pvotd`, `topic_practice`, `rpe`, `tense_tagger`, `modal_match`, `conditional_chooser`, `listening`, `dictation`, `pronunciation`, `matching`, `teacher_awarded`
+- Sources: `wordle`, `spelling_bee`, `connections`, `crossword`, `wordsearch`, `bluff`, `wotd`, `gotd`, `pvotd`, `topic_practice`, `rpe`, `tense_tagger`, `modal_match`, `conditional_chooser`, `listening`, `dictation`, `pronunciation`, `matching`, `teacher_awarded`
 - Anti-farming via `ux_stars_dedupe` partial unique index on `(student_id, source, subtype, (context->>'dedupe_key'))` where `context ? 'dedupe_key'`.
 - Writers opt in by including `dedupe_key` in `context`. Sentence-challenge stars (`subtype: 'sentence'`) from RPE / `topic_practice` intentionally omit it.
 - **Practice stars (added 18 Sep 2026):** `rpe` and `topic_practice` award `set_complete` (finished a set) and `set_pass` (RPE: 70%+; topic: the exercise's `passing_score`), each once per day — dedupe keys `practise:<levelKey>:<date>`, `fixit:fixit:<date>`, `topic:<topic>:<date>`. Inserted one row at a time, never batched, so a repeat `set_complete` can't block a first `set_pass`.
 - **`supabase-js` `.onConflict()` cannot target expression-based partial indexes.** Pattern: plain `.insert()` and catch `error.code === '23505'` silently.
 - Progress page buckets every practice source into one ✏️ Practice tile (`PRACTICE` list in `Progress.jsx`); a new source must be added to `NAMED` or `PRACTICE` there or it lands in “Other”.
+
+### Word Bluff (`bluff_words`, `bluff_sessions`) — added Oct 2026
+- Daily "Call My Bluff" game: 5 words per day per level `A`/`B`/`C`, three definitions, one real. Component `src/BluffGame.jsx`, route `/bluff`, tile title `Word Bluff`.
+- `bluff_words`: `contexts text[]` (1–2 sentences, target marked `[[like this]]`, enforced by a CHECK), `options text[]` (exactly 3, fixed display order), `correct_option` `'a'|'b'|'c'`, `reveal_note` plain text, `voice` `alice`/`daniel`, `audio_word_url`, `audio_context_urls` (same order as `contexts`), `returning_from` (id of the original intro row when a word is recycled). Unique `(play_date, level, position)`; a word can be introduced only once per level (partial unique index where `returning_from is null`).
+- Definitions must be written BELOW the word's level. A/B distractors are Spanish false friends where possible.
+- Audio: `sh scripts/bluff/run-bluff-audio.sh` (dry run) then `--commit`. Fills only rows missing audio. Words via `eleven_flash_v2` (English-only, so false friends aren't read as Spanish), sentences via `eleven_multilingual_v2`.
+- `bluff_sessions`: one row per student/date/level, `answers` jsonb keyed by `bluff_words.id`, saved after every answer (resume on refresh, no changing answers). Not logged to `student_answers` — its `question_id` is joined to `question_bank`, so bluff ids would corrupt Progress type stats.
+- Stars: source `bluff`, subtypes `complete`, `sharp_eye` (4+/5), `sentence`; dedupe `bluff:<date>:<level>:<subtype>`.
+- Teachers (`is_teacher`, Present Mode included) play without saving, can replay, and can step through every date's set.
+- `ExerciseList.jsx` `LAUNCH_DATES` shows a tile as "Soon" to students until its date; `ENGLISH_ONLY` hides a tile from Spanish-track learners.
 
 ### `exercises`
 - `title` is the join key across `ExerciseList.jsx`'s three registration points. Drift causes simultaneous "Soon" badge + icon fallback.
