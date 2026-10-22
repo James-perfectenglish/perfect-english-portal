@@ -78,7 +78,7 @@ James strongly prefers:
 
 ### `stars` (unified)
 - Columns: `id`, `student_id`, `source`, `subtype`, `context` (JSONB), `awarded_at`
-- Sources: `wordle`, `spelling_bee`, `connections`, `crossword`, `wordsearch`, `bluff`, `wotd`, `gotd`, `pvotd`, `topic_practice`, `rpe`, `tense_tagger`, `modal_match`, `conditional_chooser`, `listening`, `dictation`, `pronunciation`, `matching`, `teacher_awarded`
+- Sources: `wordle`, `spelling_bee`, `connections`, `crossword`, `wordsearch`, `bluff`, `scramble`, `wotd`, `gotd`, `pvotd`, `topic_practice`, `rpe`, `tense_tagger`, `modal_match`, `conditional_chooser`, `listening`, `dictation`, `pronunciation`, `matching`, `teacher_awarded`
 - Anti-farming via `ux_stars_dedupe` partial unique index on `(student_id, source, subtype, (context->>'dedupe_key'))` where `context ? 'dedupe_key'`.
 - Writers opt in by including `dedupe_key` in `context`. Sentence-challenge stars (`subtype: 'sentence'`) from RPE / `topic_practice` intentionally omit it.
 - **Practice stars (added 18 Sep 2026):** `rpe` and `topic_practice` award `set_complete` (finished a set) and `set_pass` (RPE: 70%+; topic: the exercise's `passing_score`), each once per day — dedupe keys `practise:<levelKey>:<date>`, `fixit:fixit:<date>`, `topic:<topic>:<date>`. Inserted one row at a time, never batched, so a repeat `set_complete` can't block a first `set_pass`.
@@ -97,6 +97,16 @@ James strongly prefers:
 - Stars: source `bluff`, subtypes `complete`, `sharp_eye` (4+/5), `sentence`; dedupe `bluff:<date>:<level>:<subtype>`.
 - Teachers (`is_teacher`, Present Mode included) play without saving, can replay, and can step through every date's set.
 - `ExerciseList.jsx` `LAUNCH_DATES` shows a tile as "Soon" to students until its date; `ENGLISH_ONLY` hides a tile from Spanish-track learners.
+
+### Story Scramble (`scramble_texts`, `scramble_sessions`) — added Oct 2026
+- Weekly jumbled-story activity in the Activities tab (`exercises.category = 'practice'`). Component `src/StoryScramble.jsx`, rendered inline by `ExerciseList` (no route). Tile title `Story Scramble`, launch `2026-11-02` via `LAUNCH_DATES`.
+- One text per week per (language, level): EN `A2`/`B1`/`B2`/`C1`; ES `A2` only for now (pitched A2–B1; separate ES A2 and B1 planned for the new year — level pills appear by themselves once a language has more than one level). `week_start` must be a Monday (CHECK). Students see texts with `week_start` <= this Monday (UTC); earlier weeks stay playable under "More stories".
+- `sentences text[]` in the correct order, cohesion clues marked `[[like this]]` (stripped while playing, highlighted afterwards). `notes text[]`, same length: why each sentence sits where it does, written in English for Spanish texts too, at or below the text's level. `start_order smallint[]` is the jumble (a permutation, enforced by `scramble_is_permutation()`); the letters A, B, C… follow it. New texts start with 0 correct links.
+- **Every text must have exactly one defensible order.** Each batch is solved blind by a separate agent before insert; anything with a second defensible order is rewritten.
+- Mechanics: no feedback while arranging. 3 checks; each reports how many links (adjacent correct pairs) are right out of n−1, never which. Links, not positions, so one misplaced sentence can't make a nearly-right order score 0. The hint ("Show me how it starts") locks sentence 1 at the top and uses a check. Out of checks → "Show me the answer" (no stars).
+- `scramble_sessions`: one row per student/text (unique). `current_order` saves ~0.7s after each move; `checks_used`, `check_results` (links right at each check), `hint_used`, `solved`, `revealed`. Checks are server-side state so a reload can't reset them. Not logged to `student_answers`.
+- Stars: source `scramble`; solved on check 1/2/3 (the hint counts as a check) → 3/2/1 rows, subtypes `solved`, `sharp`, `first_try`; dedupe `scramble:<week_start>:<lang>-<level>:<subtype>`. In `Progress.jsx` `NAMED`.
+- Teachers (`isTeacher` prop, or `profiles.is_teacher` so Present Mode counts) play without saving, see future weeks marked "Goes live", and can ↺ Start again.
 
 ### `exercises`
 - `title` is the join key across `ExerciseList.jsx`'s three registration points. Drift causes simultaneous "Soon" badge + icon fallback.

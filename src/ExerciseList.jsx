@@ -26,6 +26,7 @@ import IrregularVerbsEN from './components/IrregularVerbsEN'
 import ConditionalExplainer from './components/ConditionalExplainer'
 import ConditionalExplainerES from './components/ConditionalExplainerES'
 import ConditionalChooser from './ConditionalChooser'
+import StoryScramble from './StoryScramble'
 import { BORRAS_CARDS } from './data/BorrasCards'
 import { HOTEL_CARDS } from './data/HotelCards'
 import { VERB_CARDS } from './data/VerbCards'
@@ -49,12 +50,14 @@ const ACTIVE_EXERCISES = new Set([
   'Verb Conjugator 🇪🇸',
   'Irregular Verbs: Past Forms ⏳',
   'Conditionals Explainer', 'Conditionals Chooser',
+  'Story Scramble',
 ])
 
 // Students see these as "Soon" until the date (UTC, as the daily games use);
 // teachers can open them straight away to preview. No deploy needed on the day.
 const LAUNCH_DATES = {
   'Word Bluff': '2026-11-01',
+  'Story Scramble': '2026-11-02',
 }
 
 // Hidden from Spanish-track learners: there is no Spanish version.
@@ -108,6 +111,7 @@ const EXERCISE_ICONS = {
   'Irregular Verbs: Past Forms ⏳':    '⏳',
   'Conditionals Explainer':    '📘',
   'Conditionals Chooser':      '🎯',
+  'Story Scramble':            '📜',
 }
 
 // Play removed from tabs — students use bottom nav, teachers use sidebar
@@ -332,6 +336,7 @@ export default function ExerciseList({
         : <ConditionalExplainer profile={{ level: userLevel, tracks: userTracks }} onPractise={onPractise} />
     }
     else if (t === 'Conditionals Chooser') exerciseComponent = <ConditionalChooser language={isSpanishTrack ? 'es' : 'en'} onComplete={back} onBack={back} />
+    else if (t === 'Story Scramble')       exerciseComponent = <StoryScramble userLevel={userLevel} userTracks={userTracks} isTeacher={isTeacher} onBack={back} />
 
     if (exerciseComponent) {
       return (
