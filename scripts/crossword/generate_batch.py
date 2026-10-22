@@ -2,6 +2,8 @@
 generate_batch.py — generate daily crosswords and either commit them or emit
 reviewable SQL. Word choice uses the bank's used_count/last_used_date so a batch
 prefers fresh vocabulary and avoids repeats; clue variants rotate for variety.
+English clues carry both clue types (gap-fill + definition) so the toggle works;
+star words already used in the previous 60 days are avoided (21 Oct 2026).
 
   python3 generate_batch.py --days 7 --start 2026-06-04                # dry run
   python3 generate_batch.py --days 7 --start 2026-06-04 --commit       # write DB
@@ -18,10 +20,17 @@ from crossword_engine import generate_puzzle, LEVEL_CONFIGS
 LANG_LEVELS = [("en", "A"), ("en", "B"), ("en", "C"), ("es", "A")]
 POOL_MULT = 3.0
 
-# Clue style per level. Gap-fill sentences carry the grammar and collocation, so
-# the learner recognises the word instead of reverse-engineering a definition.
-# Words with no clue of the preferred type fall back to whatever they have.
-PREFERRED_CLUE_TYPE = {("en", "B"): "gapfill"}
+# Default clue style per level (English only). B leads with the gap-fill sentence;
+# A and C lead with the definition and carry the gap-fill as the optional layer.
+# Every English clue gets BOTH (clue_gapfill / clue_definition + their bank ids) when
+# the word has both, which is what makes the toggle appear in CrosswordGame.jsx.
+# 'text' and 'definition' rows are both dictionary definitions.
+# Words with no clue of the default kind fall back to whatever they have.
+DEFAULT_CLUE_KIND = {("en", "A"): "definition", ("en", "B"): "gapfill",
+                     ("en", "C"): "definition"}
+
+# A star word is not reused if it was the star at the same level in this window.
+STAR_LOOKBACK_DAYS = 60
 
 def load_bank(conn):
     with conn.cursor() as cur:
@@ -34,6 +43,24 @@ def load_bank(conn):
                  "clue_type": r[7]}
                 for r in cur.fetchall()]
 
+def load_recent_stars(conn, start, days=STAR_LOOKBACK_DAYS):
+    with conn.cursor() as cur:
+        cur.execute("""SELECT language, level, star_word FROM crossword_puzzles
+                        WHERE play_date >= %s AND play_date < %s""",
+                    (start - timedelta(days=days), start))
+        out = defaultdict(set)
+        for lang, level, star in cur.fetchall():
+            if star:
+                out[(lang, level)].add(star)
+        return out
+
+def clue_kind(r):
+    return "gapfill" if r.get("clue_type") == "gapfill" else "definition"
+
+def pick_variant(rows, day_index):
+    variants = sorted(rows, key=lambda r: r["used_count"])
+    return variants[day_index % len(variants)]
+
 def variants_by_word(rows):
     out = defaultdict(lambda: defaultdict(list))
     for r in rows:
@@ -45,36 +72,57 @@ def freshness_key(word_rows, extra_use):
     last = max((r["last_used_date"] or "0000-00-00") for r in word_rows)
     return (base + extra_use * 5, last)   # in-batch use weighted x5 -> keeps week varied
 
-def pick_pool(words_map, cfg, used_in_batch, rng, day_index, prefer_type=None):
-    if prefer_type:
-        words_map = {w: [r for r in rows if r.get("clue_type") == prefer_type] or rows
-                     for w, rows in words_map.items()}
-    words = sorted(words_map, key=lambda w: freshness_key(words_map[w], used_in_batch[w]))
+DUAL_KEYS = ("clue_gapfill", "gapfill_bank_id", "clue_definition", "definition_bank_id")
+
+def pick_pool(words_map, cfg, used_in_batch, rng, day_index, default_kind=None):
+    def default_rows(rows):
+        if not default_kind:
+            return rows
+        return [r for r in rows if clue_kind(r) == default_kind] or rows
+    words = sorted(words_map, key=lambda w: freshness_key(default_rows(words_map[w]),
+                                                         used_in_batch[w]))
     fresh = words[:min(len(words), int(cfg.target_words * POOL_MULT))]
     rng.shuffle(fresh)
     out = []
     for w in fresh:
-        variants = sorted(words_map[w], key=lambda r: r["used_count"])
-        v = variants[day_index % len(variants)]
-        out.append({"word": w, "clue_text": v["clue_text"], "bank_id": v["id"]})
+        rows = words_map[w]
+        v = pick_variant(default_rows(rows), day_index)
+        item = {"word": w, "clue_text": v["clue_text"], "bank_id": v["id"]}
+        if default_kind:
+            gaps = [r for r in rows if clue_kind(r) == "gapfill"]
+            defs = [r for r in rows if clue_kind(r) == "definition"]
+            if gaps and defs:
+                g = v if clue_kind(v) == "gapfill" else pick_variant(gaps, day_index)
+                dv = v if clue_kind(v) == "definition" else pick_variant(defs, day_index)
+                item.update(clue_gapfill=g["clue_text"], gapfill_bank_id=g["id"],
+                            clue_definition=dv["clue_text"], definition_bank_id=dv["id"])
+        out.append(item)
     return out
 
-def build_batch(rows, start, days, seed):
+def build_batch(rows, start, days, seed, recent_stars=None):
     rng = random.Random(seed)
     vbw = variants_by_word(rows)
     used_in_batch = {ll: defaultdict(int) for ll in LANG_LEVELS}
-    stars_seen = defaultdict(set)
+    # Seeded from earlier puzzles so a star doesn't come back a few weeks later
+    # just because it was in a different run.
+    stars_seen = defaultdict(set, {k: set(v) for k, v in (recent_stars or {}).items()})
     out = []
     for d in range(days):
         play_date = (start + timedelta(days=d)).isoformat()
         for (lang, level) in LANG_LEVELS:
             cfg = LEVEL_CONFIGS[(lang, level)]
             pool = pick_pool(vbw[(lang, level)], cfg, used_in_batch[(lang, level)], rng, d,
-                             PREFERRED_CLUE_TYPE.get((lang, level)))
+                             DEFAULT_CLUE_KIND.get((lang, level)))
             puz = generate_puzzle(pool, lang, level, rng=rng)
             if puz is None:
                 out.append({"play_date": play_date, "language": lang, "level": level,
                             "failed": True}); continue
+            extras = {p["word"]: p for p in pool}
+            for c in puz["clues"]:
+                e = extras.get(c["answer"], {})
+                for k in DUAL_KEYS:
+                    if k in e:
+                        c[k] = e[k]
             seen = stars_seen[(lang, level)]
             if puz["star_word"] in seen:
                 for w in sorted(set(puz["words_used"]), key=len, reverse=True):
@@ -89,6 +137,7 @@ def build_batch(rows, start, days, seed):
 
 def commit(conn, puzzles):
     from psycopg2.extras import Json
+    skipped = []
     with conn.cursor() as cur:
         for p in puzzles:
             if p.get("failed"):
@@ -100,12 +149,17 @@ def commit(conn, puzzles):
                    ON CONFLICT (play_date, language, level) DO NOTHING""",
                 (p["play_date"], p["language"], p["level"], p["grid_rows"],
                  p["grid_cols"], Json(p["grid"]), Json(p["clues"]), p["star_word"]))
+            if cur.rowcount == 0:
+                # A puzzle already exists for that day: leave it and its usage counts alone.
+                skipped.append(f"{p['play_date']} {p['language']}-{p['level']}")
+                continue
             ids = [c["bank_id"] for c in p["clues"] if c["bank_id"] is not None]
             if ids:
                 cur.execute(
                     """UPDATE crossword_clue_bank SET used_count = used_count + 1,
                        last_used_date = %s WHERE id = ANY(%s)""", (p["play_date"], ids))
     conn.commit()
+    return skipped
 
 def emit_sql(puzzles, path):
     L = ["BEGIN;"]
@@ -140,20 +194,28 @@ def main():
         sys.exit("SUPABASE_DB env var not set.")
     import psycopg2
     seed = args.seed if args.seed is not None else random.randrange(1 << 30)
+    start = date.fromisoformat(args.start)
     with psycopg2.connect(dsn) as conn:
         rows = load_bank(conn)
-        puzzles = build_batch(rows, date.fromisoformat(args.start), args.days, seed)
-        print(f"seed={seed}")
+        recent = load_recent_stars(conn, start)
+        puzzles = build_batch(rows, start, args.days, seed, recent)
+        print(f"seed={seed}  (stars from the previous {STAR_LOOKBACK_DAYS} days excluded: "
+              + ", ".join(f"{l}-{v} {len(s)}" for (l, v), s in sorted(recent.items())) + ")")
         for p in puzzles:
             if p.get("failed"):
                 print(f"  {p['play_date']} {p['language']}-{p['level']}  FAILED")
             else:
+                dual = sum(1 for c in p["clues"] if "clue_gapfill" in c and "clue_definition" in c)
+                both = f"  both clue types {dual}/{len(p['clues'])}" if p["language"] == "en" else ""
                 print(f"  {p['play_date']} {p['language']}-{p['level']}  "
-                      f"{p['grid_rows']}x{p['grid_cols']} {len(p['clues'])}w star={p['star_word']}")
+                      f"{p['grid_rows']}x{p['grid_cols']} {len(p['clues'])}w "
+                      f"star={p['star_word']}{both}")
         if args.out:
             emit_sql(puzzles, args.out); print(f"wrote {args.out}")
         if args.commit:
-            commit(conn, puzzles); print("committed to DB")
+            skipped = commit(conn, puzzles); print("committed to DB")
+            if skipped:
+                print("  already existed, left untouched: " + ", ".join(skipped))
     if not args.commit and not args.out:
         print("\nDry run only. Re-run with --commit to write, or --out file.sql to review.")
 
