@@ -82,6 +82,7 @@ export default function BluffGame({ onBack, userProfile }) {
   const [mode, setMode]         = useState(isSpanish ? 'english_only' : 'loading')  // + noset | playing | results
   const [words, setWords]       = useState([])
   const [answers, setAnswers]   = useState({})         // { [bluff_words.id]: 'a' | 'b' | 'c' }
+  const [seenOn, setSeenOn]     = useState({})         // { [bluff_words.id]: date the returning word was first shown }
   const [index, setIndex]       = useState(0)
 
   const [sentenceDone, setSentenceDone]         = useState(false)
@@ -119,6 +120,7 @@ export default function BluffGame({ onBack, userProfile }) {
     setMode('loading')
     setWords([])
     setAnswers({})
+    setSeenOn({})
     setIndex(0)
     setSentenceDone(false)
     setSentenceStar(false)
@@ -160,6 +162,20 @@ export default function BluffGame({ onBack, userProfile }) {
     }
     setWords(rows)
 
+    // Returning words (returning_from set) come back 21 days after they were
+    // introduced. A student sees "Seen on <date>" only if they answered the
+    // original; anyone who started later or missed that day just gets it as a
+    // new word. Teachers see every returning word labelled.
+    const returning = rows.filter(w => w.returning_from)
+    let firstShown = {}   // { [original id]: its play_date }
+    if (returning.length) {
+      const { data: orig } = await supabase
+        .from('bluff_words').select('id, play_date')
+        .in('id', returning.map(w => w.returning_from))
+      firstShown = Object.fromEntries((orig || []).map(o => [o.id, o.play_date]))
+    }
+    const answeredBefore = new Set()
+
     let saved = {}
     let completed = false
     if (!isTeacher) {
@@ -175,8 +191,23 @@ export default function BluffGame({ onBack, userProfile }) {
           if (s.sentence_done) setSentenceDone(true)
           if (s.sentence_star) setSentenceStar(true)
         }
+        const origDates = [...new Set(Object.values(firstShown))]
+        if (origDates.length) {
+          const { data: past } = await supabase
+            .from('bluff_sessions').select('answers')
+            .eq('student_id', user.id).in('play_date', origDates)
+          for (const p of past || []) {
+            for (const id of Object.keys(p.answers || {})) answeredBefore.add(Number(id))
+          }
+        }
       }
     }
+    const seen = {}
+    for (const w of returning) {
+      const first = firstShown[w.returning_from]
+      if (first && (isTeacher || answeredBefore.has(Number(w.returning_from)))) seen[w.id] = first
+    }
+    setSeenOn(seen)
     setAnswers(saved)
 
     const firstOpen = rows.findIndex(w => !saved[w.id])
@@ -330,7 +361,8 @@ export default function BluffGame({ onBack, userProfile }) {
       <HelpSheet
         title="How to play"
         points={[
-          'Five new words every day, at your level.',
+          'Five words every day, at your level.',
+          "Words come back about three weeks later with a new sentence, to check they've stuck. If you met one the first time, it's marked 🔁.",
           'Each word comes with an example sentence. Only one of the three definitions is real; the other two are bluffs.',
           'Read the sentence, or tap 🔊 to hear it, and use it for clues.',
           "Not sure? Have a guess. You'll see the real meaning straight away, and that's how the word sticks.",
@@ -450,8 +482,10 @@ export default function BluffGame({ onBack, userProfile }) {
               <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Word {index + 1} of {words.length}
               </span>
-              {w.returning_from && (
-                <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#2b6cb0', background: '#ebf8ff', padding: '2px 8px', borderRadius: '999px' }}>🔁 Seen before</span>
+              {seenOn[w.id] && (
+                <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#2b6cb0', background: '#ebf8ff', padding: '2px 8px', borderRadius: '999px' }}>
+                  🔁 {isTeacher ? 'Back from' : 'Seen on'} {formatDate(seenOn[w.id], { day: 'numeric', month: 'short' })}
+                </span>
               )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
