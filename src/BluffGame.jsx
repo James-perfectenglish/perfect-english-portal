@@ -10,26 +10,34 @@ import SpeakButton from './components/SpeakButton'
 // context (the target marked [[like this]]) with optional ElevenLabs audio, and
 // three definitions, only one of them real.
 //
+// Spanish-track learners get the Spanish version, "Verdad o farol" (Nov 2026):
+// the same game on bluff_words.language = 'es', levels A and B only,
+// definitions in simple Spanish and 💡 notes in English. Menus stay in English.
+//
 // Answers save to bluff_sessions the moment they're given, so a refresh resumes
 // where the student left off and an answer can't be changed.
 // Stars: source 'bluff', subtypes complete / sharp_eye (4+ right) / sentence,
-// dedupe_key 'bluff:<date>:<level>:<subtype>'.
+// dedupe_key 'bluff:<date>:<level>:<subtype>' (Spanish: 'bluff:<date>:es-<level>:<subtype>').
 // Teachers (is_teacher, including Present Mode) play without saving anything,
 // can replay, and can step through every day's set to review content or use
 // it in class.
 
 export const GAME_TITLE = 'Word Bluff'
+export const GAME_TITLE_ES = 'Verdad o farol'
 
 const GRADIENT      = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
 const OPTION_KEYS   = ['a', 'b', 'c']
+const LEVELS        = { en: ['A', 'B', 'C'], es: ['A', 'B'] }
 const SHARP_EYE_MIN = 4
 const GREEN = { bg: '#f0fff4', border: '#68d391', text: '#276749' }
 const RED   = { bg: '#fff5f5', border: '#fc8181', text: '#9b2c2c' }
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
-function levelForProfile(profile) {
+function levelForProfile(profile, language) {
   const lvl = profile?.level || ''
+  // Spanish has A and B. Spanish-track profiles mostly have level 'Spanish': start at A.
+  if (language === 'es') return lvl.startsWith('B') || lvl.startsWith('C') ? 'B' : 'A'
   if (lvl.startsWith('A')) return 'A'
   if (lvl.startsWith('B')) return 'B'
   if (lvl.startsWith('C')) return 'C'
@@ -53,13 +61,18 @@ export default function BluffGame({ onBack, userProfile }) {
   const isTeacher = !!userProfile?.is_teacher
   const isSpanish = (Array.isArray(userProfile?.tracks) && userProfile.tracks.includes('spanish'))
     || userProfile?.level === 'Spanish'
+  const language = isSpanish ? 'es' : 'en'
+  const levels   = LEVELS[language]
+  const title    = isSpanish ? GAME_TITLE_ES : GAME_TITLE
   const today = todayISO()
+  // Star and sentence dedupe keys. English keeps its original form.
+  const keyLevel = lvl => (language === 'es' ? `es-${lvl}` : lvl)
 
-  const [level, setLevel]       = useState(() => levelForProfile(userProfile))
+  const [level, setLevel]       = useState(() => levelForProfile(userProfile, language))
   const [viewDate, setViewDate] = useState(null)       // the set on screen
   const [dates, setDates]       = useState([])         // teacher: every date with a set at this level
   const [nextDate, setNextDate] = useState(null)       // student: next set, for the "no set today" screen
-  const [mode, setMode]         = useState(isSpanish ? 'english_only' : 'loading')  // + noset | playing | results
+  const [mode, setMode]         = useState('loading')  // + noset | playing | results
   const [words, setWords]       = useState([])
   const [answers, setAnswers]   = useState({})         // { [bluff_words.id]: 'a' | 'b' | 'c' }
   const [seenOn, setSeenOn]     = useState({})         // { [bluff_words.id]: date the returning word was first shown }
@@ -114,7 +127,7 @@ export default function BluffGame({ onBack, userProfile }) {
     if (isTeacher) {
       const { data: ds } = await supabase
         .from('bluff_words').select('play_date')
-        .eq('level', lvl).eq('position', 1).order('play_date')
+        .eq('language', language).eq('level', lvl).eq('position', 1).order('play_date')
       const list = (ds || []).map(r => r.play_date)
       setDates(list)
       if (requestedDate && list.includes(requestedDate)) target = requestedDate
@@ -125,7 +138,7 @@ export default function BluffGame({ onBack, userProfile }) {
     const { data: rows } = await supabase
       .from('bluff_words')
       .select('id, play_date, level, position, word, part_of_speech, contexts, options, correct_option, reveal_note, audio_word_url, audio_context_urls, returning_from')
-      .eq('play_date', target).eq('level', lvl)
+      .eq('language', language).eq('play_date', target).eq('level', lvl)
       .order('position')
     setViewDate(target)
 
@@ -133,7 +146,7 @@ export default function BluffGame({ onBack, userProfile }) {
       if (!isTeacher) {
         const { data: nxt } = await supabase
           .from('bluff_words').select('play_date')
-          .eq('level', lvl).gt('play_date', today)
+          .eq('language', language).eq('level', lvl).gt('play_date', today)
           .order('play_date').limit(1).maybeSingle()
         setNextDate(nxt?.play_date || null)
       }
@@ -163,7 +176,7 @@ export default function BluffGame({ onBack, userProfile }) {
       if (user) {
         const { data: s } = await supabase
           .from('bluff_sessions').select('*')
-          .eq('student_id', user.id).eq('play_date', target).eq('level', lvl)
+          .eq('student_id', user.id).eq('language', language).eq('play_date', target).eq('level', lvl)
           .maybeSingle()
         if (s) {
           saved = s.answers || {}
@@ -175,7 +188,7 @@ export default function BluffGame({ onBack, userProfile }) {
         if (origDates.length) {
           const { data: past } = await supabase
             .from('bluff_sessions').select('answers')
-            .eq('student_id', user.id).in('play_date', origDates)
+            .eq('student_id', user.id).eq('language', language).in('play_date', origDates)
           for (const p of past || []) {
             for (const id of Object.keys(p.answers || {})) answeredBefore.add(Number(id))
           }
@@ -213,12 +226,13 @@ export default function BluffGame({ onBack, userProfile }) {
     const { error } = await supabase.from('bluff_sessions').upsert({
       student_id:    user.id,
       play_date:     date,
+      language,
       level:         lvl,
       answers:       ans,
       correct_count: countCorrect(rows, ans),
       completed,
       completed_at:  completed ? new Date().toISOString() : null,
-    }, { onConflict: 'student_id,play_date,level' })
+    }, { onConflict: 'student_id,play_date,language,level' })
     if (error) console.warn('Word Bluff: could not save progress:', error)
   }
 
@@ -231,7 +245,7 @@ export default function BluffGame({ onBack, userProfile }) {
         student_id: user.id,
         source:     'bluff',
         subtype,
-        context:    { play_date: date, level: lvl, dedupe_key: `bluff:${date}:${lvl}:${subtype}`, ...extras },
+        context:    { play_date: date, level: lvl, language, dedupe_key: `bluff:${date}:${keyLevel(lvl)}:${subtype}`, ...extras },
       })
       if (error && error.code !== '23505') console.warn('Word Bluff star insert failed:', error)
     } catch (e) {
@@ -305,18 +319,29 @@ export default function BluffGame({ onBack, userProfile }) {
     if (!user) return
     const { error } = await supabase.from('bluff_sessions')
       .update({ sentence_done: true, sentence_star: passed })
-      .eq('student_id', user.id).eq('play_date', viewDate).eq('level', level)
+      .eq('student_id', user.id).eq('language', language).eq('play_date', viewDate).eq('level', level)
     if (error) console.warn('Word Bluff: could not save sentence result:', error)
   }
 
-  // Load on open and whenever the level changes. Fetching data is what this
-  // effect is for (state is only set after the first await), the same pattern
-  // as CrosswordGame's loadPuzzle effect, so the two lint rules are silenced.
+  // Load on open, whenever the level changes, and when a teacher flips the
+  // preview language (Spanish has no level C, so C drops to B). Fetching data
+  // is what this effect is for (state is only set after the first await), the
+  // same pattern as CrosswordGame's loadPuzzle effect, so the lint rules are
+  // silenced.
+  const loadedLang = useRef(language)
   useEffect(() => {
-    if (isSpanish) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!levels.includes(level)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      resetState()
+      setLevel(levels[levels.length - 1])
+      return
+    }
+    if (loadedLang.current !== language) {
+      loadedLang.current = language
+      resetState()
+    }
     loadSet(level, isTeacher ? viewDate : today)
-  }, [level]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [level, language]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const correctCount = countCorrect(words, answers)
@@ -329,7 +354,7 @@ export default function BluffGame({ onBack, userProfile }) {
   // ── Pieces ─────────────────────────────────────────────────────────────────
   const shell = children => (
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
-      {onBack && <Breadcrumb section="Play" title={GAME_TITLE} onExit={onBack} />}
+      {onBack && <Breadcrumb section="Play" title={title} onExit={onBack} />}
       <div style={{ maxWidth: '520px', margin: '0 auto', padding: '1rem 1rem 3rem' }}>
         {children}
       </div>
@@ -342,6 +367,7 @@ export default function BluffGame({ onBack, userProfile }) {
         title="How to play"
         points={[
           'Five words every day, at your level.',
+          ...(isSpanish ? ['The definitions are in simple Spanish. The 💡 notes are in English.'] : []),
           "Words come back about three weeks later with a new sentence, to check they've stuck. If you met one the first time, it's marked 🔁.",
           'Each word comes with an example sentence. Only one of the three definitions is real; the other two are bluffs.',
           'Read the sentence, or tap 🔊 to hear it, and use it for clues.',
@@ -352,7 +378,7 @@ export default function BluffGame({ onBack, userProfile }) {
       />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
         <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>🃏</span>
-        <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, letterSpacing: '2px' }}>WORD BLUFF</h1>
+        <h1 style={{ margin: 0, fontSize: isSpanish ? 'clamp(1.1rem, 5vw, 1.4rem)' : '1.4rem', fontWeight: 800, letterSpacing: '2px' }}>{title.toUpperCase()}</h1>
       </div>
       <p style={{ margin: '6px 0 0', opacity: 0.9, fontSize: '0.88rem', fontWeight: 600 }}>
         {viewDate ? formatDate(viewDate) : 'Spot the real definition'}
@@ -363,7 +389,7 @@ export default function BluffGame({ onBack, userProfile }) {
   const levelPills = (
     <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center', padding: '8px', background: 'white', borderRadius: '10px', marginBottom: '0.75rem' }}>
       <span style={{ fontSize: '0.72rem', color: '#a0aec0', fontWeight: 600, marginRight: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Level</span>
-      {['A', 'B', 'C'].map(L => {
+      {levels.map(L => {
         const active = level === L
         return (
           <button key={L} onClick={() => changeLevel(L)} style={{
@@ -410,18 +436,6 @@ export default function BluffGame({ onBack, userProfile }) {
   // ── Screens ────────────────────────────────────────────────────────────────
   if (mode === 'loading') return (
     <div style={{ textAlign: 'center', padding: '4rem', color: '#718096' }}>Loading today's words...</div>
-  )
-
-  if (mode === 'english_only') return shell(
-    <>
-      {header}
-      <div style={{ background: 'white', borderRadius: '12px', padding: '2rem 1.25rem', textAlign: 'center' }}>
-        <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🃏</div>
-        <h2 style={{ color: '#2d3748', margin: '0 0 0.5rem' }}>English only for now</h2>
-        <p style={{ color: '#718096', margin: '0 0 1.25rem' }}>Word Bluff is for English learners. There's no Spanish version yet.</p>
-        {backButton}
-      </div>
-    </>
   )
 
   if (mode === 'noset') return shell(
@@ -661,12 +675,12 @@ export default function BluffGame({ onBack, userProfile }) {
       {challengeWord && (
         <SentenceChallenge
           word={challengeWord.word}
-          language="en"
+          language={language}
           exercise="bluff"
           apiContext="wotd"
           apiExtraFields={{ partOfSpeech: challengeWord.part_of_speech, definition: definitionOf(challengeWord) }}
-          dedupeKey={`bluff:${viewDate}:${level}:sentence`}
-          headerLabel="🃏 Word Bluff"
+          dedupeKey={`bluff:${viewDate}:${keyLevel(level)}:sentence`}
+          headerLabel={`🃏 ${title}`}
           promptText="Use it in a sentence:"
           noStars={isTeacher}
           onMarkResult={handleSentenceMarked}

@@ -60,8 +60,13 @@ const LAUNCH_DATES = {
   'Story Scramble': '2026-11-02',
 }
 
-// Hidden from Spanish-track learners: there is no Spanish version.
-const ENGLISH_ONLY = new Set(['Word Bluff'])
+// Hidden from Spanish-track learners: there is no Spanish version. (Word Bluff
+// left this list in Nov 2026, when its Spanish version arrived.)
+const ENGLISH_ONLY = new Set([])
+
+// Tile names Spanish-track learners see. The English title stays the key
+// everywhere else (exercises.title, the three lists above, LAUNCH_DATES).
+const SPANISH_TITLES = { 'Word Bluff': 'Verdad o farol' }
 
 function isLaunched(title, isTeacher) {
   const launch = LAUNCH_DATES[title]
@@ -358,6 +363,7 @@ export default function ExerciseList({
   const vocationalFilters = (userTracks || []).filter(t => t !== 'spanish' && t !== 'general')
 
   const spanishView = isEs || userLevel === 'Spanish'
+  const shownTitle  = e => (spanishView && SPANISH_TITLES[e.title]) || e.title
   const tabExercises = exercises
     .filter(e => isTeacher ? teacherListVisible(e, vocationalFilters, isEs) : shouldShowExercise(e, userTracks))
     .filter(e => !(spanishView && ENGLISH_ONLY.has(e.title)))
@@ -415,7 +421,7 @@ export default function ExerciseList({
         <div style={cardStyle} onClick={() => active && startExercise(exercise)}>
           <div style={{ fontSize: '2rem', flexShrink: 0 }}>{icon}</div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#2d3748', lineHeight: 1.25 }}>{exercise.title}</div>
+            <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#2d3748', lineHeight: 1.25 }}>{shownTitle(exercise)}</div>
             <div style={{ fontSize: '0.71rem', color: '#718096', lineHeight: 1.4, marginTop: '3px' }}>{exercise.description}</div>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
               <LevelBadge level={exercise.level} />
@@ -432,7 +438,7 @@ export default function ExerciseList({
         {newFlag && <div style={{ position: 'absolute', top: 8, left: 8 }}><NewBadge /></div>}
         {fy      && <div style={{ position: 'absolute', top: 8, right: 8 }}><ForYouBadge /></div>}
         <div style={{ fontSize: '1.5rem', marginTop: (newFlag || fy) ? '18px' : '0' }}>{icon}</div>
-        <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#2d3748', lineHeight: 1.25 }}>{exercise.title}</div>
+        <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#2d3748', lineHeight: 1.25 }}>{shownTitle(exercise)}</div>
         <div style={{ fontSize: '0.71rem', color: '#718096', lineHeight: 1.4 }}>{exercise.description}</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap', gap: '3px' }}>
           <LevelBadge level={exercise.level} />
@@ -452,7 +458,7 @@ export default function ExerciseList({
         onClick={() => active && startExercise(exercise)}>
         <div style={{ fontSize: '1.6rem', flexShrink: 0 }}>{icon}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#2d3748' }}>{exercise.title}</div>
+          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#2d3748' }}>{shownTitle(exercise)}</div>
           <div style={{ fontSize: '0.74rem', color: '#718096', marginTop: '2px' }}>{exercise.description}</div>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '5px', flexWrap: 'wrap' }}>
             <LevelBadge level={exercise.level} />

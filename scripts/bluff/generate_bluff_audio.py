@@ -9,13 +9,20 @@ uploads the MP3s to the public `audio` bucket under bluff/<play_date>/, and writ
 the URLs back to the row. Each row is committed as soon as its audio is up, so an
 interrupted run simply carries on from where it stopped next time.
 
-Voices follow bluff_words.voice (alice / daniel), which rotates by day and level.
+Voices follow bluff_words.voice, which rotates by day and level:
+  en: alice / daniel
+  es: es_f / es_m ("Verdad o farol", the Spanish version; the Castilian voices
+      also used for Spanish WOTD/PVOTD)
 
 Models:
-  single words -> eleven_flash_v2 (English-only, so false friends such as
-                  "sensible" or "conductor" are never read as Spanish)
-  sentences    -> eleven_multilingual_v2 (best quality)
-Both can be overridden with --word-model / --context-model.
+  en single words -> eleven_flash_v2 (English-only, so false friends such as
+                     "sensible" or "conductor" are never read as Spanish)
+  es single words -> eleven_flash_v2_5 with language_code "es" (so "once" or
+                     "pie" are never read as English); "tacaño/a" is read as
+                     "tacaño, tacaña", as in the WOTD script
+  sentences       -> eleven_multilingual_v2 (best quality)
+The English word model and the sentence model can be overridden with
+--word-model / --context-model. --lang en|es|all (default all) picks the rows.
 
 Usage (from the repo root; the wrapper loads .env.local):
   sh scripts/bluff/run-bluff-audio.sh                          # dry run: what would be made + character count
@@ -25,6 +32,7 @@ Usage (from the repo root; the wrapper loads .env.local):
   sh scripts/bluff/run-bluff-audio.sh --commit --ids 12,15 --force
                                                                # redo specific rows (e.g. a bad pronunciation)
   --from 2026-11-01 --to 2026-11-07                            # date window
+  --lang es                                                    # Spanish rows only
 
 Env (.env.local, one per line, no quotes):
   ELEVENLABS_API_KEY
@@ -41,6 +49,7 @@ import os
 import re
 import sys
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 from datetime import date
@@ -57,8 +66,17 @@ VOICES = {
     "alice": "ZEt85AU1ui8Rr8FxNslW",
     "daniel": "ynTHHllfDmGsZ3G8QJt9",
 }
+# Spanish rows: the same Castilian voices as ES_VOICES in
+# scripts/audio/generate_daily_audio.py. (VOICES above stays English-only,
+# because that script imports it as its English voices.)
+ES_VOICES = {
+    "es_f": "UOIqAnmS11Reiei1Ytkc",  # Carolina
+    "es_m": "7ilYbYb99yBZGMUUKSaf",  # Alex
+}
+ALL_VOICES = {**VOICES, **ES_VOICES}
 
 WORD_MODEL_DEFAULT = "eleven_flash_v2"
+WORD_MODEL_ES = "eleven_flash_v2_5"
 CONTEXT_MODEL_DEFAULT = "eleven_multilingual_v2"
 
 # Steady, clear delivery. Slightly below normal speed for learners; --speed 1.0 to undo.
@@ -82,20 +100,43 @@ def spoken_context(sentence):
     return MARKER.sub(r"\1", sentence).strip()
 
 
-def spoken_word(word):
-    """A trailing full stop gives the word a natural, finished intonation."""
+def strip_accents(s):
+    return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
+
+
+def spanish_forms(word):
+    """'tacaño/a' -> 'tacaño, tacaña'; 'cortés' stays as it is. Same rule as the WOTD script."""
     w = word.strip()
+    if "/" not in w:
+        return w
+    base, _, suffix = w.partition("/")
+    suffix = suffix.strip()
+    if suffix == "a":
+        if base.endswith("o"):
+            fem = base[:-1] + "a"
+        elif base.endswith(("és", "ón", "ín", "án")):
+            fem = base[:-2] + strip_accents(base[-2]) + base[-1] + "a"
+        else:
+            fem = base + "a"
+        return f"{base}, {fem}"
+    return w.replace("/", ", ")
+
+
+def spoken_word(word, language="en"):
+    """A trailing full stop gives the word a natural, finished intonation."""
+    w = spanish_forms(word) if language == "es" else word.strip()
     return w if w.endswith((".", "!", "?")) else w + "."
 
 
 def slug(word):
-    return re.sub(r"[^a-z0-9]+", "-", word.lower()).strip("-") or "word"
+    return re.sub(r"[^a-z0-9]+", "-", strip_accents(word).lower()).strip("-") or "word"
 
 
-def storage_path(play_date, level, position, word, kind):
-    """kind is 'word' or 'ctx1', 'ctx2'."""
+def storage_path(play_date, level, position, word, kind, language="en"):
+    """kind is 'word' or 'ctx1', 'ctx2'. Spanish clips get an 'es-' prefix."""
     d = play_date.isoformat() if isinstance(play_date, date) else str(play_date)
-    return f"{FOLDER}/{d}/{level}{position}-{slug(word)}-{kind}.mp3"
+    prefix = "es-" if language == "es" else ""
+    return f"{FOLDER}/{d}/{prefix}{level}{position}-{slug(word)}-{kind}.mp3"
 
 
 def public_url(supabase_url, path, stamp):
@@ -150,16 +191,17 @@ def _send(req, what, retries=5):
             raise RuntimeError(f"{what} failed: {e.reason}") from None
 
 
-def tts(api_key, voice_id, text, model, speed):
+def tts(api_key, voice_id, text, model, speed, language="en"):
     url = f"{ELEVEN_API_BASE}/v1/text-to-speech/{voice_id}?output_format={OUTPUT_FORMAT}"
     body = {
         "text": text,
         "model_id": model,
         "voice_settings": {**VOICE_SETTINGS, "speed": speed},
     }
-    # Models that accept an explicit language get one, so nothing drifts into Spanish.
+    # Models that accept an explicit language get one, so a short word never
+    # drifts into the other language.
     if model in ("eleven_flash_v2_5", "eleven_turbo_v2_5", "eleven_v3", "eleven_v4", "eleven_v4_turbo"):
-        body["language_code"] = "en"
+        body["language_code"] = language
     req = urllib.request.Request(
         url,
         data=json.dumps(body).encode("utf-8"),
@@ -196,16 +238,17 @@ def upload(supabase_url, service_key, path, audio):
 # -----------------------------------------------------------------------------
 
 SELECT_SQL = """
-select id, play_date, level, position, word, contexts, voice
+select id, play_date, level, position, word, contexts, voice, language
 from public.bluff_words
 where (%(force)s
        or audio_word_url is null
        or audio_context_urls is null
        or cardinality(audio_context_urls) <> cardinality(contexts))
+  and language = any(%(langs)s)
   and (%(date_from)s::date is null or play_date >= %(date_from)s::date)
   and (%(date_to)s::date   is null or play_date <= %(date_to)s::date)
   and (%(ids)s::bigint[]   is null or id = any(%(ids)s::bigint[]))
-order by play_date, level, position
+order by play_date, language, level, position
 """
 
 UPDATE_SQL = """
@@ -218,6 +261,7 @@ where id = %s
 def fetch_rows(conn, args):
     params = {
         "force": args.force,
+        "langs": ["en", "es"] if args.lang == "all" else [args.lang],
         "date_from": args.date_from,
         "date_to": args.date_to,
         "ids": args.ids,
@@ -242,6 +286,7 @@ def parse_args(argv=None):
     p.add_argument("--to", dest="date_to", help="last play_date (YYYY-MM-DD)")
     p.add_argument("--ids", help="comma-separated bluff_words ids")
     p.add_argument("--limit", type=int, help="process at most N rows")
+    p.add_argument("--lang", choices=["en", "es", "all"], default="all", help="which rows (default: all)")
     p.add_argument("--word-model", default=WORD_MODEL_DEFAULT)
     p.add_argument("--context-model", default=CONTEXT_MODEL_DEFAULT)
     p.add_argument("--speed", type=float, default=SPEED_DEFAULT, help="0.7 to 1.2; default %(default)s")
@@ -268,8 +313,8 @@ def parse_args(argv=None):
 
 def plan_row(row):
     """Everything to be spoken for one row: list of (kind, text, model_role)."""
-    _id, play_date, level, position, word, contexts, voice = row
-    items = [("word", spoken_word(word), "word")]
+    _id, play_date, level, position, word, contexts, voice, language = row
+    items = [("word", spoken_word(word, language), "word")]
     for i, c in enumerate(contexts or [], 1):
         items.append((f"ctx{i}", spoken_context(c), "context"))
     return items
@@ -286,11 +331,16 @@ def main(argv=None):
             print("Nothing to do: every matching row already has audio.")
             return 0
 
-        model_for = {"word": args.word_model, "context": args.context_model}
-        chars = {args.word_model: 0, args.context_model: 0}
+        def model_for(role, language):
+            if role == "word":
+                return WORD_MODEL_ES if language == "es" else args.word_model
+            return args.context_model
+
+        chars = {}
         for row in rows:
             for _kind, text, role in plan_row(row):
-                chars[model_for[role]] += len(text)
+                m = model_for(role, row[7])
+                chars[m] = chars.get(m, 0) + len(text)
 
         mode = "COMMIT" if args.commit else "DRY RUN"
         print(f"{mode}: {len(rows)} rows, speed {args.speed}")
@@ -298,16 +348,16 @@ def main(argv=None):
             print(f"  {m}: {n:,} characters")
         print()
 
-        bad_voice = sorted({r[6] for r in rows if r[6] not in VOICES})
+        bad_voice = sorted({r[6] for r in rows if r[6] not in ALL_VOICES})
         if bad_voice:
             sys.exit(f"Unknown voice value(s) in bluff_words.voice: {bad_voice}")
 
         if not args.commit:
             for row in rows:
-                _id, play_date, level, position, word, _contexts, voice = row
-                print(f"#{_id}  {play_date} {level}{position}  {word}  [{voice}]")
+                _id, play_date, level, position, word, _contexts, voice, language = row
+                print(f"#{_id}  {play_date} {language}-{level}{position}  {word}  [{voice}]")
                 for kind, text, role in plan_row(row):
-                    print(f"    {kind:5} {model_for[role]:24} {text}")
+                    print(f"    {kind:5} {model_for(role, language):24} {text}")
             print("\nDry run only. Add --commit to generate and upload.")
             return 0
 
@@ -323,15 +373,15 @@ def main(argv=None):
 
         done, failed = 0, []
         for row in rows:
-            _id, play_date, level, position, word, contexts, voice = row
-            voice_id = VOICES[voice]
+            _id, play_date, level, position, word, contexts, voice, language = row
+            voice_id = ALL_VOICES[voice]
             stamp = int(time.time())
-            print(f"#{_id}  {play_date} {level}{position}  {word}  [{voice}]")
+            print(f"#{_id}  {play_date} {language}-{level}{position}  {word}  [{voice}]")
             try:
                 urls = {}
                 for kind, text, role in plan_row(row):
-                    audio = tts(api_key, voice_id, text, model_for[role], args.speed)
-                    path = storage_path(play_date, level, position, word, kind)
+                    audio = tts(api_key, voice_id, text, model_for(role, language), args.speed, language)
+                    path = storage_path(play_date, level, position, word, kind, language)
                     upload(supabase_url, service_key, path, audio)
                     urls[kind] = public_url(supabase_url, path, stamp)
                     if args.save_local:
