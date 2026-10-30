@@ -29,7 +29,7 @@ Heteronym check
   A word that can be said two ways in isolation (record, lead, upset, wind down...) is
   flagged: audio_check_pending = true. Its word clip is hidden from students (the
   example sentence still plays) and a copy is saved to --check-dir to listen to.
-  Spanish entries with "+ infinitivo" style patterns are flagged too.
+  Spanish entries are not flagged.
     --review                       list flagged rows with their clip URLs
     --table wotd --approve 12,15   publish those word clips
     --table wotd --ids 12 --force --commit   regenerate a bad one (stays flagged)
@@ -158,8 +158,10 @@ def spoken_word(word, language):
 
 
 def needs_check(word, language):
+    # Spanish entries are never flagged: the "+ infinitivo" patterns were checked
+    # on 30 Oct 2026 and all read fine ("poder más infinitivo").
     if language == "es":
-        return "+" in word
+        return False
     tokens = re.findall(r"[a-z]+", word.lower())
     return any(t in HETERONYMS for t in tokens)
 
@@ -478,6 +480,10 @@ def main(argv=None):
                 done += 1
             except Exception as e:  # keep going; report at the end
                 conn.rollback()
+                if "quota_exceeded" in str(e):
+                    print("    STOPPED: out of ElevenLabs credits for this API key. Nothing else was attempted.")
+                    print("    Raise the key's credit limit (or wait for the reset), then re-run the same command.")
+                    break
                 failed.append((i, str(e)))
                 print(f"    FAILED: {e}")
 

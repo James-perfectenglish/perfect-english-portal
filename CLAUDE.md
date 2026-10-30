@@ -104,7 +104,7 @@ James strongly prefers:
 - Generator: `sh scripts/audio/run-daily-audio.sh` (dry run) then `--commit`. Defaults: both tables, `--lang en`, WOTD from today, PVOTD whole active pool. Spanish needs `--lang es`/`both`. Run it after every monthly WOTD top-up.
 - Voices: `alice`/`daniel` (en), `es_f`/`es_m` (es, Castilian Voice Library IDs in `ES_VOICES`); assigned by the script when `voice` is null, alternating by date (WOTD) or pool position (PVOTD) and level.
 - Models: en word `eleven_flash_v2`; es word `eleven_flash_v2_5` + `language_code: es`; sentences `eleven_multilingual_v2`. ES `x/a` words are read as both forms ("lóbrego, lóbrega"); `+` is read "más" ("estar más gerundio").
-- `audio_check_pending = true` (possible heteronym — record, upset, wind down — or an ES `+` pattern): the word clip is hidden from students until approved; the example clip still plays. `--review` lists them; `--table wotd --approve 12,15` publishes; `--table wotd --ids 12 --force --commit` redoes one. Flagged clips are also saved to `~/Desktop/audio-check`.
+- `audio_check_pending = true` (possible English heteronym — record, upset, wind down): the word clip is hidden from students until approved; the example clip still plays. `--review` lists them; `--table wotd --approve 12,15` publishes; `--table wotd --ids 12 --force --commit` redoes one. Flagged clips are also saved to `~/Desktop/audio-check`.
 
 ### Story Scramble (`scramble_texts`, `scramble_sessions`) — added Oct 2026
 - Weekly jumbled-story activity in the Activities tab (`exercises.category = 'practice'`). Component `src/StoryScramble.jsx`, rendered inline by `ExerciseList` (no route). Tile title `Story Scramble`, launch `2026-11-02` via `LAUNCH_DATES`.
