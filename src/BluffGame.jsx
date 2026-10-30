@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient'
 import SentenceChallenge from './components/SentenceChallenge'
 import HelpSheet from './components/HelpSheet'
 import Breadcrumb from './components/Breadcrumb'
+import SpeakButton from './components/SpeakButton'
 
 // ── Word Bluff (Oct 2026) ───────────────────────────────────────────────────
 // Five new words a day per level (A/B/C) from bluff_words. Each word appears in
@@ -46,27 +47,6 @@ function Highlighted({ text }) {
   return parts.map((p, i) => (i % 2 === 1
     ? <strong key={i} style={{ color: '#553C9A', background: '#f3efff', padding: '0 3px', borderRadius: '4px' }}>{p}</strong>
     : <span key={i}>{p}</span>))
-}
-
-function SpeakButton({ url, playing, onPlay, label = 'Listen', size = 32 }) {
-  if (!url) return null
-  return (
-    <button
-      onClick={e => { e.stopPropagation(); onPlay(url) }}
-      aria-label={label}
-      title={label}
-      style={{
-        width: size, height: size, borderRadius: '50%', flexShrink: 0,
-        border: `1.5px solid ${playing ? '#667eea' : '#d6d9f5'}`,
-        background: playing ? '#667eea' : 'white',
-        color: playing ? 'white' : '#667eea',
-        fontSize: size > 30 ? '0.95rem' : '0.8rem', cursor: 'pointer',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0,
-        transition: 'all 0.15s',
-      }}>
-      🔊
-    </button>
-  )
 }
 
 export default function BluffGame({ onBack, userProfile }) {

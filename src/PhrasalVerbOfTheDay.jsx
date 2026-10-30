@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import SentenceChallenge from './components/SentenceChallenge'
+import SpeakButton, { useAudioPlayer } from './components/SpeakButton'
 
 // Phrasal Verb of the Day (EN) / Expresión del día (ES). Mirrors GrammarOfTheDay's
 // pool/rotation shape (one item per UTC day, picked by day-index from the student's
@@ -38,6 +39,7 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
   const [noItem, setNoItem]               = useState(false)
   const [expanded, setExpanded]           = useState(!collapsible)
   const [showChallenge, setShowChallenge] = useState(false)
+  const { play, playingUrl } = useAudioPlayer()
 
   const isSpanish = teacherMode
     ? classItem.language === 'es'
@@ -137,6 +139,10 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
   // ES has no separable/inseparable split — the badge carries the expression family instead.
   const sepLabel         = isSpanish ? (item.category || 'expresión') : (item.separable ? 'separable' : 'inseparable')
   const sepColour        = isSpanish ? '#805ad5' : (item.separable ? '#dd6b20' : '#3182ce')
+  // ElevenLabs clips (27 Oct 2026). A possible heteronym's clip (wind down, live up to)
+  // stays hidden until approved (audio_check_pending); the example clip always plays.
+  const wordAudio        = item.audio_check_pending ? null : item.audio_word_url
+  const exampleAudio     = item.audio_example_url
 
   // ── COLLAPSED ────────────────────────────────────────────────────────────
   if (collapsible && !expanded) {
@@ -195,6 +201,7 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
           <span style={{ fontSize: 'clamp(1.3rem, 3.5vw, 1.6rem)', fontWeight: '800', color: '#2C3E50' }}>
             {item.phrasal_verb}
           </span>
+          <SpeakButton url={wordAudio} playing={playingUrl === wordAudio} onPlay={play} label={isSpanish ? `Escuchar "${item.phrasal_verb}"` : `Hear "${item.phrasal_verb}"`} size={30} />
           <span style={{ background: `${sepColour}15`, color: sepColour, border: `1px solid ${sepColour}40`, padding: '2px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
             {sepLabel}
           </span>
@@ -208,11 +215,14 @@ export default function PhrasalVerbOfTheDay({ profile, collapsible = true, class
             <p style={{ margin: '0.15rem 0 0', fontSize: '0.92rem', color: '#2d3748', lineHeight: '1.5' }}>{item.meaning}</p>
           </div>
 
-          <div style={{ background: '#f7fafc', borderLeft: `3px solid ${levelColour}`, borderRadius: '0 8px 8px 0', padding: '0.55rem 0.85rem' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-              {isSpanish ? 'Ejemplo' : 'Example'}
-            </span>
-            <p style={{ margin: '0.1rem 0 0', fontSize: '0.9rem', color: '#2d3748', fontStyle: 'italic', lineHeight: '1.5' }}>"{item.example}"</p>
+          <div style={{ background: '#f7fafc', borderLeft: `3px solid ${levelColour}`, borderRadius: '0 8px 8px 0', padding: '0.55rem 0.85rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                {isSpanish ? 'Ejemplo' : 'Example'}
+              </span>
+              <p style={{ margin: '0.1rem 0 0', fontSize: '0.9rem', color: '#2d3748', fontStyle: 'italic', lineHeight: '1.5' }}>"{item.example}"</p>
+            </div>
+            <SpeakButton url={exampleAudio} playing={playingUrl === exampleAudio} onPlay={play} label={isSpanish ? 'Escuchar el ejemplo' : 'Hear the example'} size={30} />
           </div>
 
           {item.note && (

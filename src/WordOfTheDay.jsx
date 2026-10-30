@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import SentenceChallenge from './components/SentenceChallenge'
+import SpeakButton, { useAudioPlayer } from './components/SpeakButton'
 
 const levelBucket = (profileLevel) => {
   if (!profileLevel) return 'B1/B2'
@@ -45,6 +46,7 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
   const [community, setCommunity]       = useState([])
   const [expanded, setExpanded]         = useState(!collapsible)
   const [showChallenge, setShowChallenge] = useState(false)
+  const { play, playingUrl } = useAudioPlayer()
 
   const isSpanish = (Array.isArray(profile?.tracks) && profile.tracks.includes('spanish')) || profile?.level === 'Spanish'
   const bucket    = levelBucket(profile?.level)
@@ -162,6 +164,10 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
   const levelColour      = isSpanish ? '#e53e3e' : getLevelColour(bucket)
   const levelLabel       = isSpanish ? 'ES' : bucket
   const showCommunity    = community.length > 0 && alreadySubmitted
+  // ElevenLabs clips (27 Oct 2026). A possible heteronym's word clip stays hidden
+  // until approved (audio_check_pending); the example clip always plays.
+  const wordAudio        = word.audio_check_pending ? null : word.audio_word_url
+  const exampleAudio     = word.audio_example_url
 
   // ── COLLAPSED ────────────────────────────────────────────────────────────
   if (collapsible && !expanded) {
@@ -216,13 +222,19 @@ export default function WordOfTheDay({ profile, collapsible = false }) {
 
       <div style={{ padding: '1.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
-          <span style={{ fontSize: 'clamp(1.6rem, 4vw, 2rem)', fontWeight: '800', color: '#2C3E50' }}>{word.word}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: 'clamp(1.6rem, 4vw, 2rem)', fontWeight: '800', color: '#2C3E50' }}>{word.word}</span>
+            <SpeakButton url={wordAudio} playing={playingUrl === wordAudio} onPlay={play} label={`Hear "${word.word}"`} size={32} />
+          </span>
           <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontStyle: 'italic', fontWeight: '500' }}>{word.part_of_speech}</span>
         </div>
         <p style={{ fontSize: '0.92rem', color: '#4a5568', margin: '0 0 0.75rem', lineHeight: '1.5' }}>{word.definition}</p>
-        <div style={{ background: '#f7fafc', borderLeft: `3px solid ${levelColour}`, borderRadius: '0 8px 8px 0', padding: '0.6rem 0.9rem', marginBottom: '1rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Example</span>
-          <p style={{ margin: '0.15rem 0 0', fontSize: '0.88rem', color: '#4a5568', fontStyle: 'italic', lineHeight: '1.5' }}>"{word.example_sentence}"</p>
+        <div style={{ background: '#f7fafc', borderLeft: `3px solid ${levelColour}`, borderRadius: '0 8px 8px 0', padding: '0.6rem 0.9rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Example</span>
+            <p style={{ margin: '0.15rem 0 0', fontSize: '0.88rem', color: '#4a5568', fontStyle: 'italic', lineHeight: '1.5' }}>"{word.example_sentence}"</p>
+          </div>
+          <SpeakButton url={exampleAudio} playing={playingUrl === exampleAudio} onPlay={play} label={isSpanish ? 'Escuchar el ejemplo' : 'Hear the example'} size={30} />
         </div>
 
         {alreadySubmitted && (

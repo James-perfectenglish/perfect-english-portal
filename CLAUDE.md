@@ -99,6 +99,13 @@ James strongly prefers:
 - Teachers (`is_teacher`, Present Mode included) play without saving, can replay, and can step through every date's set.
 - `ExerciseList.jsx` `LAUNCH_DATES` shows a tile as "Soon" to students until its date; `ENGLISH_ONLY` hides a tile from Spanish-track learners.
 
+### WOTD / PVOTD audio — added 27 Oct 2026
+- `word_of_the_day` and `phrasal_verb_of_the_day` have `voice`, `audio_word_url`, `audio_example_url`, `audio_check_pending`. Cards show a 🔊 button by the word and by the example (shared `src/components/SpeakButton.jsx` + `useAudioPlayer`, also used by Word Bluff). No URL → no button.
+- Generator: `sh scripts/audio/run-daily-audio.sh` (dry run) then `--commit`. Defaults: both tables, `--lang en`, WOTD from today, PVOTD whole active pool. Spanish needs `--lang es`/`both`. Run it after every monthly WOTD top-up.
+- Voices: `alice`/`daniel` (en), `es_f`/`es_m` (es, Castilian Voice Library IDs in `ES_VOICES`); assigned by the script when `voice` is null, alternating by date (WOTD) or pool position (PVOTD) and level.
+- Models: en word `eleven_flash_v2`; es word `eleven_flash_v2_5` + `language_code: es`; sentences `eleven_multilingual_v2`. ES `x/a` words are read as both forms ("lóbrego, lóbrega"); `+` is read "más" ("estar más gerundio").
+- `audio_check_pending = true` (possible heteronym — record, upset, wind down — or an ES `+` pattern): the word clip is hidden from students until approved; the example clip still plays. `--review` lists them; `--table wotd --approve 12,15` publishes; `--table wotd --ids 12 --force --commit` redoes one. Flagged clips are also saved to `~/Desktop/audio-check`.
+
 ### Story Scramble (`scramble_texts`, `scramble_sessions`) — added Oct 2026
 - Weekly jumbled-story activity in the Activities tab (`exercises.category = 'practice'`). Component `src/StoryScramble.jsx`, rendered inline by `ExerciseList` (no route). Tile title `Story Scramble`, launch `2026-11-02` via `LAUNCH_DATES`.
 - One text per week per (language, level): EN `A2`/`B1`/`B2`/`C1`; ES `A2` only for now (pitched A2–B1; separate ES A2 and B1 planned for the new year — level pills appear by themselves once a language has more than one level). `week_start` must be a Monday (CHECK). Students see texts with `week_start` <= this Monday (UTC); earlier weeks stay playable under "More stories".
