@@ -7,7 +7,10 @@ const STAGES = [
   { name: 'Advanced', levels: ['C1', 'C2'], count: 999, gradient: 'linear-gradient(135deg, #ed8936, #f6ad55)' }
 ];
 
-export default function SurvivalMode({ onBack }) {
+export default function SurvivalMode({ onBack, userTracks = [] }) {
+  // Track-only topics stay out unless the student has the track (same rule as
+  // RandomPracticeExercise's TRACK_TOPICS; bathroom only for now).
+  const hideBathroom = !userTracks.includes('bathroom');
   const [stage, setStage] = useState('start'); // start, playing, finished
   const [questions, setQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -49,21 +52,25 @@ export default function SurvivalMode({ onBack }) {
   const fetchQuestionsForStage = async (stageIndex) => {
     const stageConfig = STAGES[stageIndex];
 
-    const { data: gapFill, error: gapError } = await supabase
+    let gapQuery = supabase
       .from('question_bank')
       .select('*')
       .eq('type', 'gap_fill')
       .in('level', stageConfig.levels)
       .in('language', ['en', 'both'])
       .neq('topic', 'spanish');
+    if (hideBathroom) gapQuery = gapQuery.neq('topic', 'bathroom_vocabulary');
+    const { data: gapFill, error: gapError } = await gapQuery;
 
-    const { data: mc, error: mcError } = await supabase
+    let mcQuery = supabase
       .from('question_bank')
       .select('*')
       .eq('type', 'multiple_choice')
       .in('level', stageConfig.levels)
       .in('language', ['en', 'both'])
       .neq('topic', 'spanish');
+    if (hideBathroom) mcQuery = mcQuery.neq('topic', 'bathroom_vocabulary');
+    const { data: mc, error: mcError } = await mcQuery;
 
     if (gapError || mcError) throw gapError || mcError;
 

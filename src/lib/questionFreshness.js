@@ -13,14 +13,36 @@
 // Failure modes all degrade to today's behaviour (pure shuffle): no user, query
 // error, or an empty history simply yield an empty seen-map. The pool is never
 // filtered, only reordered, so a session can never come up short.
+//
+// History is ALL-TIME (3 Nov 2026), via the question_seen_map() RPC: one jsonb
+// row, so the PostgREST 1,000-row cap can't bite. "Unseen" now means never
+// answered, so new questions reach heavy users first instead of competing with
+// everything they last saw over a month ago. If the RPC fails, it falls back
+// to the old 30-day windowed read below.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // One read per exercise start. Returns Map(question_number → last_seen ISO string).
-// The window bounds the QUERY, not the pedagogy: anything not answered in the
-// last `days` counts as unseen — a month-old question feels fresh anyway.
-// `limit` (newest-first) covers the heaviest student's month with headroom;
-// if it ever truncates, it drops the oldest rows, which is the safe direction.
-export async function fetchSeenMap(supabase, { days = 30, limit = 1500 } = {}) {
+export async function fetchSeenMap(supabase, opts = {}) {
+  try {
+    const { data, error } = await supabase.rpc('question_seen_map');
+    if (!error && data && typeof data === 'object') {
+      const seen = new Map();
+      for (const [qn, ts] of Object.entries(data)) {
+        const n = Number(qn);
+        if (Number.isFinite(n)) seen.set(n, ts);
+      }
+      return seen;
+    }
+  } catch {
+    // fall through to the windowed read
+  }
+  return fetchSeenMapWindowed(supabase, opts);
+}
+
+// Fallback: newest-first rows from the last `days`, capped at `limit`. Anything
+// older counts as unseen. If it truncates, it drops the oldest rows, which is
+// the safe direction.
+async function fetchSeenMapWindowed(supabase, { days = 30, limit = 1500 } = {}) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return new Map();

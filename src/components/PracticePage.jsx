@@ -92,7 +92,7 @@ export default function PracticePage({ profile, isTeacher = false }) {
   }, [location.key]);
 
   if (survivalMode) {
-    return <SurvivalMode onBack={() => setSurvivalMode(false)} />;
+    return <SurvivalMode onBack={() => setSurvivalMode(false)} userTracks={profile?.tracks || []} />;
   }
 
   if (fixitMode) {
